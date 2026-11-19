@@ -15,7 +15,7 @@ extends Node3D
 @export_group("Fog")
 ## Fog density at storm_intensity 0, 0.3, 0.7, 1.0 (Clear, Drizzle, Downpour, Acid Storm).
 @export var fog_density_curve := PackedFloat32Array([0.0, 0.012, 0.035, 0.04])
-@export var fog_color := Color(0.55, 0.58, 0.62)
+@export var fog_color := Color(0.42, 0.38, 0.52)
 @export var acid_fog_color := Color(0.18, 0.32, 0.12)
 
 @export_group("Light")
