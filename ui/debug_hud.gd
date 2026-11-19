@@ -16,7 +16,7 @@ func _process(_delta: float) -> void:
 		info.text = "no local player"
 		return
 	var speed := Vector2(player.velocity.x, player.velocity.z).length()
-	info.text = "FPS %d\nspeed %.1f m/s\nstate %s\n%s\n\nwave %d  %s  %ds\nstorm %s  intensity %.2f\n\nWASD move  Shift sprint  Ctrl/C crouch  Space jump  Esc free mouse\nF1 next phase  F2 jump to wave 5  F3-F5 spawn Drip/Gutter/Mister  F6 lightning  F9 debug text  F11 fullscreen" % [
+	info.text = "FPS %d\nspeed %.1f m/s\nstate %s\n%s\n\nwave %d  %s  %ds\nstorm %s  intensity %.2f\n\nWASD move  Shift sprint  Ctrl/C crouch  Space jump  LMB fire  R reload  1-4 or wheel weapons  Esc free mouse\nF1 next phase  F2 jump to wave 5  F3-F5 spawn Drip/Gutter/Mister  F6 lightning  F9 debug text  F11 fullscreen" % [
 		Engine.get_frames_per_second(),
 		speed,
 		player.get_move_state(),

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-f.glb" id="1_nt8t7"]
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_ls84y"]
+
+[resource]
+script = ExtResource("2_ls84y")
+display_name = "Spray Rifle"
+model = ExtResource("1_nt8t7")
+damage = 9.0
+spread_degrees = 2.5
+max_range = 60.0
+knockback = 0.6
+fire_interval = 0.085
+automatic = true
+mag_size = 40
+reserve_ammo = 200
+reload_time = 1.8
+tracer_color = Color(0.5, 1, 0.8, 1)
+view_position = Vector3(0.2, -0.21, -0.38)
+view_scale = 0.5
+muzzle = Vector3(0, 0.06, -0.66)

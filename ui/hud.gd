@@ -25,6 +25,28 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 
 var _cards := {}
 var _time := 0.0
+var _last_health := -1.0
+var _hurt := ColorRect.new()
+var _downed := Label.new()
+
+
+func _ready() -> void:
+	_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hurt.color = Color(0.8, 0.05, 0.05, 0.0)
+	add_child(_hurt)
+	move_child(_hurt, 0)
+	_downed.text = "DOWNED"
+	_downed.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_downed.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_downed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_downed.add_theme_font_size_override("font_size", 48)
+	_downed.add_theme_color_override("font_color", Color(1, 0.3, 0.2))
+	_downed.add_theme_color_override("font_outline_color", Color.BLACK)
+	_downed.add_theme_constant_override("outline_size", 8)
+	_downed.position.y += 60
+	_downed.visible = false
+	add_child(_downed)
 
 
 func _process(delta: float) -> void:
@@ -50,6 +72,11 @@ func _update_storm() -> void:
 func _update_vitals(player: Node) -> void:
 	health_bar.max_value = _num(player, "max_health", 100.0)
 	health_bar.value = _num(player, "health", health_bar.max_value)
+	if _last_health >= 0.0 and health_bar.value < _last_health:
+		_hurt.color.a = clampf(_hurt.color.a + 0.25, 0.0, 0.45)
+	_last_health = health_bar.value
+	_hurt.color.a = move_toward(_hurt.color.a, 0.0, get_process_delta_time() * 1.2)
+	_downed.visible = player.get("state") == "downed"
 	suit_bar.value = _num(player, "suit_integrity", 100.0)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
 	exposed_label.visible = exposed_in_rain

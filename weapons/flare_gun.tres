@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-h.glb" id="1_41ua2"]
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_m6jxt"]
+
+[resource]
+script = ExtResource("2_m6jxt")
+display_name = "Flare Gun"
+kind = 1
+model = ExtResource("1_41ua2")
+damage = 25.0
+fire_interval = 0.6
+mag_size = 1
+reserve_ammo = 8
+reload_time = 1.2
+projectile_speed = 32.0
+projectile_gravity = 0.35
+effect_radius = 10.0
+effect_time = 8.0
+tracer_color = Color(1, 0.3, 0.25, 1)
+view_position = Vector3(0.2, -0.2, -0.42)
+view_scale = 0.6
+muzzle = Vector3(0, 0.05, -0.33)

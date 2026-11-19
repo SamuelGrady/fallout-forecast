@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-d.glb" id="1_1c82y"]
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_psss1"]
+
+[resource]
+script = ExtResource("2_psss1")
+display_name = "Pump Shotgun"
+model = ExtResource("1_1c82y")
+damage = 12.0
+pellets = 8
+spread_degrees = 7.0
+max_range = 25.0
+knockback = 9.0
+fire_interval = 0.85
+reserve_ammo = 36
+reload_time = 2.2
+tracer_color = Color(1, 0.8, 0.35, 1)
+view_position = Vector3(0.2, -0.2, -0.42)
+view_scale = 0.55
+muzzle = Vector3(0, 0.06, -0.46)

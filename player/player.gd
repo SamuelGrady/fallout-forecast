@@ -12,6 +12,7 @@ extends CharacterBody3D
 
 signal sheltered_changed(is_sheltered: bool)
 signal exposed_changed(is_exposed: bool)
+signal damaged(amount: float)
 
 const WORLD_LAYER := 1 << 0
 const SHELTER_LAYER := 1 << 3
@@ -32,6 +33,11 @@ const PUDDLE_LAYER := 1 << 4
 @export var crouch_height := 1.1
 @export var crouch_transition_speed := 8.0
 
+@export_group("Health")
+@export var max_health := 100.0
+## Placeholder until Sam's downed/revive/Turned: get back up after this long.
+@export var placeholder_revive_time := 5.0
+
 @export_group("Look")
 @export var mouse_sensitivity := 0.0025
 @export var pad_look_speed := 3.0
@@ -44,6 +50,14 @@ var sheltered := false
 var in_puddle := false
 ## What the host reads for suit integrity and Drip targeting.
 var exposed := true
+var health := 100.0
+## "ok" or "downed" for now; Sam's downed/revive/Turned replaces the placeholder.
+var state := "ok"
+## Set by WeaponHolder for the HUD.
+var weapon_name = null
+var ammo = null
+var max_ammo = null
+var _downed_left := 0.0
 
 var _height := 1.8
 var _coyote_timer := 0.0
@@ -95,6 +109,12 @@ func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
 
+	if state == "downed":
+		_downed_left -= delta
+		if _downed_left <= 0.0:
+			state = "ok"
+			health = max_health * 0.5
+
 	var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if pad_look != Vector2.ZERO:
 		_look(pad_look * pad_look_speed * delta)
@@ -131,7 +151,9 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
 	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1
 	var speed := walk_speed
-	if is_crouching:
+	if state == "downed":
+		speed = crouch_speed * 0.5
+	elif is_crouching:
 		speed = crouch_speed
 	elif is_sprinting:
 		speed = sprint_speed
@@ -144,6 +166,17 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_update_shelter()
+
+
+## Enemies, spore clouds and suit drain call this (on the host).
+func take_damage(amount: float, _source: Node = null) -> void:
+	if state != "ok":
+		return
+	health = maxf(health - amount, 0.0)
+	damaged.emit(amount)
+	if health <= 0.0:
+		state = "downed"
+		_downed_left = placeholder_revive_time
 
 
 func get_move_state() -> String:

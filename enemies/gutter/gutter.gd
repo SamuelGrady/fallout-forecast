@@ -17,6 +17,8 @@ func _physics_process(delta: float) -> void:
 	_lunge_cooldown_left -= delta
 	if _lunge_left > 0.0:
 		_lunge_left -= delta
+		velocity += _push
+		_push = Vector3.ZERO
 		velocity.y -= _gravity * delta
 		move_and_slide()
 		if not _lunge_hit and is_instance_valid(target) \

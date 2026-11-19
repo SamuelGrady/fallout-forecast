@@ -31,7 +31,10 @@ var _repath_timer := 0.0
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
 static var _reveal_material: StandardMaterial3D
+static var _hit_material: StandardMaterial3D
 var _reveal_left := 0.0
+var _hit_left := 0.0
+var _push := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -69,6 +72,8 @@ func _physics_process(delta: float) -> void:
 			move = _path_direction(target.global_position) * data.move_speed * buff
 		_face(to_target)
 
+	move += _push
+	_push = _push.move_toward(Vector3.ZERO, 25.0 * delta)
 	velocity.x = move.x
 	velocity.z = move.z
 	if is_on_floor():
@@ -79,10 +84,32 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if _hit_left > 0.0:
+		_hit_left -= delta
+		if _hit_left <= 0.0:
+			_set_overlay(_reveal_material if _reveal_left > 0.0 else null)
 	if _reveal_left > 0.0:
 		_reveal_left -= delta
-		if _reveal_left <= 0.0:
+		if _reveal_left <= 0.0 and _hit_left <= 0.0:
 			_set_overlay(null)
+
+
+## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
+func knockback(impulse: Vector3) -> void:
+	_push += impulse
+
+
+## Local only: brief red flash when a shot lands.
+func hit_flash() -> void:
+	if _hit_material == null:
+		_hit_material = StandardMaterial3D.new()
+		_hit_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_hit_material.albedo_color = Color(1, 0.2, 0.15, 0.6)
+		_hit_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_hit_material.grow = true
+		_hit_material.grow_amount = 0.02
+	_hit_left = 0.08
+	_set_overlay(_hit_material)
 
 
 ## Local only: outline this enemy through walls and fog for `duration` seconds
