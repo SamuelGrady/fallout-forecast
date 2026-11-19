@@ -43,10 +43,15 @@ var is_small := false
 
 func _ready() -> void:
 	add_to_group("enemies")
+	if has_node("Model"):
+		$Model.queue_free()
+	var model := Node3D.new()
+	model.set_script(preload("res://enemies/infected_model.gd"))
+	add_child(model)
 	if _visibility_material == null:
 		_visibility_material = ShaderMaterial.new()
 		_visibility_material.shader = preload("res://enemies/visibility.gdshader")
-	_set_overlay(_visibility_material)
+	_set_overlay.call_deferred(_visibility_material)
 	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
 	if is_small:
 		scale = Vector3.ONE * 0.6
@@ -101,7 +106,7 @@ func _process(delta: float) -> void:
 	if _reveal_left > 0.0:
 		_reveal_left -= delta
 		if _reveal_left <= 0.0 and _hit_left <= 0.0:
-			_set_overlay(_visibility_material)
+			_set_overlay.call_deferred(_visibility_material)
 
 
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
@@ -186,6 +191,20 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func die() -> void:
+	for i in 6:
+		var fragment := MeshInstance3D.new()
+		var cube := BoxMesh.new()
+		cube.size = Vector3.ONE * randf_range(0.1, 0.22)
+		fragment.mesh = cube
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color("#b5df68") if i % 2 == 0 else Color("#337c87")
+		fragment.material_override = material
+		get_parent().add_child(fragment)
+		fragment.global_position = global_position + Vector3.UP
+		var tween := fragment.create_tween()
+		tween.tween_property(fragment, "position", fragment.position + Vector3(randf_range(-1.5, 1.5), randf_range(.3, 1.2), randf_range(-1.5, 1.5)), .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(fragment, "scale", Vector3.ZERO, .3)
+		tween.tween_callback(fragment.queue_free)
 	Sound.play_at("enemy_death", global_position)
 	GameManager.record_kill(_last_hit_by)
 	if GameManager.has_mutation("spores"):

@@ -11,6 +11,10 @@ func _ready() -> void:
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
+	if OS.is_debug_build():
+		var dev_menu := CanvasLayer.new()
+		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
+		add_child(dev_menu)
 	_setup_decon_showers()
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))

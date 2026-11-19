@@ -383,3 +383,10 @@ Additional mutation ideas for consideration
 - False Clearing. Rain briefly pauses mid-wave while a marked elite arrives.
 
 Escape pauses the solo run and opens Resume, Main Menu and Quit. Resume recaptures the mouse. Main Menu ends the active run before returning to the title.
+
+
+### Infected and feedback update
+
+Drip, Gutter and Mister now use original articulated low-poly infected models. Drips have teal workwear, Gutters orange clothing and a hunched silhouette, and Misters purple clothing with luminous spore packs. Walking animates the limbs, impacts recoil the body and kills scatter fragments. Gutters telegraph their pounce for 0.65 seconds with an orange ring, commit to a direction, then recover for one second. Chase speed is reduced and contact melee is replaced by pounce damage.
+
+The gameplay HUD is beneath the VHS composite. Health damage uses the red vignette and impact sound. The TAKING DAMAGE text is removed. Suit damage pulses an acid-green edge overlay. F10 opens a debug-build developer menu with phase, wave, lightning, enemy, boss, repair and weapon-grant controls.

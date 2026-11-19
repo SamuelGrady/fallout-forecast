@@ -27,6 +27,9 @@ var _cards := {}
 var _time := 0.0
 var _last_health := -1.0
 var _damage_left := 0.0
+var _last_suit := -1.0
+var _suit_flash := 0.0
+var _acid := ColorRect.new()
 var _damage_cue_left := 0.0
 var _damage_label := Label.new()
 var _hurt := ColorRect.new()
@@ -51,12 +54,20 @@ func _ready() -> void:
 	_hurt.material = damage_material
 	add_child(_hurt)
 	move_child(_hurt, 0)
+	_acid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_acid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var acid_material := ShaderMaterial.new()
+	acid_material.shader = preload("res://ui/damage.gdshader")
+	acid_material.set_shader_parameter("tint", Vector3(0.65, 1.0, 0.08))
+	_acid.material = acid_material
+	add_child(_acid)
+	move_child(_acid, 0)
 	_damage_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_damage_label.offset_left = -180
 	_damage_label.offset_right = 180
 	_damage_label.offset_top = 65
 	_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_damage_label.text = "TAKING DAMAGE"
+	_damage_label.text = ""
 	_style(_damage_label, 28, Color("#ff6b77"))
 	add_child(_damage_label)
 	_downed.text = "DOWNED"
@@ -205,7 +216,7 @@ func _update_vitals(player: Node) -> void:
 	_last_health = health_bar.value
 	_damage_left = maxf(0.0, _damage_left - delta)
 	(_hurt.material as ShaderMaterial).set_shader_parameter("strength", minf(_damage_left * 2.0, 0.85))
-	_damage_label.visible = _damage_left > 0.3
+	_damage_label.visible = false
 	var state := str(player.get("state"))
 	_downed.visible = state != "ok"
 	match state:
@@ -224,6 +235,11 @@ func _update_vitals(player: Node) -> void:
 		_banner_left -= get_process_delta_time()
 		_banner.visible = _banner_left > 0.0
 	suit_bar.value = _num(player, "suit_integrity", 100.0)
+	if _last_suit >= 0.0 and suit_bar.value < _last_suit:
+		_suit_flash = 0.5
+	_last_suit = suit_bar.value
+	_suit_flash = maxf(0.0, _suit_flash - delta)
+	(_acid.material as ShaderMaterial).set_shader_parameter("strength", _suit_flash * (0.5 + 0.12 * sin(_time * 18.0)))
 	$BottomLeft/SuitText.text = "SUIT INTEGRITY   %03d" % int(suit_bar.value)
 	$BottomLeft/HealthText.text = "VITAL SIGNS   %03d" % int(health_bar.value)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
