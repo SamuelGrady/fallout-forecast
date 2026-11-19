@@ -22,6 +22,10 @@ extends Node3D
 @export var min_sky_energy := 0.35
 @export var min_sun_energy := 0.15
 
+## Lightning flash, 0-1. LightningFX sets it; it fades on its own.
+var flash := 0.0
+@export var flash_fade := 4.0
+
 var _rain: GPUParticles3D
 var _rain_material: StandardMaterial3D
 var _collision: GPUParticlesCollisionHeightField3D
@@ -36,7 +40,8 @@ func _ready() -> void:
 	_find_scene_lighting.call_deferred()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	flash = maxf(flash - flash_fade * delta, 0.0)
 	var intensity := WeatherManager.storm_intensity
 	# 0 at Downpour and below, 1 at the full Acid Storm.
 	var acid := clampf((intensity - 0.7) / 0.3, 0.0, 1.0)
@@ -55,9 +60,10 @@ func _process(_delta: float) -> void:
 		_environment.fog_enabled = intensity > 0.01
 		_environment.fog_density = _sample_fog(intensity)
 		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
-		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0))
+		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) + flash * 3.0
+		_environment.fog_density *= 1.0 - flash * 0.6
 	if _sun:
-		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0))
+		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) + flash * 2.5
 
 
 func _build_rain() -> void:

@@ -30,6 +30,9 @@ var _repath_timer := 0.0
 
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
+static var _reveal_material: StandardMaterial3D
+var _reveal_left := 0.0
+
 
 func _ready() -> void:
 	add_to_group("enemies")
@@ -73,6 +76,35 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	move_and_slide()
+
+
+func _process(delta: float) -> void:
+	if _reveal_left > 0.0:
+		_reveal_left -= delta
+		if _reveal_left <= 0.0:
+			_set_overlay(null)
+
+
+## Local only: outline this enemy through walls and fog for `duration` seconds
+## (lightning strikes, the Flare Gun).
+func reveal(duration: float) -> void:
+	if _reveal_material == null:
+		_reveal_material = StandardMaterial3D.new()
+		_reveal_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_reveal_material.albedo_color = Color(1.0, 0.95, 0.6)
+		_reveal_material.grow = true
+		_reveal_material.grow_amount = 0.05
+		_reveal_material.cull_mode = BaseMaterial3D.CULL_FRONT
+		_reveal_material.no_depth_test = true
+		_reveal_material.disable_fog = true
+	_reveal_left = maxf(_reveal_left, duration)
+	_set_overlay(_reveal_material)
+
+
+func _set_overlay(material: Material) -> void:
+	for child in get_children():
+		if child is MeshInstance3D:
+			child.material_overlay = material
 
 
 ## Override to change who the enemy hunts. Default: the nearest player.

@@ -9,10 +9,16 @@ extends Node
 ## Until GameManager exists, auto_cycle runs the phases on its own timers.
 ## GameManager can set auto_cycle = false and drive it with set_phase().
 ##
-## Debug (debug builds, host only): F1 skips to the next phase, F2 jumps to wave 5.
+## Lightning: during Downpour (and the Acid Storm) the host strikes every
+## 8-15 s at a random spot on the map and sends one RPC with the position and
+## a seed, so every client's flash, bolt, outlines and thunder line up.
+##
+## Debug (debug builds, host only): F1 skips to the next phase, F2 jumps to
+## wave 5, F6 strikes lightning now.
 
 signal phase_changed(phase: Phase, wave: int)
 signal storm_changed(state: StormState, intensity: float)
+signal lightning_struck(position: Vector3, strike_seed: int)
 
 enum Phase { CALM, MUTATION_ROLL, DRIZZLE, DOWNPOUR, CLEARING }
 enum StormState { CLEAR, DRIZZLE, DOWNPOUR, ACID_STORM }
@@ -36,6 +42,10 @@ const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 @export var clearing_duration := 15.0
 ## How fast storm_intensity eases toward its target, in intensity per second.
 @export var intensity_ramp := 0.1
+@export var lightning_min_interval := 8.0
+@export var lightning_max_interval := 15.0
+## Strikes land at a random spot inside this half-size around the map center.
+@export var lightning_area := 35.0
 
 var phase: Phase = Phase.CALM
 var wave := 1
@@ -45,6 +55,8 @@ var running := false
 var storm_intensity := 0.0
 var target_intensity := 0.0
 var storm_state: StormState = StormState.CLEAR
+
+var _lightning_timer := 0.0
 
 
 func _ready() -> void:
@@ -62,6 +74,11 @@ func _process(delta: float) -> void:
 		phase_time_left = maxf(phase_time_left - delta, 0.0)
 		if auto_cycle and _is_host() and phase_time_left <= 0.0:
 			next_phase()
+		if _is_host() and phase == Phase.DOWNPOUR:
+			_lightning_timer -= delta
+			if _lightning_timer <= 0.0:
+				_lightning_timer = randf_range(lightning_min_interval, lightning_max_interval)
+				strike_lightning()
 
 	var before := storm_intensity
 	storm_intensity = move_toward(storm_intensity, target_intensity, intensity_ramp * delta)
@@ -80,6 +97,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				next_phase()
 			KEY_F2:
 				set_phase(Phase.CALM, FINAL_WAVE)
+			KEY_F6:
+				strike_lightning()
 
 
 ## Host: start wave 1 at Calm.
@@ -108,6 +127,20 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 	_apply_phase(new_phase, new_wave, duration)
 	if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
 		_receive_phase.rpc(new_phase, new_wave, duration)
+
+
+## Host: strike lightning at a random spot (or at `at`) on every client.
+func strike_lightning(at: Variant = null) -> void:
+	if not _is_host():
+		return
+	var position: Vector3 = at if at is Vector3 else Vector3(
+		randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
+	_strike.rpc(position, randi())
+
+
+@rpc("authority", "call_local", "reliable")
+func _strike(position: Vector3, strike_seed: int) -> void:
+	lightning_struck.emit(position, strike_seed)
 
 
 ## Host: send the current phase to one peer (call when a player joins mid-run).
@@ -155,6 +188,7 @@ func _apply_phase(new_phase: Phase, new_wave: int, time_left: float) -> void:
 	phase_time_left = time_left
 	running = true
 	target_intensity = _target_for(new_phase, new_wave)
+	_lightning_timer = randf_range(2.0, lightning_min_interval)
 	phase_changed.emit(phase, wave)
 
 
