@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://player/player.gd" id="1_oul6g"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rkbax"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g1dw6"]
+albedo_color = Color(0.95, 0.8, 0.1, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_yw30f"]
+radius = 0.4
+height = 1.8
+
+[node name="Player" type="CharacterBody3D" unique_id=506283332]
+collision_layer = 2
+floor_snap_length = 0.3
+script = ExtResource("1_oul6g")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=416735977]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_rkbax")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=561464133]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+layers = 2
+material_override = SubResource("StandardMaterial3D_g1dw6")
+mesh = SubResource("CapsuleMesh_yw30f")
+
+[node name="Head" type="Node3D" parent="." unique_id=785497127]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+
+[node name="Camera3D" type="Camera3D" parent="Head" unique_id=1059965848]
+cull_mask = 1048573
+
+[node name="RoofCheck" type="RayCast3D" parent="." unique_id=105555753]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+target_position = Vector3(0, 40, 0)
