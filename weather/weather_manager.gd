@@ -60,9 +60,9 @@ func _process(delta: float) -> void:
 
 	var before := storm_intensity
 	storm_intensity = move_toward(storm_intensity, target_intensity, intensity_ramp * delta)
-	if storm_intensity != before:
-		var new_state := _state_for(storm_intensity)
-		storm_state = new_state
+	var before_state := storm_state
+	storm_state = _state_for(storm_intensity)
+	if storm_intensity != before or storm_state != before_state:
 		storm_changed.emit(storm_state, storm_intensity)
 
 

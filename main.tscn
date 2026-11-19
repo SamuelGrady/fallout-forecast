@@ -3,20 +3,18 @@
 [ext_resource type="Script" path="res://main.gd" id="1_7mycd"]
 [ext_resource type="PackedScene" path="res://levels/pinecrest/level_pinecrest.tscn" id="2_272bh"]
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="3_5vw27"]
-[ext_resource type="Script" path="res://player/player.gd" id="4_kek77"]
+[ext_resource type="Script" path="res://weather/weather_fx.gd" id="3_lquwl"]
 [ext_resource type="PackedScene" path="res://ui/debug_hud.tscn" id="5_4c57u"]
-[ext_resource type="Script" path="res://ui/debug_hud.gd" id="6_efxa6"]
 
 [node name="Main" type="Node3D" unique_id=678177633]
 script = ExtResource("1_7mycd")
 
-[node name="Level" type="Node3D" parent="." unique_id=1967050112 instance=ExtResource("2_272bh")]
+[node name="Level" parent="." unique_id=1967050112 instance=ExtResource("2_272bh")]
 
-[node name="Player" type="CharacterBody3D" parent="." unique_id=506283332 instance=ExtResource("3_5vw27")]
+[node name="WeatherFX" type="Node3D" parent="." unique_id=737805570]
+script = ExtResource("3_lquwl")
+
+[node name="Player" parent="." unique_id=506283332 instance=ExtResource("3_5vw27")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16)
-collision_layer = 2
-floor_snap_length = 0.3
-script = ExtResource("4_kek77")
 
-[node name="DebugHUD" type="CanvasLayer" parent="." unique_id=1779811462 instance=ExtResource("5_4c57u")]
-script = ExtResource("6_efxa6")
+[node name="DebugHUD" parent="." unique_id=1779811462 instance=ExtResource("5_4c57u")]
