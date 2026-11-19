@@ -48,8 +48,13 @@ var storm_state: StormState = StormState.CLEAR
 
 
 func _ready() -> void:
-	if auto_cycle and _is_host():
-		start_run.call_deferred()
+	_auto_start.call_deferred()
+
+
+func _auto_start() -> void:
+	# Skip if something (GameManager, a test) already set a phase.
+	if auto_cycle and _is_host() and not running:
+		start_run()
 
 
 func _process(delta: float) -> void:
