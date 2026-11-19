@@ -14,7 +14,8 @@ Stay inside the area you were asked to work on.
 
 ## Workflow
 
-- Commit after every change.
+- Commit after every change, then push (`git push`).
+- After a change, update the live design doc (Claude Docs connector): record what was built in the relevant section and tick finished items in the task list. Then re-export it to `docs/design-doc.md` and commit and push that as well.
 - Engine: Godot 4.7.2 (Forward Plus, d3d12, Jolt physics). Both developers stay on the same version.
 - Commit `.uid` files alongside their scripts. `.godot/` is ignored.
 
