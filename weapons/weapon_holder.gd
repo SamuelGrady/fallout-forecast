@@ -58,11 +58,12 @@ func _process(delta: float) -> void:
 
 
 func _handle_input() -> void:
-	if loadout.is_empty() or player.get("state") == "downed":
+	if loadout.is_empty() or player.get("state") != "ok":
 		return
-	for i in range(mini(loadout.size(), 4)):
-		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
-			_equip(i)
+	if not GameManager.has_method("is_voting") or not GameManager.is_voting():
+		for i in range(mini(loadout.size(), 5)):
+			if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
+				_equip(i)
 	if Input.is_action_just_pressed("weapon_next"):
 		_equip((current + 1) % loadout.size())
 	if Input.is_action_just_pressed("weapon_prev"):
@@ -70,6 +71,8 @@ func _handle_input() -> void:
 	if Input.is_action_just_pressed("reload"):
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
+		return
+	if player.get("tarp_raised"):
 		return
 	var data := loadout[current]
 	var wants := Input.is_action_pressed("fire") if data.automatic else Input.is_action_just_pressed("fire")
@@ -150,7 +153,7 @@ func _resolve_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) ->
 		return
 	for ray in _pellet_rays(data, origin, dir, shot_seed):
 		var hit := _cast(origin, ray, data.max_range)
-		if hit.is_empty() or not (hit.collider is EnemyBase):
+		if hit.is_empty() or not is_damageable(hit.collider):
 			continue
 		var distance := origin.distance_to(hit.position)
 		var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
@@ -172,9 +175,9 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 				var end: Vector3 = hit.position if not hit.is_empty() else origin + ray * data.max_range
 				ShotFX.tracer(world, muzzle, end, data.tracer_color)
 				if not hit.is_empty():
-					var enemy_hit: bool = hit.collider is EnemyBase
+					var enemy_hit: bool = is_damageable(hit.collider)
 					ShotFX.puff(world, end, Color(0.6, 1.0, 0.4, 0.8) if enemy_hit else Color(0.8, 0.8, 0.75, 0.7), 0.08, 0.2)
-					if enemy_hit:
+					if enemy_hit and hit.collider.has_method("hit_flash"):
 						hit.collider.hit_flash()
 		_:
 			var projectile := Projectile.new()
@@ -196,6 +199,46 @@ func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: i
 		var radius := sqrt(rng.randf()) * spread
 		rays.append((dir + (side * cos(angle) + up * sin(angle)) * tan(radius)).normalized())
 	return rays
+
+
+## Enemies, boss parts and Turned players take bullets; everyone else doesn't.
+static func is_damageable(target: Object) -> bool:
+	if target == null or not target.has_method("take_damage"):
+		return false
+	if target is EnemyBase or (target is Node and target.is_in_group("boss_parts")):
+		return true
+	return target is Node and target.is_in_group("players") and target.get("state") == "turned"
+
+
+## Owner: an item from a crate.
+func grant(item: String) -> void:
+	if item == "ammo":
+		for i in loadout.size():
+			reserve[i] = loadout[i].reserve_ammo
+	elif item == "flares":
+		for i in loadout.size():
+			if loadout[i].kind == WeaponData.Kind.FLARE:
+				reserve[i] += 4
+	elif item == "base_ammo":
+		var i := randi() % loadout.size()
+		reserve[i] += loadout[i].mag_size * 3
+	elif item.begins_with("weapon:"):
+		add_weapon(load(item.trim_prefix("weapon:")))
+
+
+## Owner: add a weapon (cursed ones from crates) and switch to it.
+## A fifth slot is replaced if one is already there.
+func add_weapon(data: WeaponData) -> void:
+	if data == null:
+		return
+	if loadout.size() >= 5:
+		loadout.remove_at(4)
+		ammo.remove_at(4)
+		reserve.remove_at(4)
+	loadout.append(data)
+	ammo.append(data.mag_size)
+	reserve.append(data.reserve_ammo)
+	_equip(loadout.size() - 1)
 
 
 func _cast(origin: Vector3, ray: Vector3, max_range: float) -> Dictionary:
@@ -254,6 +297,7 @@ func _publish() -> void:
 		return
 	var data := loadout[current]
 	player.set("weapon_name", data.display_name + (" (reloading)" if _reload_left > 0.0 else ""))
+	player.set("holding_leaky", data.held_suit_drain > 0.0)
 	player.set("ammo", ammo[current])
 	player.set("max_ammo", reserve[current])
 

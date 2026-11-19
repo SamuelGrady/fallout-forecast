@@ -64,7 +64,7 @@ func _flare_process(delta: float) -> void:
 			global_position = hit.position + hit.normal * 0.1
 			_light.light_energy = 4.0
 			_light.omni_range = data.effect_radius * 1.6
-			if authoritative and hit.collider is EnemyBase:
+			if authoritative and WeaponHolder.is_damageable(hit.collider):
 				hit.collider.take_damage(data.damage, shooter)
 	else:
 		_light.light_energy = 3.5 + randf() * 1.5
@@ -101,14 +101,18 @@ func _explode() -> void:
 	_done = true
 	var center := global_position
 	if authoritative:
-		for enemy in get_tree().get_nodes_in_group("enemies"):
-			var d: float = enemy.global_position.distance_to(center)
+		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
+		for target in targets:
+			if not WeaponHolder.is_damageable(target):
+				continue
+			var d: float = target.global_position.distance_to(center)
 			if d <= data.effect_radius:
 				var falloff := 1.0 - 0.6 * d / data.effect_radius
-				enemy.take_damage(data.damage * falloff, shooter)
-				var push: Vector3 = (enemy.global_position - center)
-				push.y = 0.0
-				enemy.knockback(push.normalized() * data.knockback * falloff)
+				target.take_damage(data.damage * falloff, shooter)
+				if target.has_method("knockback"):
+					var push: Vector3 = (target.global_position - center)
+					push.y = 0.0
+					target.knockback(push.normalized() * data.knockback * falloff)
 	for puddle in get_tree().get_nodes_in_group("puddles"):
 		if puddle.global_position.distance_to(center) <= data.effect_radius + puddle.radius():
 			puddle.clear()

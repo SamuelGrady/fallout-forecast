@@ -28,6 +28,12 @@ var _time := 0.0
 var _last_health := -1.0
 var _hurt := ColorRect.new()
 var _downed := Label.new()
+var _prompt := Label.new()
+var _progress := ProgressBar.new()
+var _decon := Label.new()
+var _banner := Label.new()
+var _banner_left := 0.0
+var _tarp := Label.new()
 
 
 func _ready() -> void:
@@ -47,6 +53,58 @@ func _ready() -> void:
 	_downed.position.y += 60
 	_downed.visible = false
 	add_child(_downed)
+
+	_prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_prompt.offset_top = -170
+	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_style(_prompt, 22, Color(1, 1, 0.85))
+	add_child(_prompt)
+	_progress.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_progress.custom_minimum_size = Vector2(220, 8)
+	_progress.offset_left = -110
+	_progress.offset_right = 110
+	_progress.offset_top = -136
+	_progress.offset_bottom = -128
+	_progress.show_percentage = false
+	_progress.max_value = 1.0
+	add_child(_progress)
+
+	_decon.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_decon.position = Vector2(28, 0)
+	_decon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_decon.offset_left = 28
+	_decon.offset_top = -205
+	_style(_decon, 16, Color(0.4, 1, 0.9))
+	add_child(_decon)
+	_tarp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_tarp.offset_left = 28
+	_tarp.offset_top = -228
+	_style(_tarp, 16, Color(0.6, 0.8, 1))
+	add_child(_tarp)
+
+	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_banner.offset_top = -140
+	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_style(_banner, 44, Color.WHITE)
+	_banner.visible = false
+	add_child(_banner)
+	GameManager.banner.connect(_show_banner)
+
+
+func _style(l: Label, size: int, color: Color) -> void:
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color.BLACK)
+	l.add_theme_constant_override("outline_size", 6)
+
+
+func _show_banner(text: String, color: Color, seconds: float) -> void:
+	_banner.text = text
+	_banner.modulate = color
+	_banner.visible = true
+	_banner_left = seconds
 
 
 func _process(delta: float) -> void:
@@ -76,7 +134,23 @@ func _update_vitals(player: Node) -> void:
 		_hurt.color.a = clampf(_hurt.color.a + 0.25, 0.0, 0.45)
 	_last_health = health_bar.value
 	_hurt.color.a = move_toward(_hurt.color.a, 0.0, get_process_delta_time() * 1.2)
-	_downed.visible = player.get("state") == "downed"
+	var state := str(player.get("state"))
+	_downed.visible = state != "ok"
+	match state:
+		"downed":
+			_downed.text = "DOWNED  %ds" % ceili(float(player.get("bleed_left")))
+		"turned":
+			_downed.text = "TURNED: hunt your old team (LMB)"
+		"out":
+			_downed.text = "OUT until Clearing"
+	_prompt.text = str(player.get("interact_prompt"))
+	_progress.visible = float(player.get("interact_progress")) > 0.0
+	_progress.value = float(player.get("interact_progress"))
+	_decon.text = "DECON CHARGES  %d" % GameManager.decon_charges
+	_tarp.text = ("TARP UP [T]" if player.get("tarp_raised") else "TARP READY [T]") if player.get("has_tarp") else ""
+	if _banner_left > 0.0:
+		_banner_left -= get_process_delta_time()
+		_banner.visible = _banner_left > 0.0
 	suit_bar.value = _num(player, "suit_integrity", 100.0)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
 	exposed_label.visible = exposed_in_rain

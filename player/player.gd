@@ -1,27 +1,42 @@
 class_name Player
 extends CharacterBody3D
-## First-person hazmat exterminator: walk, sprint, crouch, jump, mouse/pad look.
-## Also works out whether the player is exposed to the rain:
-## - sheltered: a roof above the head (raycast) or the head inside a Shelter
-##   area on physics layer 4 (garages, awnings, bus stop, a teammate's Tarp).
-## - in_puddle: feet inside a Puddle area on physics layer 5. Puddles drain the
-##   suit even under a roof.
-## exposed = not sheltered or in_puddle. The owning client works it out and
-## reports it to the host, which does the suit-integrity math (the host reads
-## `exposed`, scaled by WeatherManager.suit_loss_per_second()).
+## First-person hazmat exterminator.
+##
+## Movement and look run on the owning client (multiplayer authority).
+## Exposure: the owning client works out `sheltered` (roof raycast, or head in a
+## layer-4 Shelter area such as a teammate's raised Tarp) and `in_puddle` (feet in
+## a layer-5 puddle) and reports them to the host. exposed = not sheltered or in
+## a puddle.
+##
+## The host owns health, suit integrity and state:
+## - suit drains at WeatherManager.suit_loss_per_second() while exposed (the
+##   Leaky Nailgun drains it even in shelter); at 0 the drain hits health.
+## - at 0 health the player is DOWNED: teammates hold E for 3 s to revive them.
+##   They bleed out in 20 s, twice as fast when exposed in rain.
+## - bleeding out TURNS them: they become a Drip (melee only, hittable by their
+##   old team) until Clearing, when they respawn. Killed while Turned = OUT
+##   until Clearing.
+## - solo: one self-revive per wave (hold E); bleeding out ends the run.
 
 signal sheltered_changed(is_sheltered: bool)
 signal exposed_changed(is_exposed: bool)
 signal damaged(amount: float)
+signal state_changed(new_state: String)
 
 const WORLD_LAYER := 1 << 0
+const PLAYER_LAYER := 1 << 1
+const ENEMY_LAYER := 1 << 2
 const SHELTER_LAYER := 1 << 3
 const PUDDLE_LAYER := 1 << 4
+const ReviveSpot := preload("res://player/revive_spot.gd")
+const ModelStyle := preload("res://props/model_style.gd")
 
 @export_group("Movement")
 @export var walk_speed := 5.0
 @export var sprint_speed := 8.0
 @export var crouch_speed := 2.5
+@export var crawl_speed := 1.0
+@export var turned_speed := 5.5
 @export var ground_accel := 60.0
 @export var air_accel := 12.0
 @export var jump_velocity := 4.8
@@ -31,12 +46,19 @@ const PUDDLE_LAYER := 1 << 4
 @export_group("Crouch")
 @export var stand_height := 1.8
 @export var crouch_height := 1.1
+@export var downed_height := 0.7
 @export var crouch_transition_speed := 8.0
 
-@export_group("Health")
+@export_group("Survival")
 @export var max_health := 100.0
-## Placeholder until Sam's downed/revive/Turned: get back up after this long.
-@export var placeholder_revive_time := 5.0
+@export var revive_health := 50.0
+@export var bleed_out_time := 20.0
+@export var turned_health := 60.0
+@export var melee_damage := 15.0
+@export var melee_range := 2.2
+@export var melee_cooldown := 0.9
+## Suit drain while holding a weapon with held_suit_drain (Leaky Nailgun).
+@export var leaky_drain := 2.0
 
 @export_group("Look")
 @export var mouse_sensitivity := 0.0025
@@ -50,14 +72,29 @@ var sheltered := false
 var in_puddle := false
 ## What the host reads for suit integrity and Drip targeting.
 var exposed := true
+
+# Host-owned (synced to clients).
 var health := 100.0
-## "ok" or "downed" for now; Sam's downed/revive/Turned replaces the placeholder.
+var suit_integrity := 100.0
+## "ok", "downed", "turned" or "out".
 var state := "ok"
-## Set by WeaponHolder for the HUD.
+var bleed_left := 0.0
+var self_revives := 1
+
+# Owner-set (synced to others).
+var display_name := "You"
+var suit_color := Color(1.0, 0.85, 0.2)
+var has_tarp := false
+var tarp_raised := false
+## Set by WeaponHolder: the held weapon drains the suit even in shelter.
+var holding_leaky := false
+
+# Local UI.
 var weapon_name = null
 var ammo = null
 var max_ammo = null
-var _downed_left := 0.0
+var interact_prompt := ""
+var interact_progress := 0.0
 
 var _height := 1.8
 var _coyote_timer := 0.0
@@ -65,6 +102,14 @@ var _jump_buffer_timer := 0.0
 var _pitch := 0.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
 var _puddle_query := PhysicsPointQueryParameters3D.new()
+var _hold := 0.0
+var _hold_done := false
+var _melee_left := 0.0
+var _shown_state := ""
+var _tarp_area: Area3D
+var _tarp_shape: CollisionShape3D
+var _tarp_mesh: MeshInstance3D
+var _turned_model: Node3D
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -86,12 +131,58 @@ func _ready() -> void:
 	_puddle_query.collide_with_bodies = false
 	_puddle_query.collision_mask = PUDDLE_LAYER
 
+	_build_children()
+
 	if is_multiplayer_authority():
 		add_to_group("local_player")
 		camera.current = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		camera.current = false
+
+
+## Children every peer builds the same way, so their node paths match for RPCs.
+func _build_children() -> void:
+	var spot := ReviveSpot.new()
+	spot.name = "ReviveSpot"
+	add_child(spot)
+
+	_tarp_area = Area3D.new()
+	_tarp_area.name = "TarpShelter"
+	_tarp_area.collision_layer = SHELTER_LAYER
+	_tarp_area.collision_mask = 0
+	_tarp_area.monitoring = false
+	_tarp_area.monitorable = false
+	var shape := CollisionShape3D.new()
+	_tarp_shape = shape
+	shape.disabled = true
+	var cyl := CylinderShape3D.new()
+	cyl.radius = 2.0
+	cyl.height = 2.6
+	shape.shape = cyl
+	shape.position.y = 1.3
+	_tarp_area.add_child(shape)
+	add_child(_tarp_area)
+	_tarp_mesh = MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(3.4, 0.05, 3.4)
+	var tm := StandardMaterial3D.new()
+	tm.albedo_color = Color(0.2, 0.45, 0.9)
+	box.material = tm
+	_tarp_mesh.mesh = box
+	_tarp_mesh.position.y = 2.3
+	_tarp_mesh.visible = false
+	add_child(_tarp_mesh)
+
+	_turned_model = (load("res://assets/kenney/characters/character-zombie.glb") as PackedScene).instantiate()
+	_turned_model.name = "TurnedModel"
+	_turned_model.set_script(ModelStyle)
+	_turned_model.set("tint", Color(0.6, 1.0, 0.5))
+	_turned_model.set("texture", load("res://assets/kenney/characters/Textures/colormap.png"))
+	_turned_model.set("render_layers", 1 << 1)
+	_turned_model.transform = Transform3D(Basis(Vector3.UP, PI).scaled(Vector3.ONE * 2.4), Vector3.ZERO)
+	_turned_model.visible = false
+	add_child(_turned_model)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -105,21 +196,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+func _process(delta: float) -> void:
+	if _is_host():
+		_host_tick(delta)
+	if state != _shown_state:
+		_apply_state_visuals()
+	var up := tarp_raised and state == "ok"
+	if _tarp_shape.disabled == up:
+		_tarp_shape.disabled = not up
+	_tarp_mesh.visible = up
+
+
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
-
-	if state == "downed":
-		_downed_left -= delta
-		if _downed_left <= 0.0:
-			state = "ok"
-			health = max_health * 0.5
+	if state == "out":
+		velocity = Vector3.ZERO
+		interact_prompt = ""
+		return
 
 	var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if pad_look != Vector2.ZERO:
 		_look(pad_look * pad_look_speed * delta)
 
-	# Gravity and coyote time.
 	if is_on_floor():
 		_coyote_timer = coyote_time
 	else:
@@ -131,55 +230,280 @@ func _physics_process(delta: float) -> void:
 	else:
 		_jump_buffer_timer -= delta
 
-	# Crouch: hold to crouch, stay down while something is overhead.
+	# Crouch: hold to crouch, stay down while something is overhead. Downed = flat.
 	if Input.is_action_pressed("crouch"):
 		is_crouching = true
 	elif is_crouching and _can_stand():
 		is_crouching = false
 	var target_height := crouch_height if is_crouching else stand_height
+	if state == "downed":
+		target_height = downed_height
 	if not is_equal_approx(_height, target_height):
 		_height = move_toward(_height, target_height, crouch_transition_speed * delta)
 		_apply_height()
 
-	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and not is_crouching:
+	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and not is_crouching and state != "downed":
 		velocity.y = jump_velocity
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 
-	# Horizontal movement relative to where the body faces.
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
-	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1
+	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok"
 	var speed := walk_speed
-	if state == "downed":
-		speed = crouch_speed * 0.5
-	elif is_crouching:
-		speed = crouch_speed
-	elif is_sprinting:
-		speed = sprint_speed
+	match state:
+		"downed":
+			speed = crawl_speed
+		"turned":
+			speed = turned_speed
+		_:
+			if is_crouching:
+				speed = crouch_speed
+			elif is_sprinting:
+				speed = sprint_speed
+			if tarp_raised:
+				speed = minf(speed, walk_speed * 0.7)
 
 	var accel := ground_accel if is_on_floor() else air_accel
 	var horizontal := Vector2(velocity.x, velocity.z).move_toward(
 		Vector2(direction.x, direction.z) * speed, accel * delta)
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
-
 	move_and_slide()
 	_update_shelter()
 
+	_handle_interact(delta)
+	if state == "turned":
+		_melee_left -= delta
+		if Input.is_action_just_pressed("fire") and _melee_left <= 0.0:
+			_melee_left = melee_cooldown
+			if _is_host():
+				_melee()
+			else:
+				_request_melee.rpc_id(1)
+	if has_tarp and state == "ok" and Input.is_action_just_pressed("use_item"):
+		tarp_raised = not tarp_raised
 
-## Enemies, spore clouds and suit drain call this (on the host).
+
+# ------------------------------------------------------------------ host rules
+func _host_tick(delta: float) -> void:
+	match state:
+		"ok":
+			var drain := WeatherManager.suit_loss_per_second() if exposed else 0.0
+			if holding_leaky:
+				drain = maxf(drain, leaky_drain)
+			if drain > 0.0:
+				if suit_integrity > 0.0:
+					suit_integrity = maxf(suit_integrity - drain * delta, 0.0)
+				else:
+					take_damage(drain * delta)
+		"downed":
+			var rate := 2.0 if exposed and WeatherManager.is_raining() else 1.0
+			bleed_left -= delta * rate
+			if bleed_left <= 0.0:
+				_bleed_out()
+
+
+## Enemies, spore clouds, suit drain and (for Turned players) teammates' guns.
 func take_damage(amount: float, _source: Node = null) -> void:
-	if state != "ok":
+	if not _is_host():
 		return
-	health = maxf(health - amount, 0.0)
-	damaged.emit(amount)
-	if health <= 0.0:
-		state = "downed"
-		_downed_left = placeholder_revive_time
+	match state:
+		"ok":
+			health = maxf(health - amount, 0.0)
+			damaged.emit(amount)
+			if health <= 0.0:
+				_go_down()
+		"turned":
+			health = maxf(health - amount, 0.0)
+			damaged.emit(amount)
+			if health <= 0.0:
+				_set_state("out")
+
+
+func heal(amount: float) -> void:
+	if _is_host() and state == "ok":
+		health = minf(health + amount, max_health)
+
+
+func can_self_revive() -> bool:
+	return state == "downed" and GameManager.is_solo() and self_revives > 0
+
+
+## Host: called by a teammate's (or the solo player's own) revive hold.
+func revive(by: Node) -> void:
+	if state != "downed":
+		return
+	health = revive_health
+	if by == self:
+		self_revives -= 1
+	else:
+		GameManager.record_revive(by)
+	_set_state("ok")
+
+
+## Host: Clearing brings Turned and out players back.
+func on_clearing() -> void:
+	self_revives = 1
+	if state == "turned" or state == "out":
+		health = max_health
+		suit_integrity = 50.0 if GameManager.is_solo() else 100.0
+		_set_state("ok")
+		var spawns := get_tree().get_nodes_in_group("player_spawn")
+		if not spawns.is_empty():
+			teleport((spawns.pick_random() as Node3D).global_transform)
+
+
+func _go_down() -> void:
+	bleed_left = bleed_out_time
+	_set_state("downed")
+
+
+func _bleed_out() -> void:
+	if GameManager.is_solo():
+		_set_state("out")
+	else:
+		health = turned_health
+		GameManager.record_turned(self)
+		_set_state("turned")
+
+
+func _set_state(new_state: String) -> void:
+	state = new_state
+	state_changed.emit(state)
+
+
+func _melee() -> void:
+	var forward := -global_basis.z
+	for p in GameManager.players():
+		if p == self or p.state != "ok":
+			continue
+		var to: Vector3 = p.global_position - global_position
+		if to.length() <= melee_range and forward.dot(to.normalized()) > 0.2:
+			p.take_damage(melee_damage, self)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_melee() -> void:
+	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority() and state == "turned":
+		_melee()
+
+
+## Host: move this player (respawn). The owner moves itself.
+func teleport(xf: Transform3D) -> void:
+	if is_multiplayer_authority():
+		_teleport(xf)
+	else:
+		_teleport.rpc_id(get_multiplayer_authority(), xf)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _teleport(xf: Transform3D) -> void:
+	if multiplayer.get_remote_sender_id() in [0, 1]:
+		global_transform = xf
+		velocity = Vector3.ZERO
+
+
+## Host: give this player an item. Health and suit items apply on the host;
+## ammo, weapons and the Tarp apply on the owning client.
+func grant(item: String) -> void:
+	match item:
+		"medkit":
+			heal(50.0)
+		"suit_patch":
+			suit_integrity = minf(suit_integrity + 50.0, 100.0)
+		_:
+			if is_multiplayer_authority():
+				_apply_grant(item)
+			else:
+				_grant.rpc_id(get_multiplayer_authority(), item)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _grant(item: String) -> void:
+	if multiplayer.get_remote_sender_id() == 1:
+		_apply_grant(item)
+
+
+func _apply_grant(item: String) -> void:
+	if item == "tarp":
+		has_tarp = true
+		return
+	var holder := get_node_or_null("Head/Camera3D/WeaponHolder")
+	if holder and holder.has_method("grant"):
+		holder.grant(item)
+
+
+# ------------------------------------------------------------------ interact
+func _handle_interact(delta: float) -> void:
+	var best: Interactable = null
+	var best_score := INF
+	if state != "turned":
+		var forward := -camera.global_basis.z
+		for node in get_tree().get_nodes_in_group("interactables"):
+			var it := node as Interactable
+			if it == null or not it.is_visible_in_tree():
+				continue
+			var to := it.global_position - global_position
+			var d := to.length()
+			if d > it.radius or not it.can_interact(self):
+				continue
+			var score := d - forward.dot(to.normalized() if d > 0.01 else forward)
+			if score < best_score:
+				best_score = score
+				best = it
+	if best == null and GameManager.has_method("lever_prompt"):
+		var lever: String = GameManager.lever_prompt(self)
+		if lever != "":
+			interact_prompt = "[E] " + lever
+			interact_progress = 0.0
+			if Input.is_action_just_pressed("interact"):
+				GameManager.pull_lever()
+			return
+	if best == null:
+		interact_prompt = ""
+		interact_progress = 0.0
+		_hold = 0.0
+		_hold_done = false
+		return
+	interact_prompt = "[E] " + best.get_prompt(self)
+	var need := best.get_hold_time(self)
+	if Input.is_action_pressed("interact"):
+		_hold += delta
+		interact_progress = clampf(_hold / maxf(need, 0.001), 0.0, 1.0)
+		if _hold >= need and not _hold_done:
+			_hold_done = true
+			GameManager.interact(best, self)
+	else:
+		_hold = 0.0
+		_hold_done = false
+		interact_progress = 0.0
+
+
+# ------------------------------------------------------------------ visuals
+func _apply_state_visuals() -> void:
+	_shown_state = state
+	var body := get_node_or_null("BodyModel") as Node3D
+	if body:
+		body.visible = state == "ok" or state == "downed"
+	_turned_model.visible = state == "turned"
+	var holder := get_node_or_null("Head/Camera3D/WeaponHolder") as Node3D
+	if holder:
+		holder.visible = state == "ok"
+	match state:
+		"turned":
+			collision_layer = ENEMY_LAYER
+		"out":
+			collision_layer = 0
+		_:
+			collision_layer = PLAYER_LAYER
+	if state != "ok":
+		tarp_raised = false
 
 
 func get_move_state() -> String:
+	if state != "ok":
+		return state
 	if not is_on_floor():
 		return "air"
 	if is_crouching:
@@ -198,8 +522,8 @@ func _look(amount: Vector2) -> void:
 
 func _apply_height() -> void:
 	var capsule := collider.shape as CapsuleShape3D
-	capsule.height = _height
-	collider.position.y = _height * 0.5
+	capsule.height = maxf(_height, capsule.radius * 2.0)
+	collider.position.y = capsule.height * 0.5
 	head.position.y = _height - 0.15
 
 
@@ -240,3 +564,7 @@ func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
 	if now_exposed != exposed:
 		exposed = now_exposed
 		exposed_changed.emit(exposed)
+
+
+func _is_host() -> bool:
+	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()

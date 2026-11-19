@@ -59,20 +59,16 @@ var storm_state: StormState = StormState.CLEAR
 var _lightning_timer := 0.0
 
 
-func _ready() -> void:
-	_auto_start.call_deferred()
-
-
-func _auto_start() -> void:
-	# Skip if something (GameManager, a test) already set a phase.
-	if auto_cycle and _is_host() and not running:
-		start_run()
+## While true the current phase doesn't time out (mutation roll vote, boss alive).
+var hold := false
+## When >= 0, storm_intensity eases to this instead of the phase target (boss sacs).
+var intensity_override := -1.0
 
 
 func _process(delta: float) -> void:
 	if running:
 		phase_time_left = maxf(phase_time_left - delta, 0.0)
-		if auto_cycle and _is_host() and phase_time_left <= 0.0:
+		if auto_cycle and _is_host() and phase_time_left <= 0.0 and not hold:
 			next_phase()
 		if _is_host() and phase == Phase.DOWNPOUR:
 			_lightning_timer -= delta
@@ -81,7 +77,8 @@ func _process(delta: float) -> void:
 				strike_lightning()
 
 	var before := storm_intensity
-	storm_intensity = move_toward(storm_intensity, target_intensity, intensity_ramp * delta)
+	var goal := intensity_override if intensity_override >= 0.0 else target_intensity
+	storm_intensity = move_toward(storm_intensity, goal, intensity_ramp * delta)
 	var before_state := storm_state
 	storm_state = _state_for(storm_intensity)
 	if storm_intensity != before or storm_state != before_state:
@@ -103,6 +100,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Host: start wave 1 at Calm.
 func start_run() -> void:
+	hold = false
+	intensity_override = -1.0
 	set_phase(Phase.CALM, 1)
 
 

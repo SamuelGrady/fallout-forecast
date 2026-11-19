@@ -32,6 +32,19 @@ enum Kind { HITSCAN, FLARE, GRENADE }
 ## Grenade fuse, or how long a flare burns.
 @export var effect_time := 1.6
 
+@export_group("Cursed")
+## Drains the holder's suit even in shelter (Leaky Nailgun).
+@export var held_suit_drain := 0.0
+## Bullets go through this many enemies (Leaky Nailgun).
+@export var pierce := 0
+## Each shot drags enemies within this radius toward the shooter (Boombox).
+@export var pull_radius := 0.0
+## Lucky Penny: chance a shot one-hit kills, chance it jams for jam_time.
+@export var lucky_kill_chance := 0.0
+@export var jam_chance := 0.0
+@export var jam_time := 2.0
+@export var cursed := false
+
 @export_group("Viewmodel")
 @export var view_position := Vector3(0.28, -0.26, -0.5)
 @export var view_rotation_degrees := Vector3.ZERO

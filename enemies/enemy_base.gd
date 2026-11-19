@@ -35,6 +35,7 @@ static var _hit_material: StandardMaterial3D
 var _reveal_left := 0.0
 var _hit_left := 0.0
 var _push := Vector3.ZERO
+var _last_hit_by: Node = null
 
 
 func _ready() -> void:
@@ -136,7 +137,12 @@ func _set_overlay(material: Material) -> void:
 
 ## Override to change who the enemy hunts. Default: the nearest player.
 func choose_target() -> Node3D:
-	return _nearest(get_tree().get_nodes_in_group("players"))
+	return _nearest(targetable_players())
+
+
+## Players who are up (not downed, Turned or out).
+func targetable_players() -> Array:
+	return get_tree().get_nodes_in_group("players").filter(func(p): return p.get("state") == null or p.get("state") == "ok")
 
 
 ## Override to move while in attack range (e.g. back away). Default: stand still.
@@ -156,6 +162,8 @@ func attack(victim: Node3D, amount: float) -> void:
 func take_damage(amount: float, _source: Node = null) -> void:
 	if not _is_host() or health <= 0.0:
 		return
+	if _source and _source.is_in_group("players"):
+		_last_hit_by = _source
 	health -= amount
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
@@ -163,6 +171,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func die() -> void:
+	GameManager.record_kill(_last_hit_by)
 	died.emit(self)
 	queue_free()
 

@@ -5,7 +5,7 @@ extends EnemyBase
 
 func choose_target() -> Node3D:
 	var exposed: Array = []
-	var everyone := get_tree().get_nodes_in_group("players")
+	var everyone := targetable_players()
 	for player in everyone:
 		if player.get("exposed") != false:
 			exposed.append(player)
