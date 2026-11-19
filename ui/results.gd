@@ -24,8 +24,8 @@ func _ready() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 26)
-	box.offset_left = -520
-	box.offset_right = 520
+	box.offset_left = -440
+	box.offset_right = 440
 	box.offset_top = -210
 	add_child(box)
 	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 60, Color("8FD65A") if won else Color("FF3EA5"))

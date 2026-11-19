@@ -24,7 +24,7 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	vec4 clip = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
-	if (snap > 0.0) {
+	if (snap > 0.0 && !triplanar) {
 		vec2 grid = vec2(snap * VIEWPORT_SIZE.x / VIEWPORT_SIZE.y, snap);
 		clip.xy = round(clip.xy / clip.w * grid) / grid * clip.w;
 	}

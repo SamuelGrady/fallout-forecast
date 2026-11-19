@@ -564,163 +564,163 @@ size = Vector3(134, 0.06, 3.5)
 material = SubResource("StandardMaterial3D_7v1uf")
 
 [node name="Dash0" type="CSGBox3D" parent="Geometry/Ground" unique_id=1541546300]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash1" type="CSGBox3D" parent="Geometry/Ground" unique_id=623074093]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -58.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -58.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash2" type="CSGBox3D" parent="Geometry/Ground" unique_id=841244759]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash3" type="CSGBox3D" parent="Geometry/Ground" unique_id=97864318]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash4" type="CSGBox3D" parent="Geometry/Ground" unique_id=1250535516]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash5" type="CSGBox3D" parent="Geometry/Ground" unique_id=876891722]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash6" type="CSGBox3D" parent="Geometry/Ground" unique_id=1357955258]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash7" type="CSGBox3D" parent="Geometry/Ground" unique_id=586784308]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash8" type="CSGBox3D" parent="Geometry/Ground" unique_id=556841063]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash9" type="CSGBox3D" parent="Geometry/Ground" unique_id=2053629673]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash10" type="CSGBox3D" parent="Geometry/Ground" unique_id=10017573]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash11" type="CSGBox3D" parent="Geometry/Ground" unique_id=1941508223]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash12" type="CSGBox3D" parent="Geometry/Ground" unique_id=1057708710]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash13" type="CSGBox3D" parent="Geometry/Ground" unique_id=61251346]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash14" type="CSGBox3D" parent="Geometry/Ground" unique_id=164159042]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash16" type="CSGBox3D" parent="Geometry/Ground" unique_id=317414688]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash17" type="CSGBox3D" parent="Geometry/Ground" unique_id=211596047]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash18" type="CSGBox3D" parent="Geometry/Ground" unique_id=236564302]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash19" type="CSGBox3D" parent="Geometry/Ground" unique_id=1015781874]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash20" type="CSGBox3D" parent="Geometry/Ground" unique_id=559856323]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash21" type="CSGBox3D" parent="Geometry/Ground" unique_id=1726491149]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash22" type="CSGBox3D" parent="Geometry/Ground" unique_id=276052984]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash23" type="CSGBox3D" parent="Geometry/Ground" unique_id=1388912563]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash24" type="CSGBox3D" parent="Geometry/Ground" unique_id=202409300]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash25" type="CSGBox3D" parent="Geometry/Ground" unique_id=1775151008]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash26" type="CSGBox3D" parent="Geometry/Ground" unique_id=998134743]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.2, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.2, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash27" type="CSGBox3D" parent="Geometry/Ground" unique_id=781926317]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.4, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.4, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash28" type="CSGBox3D" parent="Geometry/Ground" unique_id=756628608]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.6, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.6, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash29" type="CSGBox3D" parent="Geometry/Ground" unique_id=2007497244]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.8, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.8, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="Dash30" type="CSGBox3D" parent="Geometry/Ground" unique_id=249692386]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63, 0.035, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63, 0.09, 0)
 size = Vector3(2, 0.07, 0.2)
 material = SubResource("StandardMaterial3D_2uprn")
 
 [node name="PinecrestLane" type="CSGBox3D" parent="Geometry/Ground" unique_id=755418818]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, -17.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, -17.5)
 use_collision = true
 size = Vector3(9, 0.06, 26)
 material = SubResource("StandardMaterial3D_7l1ug")
 
 [node name="CulDeSac" type="CSGCylinder3D" parent="Geometry/Ground" unique_id=538974544]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, -40)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -40)
 use_collision = true
 radius = 11.5
 height = 0.06
@@ -728,13 +728,13 @@ sides = 32
 material = SubResource("StandardMaterial3D_7l1ug")
 
 [node name="Crosswalk" type="CSGBox3D" parent="Geometry/Ground" unique_id=2018868913]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.035, -6.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, -6.25)
 use_collision = true
 size = Vector3(9, 0.06, 3.5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="ParkingLot" type="CSGBox3D" parent="Geometry/Ground" unique_id=872866502]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.03, 38)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.04, 38)
 use_collision = true
 size = Vector3(70, 0.06, 26)
 material = SubResource("StandardMaterial3D_7l1ug")
@@ -746,183 +746,183 @@ size = Vector3(7, 0.06, 16)
 material = SubResource("StandardMaterial3D_7l1ug")
 
 [node name="StallN8" type="CSGBox3D" parent="Geometry/Ground" unique_id=609807760]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS8" type="CSGBox3D" parent="Geometry/Ground" unique_id=1480074137]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN12" type="CSGBox3D" parent="Geometry/Ground" unique_id=2041051165]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS12" type="CSGBox3D" parent="Geometry/Ground" unique_id=1143012294]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN16" type="CSGBox3D" parent="Geometry/Ground" unique_id=761724436]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS16" type="CSGBox3D" parent="Geometry/Ground" unique_id=1453807527]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN20" type="CSGBox3D" parent="Geometry/Ground" unique_id=1017065279]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS20" type="CSGBox3D" parent="Geometry/Ground" unique_id=499097326]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN24" type="CSGBox3D" parent="Geometry/Ground" unique_id=408177705]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS24" type="CSGBox3D" parent="Geometry/Ground" unique_id=1008020003]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN28" type="CSGBox3D" parent="Geometry/Ground" unique_id=987111366]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS28" type="CSGBox3D" parent="Geometry/Ground" unique_id=2015554279]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN32" type="CSGBox3D" parent="Geometry/Ground" unique_id=1998527880]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS32" type="CSGBox3D" parent="Geometry/Ground" unique_id=1345611183]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN36" type="CSGBox3D" parent="Geometry/Ground" unique_id=2087205774]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS36" type="CSGBox3D" parent="Geometry/Ground" unique_id=1134809963]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN40" type="CSGBox3D" parent="Geometry/Ground" unique_id=1778919811]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS40" type="CSGBox3D" parent="Geometry/Ground" unique_id=365866708]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN44" type="CSGBox3D" parent="Geometry/Ground" unique_id=547469852]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS44" type="CSGBox3D" parent="Geometry/Ground" unique_id=1481328656]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN48" type="CSGBox3D" parent="Geometry/Ground" unique_id=1693630657]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS48" type="CSGBox3D" parent="Geometry/Ground" unique_id=681609994]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN52" type="CSGBox3D" parent="Geometry/Ground" unique_id=1786067470]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS52" type="CSGBox3D" parent="Geometry/Ground" unique_id=1371317685]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN56" type="CSGBox3D" parent="Geometry/Ground" unique_id=2023259129]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS56" type="CSGBox3D" parent="Geometry/Ground" unique_id=1389020568]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN60" type="CSGBox3D" parent="Geometry/Ground" unique_id=523185697]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS60" type="CSGBox3D" parent="Geometry/Ground" unique_id=1587411211]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN64" type="CSGBox3D" parent="Geometry/Ground" unique_id=453274763]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS64" type="CSGBox3D" parent="Geometry/Ground" unique_id=838255704]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN68" type="CSGBox3D" parent="Geometry/Ground" unique_id=1061723348]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS68" type="CSGBox3D" parent="Geometry/Ground" unique_id=179799969]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallN72" type="CSGBox3D" parent="Geometry/Ground" unique_id=1849197977]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.035, 29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.09, 29)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="StallS72" type="CSGBox3D" parent="Geometry/Ground" unique_id=981545262]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.035, 47)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.09, 47)
 size = Vector3(0.15, 0.07, 5)
 material = SubResource("StandardMaterial3D_tura5")
 
 [node name="GasApron" type="CSGBox3D" parent="Geometry/Ground" unique_id=194811189]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49, 0.03, 25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49, 0.05, 25)
 use_collision = true
 size = Vector3(28, 0.06, 30)
 material = SubResource("StandardMaterial3D_7l1ug")
 
 [node name="TownSquare" type="CSGBox3D" parent="Geometry/Ground" unique_id=1057298226]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 0.035, 25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 0.07, 25)
 use_collision = true
 size = Vector3(22, 0.06, 32)
 material = SubResource("StandardMaterial3D_ykyjx")

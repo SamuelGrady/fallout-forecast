@@ -361,3 +361,6 @@ Each week ends with both of you playing the gate together in 2+ instances.
 ### UI styling ? November 19, 2026
 
 Bundled Barlow Condensed SemiBold (SIL Open Font License in assets/fonts). Title, settings and results share a broadcast grid backdrop, cyan controls and pink highlights. HUD uses the same font, dark status backplates, cyan suit and pink health bars, numeric vitals and larger ammo. Mutation reels and teammate cards share the theme. F9 reveals the debug readout.
+
+
+Display uses a fixed 960?720 (4:3) canvas with aspect-preserving bars. Road junctions and markings have separated surface heights. World-triplanar map surfaces skip vertex snapping to avoid depth-plane intersections between paving and paint.
