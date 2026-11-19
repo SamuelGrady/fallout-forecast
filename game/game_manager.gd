@@ -134,6 +134,9 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 				_set_decon(decon_charges + 1)
 		WeatherManager.Phase.MUTATION_ROLL:
 			mutations.begin()
+		WeatherManager.Phase.DOWNPOUR:
+			if _wave == WeatherManager.FINAL_WAVE:
+				spawn_boss()
 		WeatherManager.Phase.CLEARING:
 			mutations.clear()
 			for p in players():
@@ -219,6 +222,32 @@ func record_turned(player: Node) -> void:
 func record_cursed(player: Node, weapon_name: String) -> void:
 	if is_host() and player:
 		_stat(player).cursed = weapon_name
+
+
+# ------------------------------------------------------------------ boss
+## Host: Cumulus rolls in over Main Street; the Acid Storm won't end until it dies.
+func spawn_boss() -> void:
+	if not get_tree().get_nodes_in_group("boss").is_empty():
+		return
+	var world := _world()
+	var spawner := world.get_node_or_null("Enemies") if world else null
+	var anchor := get_tree().get_first_node_in_group("boss_anchor") as Node3D
+	if spawner == null:
+		return
+	var boss: Node3D = (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
+	spawner.add_child(boss, true)
+	boss.global_position = anchor.global_position if anchor else Vector3(0, 18, 0)
+	WeatherManager.hold = true
+	WeatherManager.intensity_override = 1.0
+	show_banner("CUMULUS IS HERE: burst its three sacs!", Color("8FD65A"), 4.0)
+
+
+## Host: the core popped. Clear skies, then the win.
+func boss_defeated() -> void:
+	WeatherManager.intensity_override = 0.0
+	WeatherManager.hold = false
+	show_banner("CUMULUS BROKE: the storm is over!", Color(0.4, 1, 0.6), 4.0)
+	get_tree().create_timer(5.0).timeout.connect(finish.bind(true))
 
 
 # ------------------------------------------------------------------ win / lose

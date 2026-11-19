@@ -35,6 +35,8 @@ var _banner := Label.new()
 var _banner_left := 0.0
 var _tarp := Label.new()
 var _mutation := Label.new()
+var _boss_label := Label.new()
+var _boss_bar := ProgressBar.new()
 
 
 func _ready() -> void:
@@ -98,6 +100,22 @@ func _ready() -> void:
 	_mutation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_style(_mutation, 16, Color("FF3EA5"))
 	add_child(_mutation)
+	_boss_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_boss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_boss_label.offset_top = 128
+	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_style(_boss_label, 18, Color("8FD65A"))
+	add_child(_boss_label)
+	_boss_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_boss_bar.offset_left = -260
+	_boss_bar.offset_right = 260
+	_boss_bar.offset_top = 156
+	_boss_bar.offset_bottom = 170
+	_boss_bar.show_percentage = false
+	_boss_bar.max_value = 1.0
+	var fill := StyleBoxFlat.new(); fill.bg_color = Color("8FD65A")
+	_boss_bar.add_theme_stylebox_override("fill", fill)
+	add_child(_boss_bar)
 
 
 func _style(l: Label, size: int, color: Color) -> void:
@@ -133,6 +151,12 @@ func _update_storm() -> void:
 		WeatherManager.wave, WeatherManager.FINAL_WAVE, WeatherManager.phase_name().to_upper(),
 		seconds / 60, seconds % 60]
 	var active: Array = GameManager.mutations.active if GameManager.mutations else []
+	var boss := get_tree().get_first_node_in_group("boss")
+	_boss_label.visible = boss != null
+	_boss_bar.visible = boss != null
+	if boss:
+		_boss_label.text = "CUMULUS   %s" % ("CORE EXPOSED" if boss.core_exposed() else "SACS %d / 3" % boss.sacs_left) + ("   (BURNING: no healing)" if boss.is_burning() else "")
+		_boss_bar.value = boss.total_fraction()
 	_mutation.text = ("MUTATION: " + " + ".join(active.map(func(m): return str(m).to_upper()))) if not active.is_empty() else ""
 
 

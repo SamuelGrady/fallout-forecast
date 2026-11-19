@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://enemies/boss/boss_cumulus.gd" id="1_anhwe"]
+
+[node name="BossCumulus" type="Node3D" unique_id=290413550]
+script = ExtResource("1_anhwe")
