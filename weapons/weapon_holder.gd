@@ -90,6 +90,7 @@ func fire() -> void:
 	var shot_seed := randi()
 	# Lucky Penny: the same seed decides jams here and lucky kills on the host.
 	if data.jam_chance > 0.0 and _seeded(shot_seed, 1) < data.jam_chance:
+		Sound.play("jam")
 		_cooldown = data.jam_time
 		player.set("weapon_name", data.display_name + " (JAMMED!)")
 		return
@@ -111,6 +112,7 @@ func start_reload() -> void:
 	var data := loadout[current]
 	if _reload_left > 0.0 or ammo[current] >= data.mag_size or reserve[current] <= 0:
 		return
+	Sound.play("reload")
 	_reload_left = data.reload_time
 
 
@@ -185,6 +187,11 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 	var data := loadout[index]
 	var world := player.get_parent()
 	var muzzle := _muzzle_position() if is_local else origin + dir * 0.6
+	if not data.shot_sound.is_empty():
+		if is_local:
+			Sound.play(data.shot_sound, -7.0)
+		else:
+			Sound.play_at(data.shot_sound, muzzle)
 	ShotFX.flash(world, muzzle, data.tracer_color.lightened(0.3), 3.0)
 	match data.kind:
 		WeaponData.Kind.HITSCAN:
@@ -195,8 +202,11 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 				if not hit.is_empty():
 					var enemy_hit: bool = is_damageable(hit.collider)
 					ShotFX.puff(world, end, Color(0.6, 1.0, 0.4, 0.8) if enemy_hit else Color(0.8, 0.8, 0.75, 0.7), 0.08, 0.2)
-					if enemy_hit and hit.collider.has_method("hit_flash"):
-						hit.collider.hit_flash()
+					if enemy_hit:
+						Sound.play_at("hit_enemy", end, -18.0)
+						if hit.collider.has_method("hit_flash"):
+							hit.collider.hit_flash()
+
 		_:
 			var projectile := Projectile.new()
 			world.add_child(projectile)

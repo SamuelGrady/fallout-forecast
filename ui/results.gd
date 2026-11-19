@@ -65,5 +65,7 @@ func _button(parent: Control, text: String, action: Callable) -> void:
 	b.text = text
 	b.custom_minimum_size = Vector2(240, 52)
 	b.add_theme_font_size_override("font_size", 24)
-	b.pressed.connect(action)
+	b.pressed.connect(func():
+		Sound.play("ui_click")
+		action.call())
 	parent.add_child(b)

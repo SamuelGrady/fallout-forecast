@@ -173,6 +173,7 @@ func _do_interact(target: Interactable, player: Node) -> void:
 func use_decon(player: Node) -> void:
 	if decon_charges <= 0 or float(player.get("suit_integrity")) >= 99.0:
 		return
+	Sound.play("decon")
 	player.set("suit_integrity", 100.0)
 	_set_decon(decon_charges - 1)
 

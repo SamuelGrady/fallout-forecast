@@ -7,6 +7,7 @@ const DeconShower := preload("res://props/decon_shower.gd")
 
 
 func _ready() -> void:
+	Sound.start_run()
 	_setup_decon_showers()
 	var spawns := get_tree().get_nodes_in_group("player_spawn")
 	if has_node("Player") and not spawns.is_empty():
@@ -14,6 +15,10 @@ func _ready() -> void:
 	if GameManager.is_host():
 		GameManager.start_run.call_deferred()
 	GameManager.run_finished.connect(_on_run_finished)
+
+
+func _exit_tree() -> void:
+	Sound.stop_run()
 
 
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:

@@ -77,6 +77,7 @@ var exposed := true
 var health := 100.0
 var suit_integrity := 100.0
 ## "ok", "downed", "turned" or "out".
+var _step_distance := 0.0
 var state := "ok"
 var bleed_left := 0.0
 var self_revives := 1
@@ -270,6 +271,12 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
 	move_and_slide()
+	if is_on_floor() and state in ["ok", "turned"]:
+		var travel := get_position_delta()
+		_step_distance += Vector2(travel.x, travel.z).length()
+		if _step_distance >= 1.9:
+			_step_distance = 0.0
+			Sound.play("step_%d" % (randi() % 4), -20.0)
 	_update_shelter()
 
 	_handle_interact(delta)
@@ -371,6 +378,9 @@ func _bleed_out() -> void:
 func _set_state(new_state: String) -> void:
 	state = new_state
 	state_changed.emit(state)
+	match state:
+		"downed", "turned": Sound.play_at(state, global_position)
+		"ok": Sound.play_at("revive", global_position)
 
 
 func _melee() -> void:

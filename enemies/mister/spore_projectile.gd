@@ -45,6 +45,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _burst(at: Vector3) -> void:
+	Sound.play_at("spore_burst", at)
 	var cloud := SporeCloud.new()
 	cloud.damage_per_second = damage_per_second
 	cloud.source = source if is_instance_valid(source) else null

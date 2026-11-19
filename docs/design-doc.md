@@ -290,28 +290,28 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
   Built by Drew (Nov 19) along with all 4 base weapons; Sam can take it from here for networking tests.
 - [x] One base weapon from WeaponData.tres
-- [ ] GameManager: wave and phase timers
+- [x] GameManager: wave and phase timers
 - [ ] Enemy sync: MultiplayerSpawner and synchronizer for Drew's Drip
 
 **Week 2**
 
 - [x] The other 3 base weapons
-- [ ] Downed, revive and Turned (Turned player controls a Drip)
-- [ ] Solo rules: one self-revive per wave, respawn at Clearing
-- [ ] RNG autoload, LootTable.tres, crates and the 3 cursed weapons
-- [ ] Mutation roll logic and MutationTable.tres; send the result by RPC
-- [ ] Tarp pickup
-- [ ] Decon showers with the shared charge pool
-- [ ] Suit integrity math on the host (Drew sends the exposed state)
-- [ ] Enemy scaling by player count
+- [x] Downed, revive and Turned (Turned player controls a Drip)
+- [x] Solo rules: one self-revive per wave, respawn at Clearing
+- [x] RNG autoload, LootTable.tres, crates and the 3 cursed weapons
+- [x] Mutation roll logic and MutationTable.tres; send the result by RPC
+- [x] Tarp pickup
+- [x] Decon showers with the shared charge pool
+- [x] Suit integrity math on the host (Drew sends the exposed state)
+- [x] Enemy scaling by player count
 
 **Week 3**
 
-- [ ] Double-or-nothing crate
+- [x] Double-or-nothing crate
 - [ ] Ping wheel (enemy, crate, shelter, revive me)
-- [ ] Win and lose checks
+- [x] Win and lose checks
 - [ ] Disconnect handling: a dropped player does not break the run
-- [ ] Results screen stats (kills, revives, times Turned)
+- [x] Results screen stats (kills, revives, times Turned)
 - [ ] Export builds for the demo machines
 
 ### Drew
@@ -336,12 +336,16 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
 **Week 3**
 
-- [ ] Boss\_Cumulus (fallback: a Mister swarm in an Acid Storm)
+- [x] Boss\_Cumulus (fallback: a Mister swarm in an Acid Storm)
 - [x] RetroScreen: PS1 shader, dither, VHS overlay
-- [ ] SlotReelUI that lands on the host's result
+- [x] SlotReelUI that lands on the host's result
 - [ ] Title, lobby UI and results screen
+
+  Title, settings and results are implemented. Play starts a solo run.
 - [ ] PSA screens and recorded voice lines
-- [ ] Layered synthwave music and sound from asset packs
+- [x] Layered synthwave music and sound from asset packs
+
+  Storm intensity fades in bass, drums and lead over a piano bed. Cumulus has a separate boss track. Downpour starts with a gated drum hit, and shelter muffles the rain. Gameplay and menu cues use Kenney effects. Music and sound credits are in assets/audio/CREDITS.md.
 
 **Risks**
 

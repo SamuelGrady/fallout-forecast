@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_m6jxt")
+shot_sound = "shot_flare"
 display_name = "Flare Gun"
 kind = 1
 model = ExtResource("1_41ua2")

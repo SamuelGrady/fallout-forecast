@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_adw4l")
+shot_sound = "shot_boombox"
 display_name = "Boombox Launcher"
 kind = 3
 model = ExtResource("1_2nc5l")

@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 WeatherManager="*res://weather/weather_manager.gd"
 Settings="*res://game/settings.gd"
+Sound="*res://game/sound.gd"
 RNG="*res://game/rng.gd"
 GameManager="*res://game/game_manager.gd"
 

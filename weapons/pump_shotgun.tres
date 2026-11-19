@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_psss1")
+shot_sound = "shot_shotgun"
 display_name = "Pump Shotgun"
 model = ExtResource("1_1c82y")
 damage = 12.0

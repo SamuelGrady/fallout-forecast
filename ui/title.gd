@@ -106,6 +106,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _t < 1.4 and _t + delta >= 1.4:
+		Sound.play("vhs_glitch")
 	_t += delta
 	var view := get_viewport_rect().size
 	# 0-1.4 s: tape slides up into the deck. 1.4-2.0 s: snow. Then the menu.
@@ -130,7 +132,9 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(320, 54)
-	b.pressed.connect(action)
+	b.pressed.connect(func():
+		Sound.play("ui_click")
+		action.call())
 	_style_button(b)
 	parent.add_child(b)
 	return b

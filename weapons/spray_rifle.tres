@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_ls84y")
+shot_sound = "shot_rifle"
 display_name = "Spray Rifle"
 model = ExtResource("1_nt8t7")
 damage = 9.0

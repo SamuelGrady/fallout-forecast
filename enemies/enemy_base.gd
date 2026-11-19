@@ -181,6 +181,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func die() -> void:
+	Sound.play_at("enemy_death", global_position)
 	GameManager.record_kill(_last_hit_by)
 	if GameManager.has_mutation("spores"):
 		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)

@@ -205,6 +205,7 @@ func _pop_sac(i: int) -> void:
 
 
 func _die() -> void:
+	Sound.play_at("explosion_big", global_position)
 	dead = true
 	for k in 6:
 		GameManager.spawn_cloud(global_position + Vector3(randf_range(-5, 5), randf_range(-3, 1), randf_range(-5, 5)), 0.0, 3.5)

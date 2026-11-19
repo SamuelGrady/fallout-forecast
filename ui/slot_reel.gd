@@ -94,10 +94,13 @@ func _process(delta: float) -> void:
 	_spin_t += delta
 	if _spin_t >= SPIN_STEP:
 		_spin_t = 0.0
+		if _spinning.has(true):
+			Sound.play("reel_tick", -18.0)
 		for i in 3:
 			if _spinning[i]:
 				if _targets[i] != "" and _clock >= _stop_at[i]:
 					_spinning[i] = false
+					Sound.play("reel_land")
 					_show(i, _targets[i])
 				else:
 					_show(i, _table.entries[randi() % _table.entries.size()].id)
@@ -118,6 +121,8 @@ func _on_started() -> void:
 
 
 func _on_pulls(pulled: int, needed: int) -> void:
+	if pulled > 0:
+		Sound.play("lever")
 	_status.text = "PULL THE LEVER [E]   %d / %d" % [pulled, needed]
 
 

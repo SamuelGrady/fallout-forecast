@@ -4,6 +4,7 @@ extends Resource
 
 enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
 
+@export var shot_sound := ""
 @export var display_name := "Weapon"
 @export var kind: Kind = Kind.HITSCAN
 @export var model: PackedScene

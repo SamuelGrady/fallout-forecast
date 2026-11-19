@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_1c2q0")
+shot_sound = "shot_penny"
 display_name = "Lucky Penny Revolver"
 model = ExtResource("1_86k3h")
 damage = 28.0

@@ -105,6 +105,7 @@ func _step(delta: float) -> Dictionary:
 
 
 func _explode() -> void:
+	Sound.play_at("explosion", global_position)
 	_done = true
 	var center := global_position
 	if authoritative:

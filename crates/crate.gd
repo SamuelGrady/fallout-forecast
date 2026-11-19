@@ -28,6 +28,7 @@ func _ready() -> void:
 
 ## Every peer: show the spin, then the result.
 func play_spin(result: String, tier: String, pool: Array) -> void:
+	Sound.play_at("crate_open", global_position)
 	_names = pool
 	_result = result
 	_result_color = TIER_COLORS.get(tier, Color.WHITE)
@@ -43,6 +44,7 @@ func _process(delta: float) -> void:
 		_spin_left -= delta
 		_spin_tick -= delta
 		if _spin_left <= 0.0:
+			Sound.play_at("pickup", global_position)
 			label.text = _result
 			label.modulate = _result_color
 			label.font_size = 80

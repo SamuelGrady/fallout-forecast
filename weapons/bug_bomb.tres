@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_uslrf")
+shot_sound = "throw_bomb"
 display_name = "Bug Bomb"
 kind = 2
 model = ExtResource("1_p8huw")

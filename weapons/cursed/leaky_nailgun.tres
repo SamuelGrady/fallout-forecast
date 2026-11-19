@@ -5,6 +5,7 @@
 
 [resource]
 script = ExtResource("2_xy4ij")
+shot_sound = "shot_nailgun"
 display_name = "Leaky Nailgun"
 model = ExtResource("1_qsm05")
 damage = 34.0
