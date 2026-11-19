@@ -13,6 +13,14 @@ func _ready() -> void:
 		$Player.global_transform = (spawns[0] as Node3D).global_transform
 	if GameManager.is_host():
 		GameManager.start_run.call_deferred()
+	GameManager.run_finished.connect(_on_run_finished)
+
+
+func _on_run_finished(_won: bool, _results: Dictionary) -> void:
+	get_tree().create_timer(4.5).timeout.connect(func():
+		GameManager.mutations.clear()
+		WeatherManager.stop()
+		get_tree().change_scene_to_file("res://ui/results.tscn"))
 
 
 ## Each decon_shower marker gets an "Interact" child (same path on every peer).

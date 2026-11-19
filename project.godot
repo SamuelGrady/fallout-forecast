@@ -11,13 +11,14 @@ config_version=5
 [application]
 
 config/name="Fallout Forecast"
-run/main_scene="res://main.tscn"
+run/main_scene="res://ui/title.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
 WeatherManager="*res://weather/weather_manager.gd"
+Settings="*res://game/settings.gd"
 RNG="*res://game/rng.gd"
 GameManager="*res://game/game_manager.gd"
 

@@ -105,6 +105,17 @@ func start_run() -> void:
 	set_phase(Phase.CALM, 1)
 
 
+## Leave the run (title, results): stop the cycle and clear the sky.
+func stop() -> void:
+	running = false
+	hold = false
+	intensity_override = -1.0
+	target_intensity = 0.0
+	storm_intensity = 0.0
+	phase = Phase.CALM
+	wave = 1
+
+
 ## Host: advance one phase. After Clearing the next wave starts at Calm.
 ## After the final wave's Clearing the cycle stops.
 func next_phase() -> void:

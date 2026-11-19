@@ -29,6 +29,7 @@ var _ps1_materials: Array[ShaderMaterial] = []
 
 
 func _ready() -> void:
+	enabled = Settings.retro_enabled
 	WeatherManager.lightning_struck.connect(func(_p, _s): _glitch = maxf(_glitch, lightning_glitch))
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
