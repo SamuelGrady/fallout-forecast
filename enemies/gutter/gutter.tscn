@@ -54,5 +54,5 @@ height = 0.9
 [node name="Model" parent="." unique_id=238248222 instance=ExtResource("3_y0rqq")]
 transform = Transform3D(-1.6, -1.3987645e-07, 6.1141934e-15, 0, -6.9938224e-08, -1.6, 1.3987645e-07, -1.6, 6.9938224e-08, 0, 0.3, 0)
 script = ExtResource("4_r2lh8")
-tint = Color(0.45, 0.55, 0.35, 1)
+tint = Color(0.85, 1, 0.55, 1)
 texture = ExtResource("5_2jx7i")

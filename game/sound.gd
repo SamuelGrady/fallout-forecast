@@ -91,7 +91,8 @@ func _phase_changed(phase: int, _wave: int) -> void:
 
 
 func play(cue: String, volume_db := -10.0) -> void:
-	_play_stream(load("res://assets/audio/sfx/%s.ogg" % cue) as AudioStream, volume_db)
+	var extension := "wav" if cue == "player_hurt" else "ogg"
+	_play_stream(load("res://assets/audio/sfx/%s.%s" % [cue, extension]) as AudioStream, volume_db)
 
 
 func _play_stream(stream: AudioStream, volume_db: float) -> void:

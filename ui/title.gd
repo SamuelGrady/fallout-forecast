@@ -120,6 +120,8 @@ func _ready() -> void:
 	_settings.add_child(retro)
 	_button(_settings, "BACK", _on_back)
 	_menu.get_child(0).grab_focus()
+	var vhs := (load("res://retro/retro_screen.tscn") as PackedScene).instantiate()
+	add_child(vhs)
 
 
 func _process(delta: float) -> void:

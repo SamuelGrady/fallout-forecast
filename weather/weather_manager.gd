@@ -124,6 +124,8 @@ func next_phase() -> void:
 			running = false
 			return
 		set_phase(Phase.CALM, wave + 1)
+	elif phase == Phase.CALM and wave == 1:
+		set_phase(Phase.DRIZZLE, wave)
 	else:
 		set_phase((phase + 1) as Phase, wave)
 

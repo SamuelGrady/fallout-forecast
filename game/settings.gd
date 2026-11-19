@@ -6,6 +6,12 @@ const PATH := "user://settings.cfg"
 var mouse_sensitivity := 0.0025
 var master_volume := 0.8
 var retro_enabled := true
+var unlocked_guns: Array = ["res://weapons/pump_shotgun.tres"]
+
+func unlock_gun(path: String) -> void:
+	if path not in unlocked_guns:
+		unlocked_guns.append(path)
+		save()
 
 
 func _ready() -> void:
@@ -14,6 +20,7 @@ func _ready() -> void:
 		mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", mouse_sensitivity)
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		retro_enabled = cfg.get_value("video", "retro_enabled", retro_enabled)
+		unlocked_guns = cfg.get_value("progress", "guns", unlocked_guns)
 	apply()
 
 
@@ -26,5 +33,6 @@ func save() -> void:
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("video", "retro_enabled", retro_enabled)
+	cfg.set_value("progress", "guns", unlocked_guns)
 	cfg.save(PATH)
 	apply()

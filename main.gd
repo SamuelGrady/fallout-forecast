@@ -8,7 +8,13 @@ const DeconShower := preload("res://props/decon_shower.gd")
 
 func _ready() -> void:
 	Sound.start_run()
+	var pause_menu := CanvasLayer.new()
+	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
+	add_child(pause_menu)
 	_setup_decon_showers()
+	var signs := Node.new()
+	signs.set_script(preload("res://props/map_signs.gd"))
+	$Level.add_child(signs)
 	var spawns := get_tree().get_nodes_in_group("player_spawn")
 	if has_node("Player") and not spawns.is_empty():
 		$Player.global_transform = (spawns[0] as Node3D).global_transform

@@ -364,3 +364,22 @@ Bundled Barlow Condensed SemiBold (SIL Open Font License in assets/fonts). Title
 
 
 Display uses a fixed 960?720 (4:3) canvas with aspect-preserving bars. Road junctions and markings have separated surface heights. World-triplanar map surfaces skip vertex snapping to avoid depth-plane intersections between paving and paint.
+
+
+### Combat readability and progression ? November 19, 2026
+
+Enemies have a depth-tested acid-yellow silhouette edge. Gutters use a brighter tint. Taking health damage triggers a red edge vignette, TAKING DAMAGE warning and a short impact cue.
+
+Hold right mouse to aim, narrowing FOV and reducing spread and viewmodel bob. Reloading, raising the tarp and leaving the active player state release aim. Wave one skips the mutation roll. Rolls begin before wave two, with tall cards showing mutation names and descriptions.
+
+Survive wave one to unlock the Spray Rifle, wave two for the Flare Gun and wave three for Bug Bombs. Unlocks persist in settings.cfg and join the starting inventory on later runs. Cursed guns remain crate rewards. Fixed map signs use extruded TextMesh lettering with the bundled font. Title retains the VHS overlay.
+
+Additional mutation ideas for consideration
+- Conductors. Lightning jumps between nearby enemies, rewarding careful positioning.
+- Molting. The first hit sheds armor and briefly accelerates the enemy.
+- Undertow. Puddles tug exposed players toward their centers.
+- Static Charge. Sprinting builds a charge that the next melee attacker receives.
+- Pressure Front. Enemies resist bullets but take extra explosive knockback.
+- False Clearing. Rain briefly pauses mid-wave while a marked elite arrives.
+
+Escape pauses the solo run and opens Resume, Main Menu and Quit. Resume recaptures the mouse. Main Menu ends the active run before returning to the title.

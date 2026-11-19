@@ -61,14 +61,18 @@ func _build() -> void:
 		var cell := PanelContainer.new()
 		var cs := StyleBoxFlat.new()
 		cs.bg_color = Color("#142b38")
-		cs.set_corner_radius_all(6)
+		cs.set_corner_radius_all(8)
+		cs.border_color = BroadcastUI.CYAN
+		cs.set_border_width_all(2)
 		cs.set_content_margin_all(10)
 		cell.add_theme_stylebox_override("panel", cs)
-		cell.custom_minimum_size = Vector2(170, 70)
+		cell.custom_minimum_size = Vector2(230, 270)
 		var reel := Label.new()
 		reel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		reel.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		reel.add_theme_font_size_override("font_size", 26)
+		reel.add_theme_font_size_override("font_size", 25)
+		reel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		reel.custom_minimum_size = Vector2(200, 230)
 		cell.add_child(reel)
 		h.add_child(cell)
 		_reels.append(reel)
@@ -110,7 +114,7 @@ func _process(delta: float) -> void:
 
 func _show(i: int, id: String) -> void:
 	var e := _table.get_entry(id)
-	_reels[i].text = e.display_name.to_upper()
+	_reels[i].text = e.display_name.to_upper() + "\n\n" + e.description
 	_reels[i].add_theme_color_override("font_color", e.color.lightened(0.25))
 
 

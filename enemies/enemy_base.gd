@@ -30,6 +30,7 @@ var _repath_timer := 0.0
 
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
+static var _visibility_material: ShaderMaterial
 static var _reveal_material: StandardMaterial3D
 static var _hit_material: StandardMaterial3D
 var _reveal_left := 0.0
@@ -42,6 +43,10 @@ var is_small := false
 
 func _ready() -> void:
 	add_to_group("enemies")
+	if _visibility_material == null:
+		_visibility_material = ShaderMaterial.new()
+		_visibility_material.shader = preload("res://enemies/visibility.gdshader")
+	_set_overlay(_visibility_material)
 	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
 	if is_small:
 		scale = Vector3.ONE * 0.6
@@ -92,11 +97,11 @@ func _process(delta: float) -> void:
 	if _hit_left > 0.0:
 		_hit_left -= delta
 		if _hit_left <= 0.0:
-			_set_overlay(_reveal_material if _reveal_left > 0.0 else null)
+			_set_overlay(_reveal_material if _reveal_left > 0.0 else _visibility_material)
 	if _reveal_left > 0.0:
 		_reveal_left -= delta
 		if _reveal_left <= 0.0 and _hit_left <= 0.0:
-			_set_overlay(null)
+			_set_overlay(_visibility_material)
 
 
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.

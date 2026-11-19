@@ -26,6 +26,9 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 var _cards := {}
 var _time := 0.0
 var _last_health := -1.0
+var _damage_left := 0.0
+var _damage_cue_left := 0.0
+var _damage_label := Label.new()
 var _hurt := ColorRect.new()
 var _downed := Label.new()
 var _prompt := Label.new()
@@ -42,9 +45,20 @@ var _boss_bar := ProgressBar.new()
 func _ready() -> void:
 	_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hurt.color = Color(0.8, 0.05, 0.05, 0.0)
+	_hurt.color = Color.WHITE
+	var damage_material := ShaderMaterial.new()
+	damage_material.shader = preload("res://ui/damage.gdshader")
+	_hurt.material = damage_material
 	add_child(_hurt)
 	move_child(_hurt, 0)
+	_damage_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_damage_label.offset_left = -180
+	_damage_label.offset_right = 180
+	_damage_label.offset_top = 65
+	_damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_damage_label.text = "TAKING DAMAGE"
+	_style(_damage_label, 28, Color("#ff6b77"))
+	add_child(_damage_label)
 	_downed.text = "DOWNED"
 	_downed.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_downed.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -181,10 +195,17 @@ func _update_storm() -> void:
 func _update_vitals(player: Node) -> void:
 	health_bar.max_value = _num(player, "max_health", 100.0)
 	health_bar.value = _num(player, "health", health_bar.max_value)
+	var delta := get_process_delta_time()
+	_damage_cue_left = maxf(0.0, _damage_cue_left - delta)
 	if _last_health >= 0.0 and health_bar.value < _last_health:
-		_hurt.color.a = clampf(_hurt.color.a + 0.25, 0.0, 0.45)
+		_damage_left = 0.65
+		if _damage_cue_left <= 0.0:
+			Sound.play("player_hurt", -7.0)
+			_damage_cue_left = 0.4
 	_last_health = health_bar.value
-	_hurt.color.a = move_toward(_hurt.color.a, 0.0, get_process_delta_time() * 1.2)
+	_damage_left = maxf(0.0, _damage_left - delta)
+	(_hurt.material as ShaderMaterial).set_shader_parameter("strength", minf(_damage_left * 2.0, 0.85))
+	_damage_label.visible = _damage_left > 0.3
 	var state := str(player.get("state"))
 	_downed.visible = state != "ok"
 	match state:

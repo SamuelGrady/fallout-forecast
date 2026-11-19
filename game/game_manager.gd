@@ -138,6 +138,13 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
+			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
+			if unlocks.has(_wave):
+				var gun := load("res://weapons/%s.tres" % unlocks[_wave]) as WeaponData
+				Settings.unlock_gun(gun.resource_path)
+				for p in players():
+					p.grant("weapon:" + gun.resource_path)
+				show_banner("UNLOCKED  " + gun.display_name.to_upper(), Color("#66dfda"))
 			mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):

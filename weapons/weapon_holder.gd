@@ -1,4 +1,4 @@
-class_name WeaponHolder
+﻿class_name WeaponHolder
 extends Node3D
 ## The player's guns: inventory, viewmodel, firing, reloading, switching.
 ## Sits under the player's Camera3D.
@@ -29,6 +29,8 @@ var _cooldown := 0.0
 var _reload_left := 0.0
 var _kick := 0.0
 var _bob := 0.0
+var _aim := 0.0
+var _hip_fov := 75.0
 var _model: Node3D
 var player: Node3D
 var camera: Camera3D
@@ -36,7 +38,9 @@ var camera: Camera3D
 
 func _ready() -> void:
 	camera = get_parent() as Camera3D
+	_hip_fov = camera.fov
 	player = _find_player()
+	loadout = loadout.filter(func(w): return w.resource_path in Settings.unlocked_guns)
 	for w in loadout:
 		ammo.append(w.mag_size)
 		reserve.append(w.reserve_ammo)
@@ -221,7 +225,7 @@ func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: i
 	if side.length_squared() < 0.01:
 		side = Vector3.RIGHT
 	var up := side.cross(dir).normalized()
-	var spread := deg_to_rad(data.spread_degrees)
+	var spread := deg_to_rad(data.spread_degrees * lerpf(1.0, 0.45, _aim))
 	for i in data.pellets:
 		var angle := rng.randf() * TAU
 		var radius := sqrt(rng.randf()) * spread
@@ -259,6 +263,11 @@ func grant(item: String) -> void:
 func add_weapon(data: WeaponData) -> void:
 	if data == null:
 		return
+	for i in loadout.size():
+		if loadout[i].resource_path == data.resource_path:
+			reserve[i] += data.reserve_ammo
+			_equip(i)
+			return
 	if loadout.size() >= 5:
 		loadout.remove_at(4)
 		ammo.remove_at(4)
@@ -306,6 +315,9 @@ func _animate(delta: float) -> void:
 	if loadout.is_empty() or _model == null:
 		return
 	var data := loadout[current]
+	var aiming: bool = player.get("state") == "ok" and not player.get("tarp_raised") and _reload_left <= 0.0 and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
+	camera.fov = lerpf(_hip_fov, 52.0, _aim)
 	var speed := 0.0
 	if player is CharacterBody3D:
 		speed = Vector2(player.velocity.x, player.velocity.z).length()
@@ -315,7 +327,7 @@ func _animate(delta: float) -> void:
 	if _reload_left > 0.0:
 		var t := 1.0 - _reload_left / data.reload_time
 		reload_dip = sin(t * PI)
-	_model.position = data.view_position + bob + Vector3(0, -0.12 * reload_dip, 0.08 * _kick)
+	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip, 0.08 * _kick)
 	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick - 35.0 * reload_dip, 0, 0)
 	_model.scale = Vector3.ONE * data.view_scale
 
