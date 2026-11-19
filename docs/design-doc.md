@@ -232,20 +232,23 @@ The host is the server and decides everything that matters; each client controls
 
 ## As built
 
-Drew's week 1 tasks are done and pushed to `master` (as of Nov 19, 2026). The game runs single-player from `main.tscn`, starts fullscreen (F11 toggles), and is wired so Sam's networking can plug in. Graybox numbers below are starting values for tuning.
+Drew's week 1 and week 2 tasks are done and pushed to `master` (as of Nov 19, 2026). The game runs single-player from `main.tscn`, starts fullscreen (F11 toggles), and is wired so Sam's networking can plug in. Graybox numbers below are starting values for tuning.
 
 | Piece | Where | What it does now | Hook for the rest of the game |
 | --- | --- | --- | --- |
-| Pinecrest graybox | `levels/pinecrest/level_pinecrest.tscn` | 80 × 80 m CSG block laid out as in Level design; baked `NavigationRegion3D` | Points are found by group: `player_spawn` (4), `enemy_spawn` (5), `drain_spawn` (4), `crate_spawn` (6), `decon_shower` (2), `boss_anchor`; shelters are `Area3D`s in group `shelter` on physics layer 4. Rebake the navmesh in the editor after moving geometry |
-| Player | `player/player.tscn`, `player.gd` (`Player`) | Walk 5, sprint 8, crouch 2.5 m/s, jump \~1.2 m, mouse and gamepad look | Input and physics run only when `is_multiplayer_authority()`; local player is in group `local_player`, all in `players`. `sheltered` + `sheltered_changed` (roof raycast or shelter area) |
+| Pinecrest graybox | `levels/pinecrest/level_pinecrest.tscn` | 80 × 80 m block laid out as in Level design. Kenney City Kit houses (one per house node), three Kenney storefronts under the neon signs, Kenney fences, and 16 trees with trunk collision. The CSG graybox is still there for collision, with its house, store and fence visuals hidden; garages, carport, porches, awnings and the bus stop stay CSG (recolored white and teal) because they are the shelters. The center island is a 0.5 m planter. Baked `NavigationRegion3D` | Points are found by group: `player_spawn` (4), `enemy_spawn` (5), `drain_spawn` (4), `crate_spawn` (6), `decon_shower` (2), `boss_anchor`; shelters are `Area3D`s in group `shelter` on physics layer 4. Rebake the navmesh in the editor after moving geometry |
+| Player | `player/player.tscn`, `player.gd` (`Player`) | Walk 5, sprint 8, crouch 2.5 m/s, jump \~1.2 m, mouse and gamepad look | Input and physics run only when `is_multiplayer_authority()`; local player is in group `local_player`, all in `players`. `sheltered` + `sheltered_changed` (roof raycast or shelter area), in\_puddle (feet in a puddle area on physics layer 5), and exposed = not sheltered or in a puddle. The owning client sends sheltered and in\_puddle to the host by RPC whenever they change; the host reads exposed for suit integrity and Drip targeting. A Tarp only needs an Area3D on layer 4 to count as shelter |
 | WeatherManager | autoload, `weather/weather_manager.gd` | Runs Calm 30 s → Mutation Roll 5 s (placeholder) → Drizzle 60 s → Downpour 60–90 s → Clearing 15 s, five waves; Downpour on wave 5 is the Acid Storm | Host runs timers and sends phase changes by RPC; clients ease `storm_intensity` locally. `enemy_buff()`, `suit_loss_per_second()`, `is_raining()`, signals `phase_changed`, `storm_changed`. GameManager can set `auto_cycle = false` and call `set_phase()`; call `sync_to_peer(id)` when someone joins |
 | Weather visuals | `weather/weather_fx.gd` (node `WeatherFX` in main) | Rain that follows the camera and stops on roofs, fog, darker sky and sun; green rain and fog in the Acid Storm | Local only, never networked |
-| Enemy\_Base, Drip | `enemies/enemy_base.tscn` + `.gd` (`EnemyBase`), `enemies/drip/` | Drip (60 HP, 2.5 m/s, 10 dmg melee) chases the nearest exposed player first, then anyone; follows a `NavigationAgent3D` path | AI runs on the host only. `take_damage(amount, source)` for shooting; `died`, `damaged`, `attacked` signals. Melee calls `take_damage` on the player if it exists. Tuning lives in `EnemyData` resources (`drip_data.tres`) |
-| Placeholder spawner | `enemies/enemy_spawner.gd` (node `Enemies` in main) | Spawns Drips at `enemy_spawn` markers during Drizzle and Downpour, up to 12 | Children get readable names, so a `MultiplayerSpawner` can point at `Enemies`; replace with GameManager's waves |
+| Puddles | weather/puddle.gd, 8 puddles under Puddles in the level | Grow while it rains (full size after 45 s of full-intensity rain, radius 1.6 to 2.8 m) and dry in 25 s once it stops; green in the Acid Storm. A player whose feet are in one is exposed even under a roof. Gutters can crawl out once a puddle is half grown | Area3D on physics layer 5, group puddles. clear() dries one instantly (Bug Bomb). Growth follows storm\_intensity on each client, so nothing is networked. Puddle visuals are built at runtime, so they don't show in the editor |
+| Lightning | WeatherManager (timing), weather/lightning\_fx.gd (node LightningFX under WeatherFX) | During Downpour and the Acid Storm a strike lands every 8–15 s at a random spot. Each client flashes the sky, draws a jagged bolt (same shape everywhere from the seed), lights up every enemy within 40 m of its camera as a glowing silhouette through walls and fog for 2 s, and plays thunder 0.5–2 s later, quieter with distance. Thunder is synthesized at startup at -10 dB; drop a recorded clip into thunder\_stream to replace it | Host calls strike\_lightning(); one RPC carries position and seed; signal lightning\_struck(position, seed) for RetroScreen's VHS glitch later. EnemyBase.reveal(seconds) is reusable for the Flare Gun. F6 strikes now |
+| HUD | ui/hud.tscn + hud.gd, ui/teammate\_card.tscn (node HUD in main) | Bottom left: suit and health bars, EXPOSED flashing while exposed in rain. Top center: storm state (colored) and WAVE n / 5 · PHASE · m:ss. Left edge: a card per teammate with name, health, suit and DOWNED or TURNED. Bottom right: weapon and ammo, hidden until the player has them. Crosshair. Plain default font until the week 3 restyle. The old debug text stays; F9 hides it | Reads plain properties off each Player and falls back when missing: health, max\_health, suit\_integrity, display\_name, state ("ok", "downed", "turned"), weapon\_name, ammo, max\_ammo. Sam: add those to the player and the HUD picks them up |
+| Enemy\_Base, Drip, Gutter, Mister | `enemies/enemy_base.tscn` + `.gd` (`EnemyBase`), `enemies/drip/` | Drip (60 HP, 2.5 m/s, 10 dmg melee) chases the nearest exposed player first, then anyone; follows a `NavigationAgent3D` path. Gutter (40 HP, 3.5 m/s, 12 dmg) crawls out of storm drains and grown puddles and lunges at 11 m/s from 6 m. Mister (80 HP, 2 m/s) holds 12 m away, backs off inside 7 m, and every 3 s lobs a spore arc that leaves a 2.5 m cloud doing 6 dmg/s for 4 s | AI runs on the host only. `take_damage(amount, source)` for shooting; `died`, `damaged`, `attacked` signals. Melee calls `take_damage` on the player if it exists. Tuning lives in `EnemyData` resources (`drip_data.tres`) |
+| Placeholder spawner | `enemies/enemy_spawner.gd` (node `Enemies` in main) | Spawns Drips at `enemy_spawn` markers during Drizzle and Downpour, up to 12 alive, picked by weight: Drip 6, Gutter 3 (from drains or puddles), Mister 2 (wave 2 and later) | Children get readable names, so a `MultiplayerSpawner` can point at `Enemies`; replace with GameManager's waves |
 
-Physics layers: 1 world, 2 player, 3 enemy, 4 shelter. Debug keys (debug builds, host): F1 next phase, F2 jump to wave 5, F3 spawn a Drip.
+Physics layers: 1 world, 2 player, 3 enemy, 4 shelter. Debug keys (debug builds, host): F1 next phase, F2 jump to wave 5, F3, F4, F5 spawn a Drip, Gutter, Mister. Enemies follow the agent's path themselves and repath every 1.5 s. The center island is now a 0.5 m planter so enemies path around it. Mister spores and clouds are plain script nodes under Enemies; replicating them needs a spawn function on the MultiplayerSpawner.
 
-For Sam: the host can't see a remote player's `sheltered` yet, so sync it (or the exposed state) on the player's `MultiplayerSynchronizer`; Drip targeting and suit integrity both read it.
+Done in week 2: remote players report their exposure to the host (see Player above), so the host no longer needs a synced `sheltered` on the player's `MultiplayerSynchronizer` for it. Sam's suit-integrity math reads player.exposed × WeatherManager.suit\_loss\_per\_second().
 
 ## Team, milestones and risks
 
@@ -314,12 +317,14 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
 **Week 2**
 
-- [ ] Gutter and Mister
-- [ ] Shelter detection: roof raycast and Shelter areas; report the exposed state
-- [ ] Puddles that grow and spawn Gutters
-- [ ] Lightning flash, enemy outlines and thunder
-- [ ] Build Pinecrest from Kenney and Quaternius packs
-- [ ] HUD: health, suit integrity, teammate cards
+- [x] Gutter and Mister
+- [x] Shelter detection: roof raycast and Shelter areas; report the exposed state
+- [x] Puddles that grow and spawn Gutters
+- [x] Lightning flash, enemy outlines and thunder
+- [x] Build Pinecrest from Kenney and Quaternius packs
+
+  Done with Kenney City Kit Suburban and Commercial (CC0, in assets/kenney/ with their licenses). Quaternius models are not in yet.
+- [x] HUD: health, suit integrity, teammate cards
 
 **Week 3**
 
