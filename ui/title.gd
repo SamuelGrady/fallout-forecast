@@ -15,12 +15,16 @@ var _t := 0.0
 
 
 func _ready() -> void:
+	theme = BroadcastUI.theme()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color("100A1E")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+
+	BroadcastUI.backdrop(self)
+	bg.queue_free()
 
 	# The tape.
 	_tape.size = Vector2(460, 260)
@@ -59,18 +63,18 @@ func _ready() -> void:
 	_logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_logo.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_logo.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_logo.offset_top = 70
-	_logo.add_theme_font_size_override("font_size", 84)
+	_logo.offset_top = 82
+	_logo.add_theme_font_size_override("font_size", 80)
 	_logo.add_theme_color_override("font_color", Color("FF3EA5"))
 	_logo.add_theme_color_override("font_outline_color", Color("2EE6E6"))
-	_logo.add_theme_constant_override("outline_size", 10)
+	_logo.add_theme_constant_override("outline_size", 0)
 	_logo.modulate.a = 0.0
 	add_child(_logo)
 	_sub.text = "PINECREST HEALTH DEPT.  ·  EMERGENCY BROADCAST"
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_sub.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_sub.offset_top = 290
+	_sub.offset_top = 286
 	_sub.add_theme_font_size_override("font_size", 20)
 	_sub.add_theme_color_override("font_color", Color("8FD65A"))
 	_sub.modulate.a = 0.0
@@ -79,7 +83,13 @@ func _ready() -> void:
 	_menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_menu.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_menu.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_menu.offset_top = 190
+	_menu.offset_left = -190
+	_menu.offset_right = 190
+	_menu.anchor_top = 0.0
+	_menu.anchor_bottom = 0.0
+	_menu.grow_vertical = Control.GROW_DIRECTION_END
+	_menu.offset_top = 365
+	_menu.offset_bottom = 365
 	_menu.add_theme_constant_override("separation", 14)
 	_menu.modulate.a = 0.0
 	add_child(_menu)
@@ -90,7 +100,13 @@ func _ready() -> void:
 	_settings.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_settings.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_settings.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_settings.offset_top = 190
+	_settings.offset_left = -220
+	_settings.offset_right = 220
+	_settings.anchor_top = 0.0
+	_settings.anchor_bottom = 0.0
+	_settings.grow_vertical = Control.GROW_DIRECTION_END
+	_settings.offset_top = 350
+	_settings.offset_bottom = 350
 	_settings.add_theme_constant_override("separation", 10)
 	_settings.visible = false
 	add_child(_settings)
@@ -103,6 +119,7 @@ func _ready() -> void:
 	_style_button(retro)
 	_settings.add_child(retro)
 	_button(_settings, "BACK", _on_back)
+	_menu.get_child(0).grab_focus()
 
 
 func _process(delta: float) -> void:
@@ -141,20 +158,8 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 
 
 func _style_button(b: Control) -> void:
+	b.theme = BroadcastUI.theme()
 	b.add_theme_font_size_override("font_size", 26)
-	b.add_theme_color_override("font_color", Color("F2E3C6"))
-	b.add_theme_color_override("font_hover_color", Color("2EE6E6"))
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.12, 0.08, 0.22, 0.9)
-	normal.border_color = Color("FF3EA5")
-	normal.set_border_width_all(3)
-	normal.set_corner_radius_all(6)
-	var hover := normal.duplicate()
-	hover.border_color = Color("2EE6E6")
-	b.add_theme_stylebox_override("normal", normal)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", hover)
-	b.add_theme_stylebox_override("focus", hover)
 
 
 func _slider(parent: Control, label: String, lo: float, hi: float, value: float, on_change: Callable) -> void:

@@ -34,6 +34,8 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
 	_apply_enabled()
+	rec.add_theme_font_override("font", BroadcastUI.FONT)
+	stamp.add_theme_font_override("font", BroadcastUI.FONT)
 
 
 func _unhandled_input(event: InputEvent) -> void:

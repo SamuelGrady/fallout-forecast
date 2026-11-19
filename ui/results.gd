@@ -7,12 +7,15 @@ const TITLE_SCENE := "res://ui/title.tscn"
 
 
 func _ready() -> void:
+	theme = BroadcastUI.theme()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color("100A1E")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+	BroadcastUI.backdrop(self)
+	bg.queue_free()
 	var r: Dictionary = GameManager.last_results
 	var won: bool = r.get("won", false)
 	var box := VBoxContainer.new()
@@ -20,12 +23,16 @@ func _ready() -> void:
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 26)
+	box.offset_left = -520
+	box.offset_right = 520
+	box.offset_top = -210
 	add_child(box)
 	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 60, Color("8FD65A") if won else Color("FF3EA5"))
 	_label(box, "WAVES SURVIVED: %d / %d" % [int(r.get("waves", 0)), WeatherManager.FINAL_WAVE], 28, Color("F2E3C6"))
 	var grid := GridContainer.new()
 	grid.columns = 5
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	grid.add_theme_constant_override("h_separation", 36)
 	grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(grid)
@@ -56,7 +63,7 @@ func _label(parent: Control, text: String, size: int, color: Color) -> void:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 6)
+	l.add_theme_constant_override("outline_size", 0)
 	parent.add_child(l)
 
 

@@ -77,12 +77,12 @@ func _ready() -> void:
 	_decon.position = Vector2(28, 0)
 	_decon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_decon.offset_left = 28
-	_decon.offset_top = -205
+	_decon.offset_top = -174
 	_style(_decon, 16, Color(0.4, 1, 0.9))
 	add_child(_decon)
 	_tarp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_tarp.offset_left = 28
-	_tarp.offset_top = -228
+	_tarp.offset_top = -200
 	_style(_tarp, 16, Color(0.6, 0.8, 1))
 	add_child(_tarp)
 
@@ -116,6 +116,24 @@ func _ready() -> void:
 	var fill := StyleBoxFlat.new(); fill.bg_color = Color("8FD65A")
 	_boss_bar.add_theme_stylebox_override("fill", fill)
 	add_child(_boss_bar)
+	for child in get_children():
+		BroadcastUI.apply(child)
+	BroadcastUI.bar(health_bar, BroadcastUI.PINK)
+	BroadcastUI.bar(_boss_bar, Color("#b8e56d"))
+	for box in [$BottomLeft, $BottomRight, $TopCenter]:
+		var backing := Panel.new()
+		backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		backing.offset_left = -14
+		backing.offset_top = -10
+		backing.offset_right = 14
+		backing.offset_bottom = 10
+		backing.add_theme_stylebox_override("panel", BroadcastUI.panel(Color(0.03, 0.06, 0.1, 0.86)))
+		box.add_child(backing)
+		backing.show_behind_parent = true
+		box.add_theme_constant_override("separation", 6)
+	storm_label.add_theme_font_size_override("font_size", 36)
+	ammo_label.add_theme_font_size_override("font_size", 48)
 
 
 func _style(l: Label, size: int, color: Color) -> void:
@@ -185,6 +203,8 @@ func _update_vitals(player: Node) -> void:
 		_banner_left -= get_process_delta_time()
 		_banner.visible = _banner_left > 0.0
 	suit_bar.value = _num(player, "suit_integrity", 100.0)
+	$BottomLeft/SuitText.text = "SUIT INTEGRITY   %03d" % int(suit_bar.value)
+	$BottomLeft/HealthText.text = "VITAL SIGNS   %03d" % int(health_bar.value)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
 	exposed_label.visible = exposed_in_rain
 	if exposed_in_rain:
@@ -211,6 +231,7 @@ func _update_teammates(local: Node) -> void:
 		if not _cards.has(other):
 			var card := TeammateCard.instantiate()
 			teammates.add_child(card)
+			BroadcastUI.apply(card)
 			_cards[other] = card
 		var c: Control = _cards[other]
 		var display = other.get("display_name")

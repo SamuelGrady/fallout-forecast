@@ -22,6 +22,7 @@ func _ready() -> void:
 	layer = 2
 	_table = load("res://game/mutation_table.tres")
 	_build()
+	BroadcastUI.apply(_panel)
 	_panel.visible = false
 	var roll: Node = GameManager.mutations
 	roll.roll_started.connect(_on_started)
@@ -39,8 +40,9 @@ func _build() -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.05, 0.15, 0.85)
 	sb.border_color = Color("FF3EA5")
-	sb.set_border_width_all(4)
-	sb.set_corner_radius_all(10)
+	sb.set_border_width_all(1)
+	sb.border_width_top = 4
+	sb.set_corner_radius_all(0)
 	sb.set_content_margin_all(18)
 	_panel.add_theme_stylebox_override("panel", sb)
 	add_child(_panel)
@@ -58,7 +60,7 @@ func _build() -> void:
 	for i in 3:
 		var cell := PanelContainer.new()
 		var cs := StyleBoxFlat.new()
-		cs.bg_color = Color(0.95, 0.92, 0.85)
+		cs.bg_color = Color("#142b38")
 		cs.set_corner_radius_all(6)
 		cs.set_content_margin_all(10)
 		cell.add_theme_stylebox_override("panel", cs)
@@ -109,7 +111,7 @@ func _process(delta: float) -> void:
 func _show(i: int, id: String) -> void:
 	var e := _table.get_entry(id)
 	_reels[i].text = e.display_name.to_upper()
-	_reels[i].add_theme_color_override("font_color", e.color.darkened(0.35))
+	_reels[i].add_theme_color_override("font_color", e.color.lightened(0.25))
 
 
 func _on_started() -> void:
