@@ -1,13 +1,21 @@
 class_name Player
 extends CharacterBody3D
 ## First-person hazmat exterminator: walk, sprint, crouch, jump, mouse/pad look.
-## Also reports whether the player is sheltered from the rain (roof raycast or
-## standing inside a Shelter area on physics layer 4).
+## Also works out whether the player is exposed to the rain:
+## - sheltered: a roof above the head (raycast) or the head inside a Shelter
+##   area on physics layer 4 (garages, awnings, bus stop, a teammate's Tarp).
+## - in_puddle: feet inside a Puddle area on physics layer 5. Puddles drain the
+##   suit even under a roof.
+## exposed = not sheltered or in_puddle. The owning client works it out and
+## reports it to the host, which does the suit-integrity math (the host reads
+## `exposed`, scaled by WeatherManager.suit_loss_per_second()).
 
 signal sheltered_changed(is_sheltered: bool)
+signal exposed_changed(is_exposed: bool)
 
 const WORLD_LAYER := 1 << 0
 const SHELTER_LAYER := 1 << 3
+const PUDDLE_LAYER := 1 << 4
 
 @export_group("Movement")
 @export var walk_speed := 5.0
@@ -33,12 +41,16 @@ var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var is_crouching := false
 var is_sprinting := false
 var sheltered := false
+var in_puddle := false
+## What the host reads for suit integrity and Drip targeting.
+var exposed := true
 
 var _height := 1.8
 var _coyote_timer := 0.0
 var _jump_buffer_timer := 0.0
 var _pitch := 0.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
+var _puddle_query := PhysicsPointQueryParameters3D.new()
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -56,6 +68,9 @@ func _ready() -> void:
 	_shelter_query.collide_with_areas = true
 	_shelter_query.collide_with_bodies = false
 	_shelter_query.collision_mask = SHELTER_LAYER
+	_puddle_query.collide_with_areas = true
+	_puddle_query.collide_with_bodies = false
+	_puddle_query.collision_mask = PUDDLE_LAYER
 
 	if is_multiplayer_authority():
 		add_to_group("local_player")
@@ -159,10 +174,36 @@ func _can_stand() -> bool:
 	return not test_move(global_transform, Vector3.UP * (stand_height - _height + 0.05))
 
 
+func is_exposed() -> bool:
+	return exposed
+
+
 func _update_shelter() -> void:
+	var space := get_world_3d().direct_space_state
 	_shelter_query.position = head.global_position
-	var in_shelter_area := not get_world_3d().direct_space_state.intersect_point(_shelter_query, 1).is_empty()
+	var in_shelter_area := not space.intersect_point(_shelter_query, 1).is_empty()
+	_puddle_query.position = global_position + Vector3.UP * 0.05
+	var now_in_puddle := not space.intersect_point(_puddle_query, 1).is_empty()
 	var now_sheltered := roof_check.is_colliding() or in_shelter_area
-	if now_sheltered != sheltered:
-		sheltered = now_sheltered
+	if now_sheltered != sheltered or now_in_puddle != in_puddle:
+		_set_exposure(now_sheltered, now_in_puddle)
+		if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+			_report_exposure.rpc_id(1, sheltered, in_puddle)
+
+
+## Client -> host: this player's shelter and puddle state changed.
+@rpc("any_peer", "call_remote", "reliable")
+func _report_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
+	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+		_set_exposure(is_sheltered, is_in_puddle)
+
+
+func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
+	in_puddle = is_in_puddle
+	if is_sheltered != sheltered:
+		sheltered = is_sheltered
 		sheltered_changed.emit(sheltered)
+	var now_exposed := not sheltered or in_puddle
+	if now_exposed != exposed:
+		exposed = now_exposed
+		exposed_changed.emit(exposed)
