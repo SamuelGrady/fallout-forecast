@@ -1,6 +1,9 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://player/player.gd" id="1_oul6g"]
+[ext_resource type="PackedScene" path="res://assets/kenney/characters/character-worker.glb" id="2_rkbax"]
+[ext_resource type="Script" path="res://props/model_style.gd" id="3_yw30f"]
+[ext_resource type="Texture2D" path="res://assets/kenney/characters/Textures/colormap.png" id="4_qjkh3"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rkbax"]
 radius = 0.4
@@ -25,6 +28,7 @@ shape = SubResource("CapsuleShape3D_rkbax")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=561464133]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+visible = false
 layers = 2
 material_override = SubResource("StandardMaterial3D_g1dw6")
 mesh = SubResource("CapsuleMesh_yw30f")
@@ -38,3 +42,10 @@ cull_mask = 1048573
 [node name="RoofCheck" type="RayCast3D" parent="." unique_id=105555753]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 target_position = Vector3(0, 40, 0)
+
+[node name="BodyModel" parent="." unique_id=1012235189 instance=ExtResource("2_rkbax")]
+transform = Transform3D(-2.2, 0, -1.923301e-07, 0, 2.2, 0, 1.923301e-07, 0, -2.2, 0, 0, 0)
+script = ExtResource("3_yw30f")
+tint = Color(1, 0.85, 0.2, 1)
+texture = ExtResource("4_qjkh3")
+render_layers = 2

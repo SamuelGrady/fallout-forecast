@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://enemies/mister/mister.gd" id="1_xt6fb"]
 [ext_resource type="Resource" path="res://enemies/mister/mister_data.tres" id="2_h2mai"]
+[ext_resource type="PackedScene" path="res://assets/kenney/graveyard/character-ghost.glb" id="3_h2mai"]
+[ext_resource type="Script" path="res://props/model_style.gd" id="4_4ahqm"]
+[ext_resource type="Texture2D" path="res://assets/kenney/graveyard/Textures/colormap.png" id="5_u3h28"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_4fxsp"]
 radius = 0.45
@@ -33,11 +36,13 @@ shape = SubResource("CapsuleShape3D_4fxsp")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=1712701138]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+visible = false
 material_override = SubResource("StandardMaterial3D_4ahqm")
 mesh = SubResource("CapsuleMesh_u3h28")
 
 [node name="Face" type="MeshInstance3D" parent="." unique_id=2125116126]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.68, -0.41)
+visible = false
 material_override = SubResource("StandardMaterial3D_q0ggh")
 mesh = SubResource("BoxMesh_6ob5v")
 
@@ -45,3 +50,9 @@ mesh = SubResource("BoxMesh_6ob5v")
 path_desired_distance = 0.6
 target_desired_distance = 0.6
 height = 2.1
+
+[node name="Model" parent="." unique_id=1081921299 instance=ExtResource("3_h2mai")]
+transform = Transform3D(-2.8, 0, -2.4478376e-07, 0, 2.8, 0, 2.4478376e-07, 0, -2.8, 0, 0.25, 0)
+script = ExtResource("4_4ahqm")
+tint = Color(0.6, 1, 0.45, 1)
+texture = ExtResource("5_u3h28")

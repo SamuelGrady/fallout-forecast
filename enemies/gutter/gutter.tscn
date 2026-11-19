@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://enemies/gutter/gutter.gd" id="1_wy8y5"]
 [ext_resource type="Resource" path="res://enemies/gutter/gutter_data.tres" id="2_y0rqq"]
+[ext_resource type="PackedScene" path="res://assets/kenney/graveyard/character-zombie.glb" id="3_y0rqq"]
+[ext_resource type="Script" path="res://props/model_style.gd" id="4_r2lh8"]
+[ext_resource type="Texture2D" path="res://assets/kenney/graveyard/Textures/colormap.png" id="5_2jx7i"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_7ski3"]
 radius = 0.35
@@ -33,11 +36,13 @@ shape = SubResource("CapsuleShape3D_7ski3")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=1712701138]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+visible = false
 material_override = SubResource("StandardMaterial3D_r2lh8")
 mesh = SubResource("CapsuleMesh_2jx7i")
 
 [node name="Face" type="MeshInstance3D" parent="." unique_id=2125116126]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, -0.31)
+visible = false
 material_override = SubResource("StandardMaterial3D_q0ggh")
 mesh = SubResource("BoxMesh_6ob5v")
 
@@ -45,3 +50,9 @@ mesh = SubResource("BoxMesh_6ob5v")
 path_desired_distance = 0.6
 target_desired_distance = 0.6
 height = 0.9
+
+[node name="Model" parent="." unique_id=238248222 instance=ExtResource("3_y0rqq")]
+transform = Transform3D(-1.6, -1.3987645e-07, 6.1141934e-15, 0, -6.9938224e-08, -1.6, 1.3987645e-07, -1.6, 6.9938224e-08, 0, 0.3, 0)
+script = ExtResource("4_r2lh8")
+tint = Color(0.45, 0.55, 0.35, 1)
+texture = ExtResource("5_2jx7i")

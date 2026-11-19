@@ -102,9 +102,9 @@ func reveal(duration: float) -> void:
 
 
 func _set_overlay(material: Material) -> void:
-	for child in get_children():
-		if child is MeshInstance3D:
-			child.material_overlay = material
+	for mesh in find_children("*", "MeshInstance3D", true, false):
+		if mesh.visible:
+			mesh.material_overlay = material
 
 
 ## Override to change who the enemy hunts. Default: the nearest player.

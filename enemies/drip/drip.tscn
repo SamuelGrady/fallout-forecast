@@ -2,6 +2,9 @@
 
 [ext_resource type="Script" path="res://enemies/drip/drip.gd" id="1_lygty"]
 [ext_resource type="Resource" path="res://enemies/drip/drip_data.tres" id="2_a31l3"]
+[ext_resource type="PackedScene" path="res://assets/kenney/characters/character-zombie.glb" id="3_a31l3"]
+[ext_resource type="Script" path="res://props/model_style.gd" id="4_70rgx"]
+[ext_resource type="Texture2D" path="res://assets/kenney/characters/Textures/colormap.png" id="5_mpii3"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_6dmn1"]
 radius = 0.4
@@ -33,11 +36,13 @@ shape = SubResource("CapsuleShape3D_6dmn1")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=1712701138]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+visible = false
 material_override = SubResource("StandardMaterial3D_vl24h")
 mesh = SubResource("CapsuleMesh_s7wk4")
 
 [node name="Face" type="MeshInstance3D" parent="." unique_id=2125116126]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -0.36)
+visible = false
 material_override = SubResource("StandardMaterial3D_q0ggh")
 mesh = SubResource("BoxMesh_6ob5v")
 
@@ -45,3 +50,9 @@ mesh = SubResource("BoxMesh_6ob5v")
 path_desired_distance = 0.6
 target_desired_distance = 0.6
 height = 1.8
+
+[node name="Model" parent="." unique_id=1085178066 instance=ExtResource("3_a31l3")]
+transform = Transform3D(-2.5, 0, -2.1855695e-07, 0, 2.5, 0, 2.1855695e-07, 0, -2.5, 0, 0, 0)
+script = ExtResource("4_70rgx")
+tint = Color(0.8, 1, 0.8, 1)
+texture = ExtResource("5_mpii3")
