@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://enemies/enemy_data.gd" id="1_q73yf"]
+
+[resource]
+script = ExtResource("1_q73yf")
+display_name = "Mister"
+max_health = 80.0
+move_speed = 2.0
+damage = 6.0
+attack_range = 12.0
+attack_cooldown = 3.0

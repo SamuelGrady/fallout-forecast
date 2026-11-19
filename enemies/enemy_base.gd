@@ -24,6 +24,9 @@ var _path := PackedVector3Array()
 var _path_index := 0
 
 const WAYPOINT_REACHED := 0.4
+const REPATH_INTERVAL := 1.5
+
+var _repath_timer := 0.0
 
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -51,9 +54,13 @@ func _physics_process(delta: float) -> void:
 			if _attack_timer <= 0.0:
 				_attack_timer = data.attack_cooldown
 				attack(target, data.damage * buff)
+			move = in_range_move(to_target, buff)
 		else:
-			# Re-path only when the target has moved, not every frame.
-			if _last_target_position.distance_to(target.global_position) > 1.0:
+			# Re-path when the target has moved, or every REPATH_INTERVAL in case
+			# this enemy was pushed off its path. Not every frame.
+			_repath_timer -= delta
+			if _repath_timer <= 0.0 or _last_target_position.distance_to(target.global_position) > 1.0:
+				_repath_timer = REPATH_INTERVAL
 				_last_target_position = target.global_position
 				_repath(_last_target_position)
 			move = _path_direction(target.global_position) * data.move_speed * buff
@@ -71,6 +78,11 @@ func _physics_process(delta: float) -> void:
 ## Override to change who the enemy hunts. Default: the nearest player.
 func choose_target() -> Node3D:
 	return _nearest(get_tree().get_nodes_in_group("players"))
+
+
+## Override to move while in attack range (e.g. back away). Default: stand still.
+func in_range_move(_to_target: Vector3, _buff: float) -> Vector3:
+	return Vector3.ZERO
 
 
 ## Override for ranged or special attacks. Default: melee hit on the target.
