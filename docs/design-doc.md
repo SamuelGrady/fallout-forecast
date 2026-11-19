@@ -133,20 +133,22 @@ The content list is small on purpose: 3 enemies, 1 boss, 4 base weapons and 3 cu
 | Boombox Launcher | Rockets with large blast | Each shot pulls nearby enemies toward the shooter and teammates |
 | Lucky Penny Revolver | 25% chance per shot of a one-hit kill | 10% chance per shot of jamming for 2 s |
 
-## Level design: Pinecrest cul-de-sac
+## Level design: downtown Pinecrest
 
-The whole game takes place on one dense block, about 80 × 80 m, built so shelter is never more than about 8 seconds' run away.
+The game takes place in one quarantined slice of town, 130 × 130 m: a Main Street downtown with suburbs behind it. Every zone has a shelter within about 8 seconds' run, and open ground (where crates spawn) sits between them.
 
-- **Center:** the cul-de-sac circle with a dead oak and a storm drain; open, exposed, where crates often spawn.
-- **Five houses** ring the circle. Two have open garages (large shelter), one has a carport, two are locked except for a porch awning.
-- **Strip-mall edge:** a video rental store, an arcade and a laundromat under one long awning. This is the safest shelter and the furthest from the crates.
-- **Bus stop:** a small shelter for 1–2 players at the block's entrance.
-- **Decon showers:** two, one in a garage and one at the laundromat.
-- **Spawn points:** four storm drains for Gutters, plus the road and back fences for Drips and Misters.
-- **Landmark:** a water tower painted "PINECREST" that is visible from everywhere, so players can call out positions.
-- **Boss arena:** the Cumulus floats above the circle; the houses' roofs and the awning give cover from its rain.
+- **Main Street** runs east–west through the middle: road, sidewalks, two bus stops, wrecked cars for cover, storm drains, sodium streetlights (two flicker) and a working traffic light at the Pinecrest Lane corner that blinks amber in the Acid Storm. Both ends are quarantined with police cars (flashing light bars), barriers and QUARANTINE ZONE signs; enemies pour in from there.
+- **Downtown storefronts** line the south side in two blocks with an alley between: Video Vault, Arcade, Laundromat, Diner, Pharmacy, Hardware, each with a flickering neon sign. A long awning over each block is the main shelter strip.
+- **Pinecrest Plaza rooftop deck** sits behind the east block, reached by a ramp from the parking lot: exposed high ground that looks over Main Street.
+- **Parking lot** behind the shops: parked cars and dumpsters for cover, puddles that grow fast, light poles.
+- **Town square** at the west end: a gazebo (shelter), a fountain, benches and trees.
+- **Gas station** at the east end: a big canopy (the largest shelter), pumps, a kiosk, a tow truck and a police car.
+- **Pinecrest Lane and the cul-de-sac** to the north: ten houses in all along the lane, the circle and Main Street, with garages, carports and porches as shelters, porch pumpkins (it is Oct 31, 1987), and the dead oak in a raised planter at the center. An abandoned ambulance sits in the lane.
+- **Pinecrest Park** in the northwest: the PINECREST water tower (visible from everywhere), a picnic pavilion (shelter), a playground and trees.
+- **Decon showers:** three, in the west garage, at the laundromat and under the gas canopy.
+- **Spawns:** 8 enemy spawns around the edges (both Main St ends, the back fences, the lot, behind the gas station), 7 storm drains plus 15 puddles for Gutters, 12 crate spots, 4 player spawns on Main Street, and the boss anchor over the Main St intersection.
 
-Build order: graybox with CSG boxes and the shelter areas first, play it in co-op, then replace it with art.
+Build order: graybox first, then dress with Kenney City Kit models. Collision boxes are fitted to each model, and the shelters stay simple shapes so their areas are exact.
 
 ## Art and audio direction
 
@@ -236,13 +238,15 @@ Drew's week 1 and week 2 tasks are done and pushed to `master` (as of Nov 19, 20
 
 | Piece | Where | What it does now | Hook for the rest of the game |
 | --- | --- | --- | --- |
-| Pinecrest graybox | `levels/pinecrest/level_pinecrest.tscn` | 80 × 80 m block laid out as in Level design. Kenney City Kit houses (one per house node), three Kenney storefronts under the neon signs, Kenney fences, and 16 trees with trunk collision. The CSG graybox is still there for collision, with its house, store and fence visuals hidden; garages, carport, porches, awnings and the bus stop stay CSG (recolored white and teal) because they are the shelters. The center island is a 0.5 m planter. Baked `NavigationRegion3D` | Points are found by group: `player_spawn` (4), `enemy_spawn` (5), `drain_spawn` (4), `crate_spawn` (6), `decon_shower` (2), `boss_anchor`; shelters are `Area3D`s in group `shelter` on physics layer 4. Rebake the navmesh in the editor after moving geometry |
+| Pinecrest graybox | `levels/pinecrest/level_pinecrest.tscn` | 130 × 130 m downtown map, as in Level design, built from Kenney City Kit, Car Kit, Graveyard Kit and Roads models (CC0, assets/kenney/) with box collision fitted to each model. Shelters (awnings, gazebo, gas canopy, pavilion, bus stops, garages, carports, porches) are CSG with exact Area3Ds. Dynamic props: props/flicker.gd (neon and streetlight flicker), props/traffic\_light.gd, props/police\_lights.gd. Characters: hazmat-yellow worker for the player, Kenney zombie (Drip), prone zombie (Gutter), green ghost (Mister), styled by props/model\_style.gd. Baked `NavigationRegion3D` | Points are found by group: `player_spawn` (4), `enemy_spawn` (5), `drain_spawn` (4), `crate_spawn` (6), `decon_shower` (2), `boss_anchor`; shelters are `Area3D`s in group `shelter` on physics layer 4. Rebake the navmesh in the editor after moving geometry |
 | Player | `player/player.tscn`, `player.gd` (`Player`) | Walk 5, sprint 8, crouch 2.5 m/s, jump \~1.2 m, mouse and gamepad look | Input and physics run only when `is_multiplayer_authority()`; local player is in group `local_player`, all in `players`. `sheltered` + `sheltered_changed` (roof raycast or shelter area), in\_puddle (feet in a puddle area on physics layer 5), and exposed = not sheltered or in a puddle. The owning client sends sheltered and in\_puddle to the host by RPC whenever they change; the host reads exposed for suit integrity and Drip targeting. A Tarp only needs an Area3D on layer 4 to count as shelter |
 | WeatherManager | autoload, `weather/weather_manager.gd` | Runs Calm 30 s → Mutation Roll 5 s (placeholder) → Drizzle 60 s → Downpour 60–90 s → Clearing 15 s, five waves; Downpour on wave 5 is the Acid Storm | Host runs timers and sends phase changes by RPC; clients ease `storm_intensity` locally. `enemy_buff()`, `suit_loss_per_second()`, `is_raining()`, signals `phase_changed`, `storm_changed`. GameManager can set `auto_cycle = false` and call `set_phase()`; call `sync_to_peer(id)` when someone joins |
 | Weather visuals | `weather/weather_fx.gd` (node `WeatherFX` in main) | Rain that follows the camera and stops on roofs, fog, darker sky and sun; green rain and fog in the Acid Storm | Local only, never networked |
 | Puddles | weather/puddle.gd, 8 puddles under Puddles in the level | Grow while it rains (full size after 45 s of full-intensity rain, radius 1.6 to 2.8 m) and dry in 25 s once it stops; green in the Acid Storm. A player whose feet are in one is exposed even under a roof. Gutters can crawl out once a puddle is half grown | Area3D on physics layer 5, group puddles. clear() dries one instantly (Bug Bomb). Growth follows storm\_intensity on each client, so nothing is networked. Puddle visuals are built at runtime, so they don't show in the editor |
 | Lightning | WeatherManager (timing), weather/lightning\_fx.gd (node LightningFX under WeatherFX) | During Downpour and the Acid Storm a strike lands every 8–15 s at a random spot. Each client flashes the sky, draws a jagged bolt (same shape everywhere from the seed), lights up every enemy within 40 m of its camera as a glowing silhouette through walls and fog for 2 s, and plays thunder 0.5–2 s later, quieter with distance. Thunder is synthesized at startup at -10 dB; drop a recorded clip into thunder\_stream to replace it | Host calls strike\_lightning(); one RPC carries position and seed; signal lightning\_struck(position, seed) for RetroScreen's VHS glitch later. EnemyBase.reveal(seconds) is reusable for the Flare Gun. F6 strikes now |
 | HUD | ui/hud.tscn + hud.gd, ui/teammate\_card.tscn (node HUD in main) | Bottom left: suit and health bars, EXPOSED flashing while exposed in rain. Top center: storm state (colored) and WAVE n / 5 · PHASE · m:ss. Left edge: a card per teammate with name, health, suit and DOWNED or TURNED. Bottom right: weapon and ammo, hidden until the player has them. Crosshair. Plain default font until the week 3 restyle. The old debug text stays; F9 hides it | Reads plain properties off each Player and falls back when missing: health, max\_health, suit\_integrity, display\_name, state ("ok", "downed", "turned"), weapon\_name, ammo, max\_ammo. Sam: add those to the player and the HUD picks them up |
+| Weapons | weapons/: weapon\_data.gd (WeaponData), weapon\_holder.gd (node Player/Head/Camera3D/WeaponHolder), projectile.gd, shot\_fx.gd, one .tres per weapon | Pump Shotgun (8 pellets × 12, 6 shells, strong knockback), Spray Rifle (auto, 9 dmg, 40 rounds), Flare Gun (a flare that sticks, burns 8 s and reveals enemies within 10 m; 25 on a direct hit), Bug Bomb (bouncing, 1.6 s fuse, 75 dmg in 5 m, clears puddles). Kenney Blaster Kit models in first person with bob, recoil and a reload dip; tracers, muzzle flash, impact puffs, red hit flash on enemies. LMB fire, R reload, 1–4 or wheel to switch (pad: RT, X, LB/RB). No gun sounds yet. Player now has 100 health; at 0 a placeholder DOWNED state gets them back up after 5 s at half health | The client plays effects at once and sends request\_shot(weapon, origin, dir, seed) to the host; the host checks the origin is within 4 m of that player's head, raycasts with the same seed and applies damage, then sends the effects to the other peers. Flares and bombs are simulated on every peer and only the host's copy deals damage. Cursed weapons can be new WeaponData .tres files. Sam's downed/revive/Turned replaces the placeholder in Player.take\_damage |
+| RetroScreen | retro/retro\_screen.tscn + .gd, retro\_screen.gdshader, ps1.gdshader (node RetroScreen in main, under the HUD) | Screen post effect on the 3D view: 240-line pixelation (width follows the aspect), colour bleed, 4×4 ordered dither to 32 levels, scanlines, vignette, constant tape jitter. VHS overlay: blinking ● REC ▶ and a timestamp counting from OCT 31 1987 11:47 PM. Tracking glitch (sliding bands, rolling bar, snow) on every lightning strike and while the local player is downed. Every opaque material is swapped at runtime for a PS1 shader with vertex snapping and nearest filtering, including enemies and guns spawned later. F8 toggles it all. The HUD stays sharp | Local only, never networked. Done as a screen-texture shader instead of a 320×240 SubViewport, so no scene had to move into a viewport; the look is the same. Transparent, unshaded and emissive materials (rain, puddles, signs, lights) are left alone. Affine texture warping is in ps1.gdshader as an off-by-default option |
 | Enemy\_Base, Drip, Gutter, Mister | `enemies/enemy_base.tscn` + `.gd` (`EnemyBase`), `enemies/drip/` | Drip (60 HP, 2.5 m/s, 10 dmg melee) chases the nearest exposed player first, then anyone; follows a `NavigationAgent3D` path. Gutter (40 HP, 3.5 m/s, 12 dmg) crawls out of storm drains and grown puddles and lunges at 11 m/s from 6 m. Mister (80 HP, 2 m/s) holds 12 m away, backs off inside 7 m, and every 3 s lobs a spore arc that leaves a 2.5 m cloud doing 6 dmg/s for 4 s | AI runs on the host only. `take_damage(amount, source)` for shooting; `died`, `damaged`, `attacked` signals. Melee calls `take_damage` on the player if it exists. Tuning lives in `EnemyData` resources (`drip_data.tres`) |
 | Placeholder spawner | `enemies/enemy_spawner.gd` (node `Enemies` in main) | Spawns Drips at `enemy_spawn` markers during Drizzle and Downpour, up to 12 alive, picked by weight: Drip 6, Gutter 3 (from drains or puddles), Mister 2 (wave 2 and later) | Children get readable names, so a `MultiplayerSpawner` can point at `Enemies`; replace with GameManager's waves |
 
@@ -280,14 +284,16 @@ Each week ends with both of you playing the gate together in 2+ instances.
 - [ ] Net autoload: host and join with ENetMultiplayerPeer, peer list, names and colors
 - [ ] Lobby scene with direct IP or LAN join
 - [ ] Player controller with a MultiplayerSynchronizer on position, rotation and aim
-- [ ] Shooting: client effects plus request\_shot RPC; host raycast and damage
-- [ ] One base weapon from WeaponData.tres
+- [x] Shooting: client effects plus request\_shot RPC; host raycast and damage
+
+  Built by Drew (Nov 19) along with all 4 base weapons; Sam can take it from here for networking tests.
+- [x] One base weapon from WeaponData.tres
 - [ ] GameManager: wave and phase timers
 - [ ] Enemy sync: MultiplayerSpawner and synchronizer for Drew's Drip
 
 **Week 2**
 
-- [ ] The other 3 base weapons
+- [x] The other 3 base weapons
 - [ ] Downed, revive and Turned (Turned player controls a Drip)
 - [ ] Solo rules: one self-revive per wave, respawn at Clearing
 - [ ] RNG autoload, LootTable.tres, crates and the 3 cursed weapons
@@ -329,7 +335,7 @@ Each week ends with both of you playing the gate together in 2+ instances.
 **Week 3**
 
 - [ ] Boss\_Cumulus (fallback: a Mister swarm in an Acid Storm)
-- [ ] RetroScreen: PS1 shader, dither, VHS overlay
+- [x] RetroScreen: PS1 shader, dither, VHS overlay
 - [ ] SlotReelUI that lands on the host's result
 - [ ] Title, lobby UI and results screen
 - [ ] PSA screens and recorded voice lines
