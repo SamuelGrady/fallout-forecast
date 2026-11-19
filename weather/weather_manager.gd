@@ -45,7 +45,7 @@ const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 @export var lightning_min_interval := 8.0
 @export var lightning_max_interval := 15.0
 ## Strikes land at a random spot inside this half-size around the map center.
-@export var lightning_area := 35.0
+@export var lightning_area := 60.0
 
 var phase: Phase = Phase.CALM
 var wave := 1

@@ -14,7 +14,7 @@ extends Node3D
 @export var mister_scene: PackedScene = preload("res://enemies/mister/mister.tscn")
 @export var drizzle_interval := 4.0
 @export var downpour_interval := 2.0
-@export var max_alive := 12
+@export var max_alive := 16
 @export_group("Weights")
 @export var drip_weight := 6.0
 @export var gutter_weight := 3.0
