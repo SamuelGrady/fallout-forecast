@@ -6,6 +6,7 @@ extends Node
 ## - effect RPCs that every peer must play (spore projectiles and clouds)
 ## WeatherManager owns the phase timers; GameManager reacts to its phases.
 
+signal combat_hit(killed: bool, critical: bool)
 signal decon_changed(charges: int)
 signal run_finished(won: bool, results: Dictionary)
 signal banner(text: String, color: Color, seconds: float)

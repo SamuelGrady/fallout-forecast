@@ -31,6 +31,8 @@ var _kick := 0.0
 var _bob := 0.0
 var _aim := 0.0
 var _equip_left := 0.0
+var _fire_buffer := 0.0
+var _recoil := 0.0
 var _hip_fov := 75.0
 var _model: Node3D
 var player: Node3D
@@ -51,6 +53,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_cooldown -= delta
+	_fire_buffer = maxf(0.0, _fire_buffer - delta)
+	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
 	if _reload_left > 0.0:
 		_reload_left -= delta
@@ -80,7 +84,9 @@ func _handle_input() -> void:
 	if player.get("tarp_raised"):
 		return
 	var data := loadout[current]
-	var wants := Input.is_action_pressed("fire") if data.automatic else Input.is_action_just_pressed("fire")
+	if Input.is_action_just_pressed("fire"):
+		_fire_buffer = 0.15
+	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
 	if wants and _cooldown <= 0.0 and _reload_left <= 0.0:
 		if ammo[current] > 0:
 			fire()
@@ -90,6 +96,7 @@ func _handle_input() -> void:
 
 func fire() -> void:
 	var data := loadout[current]
+	_fire_buffer = 0.0
 	ammo[current] -= 1
 	_cooldown = data.fire_interval
 	var shot_seed := randi()
@@ -100,6 +107,7 @@ func fire() -> void:
 		player.set("weapon_name", data.display_name + " (JAMMED!)")
 		return
 	_kick = 1.0
+	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
 	_play_shot(current, origin, dir, shot_seed, true)
@@ -180,7 +188,11 @@ func _resolve_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) ->
 				break
 			var distance := origin.distance_to(hit.position)
 			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
-			hit.collider.take_damage(9999.0 if lucky else data.damage * falloff, player)
+			var damage := 9999.0 if lucky else data.damage * falloff
+			if hit.collider.has_method("take_bullet"):
+				hit.collider.take_bullet(damage, hit.position, player)
+			else:
+				hit.collider.take_damage(damage, player)
 			if data.knockback > 0.0 and hit.collider.has_method("knockback"):
 				hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
 			exclude.append(hit.rid)
@@ -331,7 +343,7 @@ func _animate(delta: float) -> void:
 		var t := 1.0 - _reload_left / data.reload_time
 		reload_dip = sin(t * PI)
 	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left, 0.08 * _kick)
-	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick - 35.0 * reload_dip, 0, 0)
+	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick + _recoil * 8.0 - 35.0 * reload_dip, 0, sin(_bob) * _kick * 1.5)
 	_model.scale = Vector3.ONE * data.view_scale
 
 
@@ -364,3 +376,15 @@ func _pad_connected() -> bool:
 
 func _is_host() -> bool:
 	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+
+
+func collect_ammo() -> bool:
+	var collected := false
+	for i in loadout.size():
+		var data := loadout[i]
+		var cap := data.reserve_ammo
+		if reserve[i] < cap:
+			var amount := maxi(1, roundi(data.mag_size * 0.4))
+			reserve[i] = mini(cap, reserve[i] + amount)
+			collected = true
+	return collected

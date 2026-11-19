@@ -14,6 +14,7 @@ signal died(enemy: EnemyBase)
 @export var data: EnemyData
 
 var health := 0.0
+var _bullet_critical := false
 var target: Node3D
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -185,12 +186,19 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		if (-global_basis.z).dot(to_source.normalized()) > 0.3:
 			amount *= 0.5
 	health -= amount
+	if is_instance_valid(_source) and _source.is_in_group("local_player"):
+		GameManager.combat_hit.emit(health <= 0.0, _bullet_critical)
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
 		die()
 
 
 func die() -> void:
+	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+		var drop := Node3D.new()
+		drop.set_script(preload("res://weapons/ammo_drop.gd"))
+		get_parent().add_child(drop)
+		drop.global_position = global_position
 	for i in 6:
 		var fragment := MeshInstance3D.new()
 		var cube := BoxMesh.new()
@@ -259,3 +267,26 @@ func _face(direction: Vector3) -> void:
 
 func _is_host() -> bool:
 	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+
+
+func take_bullet(amount: float, point: Vector3, source: Node) -> void:
+	if health <= 0.0:
+		return
+	var height := to_local(point).y
+	var head_height := 1.42
+	match data.display_name.to_lower():
+		"gutter": head_height = 1.16
+		"mister": head_height = 1.63
+	_bullet_critical = height >= head_height
+	var before := health
+	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
+	if is_instance_valid(source) and source.is_in_group("local_player"):
+		var number := Label3D.new()
+		number.set_script(preload("res://weapons/damage_number.gd"))
+		number.amount = ceili(minf(before, before - health))
+		number.critical = _bullet_critical
+		get_parent().add_child(number)
+		number.global_position = point + Vector3.UP * .25
+		if _bullet_critical:
+			Sound.play("headshot", -10.0)
+	_bullet_critical = false

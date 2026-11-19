@@ -25,6 +25,8 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 
 var _cards := {}
 var _time := 0.0
+var _hit_marker := Label.new()
+var _hit_time := 0.0
 var _last_health := -1.0
 var _damage_left := 0.0
 var _last_suit := -1.0
@@ -46,6 +48,19 @@ var _boss_bar := ProgressBar.new()
 
 
 func _ready() -> void:
+	_hit_marker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_hit_marker.offset_left = -30
+	_hit_marker.offset_right = 30
+	_hit_marker.offset_top = -30
+	_hit_marker.offset_bottom = 30
+	_hit_marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hit_marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_style(_hit_marker, 38, Color.WHITE)
+	add_child(_hit_marker)
+	GameManager.combat_hit.connect(func(killed: bool, critical: bool):
+		_hit_time = .28 if killed else .12
+		_hit_marker.text = "?" if critical else "?"
+		_hit_marker.modulate = Color("#ffcc66") if critical else (Color("#ff5689") if killed else Color.WHITE))
 	_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hurt.color = Color.WHITE
@@ -177,6 +192,8 @@ func _show_banner(text: String, color: Color, seconds: float) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_hit_time = maxf(0.0, _hit_time - delta)
+	_hit_marker.visible = _hit_time > 0.0
 	var player := get_tree().get_first_node_in_group("local_player")
 	_update_storm()
 	if player == null:

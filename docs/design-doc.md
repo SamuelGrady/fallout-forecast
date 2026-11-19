@@ -394,3 +394,18 @@ The gameplay HUD is beneath the VHS composite. Health damage uses the red vignet
 ### Animation pass
 
 Infected grow into view on spawn, breathe and sway while idle, swing limbs with movement, recoil on hits and swing their arms on attacks. Weapons rise into view on equip and blend into ADS. Menu buttons animate on hover, focus and press. Settings, results, pause and mutation panels fade into view. Health bars ease toward their new value. Existing reload recoil, crate spins, reel stops, boss drift and death fragments remain active. Deferred retro conversion now resolves instance IDs safely after short-lived objects disappear.
+
+
+### Gunplay and ammo update
+
+Full-size enemies drop a small animated ammo pack on death, capped at 32 packs and expiring after 35 seconds. Within 1.8 m and clear line of sight, packs refill 40% of each carried gun's magazine into reserve up to its normal reserve cap. Small Splitter copies drop no ammo.
+
+Semi-auto shots have a 0.15-second input buffer. Recoil stacks and settles between shots. White hit markers confirm hits, pink confirms kills and gold stars confirm headshots. Hitscan headshots deal double damage using each infected type's head-height region. Gutter collision height matches its taller remodeled silhouette. Floating damage numbers show damage applied, capped at remaining health, with gold enlarged headshot numbers and a distinct headshot cue.
+
+Further gunplay ideas for consideration
+- Perfect reload. A timed second reload press grants a small temporary handling bonus.
+- Rain-charged shells. Remaining exposed charges one electrical shotgun blast.
+- Breakable spore packs. Shooting a Mister's backpack bursts its own cloud.
+- Last-shell punch. The final shotgun shell grants extra knockback.
+- Shelter supply lockers. Spend earned scrap on an ammo refill or weapon mod.
+- Ricochet revolver. Marked street signs bounce a shot toward a nearby enemy.
