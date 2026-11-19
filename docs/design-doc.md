@@ -230,6 +230,23 @@ The host is the server and decides everything that matters; each client controls
 - Direct IP or LAN for the class demo. GodotSteam lobbies are a stretch goal.
 - Keep `RetroScreen` local to each client; it never touches the network.
 
+## As built
+
+Drew's week 1 tasks are done and pushed to `master` (as of Nov 19, 2026). The game runs single-player from `main.tscn`, starts fullscreen (F11 toggles), and is wired so Sam's networking can plug in. Graybox numbers below are starting values for tuning.
+
+| Piece | Where | What it does now | Hook for the rest of the game |
+| --- | --- | --- | --- |
+| Pinecrest graybox | `levels/pinecrest/level_pinecrest.tscn` | 80 × 80 m CSG block laid out as in Level design; baked `NavigationRegion3D` | Points are found by group: `player_spawn` (4), `enemy_spawn` (5), `drain_spawn` (4), `crate_spawn` (6), `decon_shower` (2), `boss_anchor`; shelters are `Area3D`s in group `shelter` on physics layer 4. Rebake the navmesh in the editor after moving geometry |
+| Player | `player/player.tscn`, `player.gd` (`Player`) | Walk 5, sprint 8, crouch 2.5 m/s, jump \~1.2 m, mouse and gamepad look | Input and physics run only when `is_multiplayer_authority()`; local player is in group `local_player`, all in `players`. `sheltered` + `sheltered_changed` (roof raycast or shelter area) |
+| WeatherManager | autoload, `weather/weather_manager.gd` | Runs Calm 30 s → Mutation Roll 5 s (placeholder) → Drizzle 60 s → Downpour 60–90 s → Clearing 15 s, five waves; Downpour on wave 5 is the Acid Storm | Host runs timers and sends phase changes by RPC; clients ease `storm_intensity` locally. `enemy_buff()`, `suit_loss_per_second()`, `is_raining()`, signals `phase_changed`, `storm_changed`. GameManager can set `auto_cycle = false` and call `set_phase()`; call `sync_to_peer(id)` when someone joins |
+| Weather visuals | `weather/weather_fx.gd` (node `WeatherFX` in main) | Rain that follows the camera and stops on roofs, fog, darker sky and sun; green rain and fog in the Acid Storm | Local only, never networked |
+| Enemy\_Base, Drip | `enemies/enemy_base.tscn` + `.gd` (`EnemyBase`), `enemies/drip/` | Drip (60 HP, 2.5 m/s, 10 dmg melee) chases the nearest exposed player first, then anyone; follows a `NavigationAgent3D` path | AI runs on the host only. `take_damage(amount, source)` for shooting; `died`, `damaged`, `attacked` signals. Melee calls `take_damage` on the player if it exists. Tuning lives in `EnemyData` resources (`drip_data.tres`) |
+| Placeholder spawner | `enemies/enemy_spawner.gd` (node `Enemies` in main) | Spawns Drips at `enemy_spawn` markers during Drizzle and Downpour, up to 12 | Children get readable names, so a `MultiplayerSpawner` can point at `Enemies`; replace with GameManager's waves |
+
+Physics layers: 1 world, 2 player, 3 enemy, 4 shelter. Debug keys (debug builds, host): F1 next phase, F2 jump to wave 5, F3 spawn a Drip.
+
+For Sam: the host can't see a remote player's `sheltered` yet, so sync it (or the exposed state) on the player's `MultiplayerSynchronizer`; Drip targeting and suit integrity both read it.
+
 ## Team, milestones and risks
 
 Sam and Drew build the game in three weeks.
@@ -290,10 +307,10 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
 **Week 1**
 
-- [ ] Greybox Pinecrest with spawn points and shelter spots
-- [ ] WeatherManager: state machine and storm\_intensity
-- [ ] Rain particles and fog driven by storm\_intensity
-- [ ] Enemy\_Base and the Drip with NavigationAgent3D
+- [x] Greybox Pinecrest with spawn points and shelter spots
+- [x] WeatherManager: state machine and storm\_intensity
+- [x] Rain particles and fog driven by storm\_intensity
+- [x] Enemy\_Base and the Drip with NavigationAgent3D
 
 **Week 2**
 
