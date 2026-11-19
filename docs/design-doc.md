@@ -169,6 +169,8 @@ The game should look like a horror movie taped off late-night TV in 1987: low re
 - Sickly green for plague rain, spores and the boss.
 - Deep navy night sky, which turns green during the Acid Storm.
 
+**As built (textures):** every Kenney model shares one 80s palette: cream and salmon siding, mint, powder blue, mustard, avocado, wood-panel browns, navy and charcoal, with neon pink, cyan and purple accents. It works by remapping each kit's colormap. Map surfaces are 64 × 64 pixel-art textures with nearest filtering: speckled asphalt, slab sidewalks, dithered lawn, brick pavers, lap siding, teal shingles, wood planks, diamond plate, pink and cyan striped awnings, and a red-and-cream gas canopy. The sky is a synthwave dusk (navy to magenta-orange) under a low orange sun, with warm mauve ambient light.
+
 **Audio**
 
 - A synthwave score in layers (bass, drums, lead) added as `storm_intensity` rises.
