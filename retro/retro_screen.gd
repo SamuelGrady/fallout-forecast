@@ -14,6 +14,8 @@ const MONTH := "OCT"
 const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
 
 @export var enabled := true
+@export var interface_only := false
+var _interface_layer: CanvasLayer
 @export var vertex_snap := 120.0
 @export var lightning_glitch := 1.0
 @export var downed_glitch := 0.45
@@ -29,7 +31,27 @@ var _ps1_materials: Array[ShaderMaterial] = []
 
 
 func _ready() -> void:
+	screen.material = screen.material.duplicate()
+	(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", false)
 	enabled = Settings.retro_enabled
+	var recording_layer := CanvasLayer.new()
+	recording_layer.layer = 4
+	add_child(recording_layer)
+	$VHS.reparent(recording_layer, false)
+	if interface_only:
+		layer = 5
+		(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", true)
+	else:
+		_interface_layer = CanvasLayer.new()
+		_interface_layer.layer = 5
+		add_child(_interface_layer)
+		var overlay := ColorRect.new()
+		overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		overlay.material = screen.material.duplicate()
+		(overlay.material as ShaderMaterial).set_shader_parameter("interface_pass", true)
+		_interface_layer.add_child(overlay)
+
 	WeatherManager.lightning_struck.connect(func(_p, _s): _glitch = maxf(_glitch, lightning_glitch))
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
@@ -70,6 +92,8 @@ func _process(delta: float) -> void:
 
 func _apply_enabled() -> void:
 	screen.visible = enabled
+	if _interface_layer:
+		_interface_layer.visible = enabled
 	rec.visible = enabled
 	stamp.visible = enabled
 	for m in _ps1_materials:

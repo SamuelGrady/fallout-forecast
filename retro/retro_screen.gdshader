@@ -5,6 +5,7 @@ shader_type canvas_item;
 
 uniform sampler2D screen_texture : hint_screen_texture, filter_nearest;
 // Virtual vertical resolution (PS1 era: 240 lines). Width follows the aspect.
+uniform bool interface_pass = false;
 uniform float lines = 240.0;
 // Colour levels per channel after dithering (32 = 15-bit colour).
 uniform float levels = 32.0;
@@ -28,39 +29,40 @@ float bayer4(vec2 p) {
 
 void fragment() {
 	vec2 size = 1.0 / SCREEN_PIXEL_SIZE;
-	vec2 res = vec2(floor(lines * size.x / size.y), lines);
+	vec2 res = interface_pass ? size : vec2(floor(lines * size.x / size.y), lines);
 	vec2 uv = SCREEN_UV;
 	float t = TIME + time_offset;
+	float distortion = interface_pass ? 0.0 : 1.0;
 
 	// VHS tracking: rows slide sideways in bands, a rolling noise bar.
 	float row = floor(uv.y * res.y);
 	float band = step(1.0 - glitch * 0.35, hash(floor(uv.y * 18.0) + floor(t * 12.0)));
 	float wobble = sin(uv.y * 40.0 + t * 30.0) * 0.004 * glitch;
-	uv.x += band * (hash(row + floor(t * 20.0)) - 0.5) * 0.06 * glitch + wobble;
-	uv.x += (hash(row * 0.37 + floor(t * 60.0)) - 0.5) * 0.0015;  // constant tape jitter
+	uv.x += distortion * band * (hash(row + floor(t * 20.0)) - 0.5) * 0.06 * glitch + wobble * distortion;
+	uv.x += (hash(row * 0.37 + floor(t * 60.0)) - 0.5) * 0.0015 * distortion;  // constant tape jitter
 
 	// Pixelate to the virtual resolution.
 	vec2 cell = floor(uv * res);
 	vec2 puv = (cell + 0.5) / res;
-	vec2 px = vec2(bleed_pixels / res.x, 0.0);
+	vec2 px = vec2((interface_pass ? 0.2 : bleed_pixels) / res.x, 0.0);
 	vec3 col;
 	col.r = texture(screen_texture, puv + px).r;
 	col.g = texture(screen_texture, puv).g;
 	col.b = texture(screen_texture, puv - px).b;
 
 	// Ordered dither, then quantize.
-	col += bayer4(cell) * dither_strength / levels;
-	col = floor(col * levels + 0.5) / levels;
+	col += bayer4(cell) * dither_strength * (interface_pass ? 0.0 : 1.0) / levels;
+	if (!interface_pass) { col = floor(col * levels + 0.5) / levels; }
 
 	// Scanlines on the virtual lines, vignette.
-	col *= 1.0 - scanline_strength * step(0.5, fract(uv.y * res.y * 0.5));
+	col *= 1.0 - (interface_pass ? 0.045 : scanline_strength) * step(0.5, fract(uv.y * res.y * 0.5));
 	vec2 v = SCREEN_UV - 0.5;
-	col *= 1.0 - vignette_strength * dot(v, v) * 2.0;
+	col *= 1.0 - (interface_pass ? 0.06 : vignette_strength) * dot(v, v) * 2.0;
 
 	// Rolling tracking bar and snow when glitching.
 	float bar = smoothstep(0.0, 0.02, abs(fract(SCREEN_UV.y + t * 0.15) - 0.5) - 0.48);
-	col = mix(col, vec3(0.9), (1.0 - bar) * 0.25 * glitch);
-	col += (hash(cell.x * 13.1 + cell.y * 71.7 + floor(t * 30.0)) - 0.5) * 0.25 * glitch;
+	col = mix(col, vec3(0.9), (1.0 - bar) * 0.25 * glitch * distortion);
+	col += (hash(cell.x * 13.1 + cell.y * 71.7 + floor(t * 30.0)) - 0.5) * 0.25 * glitch * distortion;
 
 	COLOR = vec4(col, 1.0);
 }

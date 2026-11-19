@@ -409,3 +409,5 @@ Further gunplay ideas for consideration
 - Last-shell punch. The final shotgun shell grants extra knockback.
 - Shelter supply lockers. Spend earned scrap on an ammo refill or weapon mod.
 - Ricochet revolver. Marked street signs bounce a shot toward a nearby enemy.
+
+VHS readability uses two composites. The world keeps the coarse pixel grid and tracking effects. HUD, cards, title text, REC and timestamp receive a native-resolution pass with subtle scanlines and subpixel color bleed. Tracking displacement and snow affect the world. Each screen duplicates its shader material to keep title settings local.
