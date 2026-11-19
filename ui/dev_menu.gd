@@ -42,6 +42,7 @@ func _ready() -> void:
 func _button(box: Control, text: String, action: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	BroadcastUI.animate_button(button)
 	button.pressed.connect(action)
 	box.add_child(button)
 func _input(event: InputEvent) -> void:

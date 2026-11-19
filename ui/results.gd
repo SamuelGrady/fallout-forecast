@@ -24,6 +24,7 @@ func _ready() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 26)
+	BroadcastUI.reveal(box)
 	box.offset_left = -440
 	box.offset_right = 440
 	box.offset_top = -210
@@ -70,6 +71,7 @@ func _label(parent: Control, text: String, size: int, color: Color) -> void:
 func _button(parent: Control, text: String, action: Callable) -> void:
 	var b := Button.new()
 	b.text = text
+	BroadcastUI.animate_button(b)
 	b.custom_minimum_size = Vector2(240, 52)
 	b.add_theme_font_size_override("font_size", 24)
 	b.pressed.connect(func():

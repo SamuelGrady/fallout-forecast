@@ -205,15 +205,16 @@ func _update_storm() -> void:
 
 func _update_vitals(player: Node) -> void:
 	health_bar.max_value = _num(player, "max_health", 100.0)
-	health_bar.value = _num(player, "health", health_bar.max_value)
+	var actual_health := _num(player, "health", health_bar.max_value)
+	health_bar.value = lerpf(health_bar.value, actual_health, 1.0 - exp(-12.0 * get_process_delta_time()))
 	var delta := get_process_delta_time()
 	_damage_cue_left = maxf(0.0, _damage_cue_left - delta)
-	if _last_health >= 0.0 and health_bar.value < _last_health:
+	if _last_health >= 0.0 and actual_health < _last_health:
 		_damage_left = 0.65
 		if _damage_cue_left <= 0.0:
 			Sound.play("player_hurt", -7.0)
 			_damage_cue_left = 0.4
-	_last_health = health_bar.value
+	_last_health = actual_health
 	_damage_left = maxf(0.0, _damage_left - delta)
 	(_hurt.material as ShaderMaterial).set_shader_parameter("strength", minf(_damage_left * 2.0, 0.85))
 	_damage_label.visible = false

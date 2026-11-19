@@ -150,6 +150,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _button(parent: Control, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
+	BroadcastUI.animate_button(b)
 	b.custom_minimum_size = Vector2(320, 54)
 	b.pressed.connect(func():
 		Sound.play("ui_click")
@@ -188,6 +189,7 @@ func _on_play() -> void:
 func _on_settings() -> void:
 	_menu.visible = false
 	_settings.visible = true
+	BroadcastUI.reveal(_settings)
 
 
 func _on_back() -> void:

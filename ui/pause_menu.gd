@@ -32,6 +32,7 @@ func _ready() -> void:
 func _button(box: Control, text: String, action: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	BroadcastUI.animate_button(button)
 	button.custom_minimum_size.y = 60
 	button.pressed.connect(func():
 		Sound.play("ui_click")
@@ -45,6 +46,7 @@ func _input(event: InputEvent) -> void:
 			_resume()
 		else:
 			visible = true
+			BroadcastUI.reveal(_panel)
 			get_tree().paused = true
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			_panel.get_child(0).get_child(1).grab_focus()

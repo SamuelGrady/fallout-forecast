@@ -74,3 +74,24 @@ void fragment() {
 	background.material = material
 	parent.add_child(background)
 	parent.move_child(background, 0)
+
+static func animate_button(button: Button) -> void:
+	button.pivot_offset = button.size * 0.5
+	var active := [null]
+	var animate := func(amount: float):
+		if active[0] is Tween and active[0].is_valid():
+			active[0].kill()
+		var tween := button.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		active[0] = tween
+		tween.tween_property(button, "scale", Vector2.ONE * amount, .12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	button.mouse_entered.connect(func(): animate.call(1.025))
+	button.mouse_exited.connect(func(): animate.call(1.0))
+	button.focus_entered.connect(func(): animate.call(1.025))
+	button.focus_exited.connect(func(): animate.call(1.0))
+	button.button_down.connect(func(): animate.call(.97))
+	button.button_up.connect(func(): animate.call(1.0))
+
+static func reveal(control: Control) -> void:
+	control.modulate.a = 0.0
+	var tween := control.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(control, "modulate:a", 1.0, .2)

@@ -120,6 +120,7 @@ func _show(i: int, id: String) -> void:
 
 func _on_started() -> void:
 	_panel.visible = true
+	BroadcastUI.reveal(_panel)
 	_hide_at = -1.0
 	_title.text = "MUTATION ROLL"
 	_targets = ["", "", ""]

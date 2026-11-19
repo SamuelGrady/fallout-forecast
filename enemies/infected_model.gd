@@ -3,6 +3,7 @@
 var limbs: Array[Node3D] = []
 var _clock := 0.0
 var _hurt := 0.0
+var _attack := 0.0
 var _body: Node3D
 var _enemy: EnemyBase
 
@@ -39,6 +40,9 @@ func _ready() -> void:
 	if gutter:
 		scale = Vector3(1.05, .82, 1.0)
 		_body.rotation.x = -.25
+	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
+	scale *= 0.1
+	create_tween().tween_property(self, "scale", scale * 10.0, .3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_enemy.damaged.connect(func(_amount, _health): _hurt = 1.0)
 
 func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false) -> void:
@@ -59,7 +63,10 @@ func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := fa
 func _process(delta: float) -> void:
 	_clock += delta * (3.0 + Vector2(_enemy.velocity.x, _enemy.velocity.z).length()*2.0)
 	_hurt = move_toward(_hurt, 0.0, delta*5.0)
+	_attack = move_toward(_attack, 0.0, delta * 3.0)
+	var speed := Vector2(_enemy.velocity.x, _enemy.velocity.z).length()
 	for i in limbs.size():
-		limbs[i].rotation.x = sin(_clock + (PI if i > 1 else 0.0)) * .45
+		var swing := sin(_clock + (PI if i > 1 else 0.0)) * .45 * minf(speed, 1.0)
+		limbs[i].rotation.x = swing - (_attack * 1.5 if i % 2 == 0 else 0.0)
 	_body.position.y = absf(sin(_clock))*.045
 	_body.rotation.z = sin(_clock*.5)*.04 + _hurt*.16

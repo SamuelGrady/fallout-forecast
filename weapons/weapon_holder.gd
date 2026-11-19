@@ -30,6 +30,7 @@ var _reload_left := 0.0
 var _kick := 0.0
 var _bob := 0.0
 var _aim := 0.0
+var _equip_left := 0.0
 var _hip_fov := 75.0
 var _model: Node3D
 var player: Node3D
@@ -296,6 +297,7 @@ func _cast(origin: Vector3, ray: Vector3, max_range: float, extra_exclude: Array
 func _equip(index: int) -> void:
 	if index < 0 or index >= loadout.size():
 		return
+	_equip_left = 1.0
 	current = index
 	_reload_left = 0.0
 	_cooldown = maxf(_cooldown, 0.25)
@@ -323,11 +325,12 @@ func _animate(delta: float) -> void:
 		speed = Vector2(player.velocity.x, player.velocity.z).length()
 	_bob += delta * speed * 1.6
 	var bob := Vector3(sin(_bob) * 0.012, absf(cos(_bob)) * 0.014, 0.0) * minf(speed, 6.0) / 6.0
+	_equip_left = move_toward(_equip_left, 0.0, delta * 4.0)
 	var reload_dip := 0.0
 	if _reload_left > 0.0:
 		var t := 1.0 - _reload_left / data.reload_time
 		reload_dip = sin(t * PI)
-	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip, 0.08 * _kick)
+	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left, 0.08 * _kick)
 	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick - 35.0 * reload_dip, 0, 0)
 	_model.scale = Vector3.ONE * data.view_scale
 

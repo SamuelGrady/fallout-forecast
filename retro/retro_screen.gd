@@ -78,7 +78,13 @@ func _apply_enabled() -> void:
 
 func _on_node_added(node: Node) -> void:
 	if node is MeshInstance3D or node is CSGShape3D:
-		_convert_node.call_deferred(node)
+		_convert_id.call_deferred(node.get_instance_id())
+
+
+func _convert_id(id: int) -> void:
+	var node := instance_from_id(id) as Node
+	if is_instance_valid(node):
+		_convert_node(node)
 
 
 func _convert_tree(node: Node) -> void:
