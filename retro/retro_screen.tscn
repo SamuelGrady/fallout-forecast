@@ -1,0 +1,58 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://retro/retro_screen.gd" id="1_ipd3g"]
+[ext_resource type="Shader" path="res://retro/retro_screen.gdshader" id="2_old7s"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qs7pj"]
+shader = ExtResource("2_old7s")
+shader_parameter/lines = null
+shader_parameter/levels = null
+shader_parameter/dither_strength = null
+shader_parameter/bleed_pixels = null
+shader_parameter/scanline_strength = null
+shader_parameter/vignette_strength = null
+shader_parameter/glitch = null
+shader_parameter/time_offset = null
+
+[node name="RetroScreen" type="CanvasLayer" unique_id=1256642033]
+layer = 0
+script = ExtResource("1_ipd3g")
+
+[node name="Screen" type="ColorRect" parent="." unique_id=1081589631]
+material = SubResource("ShaderMaterial_qs7pj")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="VHS" type="VBoxContainer" parent="." unique_id=604649943]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_top = 24.0
+offset_right = -32.0
+grow_horizontal = 0
+alignment = 2
+
+[node name="Rec" type="Label" parent="VHS" unique_id=1196374856]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(0.95, 0.95, 0.9, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+text = "● REC  ▶"
+horizontal_alignment = 2
+
+[node name="Stamp" type="Label" parent="VHS" unique_id=1145806986]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.95, 0.95, 0.9, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+text = "OCT 31 1987
+11:47:00 PM"
+horizontal_alignment = 2
