@@ -87,10 +87,15 @@ func fire() -> void:
 	var data := loadout[current]
 	ammo[current] -= 1
 	_cooldown = data.fire_interval
+	var shot_seed := randi()
+	# Lucky Penny: the same seed decides jams here and lucky kills on the host.
+	if data.jam_chance > 0.0 and _seeded(shot_seed, 1) < data.jam_chance:
+		_cooldown = data.jam_time
+		player.set("weapon_name", data.display_name + " (JAMMED!)")
+		return
 	_kick = 1.0
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
-	var shot_seed := randi()
 	_play_shot(current, origin, dir, shot_seed, true)
 	if _is_host():
 		_resolve_shot(current, origin, dir, shot_seed)
@@ -149,17 +154,30 @@ func _broadcast_fx(index: int, origin: Vector3, dir: Vector3, shot_seed: int, sh
 ## Host only: damage. Projectiles deal their own damage on the host's copy.
 func _resolve_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
 	var data := loadout[index]
+	if data.pull_radius > 0.0:
+		# Boombox: every shot drags nearby enemies toward the shooter.
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			var to: Vector3 = player.global_position - enemy.global_position
+			to.y = 0.0
+			if to.length() <= data.pull_radius:
+				enemy.knockback(to.normalized() * 9.0)
 	if data.kind != WeaponData.Kind.HITSCAN:
 		return
+	var lucky := data.lucky_kill_chance > 0.0 and _seeded(shot_seed, 2) < data.lucky_kill_chance
 	for ray in _pellet_rays(data, origin, dir, shot_seed):
-		var hit := _cast(origin, ray, data.max_range)
-		if hit.is_empty() or not is_damageable(hit.collider):
-			continue
-		var distance := origin.distance_to(hit.position)
-		var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
-		hit.collider.take_damage(data.damage * falloff, player)
-		if data.knockback > 0.0:
-			hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
+		var start := origin
+		var exclude: Array[RID] = []
+		for pass_i in data.pierce + 1:
+			var hit := _cast(start, ray, data.max_range, exclude)
+			if hit.is_empty() or not is_damageable(hit.collider):
+				break
+			var distance := origin.distance_to(hit.position)
+			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
+			hit.collider.take_damage(9999.0 if lucky else data.damage * falloff, player)
+			if data.knockback > 0.0 and hit.collider.has_method("knockback"):
+				hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
+			exclude.append(hit.rid)
+			start = hit.position
 
 
 ## Every peer: effects. Projectiles are simulated by every peer from here.
@@ -241,8 +259,14 @@ func add_weapon(data: WeaponData) -> void:
 	_equip(loadout.size() - 1)
 
 
-func _cast(origin: Vector3, ray: Vector3, max_range: float) -> Dictionary:
-	var exclude: Array[RID] = []
+func _seeded(shot_seed: int, salt: int) -> float:
+	var r := RandomNumberGenerator.new()
+	r.seed = shot_seed * 31 + salt
+	return r.randf()
+
+
+func _cast(origin: Vector3, ray: Vector3, max_range: float, extra_exclude: Array[RID] = []) -> Dictionary:
+	var exclude: Array[RID] = extra_exclude.duplicate()
 	if player is CollisionObject3D:
 		exclude.append(player.get_rid())
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + ray * max_range, HIT_MASK, exclude)

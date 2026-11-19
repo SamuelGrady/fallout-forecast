@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://crates/crate.gd" id="1_odg22"]
+[ext_resource type="PackedScene" path="res://assets/kenney/blaster/crate-medium.glb" id="2_8ra5e"]
+[ext_resource type="Script" path="res://crates/crate_open.gd" id="3_236nc"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_py3o5"]
+size = Vector3(1.1, 0.74, 2)
+
+[node name="Crate" type="StaticBody3D" unique_id=1974600790]
+script = ExtResource("1_odg22")
+
+[node name="Collision" type="CollisionShape3D" parent="." unique_id=88823704]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, 0)
+shape = SubResource("BoxShape3D_py3o5")
+
+[node name="Model" type="Node3D" parent="." unique_id=220120106 instance=ExtResource("2_8ra5e")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0)
+
+[node name="Spin" type="Label3D" parent="." unique_id=393309916]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+pixel_size = 0.012
+billboard = 1
+text = "?"
+font_size = 56
+
+[node name="Interact" type="Node3D" parent="." unique_id=625906853]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+script = ExtResource("3_236nc")
+prompt = "Open mystery crate"
+hold_time = 0.6
+radius = 2.4

@@ -2,7 +2,7 @@ class_name WeaponData
 extends Resource
 ## Tuning for one weapon (WeaponData.tres in the design doc).
 
-enum Kind { HITSCAN, FLARE, GRENADE }
+enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
 
 @export var display_name := "Weapon"
 @export var kind: Kind = Kind.HITSCAN

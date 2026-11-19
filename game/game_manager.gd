@@ -12,6 +12,7 @@ signal banner(text: String, color: Color, seconds: float)
 
 const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
 const MutationRoll := preload("res://game/mutation_roll.gd")
+const CrateManager := preload("res://game/crate_manager.gd")
 const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
 
 ## Index = player count (1-4); from the design doc's scaling table.
@@ -30,6 +31,7 @@ var last_results := {}
 
 var _lose_check := 0.0
 var mutations: Node
+var crates: Node
 
 
 func _ready() -> void:
@@ -37,6 +39,9 @@ func _ready() -> void:
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
 	add_child(mutations)
+	crates = CrateManager.new()
+	crates.name = "CrateManager"
+	add_child(crates)
 
 
 func _process(delta: float) -> void:
@@ -123,6 +128,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 		return
 	match phase:
 		WeatherManager.Phase.CALM:
+			crates.spawn_for_calm()
 			# Clear weather: showers refill one charge.
 			if decon_charges < decon_max:
 				_set_decon(decon_charges + 1)

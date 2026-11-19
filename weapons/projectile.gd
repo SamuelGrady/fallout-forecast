@@ -50,10 +50,14 @@ func _physics_process(delta: float) -> void:
 	if _done:
 		return
 	_age += delta
-	if data.kind == WeaponData.Kind.FLARE:
-		_flare_process(delta)
-	else:
-		_bomb_process(delta)
+	match data.kind:
+		WeaponData.Kind.FLARE:
+			_flare_process(delta)
+		WeaponData.Kind.ROCKET:
+			if not _step(delta).is_empty() or _age > 4.0:
+				_explode()
+		_:
+			_bomb_process(delta)
 
 
 func _flare_process(delta: float) -> void:
@@ -74,6 +78,9 @@ func _flare_process(delta: float) -> void:
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.global_position.distance_to(global_position) <= data.effect_radius:
 				enemy.reveal(1.0)
+		for boss in get_tree().get_nodes_in_group("boss"):
+			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0:
+				boss.burn(1.0)
 	if _age > data.effect_time + 1.5:
 		queue_free()
 
@@ -117,6 +124,11 @@ func _explode() -> void:
 		if puddle.global_position.distance_to(center) <= data.effect_radius + puddle.radius():
 			puddle.clear()
 	var parent := get_parent()
+	if data.kind == WeaponData.Kind.ROCKET:
+		ShotFX.puff(parent, center, Color(1.0, 0.5, 0.8, 0.7), data.effect_radius * 0.4, 0.6)
+		ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.4, 0.8), 8.0, 0.12)
+		queue_free()
+		return
 	ShotFX.puff(parent, center, Color(0.7, 0.95, 0.3, 0.6), data.effect_radius * 0.4, 0.7)
 	ShotFX.flash(parent, center + Vector3.UP, Color(0.8, 1.0, 0.4), 8.0, 0.12)
 	queue_free()
