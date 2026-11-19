@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="3_5vw27"]
 [ext_resource type="Script" path="res://weather/weather_fx.gd" id="3_lquwl"]
 [ext_resource type="PackedScene" path="res://ui/debug_hud.tscn" id="5_4c57u"]
+[ext_resource type="Script" path="res://enemies/enemy_spawner.gd" id="5_7mycd"]
 
 [node name="Main" type="Node3D" unique_id=678177633]
 script = ExtResource("1_7mycd")
@@ -13,8 +14,12 @@ script = ExtResource("1_7mycd")
 
 [node name="WeatherFX" type="Node3D" parent="." unique_id=737805570]
 script = ExtResource("3_lquwl")
+fog_density_curve = PackedFloat32Array(0, 0.012, 0.035, 0.04)
 
 [node name="Player" parent="." unique_id=506283332 instance=ExtResource("3_5vw27")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16)
+
+[node name="Enemies" type="Node3D" parent="." unique_id=266724862]
+script = ExtResource("5_7mycd")
 
 [node name="DebugHUD" parent="." unique_id=1779811462 instance=ExtResource("5_4c57u")]
