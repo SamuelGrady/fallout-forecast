@@ -11,6 +11,7 @@ signal run_finished(won: bool, results: Dictionary)
 signal banner(text: String, color: Color, seconds: float)
 
 const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
+const MutationRoll := preload("res://game/mutation_roll.gd")
 const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
 
 ## Index = player count (1-4); from the design doc's scaling table.
@@ -28,10 +29,14 @@ var finished := false
 var last_results := {}
 
 var _lose_check := 0.0
+var mutations: Node
 
 
 func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
+	mutations = MutationRoll.new()
+	mutations.name = "MutationRoll"
+	add_child(mutations)
 
 
 func _process(delta: float) -> void:
@@ -76,7 +81,34 @@ func enemy_count_scale() -> float:
 
 
 func enemy_health_scale() -> float:
-	return ENEMY_HEALTH_SCALE[player_count()]
+	return ENEMY_HEALTH_SCALE[player_count()] * (0.5 if has_mutation("swarm") else 1.0)
+
+
+## How many enemies to keep alive and how fast to spawn them, vs. solo.
+func enemy_spawn_scale() -> float:
+	return ENEMY_COUNT_SCALE[player_count()] * (2.0 if has_mutation("swarm") else 1.0)
+
+
+func enemy_speed_scale() -> float:
+	return 1.4 if has_mutation("runners") else 1.0
+
+
+func has_mutation(id: String) -> bool:
+	return mutations != null and mutations.has(id)
+
+
+func lever_prompt(player: Node) -> String:
+	return mutations.lever_prompt(player)
+
+
+func pull_lever() -> void:
+	var p := get_tree().get_first_node_in_group("local_player")
+	if p:
+		mutations.pull(p)
+
+
+func is_voting() -> bool:
+	return mutations.is_voting()
 
 
 func player_for_peer(peer: int) -> Node:
@@ -94,7 +126,10 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			# Clear weather: showers refill one charge.
 			if decon_charges < decon_max:
 				_set_decon(decon_charges + 1)
+		WeatherManager.Phase.MUTATION_ROLL:
+			mutations.begin()
 		WeatherManager.Phase.CLEARING:
+			mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
 					p.on_clearing()

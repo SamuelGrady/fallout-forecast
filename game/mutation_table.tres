@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="MutationTable" format=3]
+
+[ext_resource type="Script" path="res://game/mutation_data.gd" id="1_dsyws"]
+[ext_resource type="Script" path="res://game/mutation_table.gd" id="2_kebm5"]
+
+[sub_resource type="Resource" id="Resource_po6ps"]
+script = ExtResource("1_dsyws")
+id = "spores"
+display_name = "Spores"
+description = "Enemies burst into a damage cloud on death"
+weight = 25.0
+color = Color(0.56078434, 0.8392157, 0.3529412, 1)
+
+[sub_resource type="Resource" id="Resource_elgil"]
+script = ExtResource("1_dsyws")
+id = "armor"
+display_name = "Armor"
+description = "Enemies take half damage from the front"
+color = Color(0.54901963, 0.7058824, 0.8784314, 1)
+
+[sub_resource type="Resource" id="Resource_s1f7w"]
+script = ExtResource("1_dsyws")
+id = "swarm"
+display_name = "Swarm"
+description = "Twice as many enemies at half health"
+color = Color(1, 0.8784314, 0.2901961, 1)
+
+[sub_resource type="Resource" id="Resource_7e61l"]
+script = ExtResource("1_dsyws")
+id = "runners"
+display_name = "Runners"
+description = "Enemies move 40% faster"
+color = Color(0.8509804, 0.4117647, 0.16862746, 1)
+
+[sub_resource type="Resource" id="Resource_nbr3q"]
+script = ExtResource("1_dsyws")
+id = "splitters"
+display_name = "Splitters"
+description = "Enemies split into two small ones on death"
+weight = 15.0
+color = Color(1, 0.24313726, 0.64705884, 1)
+
+[resource]
+script = ExtResource("2_kebm5")
+entries = Array[ExtResource("1_dsyws")]([SubResource("Resource_po6ps"), SubResource("Resource_elgil"), SubResource("Resource_s1f7w"), SubResource("Resource_7e61l"), SubResource("Resource_nbr3q")])

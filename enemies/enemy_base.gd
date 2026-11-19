@@ -36,11 +36,15 @@ var _reveal_left := 0.0
 var _hit_left := 0.0
 var _push := Vector3.ZERO
 var _last_hit_by: Node = null
+## Splitters mutation: the small copies don't split again.
+var is_small := false
 
 
 func _ready() -> void:
 	add_to_group("enemies")
-	health = data.max_health
+	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
+	if is_small:
+		scale = Vector3.ONE * 0.6
 	if not _is_host():
 		set_physics_process(false)
 
@@ -52,7 +56,7 @@ func _physics_process(delta: float) -> void:
 		_retarget_timer = data.retarget_interval
 		target = choose_target()
 
-	var buff := WeatherManager.enemy_buff()
+	var buff := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
 	var move := Vector3.ZERO
 	if is_instance_valid(target):
 		var to_target := target.global_position - global_position
@@ -164,6 +168,12 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
+	# Armor mutation: half damage from the front.
+	if GameManager.has_mutation("armor") and _source is Node3D:
+		var to_source: Vector3 = (_source as Node3D).global_position - global_position
+		to_source.y = 0.0
+		if (-global_basis.z).dot(to_source.normalized()) > 0.3:
+			amount *= 0.5
 	health -= amount
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
@@ -172,6 +182,11 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 func die() -> void:
 	GameManager.record_kill(_last_hit_by)
+	if GameManager.has_mutation("spores"):
+		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)
+	if GameManager.has_mutation("splitters") and not is_small and get_parent().has_method("spawn_copy"):
+		for i in 2:
+			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	died.emit(self)
 	queue_free()
 

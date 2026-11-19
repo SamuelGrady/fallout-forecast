@@ -35,10 +35,11 @@ func _physics_process(delta: float) -> void:
 			interval = downpour_interval
 		_:
 			return
+	var scale := GameManager.enemy_spawn_scale()
 	_timer -= delta
 	if _timer <= 0.0:
-		_timer = interval
-		if alive_count() < max_alive:
+		_timer = interval / scale
+		if alive_count() < int(max_alive * scale):
 			spawn(_pick_scene())
 
 
@@ -67,6 +68,17 @@ func spawn(scene: PackedScene) -> EnemyBase:
 	add_child(enemy, true)
 	enemy.global_position = (at as Vector3) + Vector3(randf_range(-1.0, 1.0), 0.1, randf_range(-1.0, 1.0))
 	return enemy
+
+
+## Splitters: a small copy of `enemy` at `at`.
+func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
+	var scene := load(enemy.scene_file_path) as PackedScene
+	if scene == null:
+		return
+	var copy := scene.instantiate() as EnemyBase
+	copy.is_small = small
+	add_child.call_deferred(copy, true)
+	copy.set_deferred("global_position", at)
 
 
 func _pick_scene() -> PackedScene:

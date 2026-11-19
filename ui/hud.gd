@@ -34,6 +34,7 @@ var _decon := Label.new()
 var _banner := Label.new()
 var _banner_left := 0.0
 var _tarp := Label.new()
+var _mutation := Label.new()
 
 
 func _ready() -> void:
@@ -91,6 +92,12 @@ func _ready() -> void:
 	_banner.visible = false
 	add_child(_banner)
 	GameManager.banner.connect(_show_banner)
+	_mutation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_mutation.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_mutation.offset_top = 100
+	_mutation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_style(_mutation, 16, Color("FF3EA5"))
+	add_child(_mutation)
 
 
 func _style(l: Label, size: int, color: Color) -> void:
@@ -125,6 +132,8 @@ func _update_storm() -> void:
 	wave_label.text = "WAVE %d / %d  ·  %s  ·  %d:%02d" % [
 		WeatherManager.wave, WeatherManager.FINAL_WAVE, WeatherManager.phase_name().to_upper(),
 		seconds / 60, seconds % 60]
+	var active: Array = GameManager.mutations.active if GameManager.mutations else []
+	_mutation.text = ("MUTATION: " + " + ".join(active.map(func(m): return str(m).to_upper()))) if not active.is_empty() else ""
 
 
 func _update_vitals(player: Node) -> void:
