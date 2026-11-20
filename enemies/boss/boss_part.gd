@@ -23,7 +23,7 @@ func take_damage(amount: float, source: Node = null) -> void:
 
 
 ## Guns call this with the exact hit point so feedback lands where you shot.
-func take_bullet(amount: float, point: Vector3, source: Node) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, _rewound_pos := Vector3.INF, _critical_bonus := 1.0) -> void:
 	if boss:
 		boss.damage_part(index, amount, source, point)
 

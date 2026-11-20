@@ -1,11 +1,9 @@
 extends Node3D
-## Small reserve refill, collected automatically within reach and line of sight.
+## Presentation for supply pickups, owned by RunLoot.
 @export_enum("ammo", "health", "suit", "supply") var kind := "ammo"
-var expires_after := 35.0
 var _age := 0.0
 var _root := Node3D.new()
 var _ring: MeshInstance3D
-var _taken := false
 
 static var _mat_cache := {}
 static var _ring_mats := {}
@@ -13,7 +11,6 @@ static var _ring_mesh: TorusMesh
 
 
 func _ready() -> void:
-	add_to_group("ammo_drops")
 	add_child(_root)
 	var colors := {"ammo": Color("#f6cf64"), "health": Color("#ff6e91"), "suit": Color("#66dfda"), "supply": Color("#b5ef82")}
 	var accent: Color = colors.get(kind, Color("#f6cf64"))
@@ -149,48 +146,7 @@ func _add_cone(parent: Node3D, at: Vector3, radius: float, height: float, color:
 	parent.add_child(mi)
 
 
-func _physics_process(delta: float) -> void:
+func _process(delta: float) -> void:
 	_age += delta
 	_root.position.y = 0.36 + sin(_age * 3.0) * 0.07
 	_root.rotation.y += delta * 1.4
-	if _ring:
-		var pulse := 1.0 + sin(_age * 4.0) * 0.08
-		_ring.scale = Vector3(pulse, 1.0, pulse)
-	if _age > expires_after:
-		queue_free()
-	if _taken or _age < .35:
-		return
-	var reach := GameManager.pickup_reach()
-	for player in get_tree().get_nodes_in_group("local_player"):
-		var dist := global_position.distance_to(player.global_position)
-		if player.state != "ok" or dist > reach:
-			continue
-		var origin: Vector3 = player.global_position + Vector3.UP
-		var query := PhysicsRayQueryParameters3D.create(origin, global_position + Vector3.UP * .3, 1)
-		if not get_world_3d().direct_space_state.intersect_ray(query).is_empty():
-			continue
-		if dist > 1.8 and GameManager.has_player_mutation("magnet_hands"):
-			var target: Vector3 = player.global_position + Vector3.UP * 0.2
-			global_position = global_position.move_toward(target, 10.0 * delta)
-			continue
-		var holder := player.get_node("Head/Camera3D/WeaponHolder")
-		if _collect(player, holder):
-			_taken = true
-			Sound.play("pickup", -12.0)
-			var tween := create_tween()
-			tween.tween_property(self, "scale", Vector3.ZERO, .12)
-			tween.tween_callback(queue_free)
-			return
-
-
-func _collect(player: Node, holder: Node) -> bool:
-	var collected := false
-	if kind in ["ammo", "supply"]:
-		collected = holder.collect_ammo(kind == "supply")
-	if kind in ["health", "supply"] and player.health < player.max_health:
-		player.heal(20.0)
-		collected = true
-	if kind in ["suit", "supply"] and player.suit_integrity < 100.0:
-		player.suit_integrity = minf(100.0, player.suit_integrity + 25.0)
-		collected = true
-	return collected

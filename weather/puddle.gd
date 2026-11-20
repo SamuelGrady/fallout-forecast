@@ -88,7 +88,8 @@ func _physics_process(delta: float) -> void:
 	var intensity := WeatherManager.storm_intensity
 	if raining:
 		var growth_rate := 3.0 if WeatherManager.wave_modifier() == WeatherManager.WavePlan.FLOOD else 1.0
-		growth = minf(growth + intensity * growth_rate * dt / grow_time, 1.0)
+		var cap := _sandbag_growth_cap()
+		growth = minf(growth + intensity * growth_rate * dt / grow_time, cap)
 	else:
 		growth = maxf(growth - dt / dry_time, 0.0)
 	_apply()
@@ -170,3 +171,15 @@ func _apply() -> void:
 		_mesh.visible = wet
 		if wet:
 			_mesh.scale = Vector3(r, 1.0, r)
+
+
+func _sandbag_growth_cap() -> float:
+	var limit := max_radius
+	for wall: Node3D in get_tree().get_nodes_in_group("sandbag_walls"):
+		var local := wall.to_local(global_position)
+		if absf(local.y) > 0.7:
+			continue
+		var edge := Vector2(maxf(absf(local.x) - 0.9, 0.0), maxf(absf(local.z) - 0.36, 0.0)).length()
+		limit = minf(limit, edge)
+	# Cap the circular edge against the nearest wall.
+	return clampf(limit / maxf(max_radius, 0.01), 0.0, 1.0)

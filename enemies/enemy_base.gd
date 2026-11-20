@@ -157,8 +157,10 @@ func _physics_process(delta: float) -> void:
 		_retarget_timer = data.retarget_interval
 		target = choose_target()
 		var lure := _nearest(get_tree().get_nodes_in_group("enemy_lures"))
-		if lure and global_position.distance_to(lure.global_position) < 12.0:
-			target = lure
+		if lure:
+			var lure_radius: float = float(lure.data.effect_radius) if lure is WeaponProjectile and lure.data and lure.data.effect_radius > 0.0 else 12.0
+			if global_position.distance_to(lure.global_position) < lure_radius:
+				target = lure
 
 	var buff := speed_multiplier()
 	var move := Vector3.ZERO
@@ -201,10 +203,10 @@ func _physics_process(delta: float) -> void:
 
 ## Movement multiplier: storm, Runners mutation, Molting burst, leg-shot slow, flare weaken.
 func speed_multiplier() -> float:
-	var m := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	var m := WeatherManager.enemy_buff() * (GameManager.enemy_speed_scale() if _suppressed_left <= 0.0 else 1.0)
 	if is_elite:
 		m *= 1.12
-	if _molt_boost_left > 0.0:
+	if _molt_boost_left > 0.0 and _suppressed_left <= 0.0:
 		m *= 1.45
 	if _slow_left > 0.0:
 		m *= 0.5
@@ -225,9 +227,17 @@ func _tick_status(delta: float) -> void:
 	if frame == _status_frame:
 		return
 	_status_frame = frame
+	_suppressed_left = maxf(0.0, _suppressed_left - delta)
 	_slow_left = maxf(0.0, _slow_left - delta)
 	_weaken_left = maxf(0.0, _weaken_left - delta)
 	_molt_boost_left = maxf(0.0, _molt_boost_left - delta)
+	if _burn_left > 0.0 and Net.is_host() and health > 0.0:
+		_burn_left = maxf(0.0, _burn_left - delta)
+		_burn_tick -= delta
+		if _burn_tick <= 0.0:
+			_burn_tick = 0.25
+			var burner: Node = _burn_source if is_instance_valid(_burn_source) else null
+			take_damage(_burn_dps * 0.25, burner)
 
 
 func _record_position() -> void:
@@ -559,13 +569,48 @@ func attack(victim: Node3D, amount: float) -> void:
 
 
 ## Host only. Shooting calls this after the host's raycast hits.
+var _suppressed_left := 0.0
+var _blast_origin := Vector3.INF
+var _burn_left := 0.0
+var _burn_dps := 0.0
+var _burn_tick := 0.0
+var _burn_source: Node = null
+
+
+func ignite(duration: float, dps: float, source: Node = null) -> void:
+	if not Net.is_host() or health <= 0.0:
+		return
+	_burn_left = maxf(_burn_left, duration)
+	_burn_dps = maxf(_burn_dps, dps)
+	if is_instance_valid(source):
+		_burn_source = source
+
+
+func enemy_mutation(id: String) -> bool:
+	return _suppressed_left <= 0.0 and GameManager.has_mutation(id)
+
+
+func suppress_mutations(duration: float) -> void:
+	_suppressed_left = maxf(_suppressed_left, duration)
+
+
+func take_blast(amount: float, source: Node, origin: Vector3, impulse: Vector3) -> void:
+	var previous_origin := _blast_origin
+	_blast_origin = origin
+	take_damage(amount, source)
+	_blast_origin = previous_origin
+	if health > 0.0 and not impulse.is_zero_approx():
+		if not has_method("blocks_impact") or not call("blocks_impact", origin):
+			knockback(impulse)
+
+
 func take_damage(amount: float, _source: Node = null) -> void:
 	if not Net.is_host() or health <= 0.0:
 		return
-	if _source and _source.is_in_group("players"):
+	if is_instance_valid(_source) and _source.is_in_group("players"):
 		_last_hit_by = _source
 	# Molting mutation: first hit sheds carapace for half damage + speed burst.
-	if GameManager.has_mutation("molting") and not _molted and amount > 0.0:
+	if enemy_mutation("molting") and not _molted and amount > 0.0:
 		_molted = true
 		_molt_boost_left = 3.5
 		amount *= 0.5
@@ -573,8 +618,8 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		if Net.is_online() and get_parent() and get_parent().has_method("notify_molt"):
 			get_parent().notify_molt(net_id)
 	# Armor mutation: half damage from the front with visible deflection sparks.
-	if GameManager.has_mutation("armor") and _source is Node3D:
-		var to_source: Vector3 = (_source as Node3D).global_position - global_position
+	if enemy_mutation("armor") and (is_instance_valid(_source) and _source is Node3D or _blast_origin != Vector3.INF):
+		var to_source: Vector3 = (_source.global_position if _blast_origin == Vector3.INF else _blast_origin) - global_position
 		to_source.y = 0.0
 		if to_source.length_squared() > 0.001 and (-global_basis.z).dot(to_source.normalized()) > 0.3:
 			amount *= 0.5
@@ -621,10 +666,10 @@ func die() -> void:
 		spawn_death_fragments(get_parent(), global_position + Vector3.UP * 1.1, throw_vec * 1.3, true)
 	Sound.play_at("enemy_death", global_position)
 	if not GameManager.victory_locked:
-		GameManager.record_kill(_last_hit_by, global_position, is_elite)
-	if not GameManager.victory_locked and GameManager.has_mutation("spores"):
+		GameManager.record_kill(_last_hit_by, global_position, is_elite, miniboss_wave > 0)
+	if not GameManager.victory_locked and enemy_mutation("spores"):
 		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)
-	if not GameManager.victory_locked and GameManager.has_mutation("splitters") and not is_small and miniboss_wave == 0 and get_parent().has_method("spawn_copy"):
+	if not GameManager.victory_locked and enemy_mutation("splitters") and not is_small and miniboss_wave == 0 and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	if get_parent() and get_parent().has_method("notify_despawn"):
@@ -682,7 +727,7 @@ func _face(direction: Vector3, instant := false) -> void:
 	rotation.y += clampf(wrapf(want - rotation.y, -PI, PI), -step, step)
 
 
-func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:
 	if health <= 0.0 or not Net.is_host():
 		return
 	var height := (point.y - rewound_pos.y) / maxf(absf(scale.y), 0.01) if rewound_pos != Vector3.INF else to_local(point).y
@@ -697,10 +742,10 @@ func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vec
 		_slow_left = 1.8
 	if _bullet_critical:
 		stagger(0.3)
-	if GameManager.has_mutation("pressure_front"):
+	if enemy_mutation("pressure_front"):
 		amount *= 0.72
 	_last_bullet_point = point
-	take_damage(amount * (GameManager.headshot_multiplier() if _bullet_critical else 1.0), source)
+	take_damage(amount * (GameManager.headshot_multiplier() * critical_bonus if _bullet_critical else 1.0), source)
 	_last_bullet_point = Vector3.ZERO
 	# The floating number is the shooter's business: take_damage routes it
 	# through Player.notify_hit, so it stacks on their screen wherever the host

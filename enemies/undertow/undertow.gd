@@ -71,6 +71,14 @@ func _emerge(victim: Node3D) -> void:
 	announce_tell("undertow_emerge", .6, -8.0)
 
 
+func harpoon_surface() -> void:
+	_retreat_left = 0.0
+	if _submerged:
+		_set_submerged(false)
+		_emerge(null)
+	_surface_left = maxf(_surface_left, 6.0)
+
+
 func expose_for_cleanup() -> void:
 	_release_puddle()
 	if _submerged:

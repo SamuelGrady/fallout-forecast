@@ -36,6 +36,8 @@ const KINDS := {
 	"health": {"label": "MEDKIT", "icon": "health", "cue": "ping_item"},
 	"suit": {"label": "SUIT PATCH", "icon": "suit", "cue": "ping_item"},
 	"supply": {"label": "SUPPLIES", "icon": "ammo", "cue": "ping_item"},
+	"ammo_box": {"label": "AMMO BOX", "icon": "ammo", "cue": "ping_item"},
+	"tarp": {"label": "TARP", "icon": "shelter", "cue": "ping_item"},
 }
 ## Live pings, oldest first: {owner, kind, pos, enemy_id, age, life, color,
 ## name, marker}. ui/ping_hud.gd draws these.
@@ -265,7 +267,9 @@ func context_ping(player: Player, only_kind := "") -> Dictionary:
 		if objective.get("active"):
 			candidates.append([objective, "objective", 0.985, objective.global_position])
 	for drop in get_tree().get_nodes_in_group("ammo_drops"):
-		candidates.append([drop, str(drop.get("kind")), 0.98, drop.global_position + Vector3.UP * 0.3])
+		var drop_kind := str(drop.get("flavor") if drop.get("flavor") != null else drop.get("kind"))
+		if KINDS.has(drop_kind):
+			candidates.append([drop, drop_kind, 0.98, drop.global_position + Vector3.UP * 0.3])
 	for entry in candidates:
 		if only_kind != "" and entry[1] != only_kind:
 			continue

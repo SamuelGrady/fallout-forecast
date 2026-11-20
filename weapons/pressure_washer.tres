@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Pressure Washer"
+shot_sound = "gun_pressure_washer"
+kind = 0
+mechanic = "wash"
+damage = 4.0
+mag_size = 56
+fire_interval = 0.11
+spread_degrees = 1.1
+max_range = 9.5
+tracer_color = Color(0.439, 0.910, 0.973, 1)
+automatic = true
+knockback = 4.6
+reload_time = 1.95

@@ -415,10 +415,7 @@ func _sync_progress(wave: int, left: int, total: int, recovery: float, score: in
 
 
 func _spawn_street_supplies() -> void:
-	for old in get_tree().get_nodes_in_group("street_supplies"):
-		old.queue_free()
-	if Net.is_online():
-		Net.rpc_to_run(_clear_supplies, [])
+	RunLoot.find(get_tree()).clear_supplies()
 	var sites := get_tree().get_nodes_in_group("street_supply_spawn")
 	if sites.is_empty():
 		sites = get_tree().get_nodes_in_group("drain_spawn")
@@ -429,8 +426,6 @@ func _spawn_street_supplies() -> void:
 		var site := sites[floori(float(i * sites.size()) / count)] as Node3D
 		var point := site.global_position + Vector3.UP * .12
 		spawn_drop(point, "supply", 600.0)
-		if Net.is_online():
-			Net.rpc_to_run(_spawn_supply, [point])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -662,29 +657,10 @@ func _near_players(points: Array) -> Variant:
 
 
 # ------------------------------------------------------------------ network
-## A drop every peer will see: it is collected locally by whoever walks over
-## it, so the node has to exist on every machine.
 func spawn_drop(at: Vector3, kind := "ammo", expires := 35.0) -> void:
-	var drop := Node3D.new()
-	drop.set_script(preload("res://weapons/ammo_drop.gd"))
-	# Set before add_child: ammo_drop's _ready() reads both.
-	drop.set("kind", kind)
-	drop.set("expires_after", expires)
-	add_child(drop)
-	drop.global_position = at
-	if kind == "supply":
-		drop.add_to_group("street_supplies")
-
-
-@rpc("authority", "call_remote", "reliable")
-func _spawn_supply(point: Vector3) -> void:
-	spawn_drop(point, "supply", 600.0)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _clear_supplies() -> void:
-	for old in get_tree().get_nodes_in_group("street_supplies"):
-		old.queue_free()
+	var loot := RunLoot.find(get_tree())
+	if Net.is_host() and loot:
+		loot.spawn_pickup(null, at, kind, expires)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -705,8 +681,6 @@ func sync_to_peer(peer: int) -> void:
 		_spawn_enemy.rpc_id(peer, enemy.net_id, _kind_of(scene), enemy.global_position, enemy.is_small, enemy.is_elite, enemy.miniboss_wave)
 		if enemy.has_method("sync_tells"):
 			enemy.sync_tells(peer)
-	for node in get_tree().get_nodes_in_group("street_supplies"):
-		_spawn_supply.rpc_id(peer, (node as Node3D).global_position)
 	_sync_progress.rpc_id(peer, _wave, remaining(), wave_total(), recovery_time(), GameManager.endless_score)
 
 
@@ -760,8 +734,6 @@ func _despawn_enemy(net_id: int, drops: Array, at: Vector3, throw_vec: Vector3, 
 		enemy.make_corpse(throw_vec)
 		enemy.remove_from_group("enemies")
 		enemy.queue_free()
-	for entry in drops:
-		spawn_drop(entry[0], str(entry[1]))
 
 
 ## One packet per tick for every enemy rather than one per enemy: positions and

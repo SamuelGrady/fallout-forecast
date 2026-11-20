@@ -7,6 +7,7 @@ var _fuse_time := 0.0
 var _natural_blast := false
 var _blast_damage := 0.0
 var _blast_visual := 0.0
+var _blunted := false
 
 
 func _physics_process(delta: float) -> void:
@@ -37,6 +38,9 @@ func _physics_blast(early: bool) -> void:
 		return
 	var radius := _blast_radius() * (.56 if early else 1.0)
 	var amount := data.damage * damage_multiplier() * .38 if early else _blast_damage
+	if _blunted:
+		radius *= 0.64
+		amount *= 0.45
 	GameManager.broadcast_blast(global_position + Vector3.UP * .45, radius * .59, SHOCK_COLOR)
 	for victim in targetable_players():
 		if global_position.distance_to(victim.global_position) <= radius and _has_attack_los(victim):
@@ -83,3 +87,8 @@ func _process(delta: float) -> void:
 
 func is_critical_hit(height: float, _source: Node) -> bool:
 	return height > 1.14 and height < 1.50
+
+
+func blunt_shockwave() -> void:
+	if _fuse > 0.0:
+		_blunted = true
