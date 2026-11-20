@@ -2781,3 +2781,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27, 18, 46)
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=491508752]
 navigation_mesh = SubResource("NavigationMesh_m3fd0")
+
+[node name="CrateStations" type="Node3D" parent="."]
+
+[node name="CanneryStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -5, 0, -35)
+
+[node name="BaitShopStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 50, 0, 10)
+
+[node name="ContainerYardStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -30, 0, -9)

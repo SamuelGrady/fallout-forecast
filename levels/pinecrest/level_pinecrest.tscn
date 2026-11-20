@@ -4497,3 +4497,14 @@ collision_mask = 0
 monitoring = false
 script = ExtResource("38_ko8sq")
 max_radius = 1.8
+
+[node name="CrateStations" type="Node3D" parent="."]
+
+[node name="HardwareStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 7.9)
+
+[node name="GasStationSurplus" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 1.8)
+
+[node name="TownSquareStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -38, 0, -4.7)

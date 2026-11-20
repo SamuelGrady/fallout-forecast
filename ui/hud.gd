@@ -41,7 +41,7 @@ var _player_mut_ids: Array = []
 var _static_label := Label.new()
 var _breather := ProgressBar.new()
 var _pips := Control.new()
-var _slots := HBoxContainer.new()
+var _slots := ItemHotbar.new()
 var _unlock_box := HBoxContainer.new()
 var _unlock_label := Label.new()
 var _unlock_left := 0.0
@@ -438,37 +438,26 @@ func _update_vitals(player: Node) -> void:
 
 
 func _update_weapon(player: Node) -> void:
-	var holder := player.get_node_or_null("Head/Camera3D/WeaponHolder")
-	if holder == null or holder.loadout.is_empty():
-		weapon_label.visible = false
-		ammo_label.visible = false
+	var holder := player.get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
+	if holder == null:
 		return
-	var weapon: WeaponData = holder.loadout[holder.current]
-	# The red dot or bead is the aim point while sighted; hide the crosshair.
+	_slots.refresh(holder)
 	_hit_marker.modulate.a = move_toward(_hit_marker.modulate.a, 0.0 if holder.sighted() else 1.0, 0.2)
-	if _last_weapon != weapon.resource_path:
-		_last_weapon = weapon.resource_path
-		_weapon_name_left = 3.0
-	weapon_label.text = weapon.display_name.to_upper()
-	weapon_label.visible = _weapon_name_left > 0.0
-	ammo_label.visible = true
-	ammo_label.text = "%d / %d" % [holder.ammo[holder.current],holder.reserve[holder.current]]
-	_pips.rounds = holder.ammo[holder.current]
-	_pips.capacity = weapon.mag_size
-	_pips.reload_progress = 1.0-holder._reload_left/maxf(holder._reload_total,0.01) if holder._reload_left > 0 else 0.0
-	if _slots.get_child_count() != holder.loadout.size():
-		for child in _slots.get_children():
-			_slots.remove_child(child)
-			child.queue_free()
-		for i in holder.loadout.size():
-			var slot := Label.new()
-			slot.text = str(i+1)
-			slot.custom_minimum_size = Vector2(34,30)
-			slot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			_slots.add_child(slot)
-	for i in _slots.get_child_count():
-		var active_slot: bool = i == holder.current
-		_slots.get_child(i).modulate = Color("#ffe066") if (active_slot and _unlock_left > 0.0) else (BroadcastUI.CYAN if active_slot else Color(1,1,1,.3))
+	var definition := holder.selected_definition()
+	var is_gun := definition != null and definition.kind == ItemDefinition.Kind.GUN
+	weapon_label.visible = definition != null
+	ammo_label.visible = definition != null
+	_pips.visible = is_gun
+	if definition == null:
+		return
+	var status := "  ·  JAMMED" if holder.jammed() else ("  ·  RELOAD" if holder.reload_remaining() > 0.0 else "")
+	weapon_label.text = definition.display_name.to_upper() + status
+	weapon_label.modulate = ItemCatalog.tier_color(definition.id, holder.selected().tier)
+	var rounds := holder.selected().count
+	ammo_label.text = "%d / %d" % [rounds, holder.selected_reserve()] if is_gun else "×%d" % rounds
+	_pips.rounds = rounds
+	_pips.capacity = definition.weapon.mag_size
+	_pips.reload_progress = 1.0 - holder.reload_remaining() / holder._reload_total if holder.reload_remaining() > 0.0 else 0.0
 
 
 func _update_teammates(local: Node) -> void:
@@ -587,11 +576,11 @@ func _build_visual_status() -> void:
 	_pips.offset_bottom = -4
 	add_child(_pips)
 	_slots.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_slots.offset_left = -230
+	_slots.offset_left = -352
 	_slots.offset_right = -28
-	_slots.offset_top = -170
-	_slots.offset_bottom = -138
-	_slots.alignment = BoxContainer.ALIGNMENT_END
+	_slots.offset_top = -184
+	_slots.offset_bottom = -118
+	_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_slots)
 	_unlock_box.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_unlock_box.offset_left = -260

@@ -108,8 +108,8 @@ static func button_role(button: Button, primary := false, quiet := false) -> voi
 
 static func input_hint(action: String) -> String:
 	if Settings.using_gamepad:
-		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
-	return {"interact":"E", "use_item":"T", "ready_up":"G", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
+		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
+	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
 
 
 static func reveal(control: Control) -> void:
