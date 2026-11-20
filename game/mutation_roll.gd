@@ -187,6 +187,7 @@ func _resolve() -> void:
 
 
 func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Array, announce: bool) -> void:
+	Perf.mark("mutation apply enemy=%s squad=%s" % [enemy_pick, str(granted[0]) if not granted.is_empty() else "none"])
 	stage = "result"
 	time_left = RESULT_TIME
 	active.assign(enemy_list)

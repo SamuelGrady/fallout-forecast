@@ -114,10 +114,8 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 		preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		monitor.add_child(preview)
 	else:
-		var shader := Shader.new()
-		shader.code = MONITOR_SHADER
 		var material := ShaderMaterial.new()
-		material.shader = shader
+		material.shader = _shared_monitor_shader()
 		material.set_shader_parameter("tint", map.accent)
 		monitor.material = material
 	_label(content, map.name, 28, BroadcastUI.PAPER)
@@ -239,3 +237,13 @@ func _action(parent: Control, value: String, action: Callable) -> Button:
 		action.call())
 	parent.add_child(button)
 	return button
+
+
+static var _monitor_shader: Shader
+
+
+static func _shared_monitor_shader() -> Shader:
+	if _monitor_shader == null:
+		_monitor_shader = Shader.new()
+		_monitor_shader.code = MONITOR_SHADER
+	return _monitor_shader

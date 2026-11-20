@@ -10,16 +10,21 @@ extends CanvasLayer
 const TRAIL_DELAY := 0.35
 
 var _trail := {}  # bar -> {chunk, value, hold}
-var _vignette := ColorRect.new()
+var _vignette: ColorRect
 var _breach := Label.new()
 var _breach_beep := 0.0
-var _drips := ColorRect.new()
-var _desat := ColorRect.new()
+var _drips: ColorRect
+var _desat: ColorRect
 var _heart := AudioStreamPlayer.new()
 var _card := Label.new()
 var _card_sub := Label.new()
 var _ticker := VBoxContainer.new()
 var _clock := 0.0
+var _warming := false
+var _seen_drips := false
+var _seen_breach := false
+var _seen_downed := false
+static var _cached_shaders := {}
 
 
 func _ready() -> void:
@@ -59,22 +64,35 @@ func _exit_tree() -> void:
 			pair[0].disconnect(pair[1])
 
 
-func _shader_rect(code: String) -> ColorRect:
+func _shader_rect(key: String, code: String) -> ColorRect:
 	var rect := ColorRect.new()
 	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not _cached_shaders.has(key):
+		var shader := Shader.new()
+		shader.code = code
+		_cached_shaders[key] = shader
 	var mat := ShaderMaterial.new()
-	var shader := Shader.new()
-	shader.code = code
-	mat.shader = shader
+	mat.shader = _cached_shaders[key]
 	rect.material = mat
 	rect.visible = false
 	add_child(rect)
 	return rect
 
 
+## Briefly draw full-screen overlays with amount=0 behind the loading card so
+## ANGLE/WebGL2 compiles their shaders during warm-up rather than mid-combat.
+func warm_shaders(active: bool) -> void:
+	_warming = active
+	for rect in [_drips, _desat, _vignette]:
+		if rect == null:
+			continue
+		(rect.material as ShaderMaterial).set_shader_parameter("amount", 0.0)
+		rect.visible = active
+
+
 func _build_screen_layers() -> void:
-	_drips = _shader_rect("""shader_type canvas_item;
+	_drips = _shader_rect("drips", """shader_type canvas_item;
 uniform float amount = 0.0;
 float h(float x){ return fract(sin(x * 91.7) * 43758.5); }
 void fragment(){
@@ -85,7 +103,17 @@ void fragment(){
 	float lane = 1.0 - smoothstep(0.0, 0.08, abs(fract(UV.x * 34.0) - 0.5) - 0.02);
 	COLOR = vec4(0.75, 0.9, 1.0, streak * lane * amount * step(0.55, h(col + 7.0)) * 0.35);
 }""")
-	_desat = _shader_rect("""shader_type canvas_item;
+	if OS.has_feature("web"):
+		# Zero screen-copy downed vignette on WebGL2 (matches RetroScreen).
+		_desat = _shader_rect("desat_web", """shader_type canvas_item;
+uniform float amount = 0.0;
+void fragment(){
+	float r = length(UV - 0.5);
+	float vig = smoothstep(0.18, 0.72, r);
+	COLOR = vec4(0.08, 0.03, 0.04, (0.28 + 0.52 * vig) * amount);
+}""")
+	else:
+		_desat = _shader_rect("desat", """shader_type canvas_item;
 uniform sampler2D screen : hint_screen_texture, filter_linear;
 uniform float amount = 0.0;
 void fragment(){
@@ -95,7 +123,7 @@ void fragment(){
 	float vig = 1.0 - smoothstep(0.25, 0.75, length(d));
 	COLOR = vec4(mix(c, vec3(g) * vec3(1.0, 0.85, 0.85), amount) * mix(1.0, vig, amount * 0.7), 1.0);
 }""")
-	_vignette = _shader_rect("""shader_type canvas_item;
+	_vignette = _shader_rect("vignette", """shader_type canvas_item;
 uniform float amount = 0.0;
 void fragment(){
 	float r = length(UV - 0.5);
@@ -202,11 +230,16 @@ func _process(delta: float) -> void:
 	var state := str(me.get("state"))
 	var suit := float(me.get("suit_integrity")) if me.get("suit_integrity") != null else 100.0
 	var exposed: bool = me.get("exposed") != false and WeatherManager.is_raining()
+	if _warming:
+		return
 	# Suit breach.
 	var breach := state == "ok" and suit < 25.0 and exposed
 	_vignette.visible = breach
 	_breach.visible = breach and fmod(_clock, 0.8) < 0.55
 	if breach:
+		if not _seen_breach:
+			_seen_breach = true
+			Perf.mark("hud first suit breach")
 		(_vignette.material as ShaderMaterial).set_shader_parameter("amount", 0.35 + 0.2 * sin(_clock * 6.0))
 		_breach_beep -= delta
 		if _breach_beep <= 0.0:
@@ -216,11 +249,17 @@ func _process(delta: float) -> void:
 	var drip := WeatherManager.storm_intensity if exposed and state == "ok" else 0.0
 	_drips.visible = drip > 0.05
 	if _drips.visible:
+		if not _seen_drips:
+			_seen_drips = true
+			Perf.mark("hud first rain drips")
 		(_drips.material as ShaderMaterial).set_shader_parameter("amount", drip)
 	# Downed view.
 	var downed := state == "downed"
 	_desat.visible = downed
 	if downed:
+		if not _seen_downed:
+			_seen_downed = true
+			Perf.mark("hud first downed overlay")
 		(_desat.material as ShaderMaterial).set_shader_parameter("amount", 0.85)
 		if not _heart.playing:
 			_heart.play()

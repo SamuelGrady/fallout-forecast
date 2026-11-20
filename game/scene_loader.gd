@@ -156,7 +156,8 @@ func _process(delta: float) -> void:
 	if not progress.is_empty():
 		var stage := float(progress[0])
 		if not _map_id.is_empty():
-			stage = 0.75 + stage * 0.25 if _map_scene else stage * 0.75
+			# Reserve 0.45..1.0 for post-load map batching and shader warm-up.
+			stage = 0.34 + stage * 0.11 if _map_scene else stage * 0.34
 		_bar.value = lerpf(_bar.value, stage, 0.4)
 	match status:
 		ResourceLoader.THREAD_LOAD_LOADED:
@@ -178,10 +179,23 @@ func _on_loaded(scene: PackedScene) -> void:
 	_finish(scene)
 
 
+## Update the visible loading card during post-load stages (batching, warm-up).
+func set_stage(caption: String, progress: float, detail := "") -> void:
+	if not visible:
+		return
+	_caption.text = caption
+	_bar.value = maxf(_bar.value, clampf(progress, 0.0, 1.0))
+	if not detail.is_empty():
+		_counter.text = detail
+
+
 func _finish(scene: PackedScene) -> void:
 	Perf.mark("load done, entering scene")
 	_entering = true
-	_bar.value = 1.0
+	if _map_scene == null:
+		_bar.value = 1.0
+	else:
+		_bar.value = maxf(_bar.value, 0.45)
 	_target = ""
 	var run: Node
 	var error: Error

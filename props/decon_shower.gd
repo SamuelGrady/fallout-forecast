@@ -56,12 +56,13 @@ func _build_station_visuals() -> void:
 	ring_mat.albedo_color = Color("#2EE6E6")
 	_head_ring.material_override = ring_mat
 	add_child(_head_ring)
-	_head_light = OmniLight3D.new()
-	_head_light.position = Vector3(0, 1.45, 0)
-	_head_light.light_color = Color("#2EE6E6")
-	_head_light.light_energy = 1.4
-	_head_light.omni_range = 3.8
-	add_child(_head_light)
+	if not OS.has_feature("web") and not Net.dedicated:
+		_head_light = OmniLight3D.new()
+		_head_light.position = Vector3(0, 1.45, 0)
+		_head_light.light_color = Color("#2EE6E6")
+		_head_light.light_energy = 1.4
+		_head_light.omni_range = 3.8
+		add_child(_head_light)
 	# Spray nozzle streams (hidden until activated).
 	_spray_root.position = Vector3(0, 1.5, 0)
 	_spray_root.visible = false
@@ -145,6 +146,7 @@ func _refresh_cells(charges: int) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func play_spray() -> void:
+	Perf.mark("decon spray")
 	_spray_left = 1.4
 	_spray_root.visible = true
 	Sound.play_at("decon_spray", global_position + Vector3.UP, -8.0)

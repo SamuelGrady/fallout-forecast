@@ -189,6 +189,7 @@ func _host_line() -> String:
 func _open_maps() -> void:
 	if _leaving or _map_picker:
 		return
+	Perf.mark("lobby open maps")
 	var scene := load(Maps.SELECT_SCENE) as PackedScene
 	_map_picker = scene.instantiate() as MapSelect
 	_map_picker.mode = MapSelect.Mode.VOTE if Net.lobby_votes_enabled else MapSelect.Mode.HOST_PICK
