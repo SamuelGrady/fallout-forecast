@@ -4,7 +4,6 @@ var _panel := PanelContainer.new()
 var _mutations := PanelContainer.new()
 var _mutation_text := RichTextLabel.new()
 var _resume_button: Button
-var _export_button: Button
 var _remote := Label.new()
 var _remote_layer := CanvasLayer.new()
 
@@ -58,7 +57,6 @@ func _ready() -> void:
 	box.add_child(title)
 	_resume_button = _button(box, "RESUME", _resume)
 	_button(box, "MAIN MENU", _main_menu)
-	_export_button = _button(box, "EXPORT PERF REPORT", _export_perf)
 	if not OS.has_feature("web"):
 		_button(box, "QUIT", get_tree().quit)
 	for item in box.get_children():
@@ -175,8 +173,3 @@ func _main_menu() -> void:
 	Net.leave()
 	SceneLoader.cut_to("res://ui/title.tscn")
 
-
-func _export_perf() -> void:
-	var where := Perf.export_report()
-	_export_button.text = "PERF REPORT DOWNLOADED" if OS.has_feature("web") else "PERF REPORT SAVED"
-	print(where)

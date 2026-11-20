@@ -35,7 +35,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_session = Crypto.new().generate_random_bytes(8).hex_encode()
 	_http = HTTPRequest.new()
-	_http.timeout = 15.0
+	_http.timeout = 45.0
 	_http.request_completed.connect(_on_done)
 	add_child(_http)
 	GameManager.run_finished.connect(_on_run_finished)
