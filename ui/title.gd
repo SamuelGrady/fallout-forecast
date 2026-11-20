@@ -94,7 +94,7 @@ void fragment() {
 
 func _build_playback_menu() -> void:
 	_label(_playback, "PLAY", Vector2(78, 34), 22, OSD_COLOR)
-	_label(_playback, "▶", Vector2(51, 36), 17, OSD_COLOR)
+	_label(_playback, ">" if OS.has_feature("web") else "▶", Vector2(51, 36), 17, OSD_COLOR)
 	_counter = _label(_playback, "SP   00:00:00", Vector2(702, 34), 22, OSD_COLOR, 206.0)
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label(_playback, "OCT 31 1987", Vector2(52, 658), 19, OSD_COLOR)

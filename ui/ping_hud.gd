@@ -51,9 +51,17 @@ func _ready() -> void:
 		_wheel_icons.append(icon)
 	system.pinged.connect(_on_pinged)
 	get_window().focus_exited.connect(_cancel)
-	GameManager.run_finished.connect(func(_won: bool, _results: Dictionary):
-		_run_ended = true
-		_cancel())
+	GameManager.run_finished.connect(_on_run_finished)
+
+
+func _exit_tree() -> void:
+	if GameManager.run_finished.is_connected(_on_run_finished):
+		GameManager.run_finished.disconnect(_on_run_finished)
+
+
+func _on_run_finished(_won: bool, _results: Dictionary) -> void:
+	_run_ended = true
+	_cancel()
 
 
 func _local() -> Player:

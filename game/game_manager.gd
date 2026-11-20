@@ -648,7 +648,8 @@ func spawn_boss() -> void:
 		return
 	var at: Vector3 = anchor.global_position if anchor else Vector3(0, 18, 0)
 	_spawn_boss_node(spawner, at)
-	_spawn_boss.rpc(at)
+	if _online():
+		Net.rpc_to_all(_spawn_boss, [at])
 	WeatherManager.hold = true
 	WeatherManager.set_intensity_override(1.0)
 	show_banner("CUMULUS", Color("8FD65A"), 2.2)
@@ -716,13 +717,13 @@ func finish(won: bool) -> void:
 		"players": stats.duplicate(true),
 	}
 	if _online():
-		_finish.rpc(won, results)
+		Net.rpc_to_all(_finish, [won, results])
 	_finish(won, results)
 
 
 func _announce_unlock(weapon_name: String) -> void:
 	if _online():
-		_weapon_unlocked.rpc(weapon_name)
+		Net.rpc_to_all(_weapon_unlocked, [weapon_name])
 	_weapon_unlocked(weapon_name)
 
 
@@ -744,7 +745,7 @@ func _finish(won: bool, results: Dictionary) -> void:
 ## Host: a spore glob on an arc, simulated on every peer; only the host's cloud hurts.
 func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float) -> void:
 	if _online():
-		_spawn_spore.rpc(from, to, flight, damage_per_second)
+		Net.rpc_to_all(_spawn_spore, [from, to, flight, damage_per_second])
 	_spawn_spore(from, to, flight, damage_per_second)
 
 

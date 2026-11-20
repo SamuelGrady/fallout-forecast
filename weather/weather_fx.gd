@@ -210,17 +210,17 @@ void fragment() {
 	_web_rain_material.set_shader_parameter("rain_color", rain_color)
 
 	var mesh := QuadMesh.new()
-	mesh.size = Vector2(0.032, 0.72)
+	mesh.size = Vector2(0.036, 0.78)
 	mesh.material = _web_rain_material
 
 	_web_rain = CPUParticles3D.new()
 	_web_rain.name = "Rain"
-	_web_rain.amount = mini(max_drops, 380)
+	_web_rain.amount = mini(max_drops, 220)
 	_web_rain.lifetime = (spawn_height + 10.0) / fall_speed
-	_web_rain.fixed_fps = 30
+	_web_rain.fixed_fps = 24
 	_web_rain.emitting = false
 	_web_rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_web_rain.emission_box_extents = Vector3(area_size * 0.32, 1.0, area_size * 0.32)
+	_web_rain.emission_box_extents = Vector3(area_size * 0.3, 1.0, area_size * 0.3)
 	_web_rain.direction = Vector3(0.05, -1.0, 0.0)
 	_web_rain.spread = 2.0
 	_web_rain.initial_velocity_min = fall_speed * 0.9
@@ -242,22 +242,26 @@ func _find_scene_lighting() -> void:
 		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 		if _web_rain:
 			_environment.glow_enabled = false
+			_environment.ssao_enabled = false
+			_environment.ssil_enabled = false
+			_environment.sdfgi_enabled = false
 	if _sun:
 		_base_sun_energy = _sun.light_energy
 		if _web_rain:
-			# Keep bright facades readable and cut WebGL2 shadow pass cost.
+			# Disable real-time sun shadow map on WebGL2: cuts full-scene geometry
+			# draw calls in half while keeping directional lighting and fog intact.
 			_base_sun_energy *= 0.75
-			_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-			_sun.directional_shadow_max_distance = 40.0
-			RenderingServer.directional_shadow_atlas_set_size(1024, false)
+			_sun.shadow_enabled = false
 	if _web_rain:
-		# Cull distant OmniLight3Ds so WebGL2 forward lighting stays fast.
+		# Aggressively fade distant streetlamps so WebGL2 forward shaders only
+		# evaluate nearby lights.
 		for light in get_tree().root.find_children("*", "OmniLight3D", true, false):
 			var omni := light as OmniLight3D
-			if omni and not omni.distance_fade_enabled:
+			if omni:
+				omni.shadow_enabled = false
 				omni.distance_fade_enabled = true
-				omni.distance_fade_begin = 26.0
-				omni.distance_fade_length = 8.0
+				omni.distance_fade_begin = 14.0
+				omni.distance_fade_length = 6.0
 
 
 func _sample_fog(intensity: float) -> float:

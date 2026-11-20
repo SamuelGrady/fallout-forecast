@@ -38,6 +38,8 @@ var _beat_done := false
 ## False Clearing mutation: mid-Downpour lull + elite spawn.
 var _false_clearing_done := false
 var _false_clearing_left := 0.0
+## Wave 1-4 Mini-Boss spawned once the main wave horde winds down.
+var _miniboss_spawned := false
 
 
 func _ready() -> void:
@@ -56,6 +58,7 @@ func _on_phase(phase: int, wave: int) -> void:
 		_supplies_pending = true
 		_beat_done = false
 		_false_clearing_done = false
+		_miniboss_spawned = false
 	_timer = 1.5
 	_burst_left = 0
 
@@ -99,6 +102,9 @@ func _physics_process(delta: float) -> void:
 	if not _beat_done and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.5):
 		_beat_done = true
 		_run_beat(_wave)
+	if not _miniboss_spawned and _wave < WeatherManager.FINAL_WAVE and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= _budget and alive_count() <= 3:
+		_miniboss_spawned = true
+		spawn_miniboss(_wave)
 	_reveal_timer -= delta
 	if _spawned >= _budget and alive_count() <= 5 and _reveal_timer <= 0.0:
 		_reveal_timer = 1.0
@@ -183,8 +189,42 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBas
 	return enemy
 
 
+## Host: enter the Wave 1-4 Mini-Boss as the main wave horde wraps up.
+func spawn_miniboss(wave: int) -> EnemyBase:
+	if not Net.is_host():
+		return null
+	var scene := drip_scene
+	match wave:
+		2:
+			scene = gutter_scene
+		3:
+			scene = mister_scene
+		_:
+			scene = drip_scene
+	var at: Variant = _marker_position("enemy_spawn")
+	if at == null:
+		var markers := get_tree().get_nodes_in_group("enemy_spawn")
+		if markers.is_empty():
+			return null
+		at = (markers.pick_random() as Node3D).global_position
+	var point: Vector3 = at
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) > 0:
+		point = NavigationServer3D.map_get_closest_point(map, point)
+	var where := point + Vector3(0, 0.15, 0)
+	var enemy := _make(scene, where, false, 0, false, wave)
+	if enemy:
+		enemy.reveal(8.0)
+		if Net.is_online():
+			Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false, wave])
+		Sound.play("storm_arrival", -6.0, 0.72)
+		GameManager.show_banner("MINI-BOSS: %s" % enemy.miniboss_name, Color("ff5689"), 3.2)
+	return enemy
+
+
 func can_finish_wave() -> bool:
-	return _spawned >= _budget and alive_count() == 0
+	var need_miniboss := _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned
+	return _spawned >= _budget and not need_miniboss and alive_count() == 0
 
 
 func remaining() -> int:
@@ -194,6 +234,9 @@ func remaining() -> int:
 func combat_status() -> String:
 	if WeatherManager.phase not in [WeatherManager.Phase.DRIZZLE, WeatherManager.Phase.DOWNPOUR]:
 		return ""
+	var mb := get_tree().get_first_node_in_group("miniboss")
+	if mb:
+		return "DEFEAT %s" % str(mb.get("miniboss_name"))
 	if _spawned >= _budget:
 		return "CLEAR THE LAST %d" % alive_count() if alive_count() > 0 else "AREA CLEAR"
 	return "%d REMAINING  /  %s" % [remaining(), "RELOAD + RESUPPLY" if _timer > 1.0 else "HORDE INCOMING"]
@@ -263,12 +306,13 @@ func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
 		Net.rpc_to_all(_spawn_enemy, [copy.net_id, _kind_of(scene), at, small, false])
 
 
-## Build one enemy on this peer. `is_small`, `is_elite` and net_id are set before
-## add_child because EnemyBase._ready() reads them. Clients pass the host's id in.
-func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite := false) -> EnemyBase:
+## Build one enemy on this peer. `is_small`, `is_elite`, `miniboss_wave` and net_id
+## are set before add_child because EnemyBase._ready() reads them.
+func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite := false, miniboss_wave := 0) -> EnemyBase:
 	var enemy := scene.instantiate() as EnemyBase
 	enemy.is_small = small
 	enemy.is_elite = elite
+	enemy.miniboss_wave = miniboss_wave
 	if forced_id > 0:
 		enemy.net_id = forced_id
 	else:
@@ -276,7 +320,7 @@ func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite :
 		_next_net_id += 1
 	add_child(enemy, true)
 	enemy.global_position = at
-	if elite:
+	if elite or miniboss_wave > 0:
 		enemy.reveal(10.0)
 	return enemy
 
@@ -383,10 +427,22 @@ func _clear_supplies() -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool, elite := false) -> void:
+func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool, elite := false, miniboss_wave := 0) -> void:
 	if _find_net(net_id) != null:
 		return
-	_make(_scene_of(kind), at, small, net_id, elite)
+	_make(_scene_of(kind), at, small, net_id, elite, miniboss_wave)
+
+
+func notify_miniboss_hp(net_id: int, hp: float, max_hp: float) -> void:
+	Net.rpc_to_run(_sync_miniboss_hp, [net_id, hp, max_hp])
+
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _sync_miniboss_hp(net_id: int, hp: float, max_hp: float) -> void:
+	var enemy := _find_net(net_id)
+	if enemy:
+		enemy.health = hp
+		enemy.max_health = max_hp
 
 
 func notify_tell(net_id: int, cue: String, duration: float, volume: float) -> void:

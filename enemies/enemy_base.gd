@@ -75,6 +75,21 @@ var _last_hit_by: Node = null
 var is_small := false
 ## False Clearing mutation: heavy elite spawn.
 var is_elite := false
+## Wave 1-4 Mini-Boss tier (0 = regular enemy).
+var miniboss_wave := 0
+var miniboss_name := ""
+var max_health := 1.0
+var _miniboss_ability_timer := 4.0
+static var _web := OS.has_feature("web")
+
+const MINIBOSS_NAMES := {
+	1: "THE DREDGE",
+	2: "SEWER MATRIARCH",
+	3: "MIASMA HERALD",
+	4: "VOLT GOLIATH",
+}
+const MINIBOSS_HP_MULT := {1: 4.5, 2: 4.2, 3: 4.5, 4: 5.5}
+const MINIBOSS_SCALES := {1: 1.85, 2: 1.8, 3: 1.85, 4: 1.95}
 
 
 func _ready() -> void:
@@ -84,13 +99,20 @@ func _ready() -> void:
 	var model := Node3D.new()
 	model.set_script(preload("res://enemies/infected_model.gd"))
 	add_child(model)
-	if _visibility_material == null:
-		_visibility_material = ShaderMaterial.new()
-		_visibility_material.shader = preload("res://enemies/visibility.gdshader")
-	_set_overlay.call_deferred(_visibility_material)
-	var mult := 0.3 if is_small else (2.2 if is_elite else 1.0)
-	health = data.max_health * GameManager.enemy_health_scale() * mult
-	if is_small:
+	if not _web:
+		if _visibility_material == null:
+			_visibility_material = ShaderMaterial.new()
+			_visibility_material.shader = preload("res://enemies/visibility.gdshader")
+		_set_overlay.call_deferred(_visibility_material)
+	var mult := 0.3 if is_small else (float(MINIBOSS_HP_MULT.get(miniboss_wave, 4.5)) if miniboss_wave > 0 else (2.2 if is_elite else 1.0))
+	max_health = data.max_health * GameManager.enemy_health_scale() * mult
+	health = max_health
+	if miniboss_wave > 0:
+		add_to_group("miniboss")
+		miniboss_name = str(MINIBOSS_NAMES.get(miniboss_wave, "ALPHA INFECTED"))
+		scale = Vector3.ONE * float(MINIBOSS_SCALES.get(miniboss_wave, 1.85))
+		_miniboss_ability_timer = 4.0
+	elif is_small:
 		scale = Vector3.ONE * 0.6
 	elif is_elite:
 		scale = Vector3.ONE * 1.35
@@ -105,6 +127,8 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_status(delta)
 	_attack_timer -= delta
+	if miniboss_wave > 0:
+		_tick_miniboss_ability(delta)
 	if _stagger_left > 0.0 or _recover_left > 0.0 or _windup_left > 0.0:
 		_stagger_left = maxf(0.0, _stagger_left - delta)
 		_recover_left = maxf(0.0, _recover_left - delta)
@@ -316,7 +340,69 @@ func _refresh_overlay() -> void:
 	elif _reveal_left > 0.0 and _reveal_material:
 		_set_overlay(_reveal_material)
 	else:
-		_set_overlay(_visibility_material)
+		_set_overlay(null if _web else _visibility_material)
+
+
+## Host: Wave 1-4 Mini-Boss signature abilities.
+func _tick_miniboss_ability(delta: float) -> void:
+	_miniboss_ability_timer -= delta
+	if _miniboss_ability_timer > 0.0 or target == null or not is_instance_valid(target):
+		return
+	var dist := global_position.distance_to(target.global_position)
+	match miniboss_wave:
+		1:
+			# THE DREDGE: acid ground-slam shockwave when close.
+			if dist > 7.5:
+				_miniboss_ability_timer = 0.6
+				return
+			_miniboss_ability_timer = 5.5
+			announce_tell("drip_windup", 0.35, -4.0)
+			GameManager.broadcast_blast(global_position + Vector3.UP * 0.7, 2.2, Color(0.65, 1.0, 0.25, 0.9))
+			GameManager.spawn_cloud(global_position + Vector3.UP * 0.3, 6.0, 3.0)
+			for p in targetable_players():
+				var pl := p as Node3D
+				if pl and pl.global_position.distance_to(global_position) <= 5.5:
+					if pl.has_method("take_damage"):
+						pl.take_damage(18.0, self)
+		2:
+			# SEWER MATRIARCH: spawns 2 small Gutter hatchlings around herself.
+			_miniboss_ability_timer = 6.5
+			var spawner := get_parent()
+			if spawner and spawner.has_method("alive_count") and spawner.alive_count() < 45 and spawner.has_method("spawn_copy"):
+				announce_tell("gutter_windup", 0.3, -4.0)
+				GameManager.broadcast_blast(global_position + Vector3.UP * 0.8, 1.4, Color(1.0, 0.24, 0.48, 0.85))
+				for i in 2:
+					spawner.spawn_copy(self, global_position + Vector3(randf_range(-1.6, 1.6), 0.15, randf_range(-1.6, 1.6)), true)
+		3:
+			# MIASMA HERALD: 3-glob spore barrage fan.
+			if dist > 24.0:
+				_miniboss_ability_timer = 0.8
+				return
+			_miniboss_ability_timer = 5.0
+			announce_tell("mister_windup", 0.35, -4.0)
+			var start := global_position + Vector3.UP * 2.4
+			var to_t := target.global_position - global_position
+			to_t.y = 0.0
+			var base_dir := to_t.normalized() if to_t.length_squared() > 0.01 else -global_basis.z
+			var reach := clampf(to_t.length(), 6.0, 20.0)
+			for angle in [-0.32, 0.0, 0.32]:
+				var goal := global_position + base_dir.rotated(Vector3.UP, angle) * reach
+				goal.y = target.global_position.y
+				GameManager.spawn_spore(start, goal, 1.15, 10.0)
+		_:
+			# VOLT GOLIATH: telegraphed lightning strike + chain arc near target.
+			if dist > 26.0:
+				_miniboss_ability_timer = 0.8
+				return
+			_miniboss_ability_timer = 5.0
+			announce_tell("drip_windup", 0.4, -3.0)
+			var strike_at := target.global_position + Vector3(randf_range(-2.2, 2.2), 0.0, randf_range(-2.2, 2.2))
+			WeatherManager.strike_lightning(strike_at)
+			GameManager.broadcast_arc([global_position + Vector3.UP * 2.8, strike_at + Vector3.UP * 1.0], Color(0.45, 0.96, 1.0))
+			for p in targetable_players():
+				var pl := p as Node3D
+				if pl and pl.global_position.distance_to(strike_at) <= 4.2 and pl.has_method("take_damage"):
+					pl.take_damage(16.0, self)
 
 
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
@@ -470,6 +556,8 @@ func take_damage(amount: float, _source: Node = null) -> void:
 			var hit_at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.1
 			ShotFX.sparks(get_parent(), hit_at, to_source.normalized(), 4)
 	health -= amount
+	if miniboss_wave > 0 and Net.is_online() and get_parent() and get_parent().has_method("notify_miniboss_hp"):
+		get_parent().notify_miniboss_hp(net_id, maxf(health, 0.0), max_health)
 	# Hit feedback belongs to whoever fired, host or client, so the shooter's
 	# Player node decides where it appears (see Player.notify_hit).
 	if is_instance_valid(_source) and _source.has_method("notify_hit"):
@@ -487,9 +575,14 @@ func die() -> void:
 	# The spawner owns the drops and tells every peer to make them: a drop is
 	# collected locally by whoever walks over it, so it has to exist everywhere.
 	var drops: Array = []
-	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+	if miniboss_wave > 0:
+		drops.append([global_position, "supply"])
+		drops.append([global_position + Vector3(0.9, 0.0, 0.0), "health"])
+		GameManager.show_banner("%s DEFEATED" % miniboss_name, Color("ffd56a"), 2.4)
+		Sound.play("reel_land", -6.0, 1.15)
+	elif not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
 		drops.append([global_position, "ammo"])
-	if not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+	if miniboss_wave == 0 and not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
 		drops.append([global_position + Vector3(0.6, 0.0, 0.0), "health" if randf() < 0.5 else "suit"])
 	if get_parent() and get_parent().has_method("spawn_drop"):
 		for entry in drops:
@@ -498,11 +591,13 @@ func die() -> void:
 	# further along the shot direction, replicated to every client.
 	var throw_vec := _last_hit_dir * clampf(0.6 + _last_hit_force * 0.12, 0.6, 2.6)
 	spawn_death_fragments(get_parent(), global_position, throw_vec, _bullet_critical)
+	if miniboss_wave > 0:
+		spawn_death_fragments(get_parent(), global_position + Vector3.UP * 1.1, throw_vec * 1.3, true)
 	Sound.play_at("enemy_death", global_position)
 	GameManager.record_kill(_last_hit_by, global_position)
 	if GameManager.has_mutation("spores"):
 		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)
-	if GameManager.has_mutation("splitters") and not is_small and get_parent().has_method("spawn_copy"):
+	if GameManager.has_mutation("splitters") and not is_small and miniboss_wave == 0 and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	if get_parent() and get_parent().has_method("notify_despawn"):

@@ -92,6 +92,36 @@ func _pick(new_color: int, new_skin: int) -> void:
 	changed.emit(color, skin)
 
 
+class _SwatchMark extends Control:
+	var mode := 0  # 0 = none, 1 = check, 2 = taken X
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	func _draw() -> void:
+		if mode == 0:
+			return
+		var w := size.x
+		var h := size.y
+		var stroke := Color("#0c1422")
+		var fg := Color.WHITE
+		if mode == 1:
+			var pts := PackedVector2Array([
+				Vector2(w * 0.24, h * 0.53),
+				Vector2(w * 0.43, h * 0.72),
+				Vector2(w * 0.77, h * 0.30),
+			])
+			draw_polyline(pts, stroke, 6.0, true)
+			draw_polyline(pts, fg, 3.2, true)
+		elif mode == 2:
+			var pad := minf(w, h) * 0.28
+			draw_line(Vector2(pad, pad), Vector2(w - pad, h - pad), stroke, 5.5, true)
+			draw_line(Vector2(w - pad, pad), Vector2(pad, h - pad), stroke, 5.5, true)
+			draw_line(Vector2(pad, pad), Vector2(w - pad, h - pad), Color(1.0, 0.7, 0.75), 3.0, true)
+			draw_line(Vector2(w - pad, pad), Vector2(pad, h - pad), Color(1.0, 0.7, 0.75), 3.0, true)
+
+
 func _refresh() -> void:
 	for i in _swatches.size():
 		var swatch := _swatches[i]
@@ -104,7 +134,14 @@ func _refresh() -> void:
 			style.set_border_width_all(4 if selected else 2)
 			swatch.add_theme_stylebox_override(state, style)
 		swatch.disabled = taken
-		swatch.text = "×" if taken else ("✓" if i == color else "")
+		swatch.text = ""
+		var mark := swatch.get_node_or_null("Mark") as _SwatchMark
+		if mark == null:
+			mark = _SwatchMark.new()
+			mark.name = "Mark"
+			swatch.add_child(mark)
+		mark.mode = 2 if taken else (1 if i == color else 0)
+		mark.queue_redraw()
 		swatch.tooltip_text = Cosmetics.COLOR_NAMES[i] + (" (IN USE)" if taken else "")
 	_skin_label.text = Cosmetics.skin_name(skin)
 	_color_label.text = Cosmetics.COLOR_NAMES[color]

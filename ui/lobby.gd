@@ -10,6 +10,7 @@ const TITLE_SCENE := "res://ui/title.tscn"
 
 var _roster: VBoxContainer
 var _status: Label
+var _name_edit: LineEdit
 var _ready_button: Button
 var _start_button: Button
 var _picker: SuitPicker
@@ -58,9 +59,28 @@ func _ready() -> void:
 	side.add_theme_constant_override("separation", 14)
 	columns.add_child(side)
 
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	side.add_child(name_row)
+	var name_lbl := Label.new()
+	name_lbl.text = "NAME"
+	name_lbl.add_theme_font_size_override("font_size", 20)
+	name_lbl.add_theme_color_override("font_color", BroadcastUI.CYAN)
+	name_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_row.add_child(name_lbl)
+	_name_edit = LineEdit.new()
+	_name_edit.text = Settings.player_name if Settings.player_name != "" else Net.local_name
+	_name_edit.placeholder_text = "YOUR NAME..."
+	_name_edit.max_length = 18
+	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_edit.custom_minimum_size = Vector2(180, 40)
+	_name_edit.text_submitted.connect(_on_name_commit)
+	_name_edit.focus_exited.connect(func(): _on_name_commit(_name_edit.text))
+	name_row.add_child(_name_edit)
+
 	_roster = VBoxContainer.new()
 	_roster.add_theme_constant_override("separation", 6)
-	_roster.custom_minimum_size.y = 200
+	_roster.custom_minimum_size.y = 180
 	side.add_child(_roster)
 
 	_start_button = _button(side, "START RUN", _on_start)
@@ -74,6 +94,15 @@ func _ready() -> void:
 	_refresh()
 	var primary := _start_button if Net.is_host() else _ready_button
 	primary.grab_focus()
+
+
+func _on_name_commit(new_text: String) -> void:
+	var clean := new_text.strip_edges().left(18)
+	if clean == "":
+		return
+	Settings.player_name = clean
+	Settings.save()
+	Net.set_display_name(clean)
 
 
 func _refresh() -> void:
@@ -109,7 +138,7 @@ func _host_line() -> String:
 	if not Net.is_host():
 		# A dedicated server is never in its own roster.
 		if not Net.roster.is_empty() and not Net.roster.has(1):
-			return "CONNECTED TO THE CLOUD SERVER   ·   THE RUN STARTS WHEN EVERYONE IS READY"
+			return "CONNECTED TO THE CLOUD SERVER   |   THE RUN STARTS WHEN EVERYONE IS READY"
 		return "CONNECTED TO HOST"
 	# Shown so the other player can type it in when discovery is blocked.
 	var lan := "no LAN address"
@@ -119,7 +148,7 @@ func _host_line() -> String:
 			continue
 		lan = text
 		break
-	return "HOSTING ON PORT %d   ·   LAN ADDRESS %s" % [Net.PORT, lan]
+	return "HOSTING ON PORT %d   |   LAN ADDRESS %s" % [Net.PORT, lan]
 
 
 func _row(peer_id: int, info: Dictionary) -> Control:

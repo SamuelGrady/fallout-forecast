@@ -19,20 +19,31 @@ signal flashed(position: Vector3)
 
 var _thunder_player := AudioStreamPlayer.new()
 var _bolt_material := StandardMaterial3D.new()
+static var _cached_thunder: AudioStreamWAV
 
 
 func _ready() -> void:
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	if thunder_stream == null:
-		thunder_stream = _make_thunder()
+		if _cached_thunder == null:
+			_cached_thunder = _make_thunder()
+		thunder_stream = _cached_thunder
 	_thunder_player.stream = thunder_stream
 	_thunder_player.volume_db = thunder_volume_db
-	_thunder_player.bus = &"Ambience"
+	var web := OS.has_feature("web")
+	_thunder_player.bus = &"Master" if web else &"Ambience"
+	if web:
+		_thunder_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(_thunder_player)
 
 	_bolt_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_bolt_material.albedo_color = Color(0.9, 0.95, 1.0)
 	_bolt_material.disable_fog = true
+
+
+func _exit_tree() -> void:
+	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
+		WeatherManager.lightning_struck.disconnect(_on_lightning_struck)
 
 
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
@@ -99,8 +110,9 @@ func _add_segment(parent: Node3D, from: Vector3, to: Vector3, width: float) -> v
 
 ## A few seconds of thunder: a sharp crack, then a low rumble that rolls off.
 func _make_thunder() -> AudioStreamWAV:
-	var rate := 22050
-	var seconds := 4.0
+	var web := OS.has_feature("web")
+	var rate := 11025 if web else 22050
+	var seconds := 2.5 if web else 4.0
 	var count := int(rate * seconds)
 	var data := PackedByteArray()
 	data.resize(count * 2)

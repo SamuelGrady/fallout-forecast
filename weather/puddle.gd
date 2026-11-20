@@ -49,12 +49,23 @@ func _ready() -> void:
 	_apply()
 
 
+var _tick_left := 0.0
+
+
 func _physics_process(delta: float) -> void:
+	_tick_left -= delta
+	if _tick_left > 0.0:
+		return
+	var dt := 0.1
+	_tick_left = dt
+	var raining := WeatherManager.is_raining()
+	if not raining and growth <= 0.0:
+		return
 	var intensity := WeatherManager.storm_intensity
-	if WeatherManager.is_raining():
-		growth = minf(growth + intensity * delta / grow_time, 1.0)
+	if raining:
+		growth = minf(growth + intensity * dt / grow_time, 1.0)
 	else:
-		growth = maxf(growth - delta / dry_time, 0.0)
+		growth = maxf(growth - dt / dry_time, 0.0)
 	var base := color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
 	if GameManager.has_mutation("undertow"):
 		var pulse := 0.55 + 0.25 * sin(Time.get_ticks_msec() * 0.006)

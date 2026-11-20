@@ -15,6 +15,8 @@ var unlocked_guns: Array = ["res://weapons/pump_shotgun.tres"]
 ## Survivor look (indices into Cosmetics.COLORS / Cosmetics.SKINS).
 var suit_color := 0
 var suit_skin := 0
+## Custom callsign shown in lobbies, teammate cards, and end-of-run results.
+var player_name := ""
 
 func unlock_gun(path: String) -> void:
 	if path not in unlocked_guns:
@@ -33,6 +35,7 @@ func _ready() -> void:
 		unlocked_guns = cfg.get_value("progress", "guns", unlocked_guns)
 		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
+		player_name = str(cfg.get_value("profile", "name", player_name)).strip_edges().left(18)
 	apply()
 
 
@@ -50,6 +53,7 @@ func save() -> void:
 	cfg.set_value("progress", "guns", unlocked_guns)
 	cfg.set_value("cosmetic", "color", suit_color)
 	cfg.set_value("cosmetic", "skin", suit_skin)
+	cfg.set_value("profile", "name", player_name.strip_edges().left(18))
 	cfg.save(PATH)
 	apply()
 

@@ -348,22 +348,29 @@ func _update_storm() -> void:
 			_player_mut_icons.add_child(icon)
 	_mutation.visible = false
 	var boss := get_tree().get_first_node_in_group("boss")
-	_boss_label.visible = boss != null
-	_boss_bar.visible = boss != null and boss.core_exposed()
+	var miniboss := get_tree().get_first_node_in_group("miniboss") if boss == null else null
+	_boss_label.visible = boss != null or miniboss != null
+	_boss_bar.visible = (boss != null and boss.core_exposed()) or miniboss != null
 	_regen.visible = boss != null and boss.is_burning()
 	for i in _sac_bars.size():
 		_sac_bars[i].visible = boss != null and not boss.core_exposed()
 		if boss:
-			_sac_bars[i].value = boss.part_health[i]/maxf(1,boss.part_max[i])
+			_sac_bars[i].value = boss.part_health[i] / maxf(1, boss.part_max[i])
 	if boss:
 		_boss_label.text = "CUMULUS"
-		_boss_bar.value = boss.part_health[3]/maxf(1,boss.part_max[3])
+		_boss_bar.value = boss.part_health[3] / maxf(1, boss.part_max[3])
+	elif miniboss:
+		var mb_name := str(miniboss.get("miniboss_name"))
+		_boss_label.text = "MINI-BOSS  -  %s" % (mb_name if mb_name != "" else "ALPHA INFECTED")
+		_boss_bar.value = _num(miniboss, "health", 0.0) / maxf(1.0, _num(miniboss, "max_health", 1.0))
 
 
 func _update_vitals(player: Node) -> void:
 	health_bar.max_value = _num(player, "max_health", 100.0)
 	var actual_health := _num(player, "health", health_bar.max_value)
 	health_bar.value = lerpf(health_bar.value, actual_health, 1.0 - exp(-12.0 * get_process_delta_time()))
+	var invuln: bool = bool(player.get("invulnerable"))
+	health_bar.modulate = Color(1.0, 1.0, 1.0, 1.0).lerp(Color(0.75, 1.0, 1.0, 1.0), 0.5 + 0.5 * sin(_time * 26.0)) if invuln else Color.WHITE
 	var delta := get_process_delta_time()
 	_damage_cue_left = maxf(0.0, _damage_cue_left - delta)
 	if _last_health >= 0.0 and actual_health < _last_health:

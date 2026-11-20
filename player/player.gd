@@ -97,11 +97,14 @@ var holding_leaky := false
 var aiming := false
 ## Set by WeaponHolder when firing: suppresses sprint briefly.
 var sprint_lock := 0.0
-## Host: post-revive grace. No damage or suit drain until it runs out.
+## Host: post-hit / post-revive i-frames. No damage (and on revive, no suit drain) until it runs out.
 var _grace_left := 0.0
+var _revive_grace_left := 0.0
+var invulnerable := false
 var _acid_blood_cooldown := 0.0
 var _last_headshot_ms := 0
-const REVIVE_GRACE := 1.0
+const HIT_IFRAMES := 0.65
+const REVIVE_GRACE := 3.0
 const SELF_REVIVE_SUIT := 30.0
 const POS_HISTORY_LIMIT := 24
 var _pos_history: Array[Dictionary] = []
@@ -159,7 +162,10 @@ func _ready() -> void:
 	if is_multiplayer_authority():
 		add_to_group("local_player")
 		camera.current = true
-		if not OS.has_feature("web"):
+		if OS.has_feature("web"):
+			# Fog hides everything past ~80 m; culling far geometry cuts WebGL draw calls.
+			camera.far = 95.0
+		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		camera.current = false
@@ -346,6 +352,8 @@ func _physics_process(delta: float) -> void:
 # ------------------------------------------------------------------ host rules
 func _host_tick(delta: float) -> void:
 	_grace_left = maxf(0.0, _grace_left - delta)
+	_revive_grace_left = maxf(0.0, _revive_grace_left - delta)
+	invulnerable = _grace_left > 0.0 or _revive_grace_left > 0.0
 	_acid_blood_cooldown = maxf(0.0, _acid_blood_cooldown - delta)
 	if state == "turned":
 		_record_position()
@@ -359,7 +367,7 @@ func _host_tick(delta: float) -> void:
 		static_charge = 0.0
 	match state:
 		"ok":
-			if _grace_left > 0.0:
+			if _revive_grace_left > 0.0:
 				return
 			if GameManager.has_player_mutation("hydro_skin") and exposed and WeatherManager.is_raining() and suit_integrity > 0.0:
 				heal(2.5 * delta)
@@ -421,10 +429,15 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	match state:
 		"ok":
-			if _grace_left > 0.0:
+			if _grace_left > 0.0 or _revive_grace_left > 0.0:
 				return
 			health = maxf(health - amount, 0.0)
 			damaged.emit(amount)
+			# Brief hit i-frames on real combat hits so swarms can't instant-delete
+			# the player in a single frame (continuous rain drain ticks stay smooth).
+			if health > 0.0 and (_source != null or amount >= 4.0):
+				_grace_left = maxf(_grace_left, HIT_IFRAMES)
+				invulnerable = true
 			# Static Charge mutation: sprinting builds shock that retaliates on melee hit.
 			if GameManager.has_mutation("static_charge") and static_charge >= 0.25 and _source is EnemyBase:
 				var attacker := _source as EnemyBase
@@ -475,6 +488,8 @@ func revive(by: Node) -> void:
 		return
 	health = revive_health
 	_grace_left = REVIVE_GRACE
+	_revive_grace_left = REVIVE_GRACE
+	invulnerable = true
 	if by == self:
 		self_revives -= 1
 		# A small suit buffer so a solo self-revive in acid rain isn't an
@@ -761,7 +776,7 @@ func _net_step(delta: float) -> void:
 	_vitals_left -= delta
 	if _vitals_left <= 0.0:
 		_vitals_left = VITALS_RATE
-		Net.rpc_to_run(_apply_vitals, [health, suit_integrity, state, bleed_left, tarp_raised, max_health, static_charge])
+		Net.rpc_to_run(_apply_vitals, [health, suit_integrity, state, bleed_left, tarp_raised, max_health, static_charge, invulnerable])
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -819,13 +834,14 @@ func _smooth_remote(delta: float) -> void:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool, max_hp := 100.0, charge := 0.0) -> void:
+func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool, max_hp := 100.0, charge := 0.0, invuln := false) -> void:
 	if Net.is_host() or multiplayer.get_remote_sender_id() != 1:
 		return
 	max_health = max_hp
 	health = hp
 	suit_integrity = suit
 	static_charge = charge
+	invulnerable = invuln
 	bleed_left = bleed
 	tarp_raised = tarp and new_state == "ok"
 	# Assigned, not _set_state(): a remote player's change must not replay the

@@ -6,26 +6,45 @@
   <title>$GODOT_PROJECT_NAME</title>
   $GODOT_HEAD_INCLUDE
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #10101e; color: #f2e3c6; }
-    body { margin: 0; }
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, sans-serif; background: #0c1422; color: #e8e9d5; }
+    body { margin: 0; overflow: hidden; background: #0c1422; }
     canvas { position: fixed; inset: 0; display: block; outline: 0; }
-    #launch { position: fixed; inset: 0; display: grid; place-content: center; padding: 1.5rem; text-align: center; background: #10101e; }
+    #launch {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.5rem;
+      padding: 1.5rem; text-align: center;
+      background: radial-gradient(circle at 50% 45%, #162a3a 0%, #0c1422 72%);
+    }
     #launch[hidden], #fullscreen[hidden] { display: none; }
-    h1 { margin: 0 0 .75rem; color: #ff3ea5; text-transform: uppercase; letter-spacing: .06em; }
-    p { max-width: 32rem; }
-    button { color: inherit; background: #25223e; border: 1px solid #68d9dd; border-radius: .25rem; padding: .6rem 1rem; font: inherit; cursor: pointer; }
-    button:hover { background: #373251; }
-    button:focus-visible { outline: 2px solid #ff3ea5; outline-offset: 3px; }
-    #fullscreen { position: fixed; bottom: .75rem; left: 50%; transform: translateX(-50%); font-size: .875rem; }
+    #start {
+      min-width: 18rem; min-height: 5.5rem; padding: 1.25rem 3.5rem;
+      font-size: 2.5rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+      color: #e8e9d5; background: #1d3c4a;
+      border: 3px solid #66dfda; border-radius: .35rem;
+      box-shadow: 0 0 36px rgba(102, 223, 218, .28), inset 0 0 18px rgba(102, 223, 218, .12);
+      cursor: pointer; transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+    }
+    #start:hover:not(:disabled) {
+      background: #29545d; transform: scale(1.04);
+      box-shadow: 0 0 48px rgba(102, 223, 218, .48), inset 0 0 22px rgba(102, 223, 218, .22);
+    }
+    #start:active:not(:disabled) { transform: scale(.98); }
+    #start:disabled { opacity: .75; cursor: wait; }
+    #start:focus-visible, #fullscreen:focus-visible { outline: 3px solid #ff5689; outline-offset: 4px; }
+    #status { min-height: 1.4rem; margin: 0; font-size: 1.05rem; letter-spacing: .06em; color: #66dfda; }
+    #fullscreen {
+      position: fixed; bottom: .75rem; left: 50%; transform: translateX(-50%);
+      color: #e8e9d5; background: rgba(20, 35, 45, .88); border: 1px solid #66dfda;
+      border-radius: .25rem; padding: .45rem .9rem; font: inherit; font-size: .875rem; cursor: pointer;
+    }
+    #fullscreen:hover { background: #29545d; }
     :fullscreen #fullscreen, .mouse-captured #fullscreen { display: none; }
   </style>
 </head>
 <body>
   <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
   <main id="launch">
-    <h1>$GODOT_PROJECT_NAME</h1>
-    <p>Click the game during a run to capture the mouse. Press Esc to release it.</p>
-    <button id="start" type="button">Start game</button>
+    <button id="start" type="button">PLAY</button>
     <p id="status" role="status"></p>
   </main>
   <button id="fullscreen" type="button" hidden>Fullscreen</button>
@@ -63,27 +82,63 @@
     const start = document.getElementById("start");
     const status = document.getElementById("status");
     const fullscreen = document.getElementById("fullscreen");
+    let gameRunning = false;
+
+    async function lockGameKeys() {
+      if (navigator.keyboard && typeof navigator.keyboard.lock === "function") {
+        try {
+          await navigator.keyboard.lock(["KeyW", "KeyA", "KeyS", "KeyD", "ControlLeft", "ControlRight", "Escape"]);
+        } catch (_) {}
+      }
+    }
+
+    function unlockGameKeys() {
+      if (navigator.keyboard && typeof navigator.keyboard.unlock === "function") {
+        try { navigator.keyboard.unlock(); } catch (_) {}
+      }
+    }
 
     fullscreen.addEventListener("click", async () => {
       try {
         await document.documentElement.requestFullscreen();
+        await lockGameKeys();
       } catch (error) {
         console.warn("Fullscreen unavailable:", error.message);
       }
       canvas.focus();
     });
+    document.addEventListener("fullscreenchange", () => {
+      if (document.fullscreenElement) {
+        lockGameKeys();
+      } else {
+        unlockGameKeys();
+      }
+    });
     document.addEventListener("pointerlockchange", () => {
       document.body.classList.toggle("mouse-captured", document.pointerLockElement === canvas);
     });
-    document.addEventListener("keydown", (event) => {
+
+    // Block accidental Ctrl+W (crouch + move forward), Ctrl+R, Ctrl+T, Ctrl+N, etc.
+    window.addEventListener("keydown", (event) => {
+      if (!gameRunning) return;
+      if ((event.ctrlKey || event.metaKey) && ["KeyW", "KeyR", "KeyT", "KeyN", "KeyS", "KeyP", "Tab"].includes(event.code)) {
+        event.preventDefault();
+      }
       if (event.key === "Escape" && document.fullscreenElement) {
         document.exitFullscreen().catch(console.warn);
       }
     }, { capture: true });
 
+    // Outside fullscreen, browsers reserve Ctrl+W; prompt before closing so crouching + W never drops the game.
+    window.addEventListener("beforeunload", (event) => {
+      if (!gameRunning) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+
     start.addEventListener("click", async () => {
       start.disabled = true;
-      status.textContent = "Loading…";
+      status.textContent = "Loading...";
       try {
         if (typeof Engine === "undefined") throw new Error("The game script could not load.");
         const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
@@ -92,13 +147,15 @@
         await engine.startGame({
           canvas,
           onProgress(current, total) {
-            if (total > 0) status.textContent = `Loading… ${Math.floor(100 * current / total)}%`;
+            if (total > 0) status.textContent = `Loading... ${Math.floor(100 * current / total)}%`;
           },
         });
+        gameRunning = true;
         launch.hidden = true;
         fullscreen.hidden = !document.fullscreenEnabled;
         canvas.focus();
       } catch (error) {
+        start.disabled = false;
         status.textContent = `${error.message} Reload this page to try again.`;
         console.error(error);
       }

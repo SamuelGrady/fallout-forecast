@@ -128,7 +128,7 @@ func _on_started() -> void:
 	_panel.visible = true
 	BroadcastUI.reveal(_panel)
 	_title.text = "MUTATION ROLL"
-	_info.text = "Enemies mutate this wave — and YOUR SQUAD mutates permanently! Match 3 for a JACKPOT (2 player mutations, vote off 1 enemy mutation)."
+	_info.text = "Enemies mutate this wave - and YOUR SQUAD mutates permanently! Match 3 for a JACKPOT (2 player mutations, vote off 1 enemy mutation)."
 	_pull_wait = 0.0
 	_targets.clear()
 	_options.clear()
@@ -201,11 +201,11 @@ func _on_final(active: Array) -> void:
 	for id in active:
 		var entry := _table.get_entry(id)
 		if entry:
-			lines.append("ENEMIES: %s — %s" % [entry.display_name.to_upper(), entry.description])
+			lines.append("ENEMIES: %s - %s" % [entry.display_name.to_upper(), entry.description])
 	for pid in GameManager.mutations.last_player_mutations:
 		if GameManager.PLAYER_MUTATIONS.has(pid):
 			var info: Dictionary = GameManager.PLAYER_MUTATIONS[pid]
-			lines.append("YOUR MUTATION: %s — %s" % [str(info.name), str(info.desc)])
+			lines.append("YOUR MUTATION: %s - %s" % [str(info.name), str(info.desc)])
 	_info.text = "\n".join(PackedStringArray(lines))
 	_hide_at = _clock + 4.5
 	if MenuState.stack.is_empty():

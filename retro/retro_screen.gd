@@ -152,7 +152,7 @@ func _prune_cache() -> void:
 func _apply_enabled() -> void:
 	screen.visible = enabled
 	if _web and not interface_only and get_viewport():
-		get_viewport().scaling_3d_scale = 0.55 if enabled else 0.75
+		get_viewport().scaling_3d_scale = 0.50 if enabled else 0.65
 	if _interface_layer:
 		_interface_layer.visible = enabled
 	rec.visible = enabled

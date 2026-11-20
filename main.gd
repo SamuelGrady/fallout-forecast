@@ -14,6 +14,8 @@ const PlayerScene := preload("res://player/player.tscn")
 
 
 func _ready() -> void:
+	if OS.has_feature("web"):
+		Engine.max_physics_steps_per_frame = 2
 	Sound.start_run()
 	# Tell the host this client can now take per-frame player relays.
 	Net.report_in_run.call_deferred(true)
@@ -149,6 +151,9 @@ func _setup_objectives() -> void:
 		objective.global_position = objective.SITES[site].at + Vector3.UP
 
 
+var _finishing := false
+
+
 func _exit_tree() -> void:
 	Sound.stop_run()
 	Net.report_in_run(false)
@@ -157,18 +162,27 @@ func _exit_tree() -> void:
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 	# The dedicated server has no results screen; game/dedicated_server.gd
 	# unloads the run itself.
-	if Net.dedicated:
+	if Net.dedicated or _finishing:
 		return
-	get_tree().create_timer(4.5).timeout.connect(func():
+	_finishing = true
+	get_tree().create_timer(4.5, true).timeout.connect(func():
+		if not is_inside_tree():
+			return
+		var tree := get_tree()
+		MenuState.reset()
 		_end()
-		get_tree().change_scene_to_file("res://ui/results.tscn"))
+		tree.change_scene_to_file.call_deferred("res://ui/results.tscn"))
 
 
 ## The host left (or dropped us): there is no run to be in any more.
 func _leave_to_title() -> void:
+	if _finishing or not is_inside_tree():
+		return
+	_finishing = true
+	MenuState.reset()
 	_end()
 	Net.leave()
-	get_tree().change_scene_to_file("res://ui/title.tscn")
+	get_tree().change_scene_to_file.call_deferred("res://ui/title.tscn")
 
 
 ## Run bookkeeping, but leave the session up: after a finished run everyone

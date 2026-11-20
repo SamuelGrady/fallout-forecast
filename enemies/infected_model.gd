@@ -53,41 +53,48 @@ func _ready() -> void:
 		pants = Color("#3a2d4a")
 		accent = Color("#c6f075")
 		_reach = 0.3
+	var web := OS.has_feature("web")
 	_body = Node3D.new()
 	add_child(_body)
 	# Torso: pelvis, belly, chest. The shirt is torn open over the ribs.
 	_piece(_body, Vector3(0, 0.8, 0), Vector3(.5, .2, .3), pants)
 	_piece(_body, Vector3(0, 1.0, 0), Vector3(.52, .24, .3), shirt)
 	_piece(_body, Vector3(0, 1.27, 0.02), Vector3(.6, .34, .34), shirt)
-	_piece(_body, Vector3(.1, 1.2, -.17), Vector3(.2, .3, .02), skin.darkened(.15))  # torn gap
-	for i in 3:
-		_piece(_body, Vector3(.1, 1.12 + i * .08, -.18), Vector3(.18, .025, .02), Color("#e8e3cf"))  # ribs
-	_piece(_body, Vector3(-.15, 1.0, -.16), Vector3(.12, .1, .02), Color("#6b1f2a"))  # wound
-	if not gutter and not mister:
-		_piece(_body, Vector3(-.06, 1.24, -.18), Vector3(.06, .22, .02), accent)  # tie or zip
+	if not web:
+		_piece(_body, Vector3(.1, 1.2, -.17), Vector3(.2, .3, .02), skin.darkened(.15))  # torn gap
+		for i in 3:
+			_piece(_body, Vector3(.1, 1.12 + i * .08, -.18), Vector3(.18, .025, .02), Color("#e8e3cf"))  # ribs
+		_piece(_body, Vector3(-.15, 1.0, -.16), Vector3(.12, .1, .02), Color("#6b1f2a"))  # wound
+		if not gutter and not mister:
+			_piece(_body, Vector3(-.06, 1.24, -.18), Vector3(.06, .22, .02), accent)  # tie or zip
 	# Neck and head with a hanging jaw, sunken eyes and a little hair.
 	_piece(_body, Vector3(0, 1.48, 0), Vector3(.16, .12, .16), skin.darkened(.1))
 	_body.add_child(_head)
 	_head.position.y = 1.63
 	_piece(_head, Vector3(0, .04, -.02), Vector3(.4, .34, .38), skin)
 	_piece(_head, Vector3(0, .2, .02), Vector3(.42, .08, .4), Color("#3b3026") if not mister else skin.darkened(.2))  # hair
-	_piece(_head, Vector3(.12, .24, -.08), Vector3(.08, .08, .08), Color("#3b3026") if not mister else skin.darkened(.2))
+	if not web:
+		_piece(_head, Vector3(.12, .24, -.08), Vector3(.08, .08, .08), Color("#3b3026") if not mister else skin.darkened(.2))
 	for side in [-1.0, 1.0]:
-		_piece(_head, Vector3(side * .1, .07, -.2), Vector3(.1, .07, .03), Color("#1a1412"))  # socket
-		_piece(_head, Vector3(side * .1, .07, -.215), Vector3(.035, .035, .02), Color("#ffed8a"), true)  # eye glow
-		_piece(_head, Vector3(side * .21, .03, 0), Vector3(.04, .1, .08), skin.darkened(.1))  # ear
-	_piece(_head, Vector3(0, -.01, -.215), Vector3(.06, .06, .04), skin.darkened(.2))  # nose
+		if not web:
+			_piece(_head, Vector3(side * .1, .07, -.2), Vector3(.1, .07, .03), Color("#1a1412"))  # socket
+			_piece(_head, Vector3(side * .21, .03, 0), Vector3(.04, .1, .08), skin.darkened(.1))  # ear
+		_piece(_head, Vector3(side * .1, .07, -.215), Vector3(.045 if web else .035, .045 if web else .035, .02), Color("#ffed8a"), true)  # eye glow
+	if not web:
+		_piece(_head, Vector3(0, -.01, -.215), Vector3(.06, .06, .04), skin.darkened(.2))  # nose
 	_jaw = Node3D.new()
 	_jaw.position = Vector3(0, -.11, .02)
 	_head.add_child(_jaw)
 	_piece(_jaw, Vector3(0, -.05, -.1), Vector3(.32, .09, .28), skin.darkened(.08))
-	_piece(_jaw, Vector3(0, .0, -.22), Vector3(.26, .03, .03), Color("#efe6c8"))  # teeth
-	_piece(_head, Vector3(0, -.1, -.2), Vector3(.26, .03, .03), Color("#efe6c8"))
-	_piece(_head, Vector3(0, -.13, -.16), Vector3(.24, .05, .1), Color("#3a0f14"))  # mouth
+	if not web:
+		_piece(_jaw, Vector3(0, .0, -.22), Vector3(.26, .03, .03), Color("#efe6c8"))  # teeth
+		_piece(_head, Vector3(0, -.1, -.2), Vector3(.26, .03, .03), Color("#efe6c8"))
+		_piece(_head, Vector3(0, -.13, -.16), Vector3(.24, .05, .1), Color("#3a0f14"))  # mouth
 	if gutter:
 		# Wide maw with extra teeth and slime down the front.
-		for i in 4:
-			_piece(_jaw, Vector3(-.12 + i * .08, .03, -.23), Vector3(.03, .06, .02), Color("#efe6c8"))
+		if not web:
+			for i in 4:
+				_piece(_jaw, Vector3(-.12 + i * .08, .03, -.23), Vector3(.03, .06, .02), Color("#efe6c8"))
 		_piece(_body, Vector3(0, 1.12, -.18), Vector3(.3, .4, .02), accent, true)
 	for side in [-1.0, 1.0]:
 		# Shoulder -> upper arm -> elbow -> forearm -> hand with three fingers.
@@ -102,8 +109,9 @@ func _ready() -> void:
 		var fore := (.32 if not gutter else .42)
 		_piece(elbow, Vector3(0, -fore * .5, 0), Vector3(.13, fore, .14), skin if randf() < 0.5 else shirt)
 		_piece(elbow, Vector3(0, -fore - .05, 0), Vector3(.15, .1, .1), skin)
-		for f in 3:
-			_piece(elbow, Vector3(-.045 + f * .045, -fore - .14, 0), Vector3(.03, .1 if not gutter else .16, .03), skin.darkened(.12))
+		if not web:
+			for f in 3:
+				_piece(elbow, Vector3(-.045 + f * .045, -fore - .14, 0), Vector3(.03, .1 if not gutter else .16, .03), skin.darkened(.12))
 		limbs.append(arm)
 		_elbows.append(elbow)
 		# Hip -> thigh -> knee -> shin -> shoe.
@@ -116,7 +124,7 @@ func _ready() -> void:
 		leg.add_child(knee)
 		_piece(knee, Vector3(0, -.15, 0), Vector3(.17, .3, .19), pants.darkened(.1))
 		_piece(knee, Vector3(0, -.32, -.06), Vector3(.2, .1, .32), Color("#111b28"))
-		if randf() < 0.3:
+		if not web and randf() < 0.3:
 			_piece(knee, Vector3(0, -.08, -.1), Vector3(.12, .08, .02), skin.darkened(.15))  # torn knee
 		limbs.append(leg)
 		_knees.append(knee)
@@ -126,12 +134,15 @@ func _ready() -> void:
 		for side in [-1.0, 1.0]:
 			_piece(_body, Vector3(side * .3, 1.22, .26), Vector3(.34, .5, .34), accent, true)
 		_piece(_body, Vector3(0, 1.45, .3), Vector3(.28, .3, .26), accent, true)
-		_piece(_head, Vector3(0, -.12, -.32), Vector3(.1, .1, .22), Color("#5b4a66"))
+		if not web:
+			_piece(_head, Vector3(0, -.12, -.32), Vector3(.1, .1, .22), Color("#5b4a66"))
 		_piece(_head, Vector3(0, -.12, -.45), Vector3(.16, .16, .06), accent, true)
 		scale = Vector3(1.2, 1.12, 1.15)
 	if gutter:
 		scale = Vector3(1.05, .82, 1.0)
 		_body.rotation.x = -.25
+	if _enemy.miniboss_wave > 0:
+		_build_miniboss_trappings(_enemy.miniboss_wave)
 	scale *= randf_range(0.94, 1.06)
 	_body.add_child(_mutation_root)
 	_apply_mutations()
@@ -253,6 +264,47 @@ static func _shared_material(color: Color, glow: bool, metallic: float) -> Stand
 
 
 static var _unit_box: BoxMesh
+static var _web_model := OS.has_feature("web")
+
+
+func _build_miniboss_trappings(wave: int) -> void:
+	match wave:
+		1:
+			# THE DREDGE: hazard bulldozer pauldrons + glowing toxic furnace core.
+			var armor := Color("#c89328")
+			var core := Color("#a8ff3e")
+			_piece(_body, Vector3(0, 1.18, -0.22), Vector3(0.76, 0.56, 0.16), armor, false, 0.7)
+			_piece(_body, Vector3(0, 1.18, -0.32), Vector3(0.24, 0.24, 0.08), core, true)
+			for side in [-1.0, 1.0]:
+				_piece(_body, Vector3(side * 0.54, 1.46, -0.02), Vector3(0.38, 0.32, 0.44), armor, false, 0.75)
+			_piece(_head, Vector3(0, 0.28, -0.06), Vector3(0.48, 0.16, 0.46), armor, false, 0.7)
+		2:
+			# SEWER MATRIARCH: crimson dorsal spines + glowing brood sacs.
+			var spine := Color("#ff3e7a")
+			var sac := Color("#d4ff4a")
+			for i in 3:
+				_piece(_body, Vector3(0, 1.05 + i * 0.22, 0.26 + i * 0.03), Vector3(0.14, 0.22, 0.28), spine, true)
+			for side in [-1.0, 1.0]:
+				_piece(_body, Vector3(side * 0.34, 1.18, 0.24), Vector3(0.28, 0.34, 0.28), sac, true)
+			_piece(_head, Vector3(0, 0.24, -0.1), Vector3(0.46, 0.12, 0.12), spine, true)
+		3:
+			# MIASMA HERALD: oversized twin toxic canisters + neon respirator visor.
+			var glow := Color("#88ff3c")
+			var metal := Color("#463864")
+			for side in [-1.0, 1.0]:
+				_piece(_body, Vector3(side * 0.46, 1.38, 0.32), Vector3(0.36, 0.68, 0.36), metal, false, 0.6)
+				_piece(_body, Vector3(side * 0.46, 1.76, 0.32), Vector3(0.26, 0.22, 0.26), glow, true)
+			_piece(_head, Vector3(0, 0.06, -0.26), Vector3(0.42, 0.18, 0.1), glow, true)
+		_:
+			# VOLT GOLIATH: twin Tesla spires + crackling cyan chest reactor.
+			var volt := Color("#66f2ff")
+			var plate := Color("#23334c")
+			_piece(_body, Vector3(0, 1.2, -0.22), Vector3(0.78, 0.6, 0.16), plate, false, 0.75)
+			_piece(_body, Vector3(0, 1.2, -0.32), Vector3(0.26, 0.34, 0.08), volt, true)
+			for side in [-1.0, 1.0]:
+				_piece(_body, Vector3(side * 0.48, 1.76, 0.04), Vector3(0.12, 0.72, 0.12), plate, false, 0.8)
+				_piece(_body, Vector3(side * 0.48, 2.16, 0.04), Vector3(0.24, 0.24, 0.24), volt, true)
+			_piece(_head, Vector3(0, 0.26, 0), Vector3(0.5, 0.12, 0.46), volt, true)
 
 
 func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> void:
@@ -263,6 +315,8 @@ func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := fa
 	mesh.mesh = _unit_box
 	mesh.position = at
 	mesh.scale = size
+	if _web_model:
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mesh.material_override = _shared_material(color, glow, metallic)
 	parent.add_child(mesh)
 

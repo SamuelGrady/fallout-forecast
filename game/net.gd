@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 4
+const PROTOCOL := 5
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -156,7 +156,8 @@ func host(port := PORT, as_player := true) -> Error:
 	multiplayer.multiplayer_peer = peer
 	_host_port = port
 	mode = Mode.HOST
-	local_name = "HOST" if as_player else "CLOUD SERVER"
+	var custom := Settings.player_name.strip_edges().left(18)
+	local_name = (custom if custom != "" else "HOST") if as_player else "CLOUD SERVER"
 	roster.clear()
 	if as_player:
 		roster[1] = {"name": local_name, "ready": false}
@@ -244,6 +245,22 @@ func set_cosmetic(color: int, skin: int) -> void:
 		_request_cosmetic.rpc_id(1, color, skin)
 
 
+func set_display_name(new_name: String) -> void:
+	var clean := new_name.strip_edges().left(18)
+	if clean == "":
+		return
+	local_name = clean
+	if not is_online():
+		return
+	if is_host():
+		if roster.has(1):
+			roster[1]["name"] = clean
+			_broadcast_roster()
+			roster_changed.emit()
+	else:
+		_request_name.rpc_id(1, clean)
+
+
 ## Host: store a peer's look, nudging the colour to the next free one.
 func _assign_cosmetic(peer_id: int, color: int, skin: int) -> void:
 	var taken := []
@@ -273,7 +290,10 @@ func end_run() -> void:
 func _on_connected() -> void:
 	if mode != Mode.CLIENT:
 		return
-	if local_name == "":
+	var saved := Settings.player_name.strip_edges().left(18)
+	if saved != "":
+		local_name = saved
+	elif local_name == "":
 		local_name = "PLAYER %d" % multiplayer.get_unique_id()
 	_connect_left = 0.0
 	# Keep the hello RPC's argument types stable so older hosts can decline it.
@@ -488,6 +508,18 @@ func _request_cosmetic(color: int, skin: int) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	if roster.has(peer_id):
 		_assign_cosmetic(peer_id, color, skin)
+		_broadcast_roster()
+		roster_changed.emit()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_name(new_name: String) -> void:
+	if not is_host() or run_active:
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	var clean := new_name.strip_edges().left(18)
+	if clean != "" and roster.has(peer_id):
+		roster[peer_id]["name"] = clean
 		_broadcast_roster()
 		roster_changed.emit()
 

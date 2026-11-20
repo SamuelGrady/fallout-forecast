@@ -11,6 +11,7 @@ const LOBBY_SCENE := "res://ui/lobby.tscn"
 
 var _list: VBoxContainer
 var _status: Label
+var _name_edit: LineEdit
 var _address: LineEdit
 var _connect_button: Button
 var _leaving := false
@@ -29,7 +30,7 @@ func _ready() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.offset_left = -340
 	box.offset_right = 340
-	box.offset_top = -270
+	box.offset_top = -290
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -40,6 +41,24 @@ func _ready() -> void:
 	title.add_theme_font_size_override("font_size", 52)
 	box.add_child(title)
 
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 12)
+	box.add_child(name_row)
+	var name_lbl := Label.new()
+	name_lbl.text = "YOUR NAME"
+	name_lbl.add_theme_font_size_override("font_size", 22)
+	name_lbl.add_theme_color_override("font_color", BroadcastUI.CYAN)
+	name_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_row.add_child(name_lbl)
+	_name_edit = LineEdit.new()
+	_name_edit.text = Settings.player_name
+	_name_edit.placeholder_text = "ENTER CALLSIGN..."
+	_name_edit.max_length = 18
+	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_edit.custom_minimum_size = Vector2(240, 44)
+	_name_edit.text_changed.connect(_on_name_changed)
+	name_row.add_child(_name_edit)
+
 	_status = Label.new()
 	_status.text = "SCANNING THE LAN..."
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -48,7 +67,7 @@ func _ready() -> void:
 	box.add_child(_status)
 
 	# The always-on dedicated server (server/README.md), above the LAN list.
-	var cloud := _button(box, "CLOUD SERVER   ·   %s" % Net.CLOUD_HOST, func(): _connect_to(Net.CLOUD_URL))
+	var cloud := _button(box, "CLOUD SERVER   |   %s" % Net.CLOUD_HOST, func(): _connect_to(Net.CLOUD_URL))
 	cloud.custom_minimum_size = Vector2(0, 52)
 	BroadcastUI.button_role(cloud, true)
 
@@ -94,6 +113,12 @@ func _exit_tree() -> void:
 	Net.stop_scanning()
 
 
+func _on_name_changed(new_text: String) -> void:
+	var clean := new_text.strip_edges().left(18)
+	Settings.player_name = clean
+	Net.local_name = clean
+
+
 func _refresh() -> void:
 	if _leaving:
 		return
@@ -116,7 +141,7 @@ func _refresh() -> void:
 		# loop variable.
 		var address := "%s:%d" % [str(ip), int(info.get("port", Net.PORT))]
 		var row := Button.new()
-		row.text = "%s   ·   %d / %d   ·   %s" % [
+		row.text = "%s   |   %d / %d   |   %s" % [
 			str(info.get("name", "HOST")), int(info.get("players", 0)),
 			int(info.get("max", 4)), address]
 		row.custom_minimum_size = Vector2(0, 48)
@@ -132,6 +157,10 @@ func _connect_to(address: String) -> void:
 	var target := address.strip_edges()
 	if target == "" or _leaving or _connecting:
 		return
+	var clean_name := _name_edit.text.strip_edges().left(18)
+	Settings.player_name = clean_name
+	Settings.save()
+	Net.local_name = clean_name
 	_status.text = "CONNECTING TO %s ..." % target.to_upper()
 	_status.add_theme_color_override("font_color", Color("FFE04A"))
 	_connecting = true
