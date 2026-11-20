@@ -24,7 +24,7 @@ func close(menu: Node) -> void:
 	if not stack.is_empty():
 		stack.back().visible = true
 		stack.back().focus_default()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if not stack.is_empty() or GameManager.mutations.stage != "" else Input.MOUSE_MODE_CAPTURED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if not stack.is_empty() else Input.MOUSE_MODE_CAPTURED
 
 
 func reset() -> void:

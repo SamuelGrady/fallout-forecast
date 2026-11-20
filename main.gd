@@ -22,6 +22,11 @@ func _ready() -> void:
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
+	# Teammate nameplates and off-screen pointers, visible through walls.
+	var markers := CanvasLayer.new()
+	markers.name = "TeammateMarkers"
+	markers.set_script(preload("res://ui/teammate_markers.gd"))
+	add_child(markers)
 	if OS.is_debug_build():
 		var dev_menu := CanvasLayer.new()
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))

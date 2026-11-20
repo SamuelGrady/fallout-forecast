@@ -11,11 +11,25 @@ func _ready() -> void:
 	add_child(shade)
 	_panel.theme = BroadcastUI.theme()
 	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_panel.offset_left = -190
-	_panel.offset_right = 190
+	_panel.offset_left = -410
+	_panel.offset_right = -30
 	_panel.offset_top = -180
 	_panel.offset_bottom = 180
 	add_child(_panel)
+	# Right column: what is mutated right now, with descriptions.
+	_mutations.theme = BroadcastUI.theme()
+	_mutations.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_mutations.offset_left = 10
+	_mutations.offset_right = 430
+	_mutations.offset_top = -240
+	_mutations.offset_bottom = 240
+	add_child(_mutations)
+	_mutation_text.bbcode_enabled = true
+	_mutation_text.fit_content = false
+	_mutation_text.scroll_active = true
+	_mutation_text.add_theme_font_size_override("normal_font_size", 17)
+	_mutation_text.add_theme_font_size_override("bold_font_size", 19)
+	_mutations.add_child(_mutation_text)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
 	_panel.add_child(box)
@@ -43,6 +57,38 @@ func _ready() -> void:
 	add_sibling.call_deferred(_remote_layer)
 	_remote_layer.add_child(_remote)
 	GameManager.global_pause_changed.connect(_on_global_pause)
+
+
+var _mutations := PanelContainer.new()
+var _mutation_text := RichTextLabel.new()
+
+
+## Fill the right column: this wave's enemy mutation and the squad's run-long
+## mutations, each with its description.
+func _refresh_mutations() -> void:
+	var roll := GameManager.mutations
+	var lines := PackedStringArray()
+	lines.append("[b][color=#ff6a6a]ENEMY MUTATIONS (THIS WAVE)[/color][/b]")
+	if roll == null or roll.active.is_empty():
+		lines.append("[color=#9aa3ad]None right now.[/color]")
+	else:
+		for id in roll.active:
+			var entry: MutationData = roll.table.get_entry(id)
+			if entry:
+				lines.append("[b]%s[/b]
+[color=#e6d4d4]%s[/color]" % [entry.display_name.to_upper(), entry.description])
+	lines.append("")
+	lines.append("[b][color=#8fe36a]SQUAD MUTATIONS (THIS RUN)[/color][/b]")
+	if roll == null or roll.player_mutations.is_empty():
+		lines.append("[color=#9aa3ad]None yet. Draft one after each Calm.[/color]")
+	else:
+		for id in roll.player_mutations:
+			if GameManager.PLAYER_MUTATIONS.has(id):
+				var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
+				lines.append("[b]%s[/b]
+[color=#dcefd6]%s[/color]" % [str(info.name), str(info.desc)])
+	_mutation_text.text = "
+".join(lines)
 
 
 ## Shown on everyone else's screen while someone has the game paused.
@@ -89,6 +135,7 @@ func _input(event: InputEvent) -> void:
 			_remote.visible = false
 
 func focus_default() -> void:
+	_refresh_mutations()
 	_panel.get_child(0).get_child(1).grab_focus()
 
 func _resume() -> void:

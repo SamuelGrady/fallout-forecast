@@ -1,77 +1,217 @@
 extends Node
-## Child of GameManager: the Mutation Roll.
-## 1. Mutation Roll phase starts: WeatherManager holds the phase; every player
-##    gets "[E] Pull the lever" (5 s, or until everyone has pulled).
-## 2. The host spins three reels (weighted). The symbol on 2+ reels is the
-##    wave's mutation; three different symbols = the middle reel's.
-## 3. Three of a kind = JACKPOT: a second mutation stacks on top and players
-##    vote (keys 1 / 2, 6 s) to cancel one of the two.
-## 4. The result is announced and the storm moves on to Drizzle. Mutations last
-##    until Clearing.
+## Child of GameManager: the Mutation Draft (replaces the old slot reel).
+## 1. Mutation phase starts: WeatherManager holds the phase and the host deals
+##    three cards. Each card pairs an ENEMY mutation (this wave only) with a
+##    PLAYER mutation (kept for the rest of the run).
+## 2. Everyone picks a card with 1 / 2 / 3 (D-pad on a controller). Solo, the
+##    pick resolves at once; in a session the host tallies one vote per peer
+##    and resolves when everyone has voted or DRAFT_TIME runs out (most votes
+##    wins, ties broken at random, no votes = a random card).
+## 3. The winning card's enemy mutation is active until Clearing; its player
+##    mutation joins the squad's list for the run.
 ##
-## The host owns the reels, the timers and the tally; every step is broadcast,
-## so all peers show the same result. Pulls and votes are per peer id and come
-## to the host, which counts one each.
+## The host owns the deck, the timer and the tally; every step is broadcast so
+## every peer shows the same cards and result.
 
-signal roll_started
-signal pulls_changed(pulled: int, needed: int)
-signal roll_result(symbols: Array, mutations: Array, jackpot: bool)
-signal vote_started(options: Array)
+signal cards_dealt(cards: Array)
+signal votes_changed(counts: Array)
 signal vote_cast(index: int)
+signal draft_resolved(index: int)
 signal mutations_changed(active: Array)
 signal player_mutations_changed(active: Array)
 
-const PULL_TIME := 5.0
-const LAND_TIME := 3.0
-const VOTE_TIME := 6.0
+const DRAFT_TIME := 14.0
+const RESULT_TIME := 2.2
 
 var table: MutationTable
 ## Active enemy mutations for the current wave (cleared at Clearing).
 var active: Array[String] = []
 ## Accumulated player mutations for the current run (cleared on new run).
 var player_mutations: Array[String] = []
-## New player mutation(s) granted by the most recent roll (for the reel UI).
+## Player mutation(s) granted by the most recent draft (for the HUD/banner).
 var last_player_mutations: Array[String] = []
-var stage := ""  # "", "pulling", "landing", "voting"
+## "" | "voting" | "result"
+var stage := ""
+## The dealt cards: [{"enemy": id, "player": id}, …]
+var cards: Array = []
+var vote_counts: Array = [0, 0, 0]
+var local_pick := -1
+var time_left := 0.0
 
-var _timer := 0.0
-var _pulled := {}            # peer id -> true (host only)
-var _pending: Array = []
-var _last_jackpot := false
-var _votes := {}             # peer id -> option index (host only)
-var _local_voted := false
-var _local_pulled := false
+var _votes := {}  # peer id -> card index (host only)
 
 
 func _ready() -> void:
 	table = load("res://game/mutation_table.tres")
 
 
-# ------------------------------------------------------------------ steps
+# ------------------------------------------------------------------ deal
 func begin() -> void:
 	if not Net.is_host():
 		return
-	_apply_begin()
-	Net.rpc_to_all(_begin_rpc)
-
-
-func _apply_begin() -> void:
-	stage = "pulling"
-	_timer = PULL_TIME
-	_pulled.clear()
-	_last_jackpot = false
-	_local_voted = false
-	_local_pulled = false
 	WeatherManager.hold = true
-	roll_started.emit()
-	pulls_changed.emit(0, GameManager.player_count())
+	var dealt := _deal()
+	_apply_deal(dealt)
+	Net.rpc_to_all(_deal_rpc, [dealt])
+
+
+func _deal() -> Array:
+	var enemy_ids: Array = []
+	var pool := table.entries.duplicate()
+	for i in 3:
+		if pool.is_empty():
+			pool = table.entries.duplicate()
+		var idx := RNG.weighted_index(pool.map(func(e): return e.weight))
+		enemy_ids.append(pool[idx].id)
+		pool.remove_at(idx)
+	var player_ids := _pick_player_mutations(3)
+	var out: Array = []
+	for i in 3:
+		out.append({"enemy": enemy_ids[i], "player": player_ids[i] if i < player_ids.size() else ""})
+	return out
+
+
+func _apply_deal(dealt: Array) -> void:
+	cards = dealt
+	stage = "voting"
+	time_left = DRAFT_TIME
+	vote_counts = [0, 0, 0]
+	local_pick = -1
+	_votes.clear()
+	cards_dealt.emit(cards)
+	votes_changed.emit(vote_counts)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _begin_rpc() -> void:
-	_apply_begin()
+func _deal_rpc(dealt: Array) -> void:
+	WeatherManager.hold = true
+	_apply_deal(dealt)
 
 
+# ------------------------------------------------------------------ vote
+func is_voting() -> bool:
+	return stage == "voting"
+
+
+## One pick per player per draft; it can be changed until the draft resolves.
+func vote(index: int) -> bool:
+	if stage != "voting" or index < 0 or index >= cards.size():
+		return false
+	local_pick = index
+	vote_cast.emit(index)
+	if Net.is_host():
+		_count_vote(multiplayer.get_unique_id() if Net.is_online() else 1, index)
+	else:
+		_request_vote.rpc_id(1, index)
+	return true
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_vote(index: int) -> void:
+	if not Net.is_host() or stage != "voting":
+		return
+	_count_vote(multiplayer.get_remote_sender_id(), clampi(index, 0, cards.size() - 1))
+
+
+func _count_vote(peer_id: int, index: int) -> void:
+	_votes[peer_id] = index
+	vote_counts = [0, 0, 0]
+	for p in _votes:
+		vote_counts[int(_votes[p])] += 1
+	votes_changed.emit(vote_counts)
+	Net.rpc_to_all(_votes_rpc, [vote_counts])
+	if _votes.size() >= GameManager.player_count():
+		# Everyone has picked: resolve after a beat so the last pick shows.
+		time_left = minf(time_left, 0.6)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _votes_rpc(counts: Array) -> void:
+	vote_counts = counts
+	votes_changed.emit(vote_counts)
+
+
+# ------------------------------------------------------------------ clock
+func _process(delta: float) -> void:
+	if stage == "":
+		return
+	time_left = maxf(0.0, time_left - delta)
+	if stage == "voting":
+		_local_input()
+	if not Net.is_host():
+		return
+	if stage == "voting" and time_left <= 0.0:
+		_resolve()
+	elif stage == "result" and time_left <= 0.0:
+		stage = ""
+		WeatherManager.hold = false
+		if WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
+			WeatherManager.next_phase()
+
+
+func _local_input() -> void:
+	if get_tree().paused:
+		return
+	for i in cards.size():
+		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
+			vote(i)
+			return
+	if Settings.using_gamepad:
+		if Input.is_action_just_pressed("ui_left"):
+			vote(0)
+		elif Input.is_action_just_pressed("ui_up"):
+			vote(1)
+		elif Input.is_action_just_pressed("ui_right"):
+			vote(2)
+
+
+func _resolve() -> void:
+	var best := -1
+	var top: Array = []
+	for i in cards.size():
+		var c: int = vote_counts[i]
+		if c > best:
+			best = c
+			top = [i]
+		elif c == best:
+			top.append(i)
+	var pick: int = top[RNG.rng.randi_range(0, top.size() - 1)]
+	var card: Dictionary = cards[pick]
+	var enemy_list: Array = [card.enemy]
+	var granted: Array = []
+	var updated_player: Array = player_mutations.duplicate()
+	if str(card.player) != "" and not updated_player.has(card.player):
+		updated_player.append(card.player)
+		granted.append(card.player)
+	_apply_player_grant_effects(granted)
+	_apply_result(pick, enemy_list, updated_player, granted, true)
+	Net.rpc_to_all(_result_rpc, [pick, enemy_list, updated_player, granted])
+
+
+func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Array, announce: bool) -> void:
+	stage = "result"
+	time_left = RESULT_TIME
+	active.assign(enemy_list)
+	player_mutations.assign(player_list)
+	last_player_mutations.assign(granted)
+	draft_resolved.emit(pick)
+	mutations_changed.emit(active)
+	player_mutations_changed.emit(player_mutations)
+	if announce and not active.is_empty():
+		var entry := table.get_entry(active[0])
+		var text := "ENEMIES: " + entry.display_name.to_upper()
+		if not granted.is_empty():
+			text += "  |  SQUAD: " + str(GameManager.PLAYER_MUTATIONS[granted[0]].name)
+		GameManager.show_banner(text, entry.color, 2.6)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _result_rpc(pick: int, enemy_list: Array, player_list: Array, granted: Array) -> void:
+	# The host's show_banner already reached this peer; don't re-announce.
+	_apply_result(pick, enemy_list, player_list, granted, false)
+
+
+# ------------------------------------------------------------------ run scope
 ## Clear wave-scoped enemy mutations (at Clearing). Player mutations persist.
 func clear() -> void:
 	if not Net.is_host():
@@ -83,6 +223,7 @@ func clear() -> void:
 func _apply_clear() -> void:
 	active.clear()
 	stage = ""
+	cards.clear()
 	mutations_changed.emit(active)
 
 
@@ -103,6 +244,7 @@ func _apply_reset_run() -> void:
 	active.clear()
 	player_mutations.clear()
 	last_player_mutations.clear()
+	cards.clear()
 	stage = ""
 	mutations_changed.emit(active)
 	player_mutations_changed.emit(player_mutations)
@@ -117,6 +259,8 @@ func _reset_run_rpc() -> void:
 func sync_to_peer(peer_id: int) -> void:
 	if Net.is_host():
 		_sync_active.rpc_id(peer_id, active, player_mutations)
+		if stage == "voting":
+			_deal_rpc.rpc_id(peer_id, cards)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -135,6 +279,16 @@ func has_player(id: String) -> bool:
 	return player_mutations.has(id)
 
 
+## No lever any more; kept so old callers compile.
+func lever_prompt(_player: Node) -> String:
+	return ""
+
+
+func pull(_player: Node) -> void:
+	pass
+
+
+# ------------------------------------------------------------------ dev helpers
 ## Dev / testing: activate one enemy mutation immediately.
 func force_enemy_mutation(id: String) -> void:
 	if not Net.is_host() or table.get_entry(id) == null:
@@ -147,7 +301,7 @@ func force_enemy_mutation(id: String) -> void:
 	GameManager.show_banner("MUTATION: " + entry.display_name.to_upper(), entry.color, 2.5)
 
 
-## Dev / testing or roll reward: add one unowned player mutation.
+## Dev / testing: add one unowned player mutation.
 func grant_random_player_mutation() -> String:
 	if not Net.is_host():
 		return ""
@@ -163,177 +317,6 @@ func grant_random_player_mutation() -> String:
 	var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
 	GameManager.show_banner("PLAYER MUTATION: " + str(info.name), info.color, 2.6)
 	return id
-
-
-func is_voting() -> bool:
-	return stage == "voting"
-
-
-# ------------------------------------------------------------------ levers
-func lever_prompt(player: Node) -> String:
-	if stage != "pulling" or player.get("state") != "ok":
-		return ""
-	if Net.is_host():
-		return "" if _pulled.has(player.get_multiplayer_authority()) else "Pull the lever"
-	return "" if _local_pulled else "Pull the lever"
-
-
-func pull(player: Node) -> void:
-	if stage != "pulling":
-		return
-	if not Net.is_host():
-		# Show the prompt as spent straight away; the host confirms the count.
-		_local_pulled = true
-		_request_pull.rpc_id(1)
-		return
-	_count_pull(player.get_multiplayer_authority())
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func _request_pull() -> void:
-	if not Net.is_host() or stage != "pulling":
-		return
-	_count_pull(multiplayer.get_remote_sender_id())
-
-
-func _count_pull(peer_id: int) -> void:
-	if _pulled.has(peer_id):
-		return
-	_pulled[peer_id] = true
-	var needed := GameManager.player_count()
-	pulls_changed.emit(_pulled.size(), needed)
-	_sync_pulls.rpc(_pulled.size(), needed)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _sync_pulls(pulled: int, needed: int) -> void:
-	pulls_changed.emit(pulled, needed)
-
-
-# ------------------------------------------------------------------ clock
-func _process(delta: float) -> void:
-	if stage == "":
-		return
-	_local_vote_input()
-	if not Net.is_host():
-		return
-	_timer -= delta
-	match stage:
-		"pulling":
-			if _timer <= 0.0 or _pulled.size() >= GameManager.player_count():
-				_roll()
-		"landing":
-			if _timer <= 0.0:
-				if _pending.size() > 1:
-					_open_vote()
-				else:
-					_finish(_pending)
-		"voting":
-			if _timer <= 0.0:
-				_resolve_vote()
-
-
-func _local_vote_input() -> void:
-	if stage != "voting" or _local_voted:
-		return
-	for i in mini(_pending.size(), 2):
-		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
-			vote(i)
-			return
-	if Settings.using_gamepad:
-		if Input.is_action_just_pressed("ui_left"):
-			vote(0)
-		elif Input.is_action_just_pressed("ui_right"):
-			vote(1)
-
-
-## One vote per player per roll. Keys, the reel's buttons and the gamepad all
-## come through here; a client's vote is forwarded to the host, which tallies
-## by peer id so each player counts once.
-func vote(index: int) -> bool:
-	if stage != "voting" or _local_voted or index < 0 or index > 1:
-		return false
-	_local_voted = true
-	if Net.is_host():
-		_votes[multiplayer.get_unique_id()] = index
-	else:
-		_request_vote.rpc_id(1, index)
-	vote_cast.emit(index)
-	return true
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func _request_vote(index: int) -> void:
-	if not Net.is_host() or stage != "voting":
-		return
-	_votes[multiplayer.get_remote_sender_id()] = clampi(index, 0, 1)
-
-
-func _open_vote() -> void:
-	stage = "voting"
-	_timer = VOTE_TIME
-	_votes.clear()
-	_local_voted = false
-	vote_started.emit(_pending)
-	Net.rpc_to_all(_vote_rpc, [_pending])
-
-
-@rpc("authority", "call_remote", "reliable")
-func _vote_rpc(options: Array) -> void:
-	_pending = options
-	stage = "voting"
-	_timer = VOTE_TIME
-	_votes.clear()
-	_local_voted = false
-	vote_started.emit(options)
-
-
-## Host: cancel the option that fewer people voted for.
-func _resolve_vote() -> void:
-	var zero := 0
-	var one := 0
-	for peer_id in _votes:
-		if int(_votes[peer_id]) == 0:
-			zero += 1
-		else:
-			one += 1
-	var cancel := 0
-	if one > zero:
-		cancel = 1
-	elif zero == one:
-		cancel = RNG.rng.randi_range(0, 1)
-	var keep: Array = _pending.duplicate()
-	keep.remove_at(cancel)
-	_finish(keep)
-
-
-# ------------------------------------------------------------------ reels
-func _roll() -> void:
-	var weights := table.weights()
-	var symbols: Array = []
-	for i in 3:
-		symbols.append(table.entries[RNG.weighted_index(weights)].id)
-	var pick: String = symbols[1]
-	for s in symbols:
-		if symbols.count(s) >= 2:
-			pick = s
-	var jackpot: bool = symbols.count(symbols[0]) == 3
-	_last_jackpot = jackpot
-	_pending = [pick]
-	if jackpot:
-		var rest := table.entries.filter(func(e): return e.id != pick)
-		_pending.append(rest[RNG.weighted_index(rest.map(func(e): return e.weight))].id)
-	stage = "landing"
-	_timer = LAND_TIME
-	roll_result.emit(symbols, _pending, jackpot)
-	Net.rpc_to_all(_result_rpc, [symbols, _pending, jackpot])
-
-
-@rpc("authority", "call_remote", "reliable")
-func _result_rpc(symbols: Array, pending: Array, jackpot: bool) -> void:
-	_pending = pending
-	stage = "landing"
-	roll_result.emit(symbols, pending, jackpot)
 
 
 func _pick_player_mutations(count: int) -> Array[String]:
@@ -358,39 +341,3 @@ func _apply_player_grant_effects(granted: Array) -> void:
 		for p in GameManager.players():
 			if p.has_method("apply_max_health_bonus"):
 				p.apply_max_health_bonus(25.0)
-
-
-func _finish(result: Array) -> void:
-	var granted := _pick_player_mutations(2 if _last_jackpot else 1)
-	var updated_player: Array = player_mutations.duplicate()
-	for id in granted:
-		if not updated_player.has(id):
-			updated_player.append(id)
-	_apply_player_grant_effects(granted)
-	_apply_finish(result, updated_player, granted, true)
-	Net.rpc_to_all(_finish_rpc, [result, updated_player, granted])
-	WeatherManager.hold = false
-	if WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
-		WeatherManager.next_phase()
-
-
-func _apply_finish(result: Array, player_list: Array, granted: Array, announce: bool) -> void:
-	active.assign(result)
-	player_mutations.assign(player_list)
-	last_player_mutations.assign(granted)
-	stage = ""
-	mutations_changed.emit(active)
-	player_mutations_changed.emit(player_mutations)
-	if announce and not active.is_empty():
-		var enemy_names := active.map(func(id): return table.get_entry(id).display_name.to_upper())
-		var text := "ENEMIES: " + " + ".join(PackedStringArray(enemy_names))
-		if not granted.is_empty():
-			var p_names := granted.map(func(id): return str(GameManager.PLAYER_MUTATIONS[id].name))
-			text += "  |  YOU: " + " + ".join(PackedStringArray(p_names))
-		GameManager.show_banner(text, table.get_entry(active[0]).color, 3.2)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _finish_rpc(result: Array, player_list: Array, granted: Array) -> void:
-	# The host's show_banner already reached this peer; don't re-broadcast.
-	_apply_finish(result, player_list, granted, false)

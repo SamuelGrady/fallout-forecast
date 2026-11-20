@@ -599,7 +599,7 @@ func _apply_grant(item: String) -> void:
 func _handle_interact(delta: float) -> void:
 	var best: Interactable = null
 	var best_score := INF
-	if state != "turned" and GameManager.mutations.stage == "":
+	if state != "turned":
 		var forward := -camera.global_basis.z
 		for node in get_tree().get_nodes_in_group("interactables"):
 			var it := node as Interactable

@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 
 
 func _handle_input() -> void:
-	if loadout.is_empty() or player.get("state") != "ok" or GameManager.mutations.stage != "":
+	if loadout.is_empty() or player.get("state") != "ok":
 		_fire_buffer = 0.0
 		_reload_left = 0.0
 		return
@@ -493,7 +493,7 @@ func _animate(delta: float) -> void:
 	var data := loadout[current]
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
-	var aiming: bool = player.is_multiplayer_authority() and player.get("state") == "ok" and not player.get("tarp_raised") 			and _reload_left <= 0.0 and GameManager.mutations.stage == "" 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
+	var aiming: bool = player.is_multiplayer_authority() and player.get("state") == "ok" and not player.get("tarp_raised") 			and _reload_left <= 0.0 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
@@ -550,7 +550,7 @@ var _arc_material: StandardMaterial3D
 ## a ring where it lands, sized to its blast/dome radius. Brighter while aiming.
 func _update_throw_preview() -> void:
 	var data: WeaponData = loadout[current] if not loadout.is_empty() else null
-	var wanted: bool = data != null and player != null and player.is_multiplayer_authority() 			and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE] 			and player.get("state") == "ok" and _reload_left <= 0.0 and ammo[current] > 0 			and GameManager.mutations.stage == ""
+	var wanted: bool = data != null and player != null and player.is_multiplayer_authority() 			and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE] 			and player.get("state") == "ok" and _reload_left <= 0.0 and ammo[current] > 0
 	if not wanted:
 		if _arc:
 			_arc.visible = false
