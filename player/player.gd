@@ -543,8 +543,9 @@ func _apply_state_visuals() -> void:
 	_shown_state = state
 	var body := get_node_or_null("BodyModel") as Node3D
 	if body:
-		body.visible = state == "ok" or state == "downed"
-	_turned_model.visible = state == "turned"
+		body.visible = state in ["ok", "downed", "turned"]
+	# Turned players keep their hazmat model, overlaid sickly green (PlayerModel).
+	_turned_model.visible = false
 	var holder := get_node_or_null("Head/Camera3D/WeaponHolder") as Node3D
 	if holder:
 		holder.visible = state == "ok"

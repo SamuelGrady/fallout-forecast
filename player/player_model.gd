@@ -146,12 +146,38 @@ func _process(delta: float) -> void:
 		_forearms[1].rotation.x = 0.25
 		_gun.rotation = Vector3(aim_lift * 0.9, 0.0, 0.0)
 	_gun.visible = state == "ok"
+	_set_turned(state == "turned")
+	if state == "turned":
+		# Zombie lurch: arms out, head lolled, torso hunched.
+		_arms[0].rotation = Vector3(1.4 + sin(_clock) * 0.15, 0, 0.1)
+		_arms[1].rotation = Vector3(1.4 - sin(_clock) * 0.15, 0, -0.1)
+		_forearms[0].rotation.x = 0.2
+		_forearms[1].rotation.x = 0.3
+		_torso.rotation.x = 0.35
+		_head.rotation = Vector3(0.3, 0, 0.35)
 	# Downed: roll onto the side, one arm reaching out, slow crawl.
 	rotation.z = lerpf(0.0, 1.35, _down_blend)
 	if _down_blend > 0.01:
 		var crawl := sin(Time.get_ticks_msec() * 0.003)
 		_arms[1].rotation = _arms[1].rotation.lerp(Vector3(2.6 + crawl * 0.3, 0, -0.2), _down_blend)
 		_legs[0].rotation.x = lerpf(_legs[0].rotation.x, 0.3 + crawl * 0.2, _down_blend)
+
+
+var _turned_shown := false
+static var _turned_overlay: StandardMaterial3D
+
+
+func _set_turned(value: bool) -> void:
+	if value == _turned_shown:
+		return
+	_turned_shown = value
+	if _turned_overlay == null:
+		_turned_overlay = StandardMaterial3D.new()
+		_turned_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_turned_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_turned_overlay.albedo_color = Color(0.55, 0.9, 0.3, 0.55)
+	for mesh in find_children("*", "MeshInstance3D", true, false):
+		mesh.material_overlay = _turned_overlay if value else null
 
 
 func _part(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false) -> MeshInstance3D:
