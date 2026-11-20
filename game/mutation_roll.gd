@@ -1,19 +1,19 @@
 extends Node
 ## Child of GameManager: the Mutation Draft (replaces the old slot reel).
-## 1. Mutation phase starts: WeatherManager holds the phase and the host deals
-##    three cards. Each card pairs an ENEMY mutation (this wave only) with a
-##    PLAYER mutation (kept for the rest of the run).
-## 2. Everyone picks a card with 1 / 2 / 3 (D-pad on a controller). Solo, the
-##    pick resolves at once; in a session the host tallies one vote per peer
-##    and resolves when everyone has voted or DRAFT_TIME runs out (most votes
-##    wins, ties broken at random, no votes = a random card).
-## 3. The winning card's enemy mutation is active until Clearing; its player
-##    mutation joins the squad's list for the run.
+## 1. Mutation phase starts: WeatherManager holds the phase. The host rolls the
+##    wave's ENEMY mutation (weighted, not chosen) and deals three PLAYER
+##    mutation cards.
+## 2. Everyone picks one player card with 1 / 2 / 3 (D-pad on a controller).
+##    Solo, the pick resolves at once; in a session the host tallies one vote
+##    per peer and resolves when everyone has voted or DRAFT_TIME runs out
+##    (most votes wins, ties at random, no votes = a random card).
+## 3. The enemy mutation is active until Clearing; the picked player mutation
+##    joins the squad's list for the run.
 ##
 ## The host owns the deck, the timer and the tally; every step is broadcast so
 ## every peer shows the same cards and result.
 
-signal cards_dealt(cards: Array)
+signal cards_dealt(enemy: String, cards: Array)
 signal votes_changed(counts: Array)
 signal vote_cast(index: int)
 signal draft_resolved(index: int)
@@ -32,7 +32,9 @@ var player_mutations: Array[String] = []
 var last_player_mutations: Array[String] = []
 ## "" | "voting" | "result"
 var stage := ""
-## The dealt cards: [{"enemy": id, "player": id}, …]
+## This wave's rolled enemy mutation id.
+var enemy_pick := ""
+## The three dealt player mutation ids to choose between.
 var cards: Array = []
 var vote_counts: Array = [0, 0, 0]
 var local_pick := -1
@@ -50,42 +52,34 @@ func begin() -> void:
 	if not Net.is_host():
 		return
 	WeatherManager.hold = true
-	var dealt := _deal()
-	_apply_deal(dealt)
-	Net.rpc_to_all(_deal_rpc, [dealt])
+	var weights: Array = table.entries.map(func(e): return e.weight)
+	var enemy: String = table.entries[RNG.weighted_index(weights)].id
+	var dealt: Array = []
+	for id in _pick_player_mutations(3):
+		dealt.append(id)
+	_apply_deal(enemy, dealt)
+	Net.rpc_to_all(_deal_rpc, [enemy, dealt])
 
 
-func _deal() -> Array:
-	var enemy_ids: Array = []
-	var pool := table.entries.duplicate()
-	for i in 3:
-		if pool.is_empty():
-			pool = table.entries.duplicate()
-		var idx := RNG.weighted_index(pool.map(func(e): return e.weight))
-		enemy_ids.append(pool[idx].id)
-		pool.remove_at(idx)
-	var player_ids := _pick_player_mutations(3)
-	var out: Array = []
-	for i in 3:
-		out.append({"enemy": enemy_ids[i], "player": player_ids[i] if i < player_ids.size() else ""})
-	return out
-
-
-func _apply_deal(dealt: Array) -> void:
+func _apply_deal(enemy: String, dealt: Array) -> void:
+	enemy_pick = enemy
 	cards = dealt
 	stage = "voting"
 	time_left = DRAFT_TIME
 	vote_counts = [0, 0, 0]
 	local_pick = -1
 	_votes.clear()
-	cards_dealt.emit(cards)
+	cards_dealt.emit(enemy_pick, cards)
 	votes_changed.emit(vote_counts)
+	# Nothing left to draft (every player mutation owned): just apply the enemy.
+	if cards.is_empty() and Net.is_host():
+		time_left = 1.5
 
 
 @rpc("authority", "call_remote", "reliable")
-func _deal_rpc(dealt: Array) -> void:
+func _deal_rpc(enemy: String, dealt: Array) -> void:
 	WeatherManager.hold = true
-	_apply_deal(dealt)
+	_apply_deal(enemy, dealt)
 
 
 # ------------------------------------------------------------------ vote
@@ -175,14 +169,13 @@ func _resolve() -> void:
 			top = [i]
 		elif c == best:
 			top.append(i)
-	var pick: int = top[RNG.rng.randi_range(0, top.size() - 1)]
-	var card: Dictionary = cards[pick]
-	var enemy_list: Array = [card.enemy]
+	var pick: int = top[RNG.rng.randi_range(0, top.size() - 1)] if not top.is_empty() else -1
+	var enemy_list: Array = [enemy_pick]
 	var granted: Array = []
 	var updated_player: Array = player_mutations.duplicate()
-	if str(card.player) != "" and not updated_player.has(card.player):
-		updated_player.append(card.player)
-		granted.append(card.player)
+	if pick >= 0 and pick < cards.size() and not updated_player.has(cards[pick]):
+		updated_player.append(cards[pick])
+		granted.append(cards[pick])
 	_apply_player_grant_effects(granted)
 	_apply_result(pick, enemy_list, updated_player, granted, true)
 	Net.rpc_to_all(_result_rpc, [pick, enemy_list, updated_player, granted])
@@ -260,7 +253,7 @@ func sync_to_peer(peer_id: int) -> void:
 	if Net.is_host():
 		_sync_active.rpc_id(peer_id, active, player_mutations)
 		if stage == "voting":
-			_deal_rpc.rpc_id(peer_id, cards)
+			_deal_rpc.rpc_id(peer_id, enemy_pick, cards)
 
 
 @rpc("authority", "call_remote", "reliable")

@@ -3,10 +3,10 @@ extends Node
 ## title, lobby or join screens, so pressing Play (and the first gunshot,
 ## enemy or explosion) doesn't stall on a disk/pck read.
 ##
-## Desktop: everything is requested as threaded loads up front.
-## Web (single-threaded export): no worker threads, so one resource is loaded
-## per frame from a queue, which spreads the cost into tiny hitches on the
-## menus instead of one long hang at the start of a run.
+## One small resource (sounds, weapon data) is loaded per frame from a queue
+## on the main thread, on every platform. Scenes are deliberately left out:
+## a threaded load of main.tscn deadlocked when the game then loaded it on
+## the main thread, and a blocking load of it would just move the hang.
 ##
 ## Loaded resources are held here so the cache never drops them.
 
@@ -40,21 +40,10 @@ func _ready() -> void:
 	if Net.dedicated or DisplayServer.get_name() == "headless":
 		done = true
 		return
-	# On web every load blocks the only thread, so warm only the small things
-	# (sounds, weapon data); big scenes load once, when the run starts.
-	if not _web:
-		for path in SCENES:
-			_queue_path(path)
 	for dir in DIRS:
 		for path in _list(dir):
-			if _web and path.get_extension() == "tscn":
-				continue
-			_queue_path(path)
-	if not _web:
-		for path in _queue:
-			if ResourceLoader.load_threaded_request(path, "", true) == OK:
-				_pending.append(path)
-		_queue.clear()
+			if path.get_extension() != "tscn":
+				_queue_path(path)
 
 
 func _queue_path(path: String) -> void:
@@ -79,23 +68,13 @@ func _process(_delta: float) -> void:
 	if done:
 		set_process(false)
 		return
-	if _web:
-		# Never load on the same frame a scene change might happen in a run.
-		if GameManager.run_active:
-			return
-		if not _queue.is_empty():
-			var res := load(_queue.pop_front())
-			if res:
-				_held.append(res)
-	else:
-		for i in range(_pending.size() - 1, -1, -1):
-			var path := _pending[i]
-			var status := ResourceLoader.load_threaded_get_status(path)
-			if status == ResourceLoader.THREAD_LOAD_LOADED:
-				_held.append(ResourceLoader.load_threaded_get(path))
-				_pending.remove_at(i)
-			elif status != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-				_pending.remove_at(i)
+	# Only on the menus; never stall a frame mid-run.
+	if GameManager.run_active:
+		return
+	if not _queue.is_empty():
+		var res := load(_queue.pop_front())
+		if res:
+			_held.append(res)
 	if _queue.is_empty() and _pending.is_empty():
 		done = true
 		finished.emit()
