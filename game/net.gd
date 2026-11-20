@@ -78,6 +78,10 @@ func is_online() -> bool:
 	return mode != Mode.OFFLINE and multiplayer.has_multiplayer_peer()
 
 
+func is_offline() -> bool:
+	return mode == Mode.OFFLINE
+
+
 func local_id() -> int:
 	return multiplayer.get_unique_id()
 

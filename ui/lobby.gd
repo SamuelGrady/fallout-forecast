@@ -70,7 +70,7 @@ func _refresh() -> void:
 	_start_button.visible = hosting
 	_ready_button.visible = not hosting
 	_ready_button.text = "READY" if _is_ready(Net.local_id()) else "NOT READY"
-	if Net.mode == Net.Mode.OFFLINE:
+	if Net.is_offline():
 		_status.text = "No session. Go back and pick HOST GAME or JOIN GAME."
 	else:
 		_status.text = _host_line()

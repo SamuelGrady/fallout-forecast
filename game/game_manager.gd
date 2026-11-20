@@ -37,6 +37,7 @@ var crates: Node
 
 func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
+	Net.peer_joined.connect(_on_peer_joined)
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
 	add_child(mutations)
@@ -68,6 +69,17 @@ func start_run() -> void:
 	decon_max = DECON_CHARGES[n]
 	_set_decon(decon_max)
 	WeatherManager.start_run()
+
+
+## Host: someone joined while a run was going. Bring them up to date; Net has
+## already sent them into the run scene.
+func _on_peer_joined(peer_id: int) -> void:
+	if not is_host() or not run_active:
+		return
+	WeatherManager.sync_to_peer(peer_id)
+	_sync_decon.rpc_id(peer_id, decon_charges)
+	if mutations:
+		mutations.sync_to_peer(peer_id)
 
 
 func players() -> Array:
@@ -243,17 +255,33 @@ func spawn_boss() -> void:
 	var anchor := get_tree().get_first_node_in_group("boss_anchor") as Node3D
 	if spawner == null:
 		return
-	var boss: Node3D = (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
-	spawner.add_child(boss, true)
-	boss.global_position = anchor.global_position if anchor else Vector3(0, 18, 0)
+	var at: Vector3 = anchor.global_position if anchor else Vector3(0, 18, 0)
+	_spawn_boss_node(spawner, at)
+	_spawn_boss.rpc(at)
 	WeatherManager.hold = true
-	WeatherManager.intensity_override = 1.0
+	WeatherManager.set_intensity_override(1.0)
 	show_banner("CUMULUS IS HERE: burst its three sacs!", Color("8FD65A"), 4.0)
+
+
+func _spawn_boss_node(parent: Node, at: Vector3) -> void:
+	var boss := (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
+	boss.name = "BossCumulus"
+	parent.add_child(boss, true)
+	boss.global_position = at
+
+
+@rpc("authority", "call_remote", "reliable")
+func _spawn_boss(at: Vector3) -> void:
+	var world := _world()
+	var spawner := world.get_node_or_null("Enemies") if world else null
+	if spawner == null or not get_tree().get_nodes_in_group("boss").is_empty():
+		return
+	_spawn_boss_node(spawner, at)
 
 
 ## Host: the core popped. Clear skies, then the win.
 func boss_defeated() -> void:
-	WeatherManager.intensity_override = 0.0
+	WeatherManager.set_intensity_override(0.0)
 	WeatherManager.hold = false
 	show_banner("CUMULUS BROKE: the storm is over!", Color(0.4, 1, 0.6), 4.0)
 	get_tree().create_timer(5.0).timeout.connect(finish.bind(true))

@@ -101,16 +101,19 @@ func _refresh() -> void:
 	ips.sort()
 	for ip in ips:
 		var info: Dictionary = Net.servers[ip]
+		# A fresh local per row: the button closure captures this one, not the
+		# loop variable.
+		var address := str(ip)
 		var row := Button.new()
 		row.text = "%s   ·   %d / %d   ·   %s" % [
 			str(info.get("name", "HOST")), int(info.get("players", 0)),
-			int(info.get("max", 4)), str(ip)]
+			int(info.get("max", 4)), address]
 		row.custom_minimum_size = Vector2(0, 48)
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		BroadcastUI.animate_button(row)
 		row.pressed.connect(func():
 			Sound.play("ui_click")
-			_connect_to(str(ip)))
+			_connect_to(address))
 		_list.add_child(row)
 
 

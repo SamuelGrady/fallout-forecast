@@ -28,6 +28,7 @@ func _ready() -> void:
 	$Level.add_child(signs)
 	_setup_players()
 	Net.roster_changed.connect(_sync_players)
+	Net.server_closed.connect(_leave_to_title)
 	if GameManager.is_host():
 		GameManager.start_run.call_deferred()
 	GameManager.run_finished.connect(_on_run_finished)
@@ -110,10 +111,23 @@ func _exit_tree() -> void:
 
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 	get_tree().create_timer(4.5).timeout.connect(func():
-		Net.end_run()
-		GameManager.mutations.clear()
-		WeatherManager.stop()
+		_end()
 		get_tree().change_scene_to_file("res://ui/results.tscn"))
+
+
+## The host left (or dropped us): there is no run to be in any more.
+func _leave_to_title() -> void:
+	_end()
+	Net.leave()
+	get_tree().change_scene_to_file("res://ui/title.tscn")
+
+
+## Run bookkeeping, but leave the session up: after a finished run everyone
+## goes back to the lobby to play again.
+func _end() -> void:
+	Net.end_run()
+	GameManager.mutations.clear()
+	WeatherManager.stop()
 
 
 ## Each decon_shower marker gets an "Interact" child (same path on every peer).

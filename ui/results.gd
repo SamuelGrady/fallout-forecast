@@ -4,6 +4,7 @@ extends Control
 
 const RUN_SCENE := "res://main.tscn"
 const TITLE_SCENE := "res://ui/title.tscn"
+const LOBBY_SCENE := "res://ui/lobby.tscn"
 
 
 func _ready() -> void:
@@ -53,8 +54,18 @@ func _ready() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 20)
 	box.add_child(row)
-	_button(row, "PLAY AGAIN", func(): get_tree().change_scene_to_file(RUN_SCENE))
-	_button(row, "TITLE", func(): get_tree().change_scene_to_file(TITLE_SCENE))
+	# Online, another run has to start from the lobby: only the host can send
+	# everyone into the run scene.
+	if Net.is_online():
+		_button(row, "BACK TO LOBBY", func(): get_tree().change_scene_to_file(LOBBY_SCENE))
+	else:
+		_button(row, "PLAY AGAIN", func(): get_tree().change_scene_to_file(RUN_SCENE))
+	_button(row, "TITLE", _on_title)
+
+
+func _on_title() -> void:
+	Net.leave()
+	get_tree().change_scene_to_file(TITLE_SCENE)
 
 
 func _label(parent: Control, text: String, size: int, color: Color) -> void:

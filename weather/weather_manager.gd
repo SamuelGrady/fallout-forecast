@@ -98,6 +98,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				strike_lightning()
 
 
+## Host: force storm_intensity toward `value` (-1 to go back to the phase's
+## target). Every client eases toward the same number, so the boss's sacs step
+## the storm down on every screen at once.
+func set_intensity_override(value: float) -> void:
+	if not Net.is_host():
+		return
+	intensity_override = value
+	if Net.is_online():
+		_override.rpc(value)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _override(value: float) -> void:
+	intensity_override = value
+
+
 ## Host: start wave 1 at Calm.
 func start_run() -> void:
 	hold = false

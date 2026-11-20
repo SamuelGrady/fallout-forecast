@@ -14,6 +14,8 @@ signal died(enemy: EnemyBase)
 @export var data: EnemyData
 
 var health := 0.0
+## Host-assigned, used by the spawner to match this enemy across peers.
+var net_id := 0
 var _bullet_critical := false
 ## Where the last bullet landed; falls back to the body for splash damage.
 var _hit_point := Vector3.ZERO
@@ -200,11 +202,11 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func die() -> void:
-	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
-		var drop := Node3D.new()
-		drop.set_script(preload("res://weapons/ammo_drop.gd"))
-		get_parent().add_child(drop)
-		drop.global_position = global_position
+	# The spawner owns the drop and tells every peer to make one: a drop is
+	# collected locally by whoever walks over it.
+	var drop := not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32
+	if drop and get_parent() and get_parent().has_method("spawn_ammo_drop"):
+		get_parent().spawn_ammo_drop(global_position)
 	for i in 6:
 		var fragment := MeshInstance3D.new()
 		var cube := BoxMesh.new()
@@ -226,6 +228,8 @@ func die() -> void:
 	if GameManager.has_mutation("splitters") and not is_small and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
+	if get_parent() and get_parent().has_method("notify_despawn"):
+		get_parent().notify_despawn(self, drop)
 	died.emit(self)
 	queue_free()
 

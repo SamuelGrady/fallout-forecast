@@ -33,6 +33,7 @@ var _anchor := Vector3.ZERO
 var _height := 18.0
 var _t := 0.0
 var _burn_left := 0.0
+var _net_left := 0.0
 var _spore_timer := 3.0
 var _summon_timer := 8.0
 var _parts: Array[Node] = []
@@ -131,6 +132,13 @@ func _process(delta: float) -> void:
 	_t += delta
 	_body.rotation.y += delta * 0.15
 	_sac_material.emission_energy_multiplier = 1.5 + sin(_t * 4.0) * 0.8
+	# Clients only draw it: position, part health and the burn timer ride one
+	# unreliable packet ten times a second, the kill is sent reliably below.
+	if Net.is_host() and Net.is_online():
+		_net_left -= delta
+		if _net_left <= 0.0:
+			_net_left = 0.1
+			_sync.rpc(global_position, part_health, sacs_left, _burn_left)
 	if not Net.is_host() or dead:
 		return
 	# Drift in a slow circle over Main Street and sink as sacs pop.
@@ -196,7 +204,7 @@ func _pop_sac(i: int) -> void:
 	GameManager.spawn_cloud(part.global_position, 10.0, 4.0)
 	part.visible = false
 	part.collision_layer = 0
-	WeatherManager.intensity_override = STORM_STEPS[2 - sacs_left]
+	WeatherManager.set_intensity_override(STORM_STEPS[2 - sacs_left])
 	if sacs_left == 0:
 		_shell.visible = false
 		GameManager.show_banner("THE CORE IS EXPOSED!", Color("FF3EA5"), 3.0)
@@ -211,6 +219,37 @@ func _die() -> void:
 		GameManager.spawn_cloud(global_position + Vector3(randf_range(-5, 5), randf_range(-3, 1), randf_range(-5, 5)), 0.0, 3.5)
 	defeated.emit()
 	GameManager.boss_defeated()
+	if Net.is_online():
+		_died.rpc()
+	var t := create_tween()
+	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
+	t.tween_callback(queue_free)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync(pos: Vector3, parts: Array, sacs: int, burn: float) -> void:
+	if Net.is_host():
+		return
+	global_position = pos
+	for i in mini(parts.size(), part_health.size()):
+		part_health[i] = float(parts[i])
+		if i < 3 and part_health[i] <= 0.0 and i < _parts.size():
+			var part := _parts[i] as Node3D
+			if part:
+				part.visible = false
+				part.collision_layer = 0
+	sacs_left = sacs
+	_burn_left = burn
+	if _shell:
+		_shell.visible = sacs > 0
+
+
+@rpc("authority", "call_remote", "reliable")
+func _died() -> void:
+	if Net.is_host():
+		return
+	dead = true
+	Sound.play_at("explosion_big", global_position)
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
 	t.tween_callback(queue_free)
