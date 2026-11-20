@@ -18,7 +18,7 @@ const LIST: Array[Dictionary] = [
 		"requires": ["main_street", "low_tide", "sunday_service"]},
 	{"id": "cold_shoulder", "name": "COLD SHOULDER", "desc": "Kill 50 Hailstones with hits to the glowing back core.", "goal": 50, "color": 3},
 	{"id": "first_responder", "name": "FIRST RESPONDER", "desc": "Revive teammates 25 times.", "goal": 25, "skin": 2},
-	{"id": "clean_bill", "name": "CLEAN BILL OF HEALTH", "desc": "Win a run without the rain ever eating through your suit while exposed.", "skin": 3},
+	{"id": "clean_bill", "name": "CLEAN BILL OF HEALTH", "desc": "Win a run without acid rain ever eating through your suit.", "skin": 3},
 	{"id": "late_late_show", "name": "LATE LATE SHOW", "desc": "Reach wave 10 on the endless tape.", "skin": 4},
 	# ---------------------------------------------------------- achievements
 	{"id": "umbrella_policy", "name": "UMBRELLA POLICY", "desc": "Break Cumulus's core while standing under your own Shield Dome."},

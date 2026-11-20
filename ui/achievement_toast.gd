@@ -43,9 +43,11 @@ func _ready() -> void:
 	col.add_child(_tag)
 	BroadcastUI.text(_name, 27, BroadcastUI.PAPER, 2)
 	_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_name.custom_minimum_size.x = WIDTH - 44.0
 	col.add_child(_name)
 	BroadcastUI.text(_desc, 18, BroadcastUI.MUTED)
 	_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_desc.custom_minimum_size.x = WIDTH - 44.0
 	col.add_child(_desc)
 	_panel.hide()
 
@@ -83,6 +85,7 @@ func _next() -> void:
 	_panel.add_theme_stylebox_override("panel", style)
 	_panel.size = Vector2(WIDTH, 0.0)
 	_panel.reset_size()
+	_panel.reset_size.call_deferred()
 	_panel.show()
 	Sound.play("ui_achievement", -7.0)
 	var shown_x := 960.0 - WIDTH - 16.0

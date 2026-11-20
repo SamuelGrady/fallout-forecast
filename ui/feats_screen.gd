@@ -236,11 +236,12 @@ class _FeatIcon extends Control:
 		if swatch.a > 0.0:
 			draw_rect(r, swatch if done else swatch.darkened(0.6))
 		elif skin:
-			draw_rect(r, Color("#24424f") if done else Color("#17262f"))
-			# A little helmet silhouette for skin rewards.
-			var c := size * 0.5
-			draw_circle(c + Vector2(0, -2), size.x * 0.26, BroadcastUI.AMBER if not done else BroadcastUI.PAPER)
-			draw_rect(Rect2(c + Vector2(-size.x * 0.17, -size.y * 0.1), Vector2(size.x * 0.34, size.y * 0.16)), ink)
+			# Skin rewards: an amber plate with hazard stripes along the bottom.
+			draw_rect(r, Color("#4a3a1c") if done else Color("#2a2214"))
+			for k in 4:
+				var x := size.x * (0.05 + 0.25 * k)
+				draw_colored_polygon(PackedVector2Array([Vector2(x, size.y), Vector2(x + size.x * 0.12, size.y * 0.8),
+					Vector2(x + size.x * 0.22, size.y * 0.8), Vector2(x + size.x * 0.1, size.y)]), Color(BroadcastUI.AMBER, 0.55))
 		else:
 			draw_rect(r, Color("#1d3844") if done else Color("#121e27"))
 		draw_rect(r, BroadcastUI.ACID if done else BroadcastUI.MUTED.darkened(0.4), false, 1.5)

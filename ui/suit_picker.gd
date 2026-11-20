@@ -83,11 +83,12 @@ func _init(preview_size := Vector2i(260, 224)) -> void:
 	row.add_child(_skin_label)
 	_arrow(row, ">", 1)
 	_hint = Label.new()
-	_hint.custom_minimum_size = Vector2(preview_size.x, 38)
+	_hint.custom_minimum_size = Vector2(preview_size.x, 54)
+	_hint.max_lines_visible = 3
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hint.size_flags_horizontal = Control.SIZE_FILL
 	BroadcastUI.text(_hint, 17, BroadcastUI.MUTED)
 	add_child(_hint)
 	_refresh()
@@ -410,7 +411,7 @@ func _refresh() -> void:
 	_hint_default = "SUIT UNLOCKS  %d / %d  -  EARN MORE THROUGH FEATS" % [earned, total]
 	_restore_hint()
 	if _preview_frame_node:
-		_preview_frame_node.modulate = Color(0.5, 0.5, 0.55) if view_locked else Color.WHITE
+		_preview_frame_node.modulate = Color(0.78, 0.78, 0.82) if view_locked else Color.WHITE
 	if _model:
 		_model.set_look(Cosmetics.color(color), _view_skin)
 		for mesh in _model.find_children("*", "MeshInstance3D", true, false):

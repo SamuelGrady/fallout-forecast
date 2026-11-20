@@ -205,7 +205,8 @@ func _unlock_card(id: String, count: int) -> Control:
 	style.content_margin_left = 10
 	style.content_margin_right = 12
 	card.add_theme_stylebox_override("panel", style)
-	card.custom_minimum_size.x = 704.0 if count == 1 else 228.0
+	var width := 704.0 if count == 1 else (347.0 if count == 2 else (228.0 if count == 3 else 214.0))
+	card.custom_minimum_size.x = width
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
@@ -231,8 +232,8 @@ func _unlock_card(id: String, count: int) -> Control:
 	BroadcastUI.text(sub, 17, BroadcastUI.MUTED)
 	col.add_child(sub)
 	if count > 1:
-		head.custom_minimum_size.x = 168
-		sub.custom_minimum_size.x = 168
+		head.custom_minimum_size.x = width - 60.0
+		sub.custom_minimum_size.x = width - 60.0
 	return card
 
 
