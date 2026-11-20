@@ -34,7 +34,7 @@ func _ready() -> void:
 				_cached_thunder = _make_thunder()
 		thunder_stream = _cached_thunder
 	_thunder_player.stream = thunder_stream
-	_thunder_player.volume_db = thunder_volume_db
+	_thunder_player.volume_db = Sound.cue_gain("thunder", thunder_volume_db)
 	var web := OS.has_feature("web")
 	_thunder_player.bus = &"Master" if web else &"Ambience"
 	if web:
@@ -79,7 +79,7 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 
 
 func _play_thunder(level: float) -> void:
-	_thunder_player.volume_db = level
+	_thunder_player.volume_db = Sound.cue_gain("thunder", level)
 	_thunder_player.play()
 
 

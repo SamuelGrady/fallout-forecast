@@ -277,10 +277,9 @@ func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 	get_tree().create_timer(4.5, true).timeout.connect(func():
 		if not is_inside_tree():
 			return
-		var tree := get_tree()
 		MenuState.reset()
 		_end()
-		tree.change_scene_to_file.call_deferred("res://ui/results.tscn"))
+		SceneLoader.cut_to.call_deferred("res://ui/results.tscn"))
 
 
 ## Local, cosmetic ending beat while the run winds down (every peer):
@@ -289,7 +288,7 @@ func _play_ending(won: bool) -> void:
 	var me := get_tree().get_first_node_in_group("local_player") as Node3D
 	if won:
 		Sound.play("reel_land", -4.0, 1.4)
-		if me:
+		if me and not Settings.reduced_flash:
 			for i in 9:
 				get_tree().create_timer(0.35 * i).timeout.connect(func():
 					if not is_inside_tree():
@@ -313,8 +312,7 @@ func _play_ending(won: bool) -> void:
 	label.text = "SIGNAL LOST
 TRACKING..."
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 54)
-	label.add_theme_color_override("font_color", BroadcastUI.PINK)
+	BroadcastUI.text(label, 54, BroadcastUI.PINK, 3)
 	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	label.offset_left = -300
 	label.offset_right = 300
@@ -335,7 +333,7 @@ func _leave_to_title() -> void:
 	MenuState.reset()
 	_end()
 	Net.leave()
-	get_tree().change_scene_to_file.call_deferred("res://ui/title.tscn")
+	SceneLoader.cut_to.call_deferred("res://ui/title.tscn")
 
 
 ## Run bookkeeping, but leave the session up: after a finished run everyone

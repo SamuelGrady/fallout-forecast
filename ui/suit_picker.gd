@@ -35,9 +35,8 @@ func _init(preview_size := Vector2i(260, 250)) -> void:
 	for i in Cosmetics.COLORS.size():
 		var swatch := Button.new()
 		swatch.custom_minimum_size = Vector2(56, 34)
-		swatch.focus_mode = Control.FOCUS_ALL
+		BroadcastUI.animate_button(swatch)
 		swatch.pressed.connect(func():
-			Sound.play("ui_click")
 			_pick(i, skin))
 		grid.add_child(swatch)
 		_swatches.append(swatch)
@@ -155,7 +154,6 @@ func _arrow(parent: Control, text: String, step: int) -> void:
 	b.custom_minimum_size = Vector2(48, 40)
 	BroadcastUI.animate_button(b)
 	b.pressed.connect(func():
-		Sound.play("ui_click")
 		_pick(color, skin + step))
 	parent.add_child(b)
 

@@ -16,8 +16,11 @@ const PLAY := 0.96
 const OSD_COLOR := Color("CCEADB")
 
 var _playback := Control.new()
+var _content := Control.new()
 var _menu := VBoxContainer.new()
+var _settings_panel := PanelContainer.new()
 var _settings := VBoxContainer.new()
+var _settings_initial: HSlider
 var _suit := VBoxContainer.new()
 var _intro := Control.new()
 var _deck := VcrDeck.new()
@@ -47,12 +50,11 @@ func _ready() -> void:
 	_build_tape_loader()
 
 	_transport.bus = &"UI"
-	_transport.volume_db = -11.0
 	if OS.has_feature("web"):
 		_transport.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(_transport)
 	_tracking.bus = &"UI"
-	_tracking.volume_db = -19.0
+	_tracking.volume_db = Sound.cue_gain("vhs_glitch", -19.0)
 	if OS.has_feature("web"):
 		_tracking.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(_tracking)
@@ -61,6 +63,8 @@ func _ready() -> void:
 	retro.interface_only = true
 	retro.get_node("VHS").hide()
 	add_child(retro)
+	if MenuState.title_played:
+		_finish_intro()
 
 
 func _build_tape_loader() -> void:
@@ -82,7 +86,9 @@ void fragment() {
 	_add_full_rect(wall, _intro)
 	_intro.add_child(_deck)
 	_deck.tape_depth = -84.0
-	var skip := _label(_intro, "PRESS ANY BUTTON TO SKIP", Vector2(0, 674), 16, Color("8C8B9B"), 960.0)
+	var skip := _label(_intro, "PRESS ANY BUTTON TO SKIP", Vector2(0, 674), 16, BroadcastUI.MUTED, 960.0)
+	skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	skip.offset_top = -45
 	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_snow_material.shader = _snow_shader()
 	_snow_material.set_shader_parameter("steady", Settings.reduced_flash)
@@ -92,14 +98,19 @@ void fragment() {
 
 
 func _build_playback_menu() -> void:
-	_label(_playback, "PLAY", Vector2(78, 34), 22, OSD_COLOR)
-	_label(_playback, ">" if OS.has_feature("web") else "▶", Vector2(51, 36), 17, OSD_COLOR)
-	_counter = _label(_playback, "SP   00:00:00", Vector2(702, 34), 22, OSD_COLOR, 206.0)
+	_add_full_rect(_content, _playback)
+	_content.anchor_left = 0.5
+	_content.anchor_right = 0.5
+	_content.offset_left = -480
+	_content.offset_right = 480
+	_label(_content, "PLAY", Vector2(78, 34), 22, OSD_COLOR)
+	_label(_content, ">" if OS.has_feature("web") else "▶", Vector2(51, 36), 17, OSD_COLOR)
+	_counter = _label(_content, "SP   00:00:00", Vector2(702, 34), 22, OSD_COLOR, 206.0)
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_label(_playback, "OCT 31 1987", Vector2(52, 658), 19, OSD_COLOR)
+	_label(_content, "OCT 31 1987", Vector2(52, 658), 19, OSD_COLOR)
 
-	var first := _label(_playback, "FALLOUT", Vector2(96, 91), 99, Color("E6EEE2"))
-	var second := _label(_playback, "FORECAST", Vector2(96, 174), 99, Color("A9E9D9"))
+	var first := _label(_content, "FALLOUT", Vector2(96, 91), 99, Color("E6EEE2"))
+	var second := _label(_content, "FORECAST", Vector2(96, 174), 99, Color("A9E9D9"))
 	for line in [first, second]:
 		line.add_theme_constant_override("shadow_offset_x", 3)
 		line.add_theme_constant_override("shadow_offset_y", 3)
@@ -108,8 +119,8 @@ func _build_playback_menu() -> void:
 	_menu.position = Vector2(104, 325)
 	_menu.custom_minimum_size.x = 354.0
 	_menu.add_theme_constant_override("separation", 5)
-	_playback.add_child(_menu)
-	_button(_menu, "PLAY SOLO", _on_play)
+	_content.add_child(_menu)
+	BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
 	# Browsers can join a session, but cannot listen for incoming connections.
 	_host_button = _button(_menu, "HOST GAME", _on_host)
 	_host_button.visible = Net.can_host()
@@ -120,47 +131,42 @@ func _build_playback_menu() -> void:
 	for button in _menu.get_children():
 		button.disabled = true
 
-	_settings.position = _menu.position
-	_settings.custom_minimum_size.x = _menu.custom_minimum_size.x
+	_settings_panel.position = Vector2(495, 87)
+	_settings_panel.custom_minimum_size.x = 376.0
+	_settings_panel.hide()
+	_content.add_child(_settings_panel)
 	_settings.add_theme_constant_override("separation", 5)
-	_settings.hide()
-	_playback.add_child(_settings)
-	_slider(_settings, "MOUSE SENSITIVITY", 0.0005, 0.006, Settings.mouse_sensitivity, func(v): Settings.mouse_sensitivity = v)
+	_settings_panel.add_child(_settings)
+	var heading := Label.new()
+	heading.text = "SETTINGS"
+	BroadcastUI.text(heading, 38, BroadcastUI.CYAN)
+	_settings.add_child(heading)
+	_settings_initial = _slider(_settings, "MOUSE SENSITIVITY", 0.0005, 0.006, Settings.mouse_sensitivity, func(v: float): Settings.mouse_sensitivity = v)
 	_slider(_settings, "VOLUME", 0.0, 1.0, Settings.master_volume, _set_volume)
-	var retro := CheckButton.new()
-	retro.text = "RETRO VHS EFFECT"
-	retro.button_pressed = Settings.retro_enabled
-	retro.toggled.connect(Settings.set_retro)
-	_style_button(retro)
-	_settings.add_child(retro)
-	var calm := CheckButton.new()
-	calm.text = "REDUCED FLASHING"
-	calm.button_pressed = Settings.reduced_flash
-	calm.toggled.connect(Settings.set_reduced_flash)
-	_style_button(calm)
-	_settings.add_child(calm)
-	# Where JOIN GAME connects. Blank = the public cloud server.
+	_toggle("RETRO VHS EFFECT", Settings.retro_enabled, Settings.set_retro)
+	_toggle("REDUCED FLASHING", Settings.reduced_flash, Settings.set_reduced_flash)
+	_toggle("LARGE HUD", Settings.hud_scale > 1.0, Settings.set_large_hud)
+	_toggle("PERFORMANCE OVERLAY", Settings.perf_overlay, func(on: bool):
+		Settings.perf_overlay = on
+		Settings.save())
 	var server_caption := Label.new()
 	server_caption.text = "SERVER (WSS)"
-	server_caption.add_theme_font_size_override("font_size", 16)
+	BroadcastUI.text(server_caption, 19, BroadcastUI.CYAN)
 	_settings.add_child(server_caption)
 	var server_edit := LineEdit.new()
 	server_edit.text = Settings.server_url
 	server_edit.placeholder_text = Net.CLOUD_URL
 	server_edit.custom_minimum_size.y = 38
-	server_edit.text_changed.connect(func(t): Settings.server_url = t.strip_edges())
-	server_edit.text_submitted.connect(func(_t): Settings.save())
-	_settings.add_child(server_edit)
-	var perf := CheckButton.new()
-	perf.text = "PERFORMANCE OVERLAY"
-	perf.button_pressed = Settings.perf_overlay
-	perf.toggled.connect(func(on):
-		Settings.perf_overlay = on
+	server_edit.text_changed.connect(func(t: String): Settings.server_url = t.strip_edges())
+	server_edit.text_submitted.connect(func(_t: String):
+		Sound.play("ui_click")
 		Settings.save())
-	_style_button(perf)
-	_settings.add_child(perf)
+	BroadcastUI.focus_sound(server_edit)
+	_settings.add_child(server_edit)
 	var export := _button(_settings, "EXPORT PERF REPORT", func(): pass)
-	export.pressed.connect(func(): export.text = Perf.export_report().to_upper().left(34))
+	export.pressed.connect(func():
+		Perf.export_report()
+		export.text = "PERF REPORT DOWNLOADED" if OS.has_feature("web") else "PERF REPORT SAVED")
 	if Net.can_host():
 		_button(_settings, "BROWSE LAN GAMES", _on_browse_lan)
 	_button(_settings, "BACK", _on_back)
@@ -169,7 +175,7 @@ func _build_playback_menu() -> void:
 	_suit.custom_minimum_size.x = 362.0
 	_suit.add_theme_constant_override("separation", 8)
 	_suit.hide()
-	_playback.add_child(_suit)
+	_content.add_child(_suit)
 	_suit_picker = SuitPicker.new(Vector2i(280, 280))
 	_suit_picker.changed.connect(func(color: int, skin: int):
 		Settings.suit_color = color
@@ -225,12 +231,14 @@ func _input(event: InputEvent) -> void:
 		_play_transport(FAST_FORWARD)
 		_finish_intro()
 		get_viewport().set_input_as_handled()
-	elif (_settings.visible or _suit.visible) and event.is_action_pressed("ui_cancel"):
+	elif (_settings_panel.visible or _suit.visible) and event.is_action_pressed("ui_cancel"):
+		Sound.play("ui_click")
 		_on_back()
 		get_viewport().set_input_as_handled()
 
 
 func _finish_intro() -> void:
+	MenuState.title_played = true
 	_t = PLAY
 	_menu_ready = true
 	_intro.hide()
@@ -245,6 +253,7 @@ func _finish_intro() -> void:
 
 func _play_transport(stream: AudioStream) -> void:
 	_transport.stream = stream
+	_transport.volume_db = Sound.cue_gain(stream.resource_path.get_file().get_basename(), -11.0)
 	_transport.play()
 
 
@@ -264,8 +273,7 @@ func _label(parent: Control, text: String, at: Vector2, font_size: int, color: C
 	label.text = text
 	label.position = at
 	label.size.x = width
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
+	BroadcastUI.text(label, font_size, color, 2)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(label)
 	return label
@@ -276,30 +284,23 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 	button.text = text
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.custom_minimum_size.y = 43
-	_style_button(button)
+	BroadcastUI.button_role(button)
 	BroadcastUI.animate_button(button)
-	button.pressed.connect(func():
-		Sound.play("ui_click")
-		action.call())
+	button.pressed.connect(action)
 	parent.add_child(button)
 	return button
 
 
-func _style_button(button: Control) -> void:
-	button.add_theme_font_size_override("font_size", 24)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var selected: bool = state in ["hover", "pressed", "focus"]
-		var fill := Color(0.04, 0.13, 0.16, 0.86) if selected else Color(0.03, 0.06, 0.09, 0.54)
-		if state == "focus":
-			fill.a = 0.0
-		var style := BroadcastUI.panel(fill, OSD_COLOR)
-		style.border_width_left = 3 if selected else 0
-		style.set_content_margin_all(10)
-		style.content_margin_left = 19
-		button.add_theme_stylebox_override(state, style)
+func _toggle(caption: String, checked: bool, action: Callable) -> void:
+	var toggle := CheckButton.new()
+	toggle.text = caption
+	toggle.button_pressed = checked
+	toggle.toggled.connect(action)
+	BroadcastUI.animate_button(toggle)
+	_settings.add_child(toggle)
 
 
-func _slider(parent: Control, caption: String, lo: float, hi: float, value: float, on_change: Callable) -> void:
+func _slider(parent: Control, caption: String, lo: float, hi: float, value: float, on_change: Callable) -> HSlider:
 	var label := Label.new()
 	label.text = caption
 	label.add_theme_color_override("font_color", OSD_COLOR)
@@ -312,7 +313,10 @@ func _slider(parent: Control, caption: String, lo: float, hi: float, value: floa
 	slider.value = value
 	slider.custom_minimum_size = Vector2(320, 21)
 	slider.value_changed.connect(on_change)
+	slider.value_changed.connect(func(_value: float): Sound.ui_focus())
+	BroadcastUI.focus_sound(slider)
 	parent.add_child(slider)
+	return slider
 
 
 func _set_volume(value: float) -> void:
@@ -324,7 +328,7 @@ func _set_volume(value: float) -> void:
 func _on_play() -> void:
 	Settings.save()
 	Net.leave()
-	get_tree().change_scene_to_file(Maps.SELECT_SCENE)
+	SceneLoader.cut_to(Maps.SELECT_SCENE)
 
 
 func _on_host() -> void:
@@ -333,7 +337,7 @@ func _on_host() -> void:
 	if err != OK:
 		_show_error("Could not open port %d (error %d). Another copy running?" % [Net.PORT, err])
 		return
-	get_tree().change_scene_to_file(LOBBY_SCENE)
+	SceneLoader.cut_to(LOBBY_SCENE)
 
 
 ## JOIN GAME goes straight to the cloud server (or the address in Settings).
@@ -354,7 +358,7 @@ func _on_join() -> void:
 func _on_joined() -> void:
 	if Net.connection_failed.is_connected(_on_join_failed):
 		Net.connection_failed.disconnect(_on_join_failed)
-	get_tree().change_scene_to_file(LOBBY_SCENE)
+	SceneLoader.cut_to(LOBBY_SCENE)
 
 
 func _on_join_failed() -> void:
@@ -369,7 +373,7 @@ func _on_join_failed() -> void:
 func _on_browse_lan() -> void:
 	Settings.save()
 	Net.leave()
-	get_tree().change_scene_to_file(BROWSER_SCENE)
+	SceneLoader.cut_to(BROWSER_SCENE)
 
 
 var _status_label: Label
@@ -381,7 +385,7 @@ func _join_status(text: String) -> void:
 		_status_label.add_theme_font_size_override("font_size", 20)
 		_status_label.add_theme_color_override("font_color", BroadcastUI.CYAN)
 		_status_label.position = _menu.position + Vector2(0, -34)
-		_playback.add_child(_status_label)
+		_content.add_child(_status_label)
 	_status_label.text = text
 	_status_label.visible = text != ""
 
@@ -421,7 +425,7 @@ func _show_error(text: String) -> void:
 	row.position = _menu.position
 	row.custom_minimum_size.x = _menu.custom_minimum_size.x
 	row.add_theme_constant_override("separation", 12)
-	_playback.add_child(row)
+	_content.add_child(row)
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -438,25 +442,26 @@ func _show_error(text: String) -> void:
 
 func _on_settings() -> void:
 	_menu.hide()
-	_settings.show()
-	BroadcastUI.reveal(_settings)
-	_settings.get_child(1).grab_focus()
+	_settings_panel.show()
+	_settings_initial.grab_focus()
+	SceneLoader.tracking_wipe()
 
 
 func _on_suit() -> void:
 	_menu.hide()
 	_suit.show()
-	BroadcastUI.reveal(_suit)
 	_suit_picker.focus_selected()
+	SceneLoader.tracking_wipe()
 
 
 func _on_back() -> void:
 	Settings.save()
 	var button := _suit_button if _suit.visible else _settings_button
-	_settings.hide()
+	_settings_panel.hide()
 	_suit.hide()
 	_menu.show()
 	button.grab_focus()
+	SceneLoader.tracking_wipe()
 
 
 func _snow_shader() -> Shader:

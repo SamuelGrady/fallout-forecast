@@ -31,10 +31,10 @@ func _ready() -> void:
 
 	var box := VBoxContainer.new()
 	_content = box
-	box.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	box.offset_left = 40
-	box.offset_right = -40
-	box.offset_top = 24
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	box.offset_left = -430
+	box.offset_right = 430
+	box.offset_top = 22
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -56,7 +56,7 @@ func _ready() -> void:
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 28)
 	box.add_child(columns)
-	_picker = SuitPicker.new()
+	_picker = SuitPicker.new(Vector2i(258, 204))
 	_picker.changed.connect(_on_suit_changed)
 	columns.add_child(_picker)
 	var side := VBoxContainer.new()
@@ -79,7 +79,10 @@ func _ready() -> void:
 	_name_edit.max_length = 18
 	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_edit.custom_minimum_size = Vector2(180, 40)
-	_name_edit.text_submitted.connect(_on_name_commit)
+	_name_edit.text_submitted.connect(func(value: String):
+		Sound.play("ui_click")
+		_on_name_commit(value))
+	BroadcastUI.focus_sound(_name_edit)
 	_name_edit.focus_exited.connect(func(): _on_name_commit(_name_edit.text))
 	name_row.add_child(_name_edit)
 
@@ -102,7 +105,10 @@ func _ready() -> void:
 	_start_button = _button(side, "START RUN", _on_start)
 	_ready_button = _button(side, "READY", _on_ready)
 	_force_button = _button(side, "FORCE START", _on_force)
-	_leave_button = _button(side, "LEAVE", _on_leave)
+	_leave_button = _button(side, "LEAVE LOBBY", _on_leave)
+	BroadcastUI.button_role(_start_button, true)
+	BroadcastUI.button_role(_ready_button, true)
+	BroadcastUI.button_role(_leave_button, false, true)
 
 	_build_chat()
 	Net.chat_received.connect(_on_chat)
@@ -113,7 +119,7 @@ func _ready() -> void:
 	Net.connection_failed.connect(_on_connection_failed)
 	SceneLoader.load_failed.connect(_on_load_failed)
 	_refresh()
-	var primary := _start_button if Net.is_host() else _ready_button
+	var primary := _start_button if _start_button.visible else (_ready_button if _ready_button.visible else _leave_button)
 	primary.grab_focus()
 
 
@@ -139,7 +145,7 @@ func _refresh() -> void:
 	_start_button.text = "START RUN" if all_ready else "FORCE START"
 	# Clients can force the start too (the cloud server has no host player).
 	_force_button.visible = not hosting and Net.is_online() and not all_ready
-	_ready_button.text = "READY" if _is_ready(Net.local_id()) else "NOT READY"
+	_ready_button.text = "CANCEL READY" if _is_ready(Net.local_id()) else "READY UP"
 	if Net.is_offline():
 		_status.text = Net.last_error if Net.last_error != "" else "No session. Go back and pick HOST GAME or JOIN GAME."
 		_start_button.hide()
@@ -148,7 +154,11 @@ func _refresh() -> void:
 	_map_button.visible = Net.is_online() and (hosting or Net.lobby_votes_enabled)
 	_map_button.text = "VOTE MAP" if Net.lobby_votes_enabled else "CHANGE MAP"
 	if Net.lobby_votes_enabled:
-		_map_status.text = "VOTED  " + Maps.display_name(Net.lobby_my_vote) if Net.lobby_my_vote != "" else "CAST A MAP VOTE"
+		var votes := 0
+		for count in Net.lobby_vote_counts.values():
+			votes += int(count)
+		var pick := Maps.display_name(Net.lobby_my_vote) if not Net.lobby_my_vote.is_empty() else "NO PICK"
+		_map_status.text = "%s  /  %d VOTED" % [pick, votes]
 	else:
 		_map_status.text = "MAP  " + Maps.display_name(Net.lobby_map_id) if Net.is_online() else ""
 	# Out of the tree now, so the rebuilt list doesn't double up for a frame.
@@ -162,7 +172,7 @@ func _refresh() -> void:
 	_sync_picker()
 	if ids.is_empty():
 		var waiting := Label.new()
-		waiting.text = "waiting for players..."
+		waiting.text = "WAITING FOR PLAYERS"
 		waiting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		waiting.add_theme_font_size_override("font_size", 18)
 		waiting.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
@@ -194,8 +204,8 @@ func _open_maps() -> void:
 	_map_picker.mode = MapSelect.Mode.VOTE if Net.lobby_votes_enabled else MapSelect.Mode.HOST_PICK
 	_map_picker.dismissed.connect(_close_maps)
 	_content.hide()
-	_chat_panel.hide()
 	add_child(_map_picker)
+	SceneLoader.tracking_wipe()
 
 
 func _close_maps() -> void:
@@ -207,6 +217,7 @@ func _close_maps() -> void:
 	_chat_panel.visible = Net.is_online()
 	if _map_button.visible:
 		_map_button.grab_focus()
+	SceneLoader.tracking_wipe()
 
 
 func _row(peer_id: int, info: Dictionary) -> Control:
@@ -267,11 +278,9 @@ func _is_ready(peer_id: int) -> bool:
 func _button(parent: Control, text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(320, 52)
+	b.custom_minimum_size = Vector2(320, 44)
 	BroadcastUI.animate_button(b)
-	b.pressed.connect(func():
-		Sound.play("ui_click")
-		action.call())
+	b.pressed.connect(action)
 	parent.add_child(b)
 	return b
 
@@ -286,46 +295,65 @@ var _chat_edit := LineEdit.new()
 func _build_chat() -> void:
 	var panel := PanelContainer.new()
 	_chat_panel = panel
-	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_top = -168
-	panel.offset_left = 40
-	panel.offset_right = -40
-	panel.offset_bottom = -12
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.02, 0.04, 0.08, 0.82)
-	style.border_color = BroadcastUI.CYAN
-	style.border_width_left = 3
+	var style := BroadcastUI.panel(BroadcastUI.OVERLAY)
 	style.set_content_margin_all(8)
 	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
+	_content.add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	panel.add_child(v)
+	var heading := Label.new()
+	heading.text = "SQUAD CHAT"
+	BroadcastUI.text(heading, 18, BroadcastUI.CYAN)
+	v.add_child(heading)
 	_chat_log.bbcode_enabled = false
 	_chat_log.scroll_following = true
-	_chat_log.custom_minimum_size.y = 82
+	_chat_log.custom_minimum_size.y = 66
 	_chat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_chat_log.add_theme_font_size_override("normal_font_size", 18)
 	v.add_child(_chat_log)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	v.add_child(row)
-	_chat_edit.placeholder_text = "SAY SOMETHING... (ENTER)"
+	_chat_edit.placeholder_text = "MESSAGE SQUAD"
+	BroadcastUI.focus_sound(_chat_edit)
 	_chat_edit.max_length = Net.CHAT_MAX
 	_chat_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_chat_edit.text_submitted.connect(func(t):
-		Net.send_chat(t)
-		_chat_edit.clear())
+	_chat_edit.text_submitted.connect(_send_chat)
+	var send := Button.new()
+	send.text = "SEND"
+	BroadcastUI.button_role(send, true, true)
+	BroadcastUI.animate_button(send)
+	send.pressed.connect(func(): _send_chat(_chat_edit.text, false))
 	row.add_child(_chat_edit)
+	row.add_child(send)
 	for phrase in QUICK:
 		var b := Button.new()
 		b.text = phrase
-		b.focus_mode = Control.FOCUS_NONE
+		BroadcastUI.button_role(b, false, true)
+		BroadcastUI.animate_button(b)
 		b.pressed.connect(func(): Net.send_chat(phrase))
 		row.add_child(b)
 	for line in Net.chat_log:
 		_on_chat(line[0], line[1])
 	panel.visible = Net.is_online()
+
+
+func _send_chat(message: String, sound := true) -> void:
+	if message.strip_edges().is_empty():
+		return
+	if sound:
+		Sound.play("ui_click")
+	Net.send_chat(message)
+	_chat_edit.clear()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(_map_picker) or not event.is_action_pressed("ui_cancel") or event.is_echo():
+		return
+	get_viewport().set_input_as_handled()
+	Sound.play("ui_click")
+	_on_leave()
 
 
 func _on_chat(sender: String, text: String) -> void:
@@ -348,7 +376,7 @@ func _on_force() -> void:
 func _on_leave() -> void:
 	_leaving = true
 	Net.leave()
-	get_tree().change_scene_to_file(TITLE_SCENE)
+	SceneLoader.cut_to(TITLE_SCENE)
 
 
 func _on_run_started() -> void:
@@ -362,7 +390,7 @@ func _on_run_started() -> void:
 func _on_server_closed() -> void:
 	_leaving = true
 	Net.leave()
-	get_tree().change_scene_to_file(TITLE_SCENE)
+	SceneLoader.cut_to(TITLE_SCENE)
 
 
 func _on_connection_failed() -> void:

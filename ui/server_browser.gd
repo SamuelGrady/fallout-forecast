@@ -57,6 +57,7 @@ func _ready() -> void:
 	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_edit.custom_minimum_size = Vector2(240, 44)
 	_name_edit.text_changed.connect(_on_name_changed)
+	BroadcastUI.focus_sound(_name_edit)
 	name_row.add_child(_name_edit)
 
 	_status = Label.new()
@@ -83,14 +84,16 @@ func _ready() -> void:
 	_address.placeholder_text = "192.168.1.20 or host:port"
 	_address.custom_minimum_size = Vector2(280, 46)
 	_address.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_address.text_submitted.connect(func(text): _connect_to(text))
+	BroadcastUI.focus_sound(_address)
+	_address.text_submitted.connect(func(text: String):
+		Sound.play("ui_click")
+		_connect_to(text))
 	manual.add_child(_address)
 	_connect_button = Button.new()
 	_connect_button.text = "CONNECT"
 	_connect_button.custom_minimum_size = Vector2(160, 46)
 	BroadcastUI.animate_button(_connect_button)
 	_connect_button.pressed.connect(func():
-		Sound.play("ui_click")
 		_connect_to(_address.text))
 	manual.add_child(_connect_button)
 
@@ -148,7 +151,6 @@ func _refresh() -> void:
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		BroadcastUI.animate_button(row)
 		row.pressed.connect(func():
-			Sound.play("ui_click")
 			_connect_to(address))
 		_list.add_child(row)
 
@@ -173,7 +175,7 @@ func _on_joined() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	get_tree().change_scene_to_file(LOBBY_SCENE)
+	SceneLoader.cut_to(LOBBY_SCENE)
 
 
 func _on_failed() -> void:
@@ -188,7 +190,14 @@ func _on_failed() -> void:
 func _on_back() -> void:
 	_leaving = true
 	Net.leave()
-	get_tree().change_scene_to_file(TITLE_SCENE)
+	SceneLoader.cut_to(TITLE_SCENE)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _leaving and event.is_action_pressed("ui_cancel") and not event.is_echo():
+		get_viewport().set_input_as_handled()
+		Sound.play("ui_click")
+		_on_back()
 
 
 func _button(parent: Control, text: String, action: Callable) -> Button:
@@ -196,8 +205,6 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(320, 52)
 	BroadcastUI.animate_button(b)
-	b.pressed.connect(func():
-		Sound.play("ui_click")
-		action.call())
+	b.pressed.connect(action)
 	parent.add_child(b)
 	return b
