@@ -483,10 +483,15 @@ func _handle_interact(delta: float) -> void:
 			var self_revive := it.get_parent() == self and state == "downed"
 			var direction := it.global_position - camera.global_position
 			var distance := global_position.distance_to(it.global_position)
-			if distance > it.radius:
+			if distance > it.radius + (0.6 if it == _hold_target and _hold > 0.0 else 0.0):
 				continue
-			if not self_revive:
-				if forward.dot(direction.normalized()) < 0.65:
+			# Holding E on a target keeps it while it stays in reach, so a slight
+			# look-away doesn't reset a 1 s hold (the decon "repair isn't working"
+			# playtest bug). Up close the view cone also widens.
+			var keep := it == _hold_target and _hold > 0.0 and distance <= it.radius + 0.6
+			if not self_revive and not keep:
+				var cone := lerpf(0.25, 0.65, clampf((distance - 0.6) / 1.4, 0.0, 1.0))
+				if forward.dot(direction.normalized()) < cone:
 					continue
 				var query := PhysicsRayQueryParameters3D.create(camera.global_position,it.global_position, WORLD_LAYER,[get_rid()])
 				var hit := get_world_3d().direct_space_state.intersect_ray(query)
