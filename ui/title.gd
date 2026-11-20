@@ -120,7 +120,20 @@ func _build_playback_menu() -> void:
 	_menu.custom_minimum_size.x = 354.0
 	_menu.add_theme_constant_override("separation", 5)
 	_content.add_child(_menu)
-	BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
+	if OS.has_feature("web"):
+		# Web: PLAY SOLO shares its row with a DOWNLOAD button for the desktop build.
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 5)
+		_menu.add_child(row)
+		var play := _button(row, "PLAY SOLO", _on_play)
+		play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		BroadcastUI.button_role(play, true)
+		var download := _button(row, "DOWNLOAD", _on_download)
+		download.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		download.custom_minimum_size.x = 150
+		download.tooltip_text = "Get the desktop build (Windows / Linux)"
+	else:
+		BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
 	# Browsers can join a session, but cannot listen for incoming connections.
 	_host_button = _button(_menu, "HOST GAME", _on_host)
 	_host_button.visible = Net.can_host()
@@ -128,8 +141,7 @@ func _build_playback_menu() -> void:
 	_suit_button = _button(_menu, "SUIT", _on_suit)
 	_settings_button = _button(_menu, "SETTINGS", _on_settings)
 	_button(_menu, "QUIT", _on_quit).visible = not OS.has_feature("web")
-	for button in _menu.get_children():
-		button.disabled = true
+	_set_menu_enabled(false)
 
 	_settings_panel.position = Vector2(495, 87)
 	_settings_panel.custom_minimum_size.x = 376.0
@@ -246,9 +258,8 @@ func _finish_intro() -> void:
 	_playback.show()
 	if _backdrop_viewport:
 		_backdrop_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
-	for button in _menu.get_children():
-		button.disabled = false
-	_menu.get_child(0).grab_focus()
+	_set_menu_enabled(true)
+	_menu_buttons()[0].grab_focus()
 
 
 func _play_transport(stream: AudioStream) -> void:
@@ -391,9 +402,37 @@ func _join_status(text: String) -> void:
 
 
 func _set_menu_enabled(enabled: bool) -> void:
-	for button in _menu.get_children():
-		if button is Button:
-			button.disabled = not enabled
+	for button in _menu_buttons():
+		button.disabled = not enabled
+
+
+## Every menu button, including the ones inside the web PLAY / DOWNLOAD row.
+func _menu_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	for child in _menu.get_children():
+		if child is Button:
+			out.append(child)
+		elif child is HBoxContainer:
+			for inner in child.get_children():
+				if inner is Button:
+					out.append(inner)
+	return out
+
+
+const RELEASES := "https://github.com/kickofline/fallout-forecast/releases"
+
+
+## Web only: download the desktop build that matches the visitor's OS (the
+## rolling "nightly" release CI refreshes on every master push).
+func _on_download() -> void:
+	var file := ""
+	if OS.has_feature("web"):
+		var agent := str(JavaScriptBridge.eval("navigator.userAgent", true)).to_lower()
+		if "windows" in agent:
+			file = "FalloutForecast-windows-x86_64.zip"
+		elif "linux" in agent and not "android" in agent:
+			file = "FalloutForecast-linux-x86_64.tar.gz"
+	OS.shell_open(RELEASES + ("/download/nightly/" + file if file != "" else "/tag/nightly"))
 
 
 func _on_quit() -> void:
