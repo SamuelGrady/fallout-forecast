@@ -7,6 +7,7 @@ const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
 var damage_per_second := 6.0
 var source: Node = null
 var acid := false
+var hazard_id := 0
 
 var _velocity := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -87,6 +88,7 @@ func _burst(at: Vector3) -> void:
 		at = floor_hit.get("position", at)
 	Sound.play_at("smog_splash" if acid else "spore_burst", at)
 	var cloud := SporeCloud.new()
+	cloud.hazard_id = hazard_id
 	cloud.damage_per_second = damage_per_second
 	cloud.source = source if is_instance_valid(source) else null
 	if acid:

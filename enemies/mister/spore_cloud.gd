@@ -7,6 +7,7 @@ var radius := 2.5
 var lifetime := 4.0
 var source: Node = null
 var acid := false
+var hazard_id := 0
 
 var _age := 0.0
 var _mesh_material := StandardMaterial3D.new()

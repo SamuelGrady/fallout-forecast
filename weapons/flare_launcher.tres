@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Road Flare Launcher"
+shot_sound = "gun_flare_launcher"
+kind = 1
+mechanic = "burn"
+damage = 24.0
+mag_size = 1
+fire_interval = 0.75
+spread_degrees = 0
+max_range = 64.0
+tracer_color = Color(1.000, 0.451, 0.231, 1)
+projectile_speed = 25
+effect_radius = 4
+effect_time = 8
+reload_time = 1.35
+gun_model = "flare"

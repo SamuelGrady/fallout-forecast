@@ -1,235 +1,387 @@
+class_name WeaponProjectile
 extends Node3D
-## Flare or Bug Bomb in flight. Every peer simulates the same throw from the
-## same start, so everyone sees it; only the copy with `authoritative` (the
-## host's) deals damage.
-##
-## Shield Dome (Kind.FLARE slot): thrown, bounces off walls, settles on the
-## ground and projects a dome of effect_radius for effect_time. Players inside
-## are fully sheltered from acid rain (see protects()); infected inside are
-## shoved back out, weakened and outlined.
-## Frag grenade (Kind.GRENADE): bounces, and after effect_time explodes,
-## hurting enemies within effect_radius (more near the center), knocking them
-## back and drying any puddle it touches.
+## The host moves, deploys and expires effects. Replicas render host events.
 
+var registry: RunLoot
+var seq: int
+var id: String
 var data: WeaponData
-var authoritative := false
-var shooter: Node = null
-var velocity := Vector3.ZERO
-
-var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
-var _age := 0.0
-var _stuck := false
-var _done := false
-var _light: OmniLight3D
-var _reveal_tick := 0.0
+var shooter: Node3D
+var tier: int
+var velocity: Vector3
+var deployed := false
+var left := 0.0
+var yaw := 0.0
+var age := 0.0
+var _started_at: Vector3
+var _replica_at: Vector3
 var _exclude: Array[RID] = []
+var _tick_left := 0.0
+var _body: Node3D
+var _visual: Node3D
+var _light: OmniLight3D
+static var _ring: TorusMesh
+static var _hemisphere: SphereMesh
+static var _zone_mats: Dictionary = {}
 
+func configure(system: RunLoot, key: int, definition_id: String, at: Vector3, motion: Vector3, quality: int, source: Node3D) -> void:
+	registry = system
+	seq = key
+	id = definition_id
+	data = ItemCatalog.definition(id).weapon
+	shooter = source
+	tier = quality
+	_started_at = at
+	_replica_at = at
+	velocity = motion
+	if source is CollisionObject3D:
+		_exclude.append(source.get_rid())
 
-func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritative: bool, from_shooter: Node) -> void:
-	data = weapon
-	authoritative = is_authoritative
-	shooter = from_shooter
-	global_position = from
-	velocity = direction * weapon.projectile_speed
+func _ready() -> void:
+	global_position = _started_at
+	if not Net.dedicated:
+		_visual = ItemCatalog.projectile_model(id)
+		add_child(_visual)
+
+static func launch_velocity(weapon: WeaponData, dir: Vector3) -> Vector3:
+	var lift := 3.0 if weapon.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE] else 0.0
+	return dir * weapon.projectile_speed + Vector3.UP * lift
+
+static func gravity(weapon: WeaponData) -> float:
+	return float(ProjectSettings.get_setting("physics/3d/default_gravity")) * weapon.projectile_gravity
+
+static func motion_hit(world: World3D, from: Vector3, to: Vector3, exclude: Array[RID]) -> Dictionary:
+	return world.direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, WeaponHolder.HIT_MASK, exclude))
+
+static func bounce(weapon: WeaponData, hit: Dictionary, motion: Vector3, elapsed: float) -> Vector3:
+	var normal: Vector3 = hit.normal
 	if weapon.kind == WeaponData.Kind.GRENADE:
-		velocity += Vector3.UP * 3.0
-	if from_shooter is CollisionObject3D:
-		_exclude.append(from_shooter.get_rid())
-	if weapon.gun_model != "":
-		add_child(GunModels.projectile(weapon.gun_model))
-	elif weapon.model:
-		var model := weapon.model.instantiate() as Node3D
-		model.scale = Vector3.ONE * 2.0
-		add_child(model)
-	if weapon.kind == WeaponData.Kind.FLARE:
-		velocity += Vector3.UP * 3.0
-		_light = OmniLight3D.new()
-		_light.light_color = Color(0.35, 0.95, 1.0)
-		_light.light_energy = 1.0
-		_light.omni_range = 3.0
-		add_child(_light)
+		return motion.bounce(normal) * 0.4
+	if weapon.kind == WeaponData.Kind.FLARE and normal.y < 0.6 and elapsed < 3.0 			and (weapon.mechanic != "burn" or not WeaponCombat.is_damageable(hit.collider)):
+		return motion.bounce(normal) * 0.35
+	return Vector3.ZERO
 
+static func flight_time(weapon: WeaponData) -> float:
+	return (weapon.fuse if weapon.fuse > 0.0 else weapon.effect_time) if weapon.kind == WeaponData.Kind.GRENADE else 5.0
+
+func snapshot() -> Array:
+	return [id, global_position, velocity, tier, deployed, left, yaw]
+
+func sync_flight(at: Vector3, motion: Vector3) -> void:
+	_replica_at = at
+	velocity = motion
 
 func _physics_process(delta: float) -> void:
-	if _done:
+	if deployed:
+		if not Net.is_host():
+			return
+		if data.effect_time > 0.0:
+			left -= delta
+			if left <= 0.0:
+				registry.effect_finished(seq, global_position, false)
+				return
+		_tick_left -= delta
+		if _tick_left <= 0.0:
+			_tick_left = 0.25
+			_tick_zone()
 		return
-	_age += delta
-	match data.kind:
-		WeaponData.Kind.FLARE:
-			_flare_process(delta)
-		WeaponData.Kind.ROCKET:
-			if not _step(delta).is_empty() or _age > 4.0:
-				_explode()
-		_:
-			_bomb_process(delta)
-
-
-func _flare_process(delta: float) -> void:
-	if not _stuck:
-		var hit := _step(delta)
-		if not hit.is_empty():
-			global_position = hit.position + hit.normal * 0.05
-			if hit.normal.y < 0.6 and _age < 3.0:
-				# Walls and cars: bounce off and keep falling.
-				velocity = velocity.bounce(hit.normal) * 0.35
-			else:
-				_stuck = true
-				_deploy_dome()
+	age += delta
+	if not Net.is_host():
+		velocity.y -= gravity(data) * delta
+		_replica_at += velocity * delta
+		global_position = global_position.lerp(_replica_at, clampf(delta * 18.0, 0.0, 1.0))
 		return
-	var left := data.effect_time - (_age - _deployed_at)
-	if _dome:
-		# Shimmer, then flicker out in the last second.
-		var fade := clampf(left, 0.0, 1.0)
-		_dome_material.albedo_color.a = (0.16 + 0.04 * sin(_age * 6.0)) * fade * (1.0 if left > 1.0 or fmod(_age, 0.2) < 0.1 else 0.3)
-		_dome_rim.albedo_color.a = 0.7 * fade
-		_light.light_energy = 2.2 * fade
-	_reveal_tick -= delta
-	if _reveal_tick <= 0.0 and left > 0.0:
-		_reveal_tick = 0.25
-		for enemy in get_tree().get_nodes_in_group("enemies"):
-			var offset: Vector3 = enemy.global_position - global_position
-			offset.y = 0.0
-			if offset.length() <= data.effect_radius:
-				enemy.reveal(0.5)
-				if authoritative:
-					enemy.weaken(0.6)
-					# Push infected out through the dome wall.
-					var push := offset.normalized() if offset.length_squared() > 0.01 else Vector3.RIGHT
-					enemy.knockback(push * 3.5)
-	if left <= 0.0:
-		if is_in_group("active_flares"):
-			remove_from_group("active_flares")
-			Sound.play_at("dome_collapse", global_position, -10.0)
-		if left < -0.3:
-			queue_free()
-
-
-var _dome: MeshInstance3D
-var _dome_material: StandardMaterial3D
-var _dome_rim: StandardMaterial3D
-var _deployed_at := 0.0
-
-
-func _deploy_dome() -> void:
-	_deployed_at = _age
-	add_to_group("active_flares")
-	rotation = Vector3.ZERO
-	Sound.play_at("dome_deploy", global_position, -7.0)
-	ShotFX.flash(get_parent(), global_position + Vector3.UP, Color(0.35, 0.95, 1.0), 6.0, 0.2)
-	var r := data.effect_radius
-	_dome = MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = r
-	sphere.height = r  # a hemisphere's height is its radius
-	sphere.is_hemisphere = true
-	sphere.radial_segments = 24
-	sphere.rings = 8
-	_dome.mesh = sphere
-	_dome_material = StandardMaterial3D.new()
-	_dome_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_dome_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_dome_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_dome_material.albedo_color = Color(0.35, 0.95, 1.0, 0.18)
-	_dome_material.disable_fog = true
-	_dome.material_override = _dome_material
-	_dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_dome)
-	var rim := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = r - 0.08
-	torus.outer_radius = r
-	torus.rings = 32
-	rim.mesh = torus
-	rim.position.y = 0.05
-	_dome_rim = StandardMaterial3D.new()
-	_dome_rim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_dome_rim.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_dome_rim.albedo_color = Color(0.5, 1.0, 1.0, 0.7)
-	rim.material_override = _dome_rim
-	add_child(rim)
-	_dome.scale = Vector3.ONE * 0.1
-	_dome.create_tween().tween_property(_dome, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_light.omni_range = r * 1.4
-	_light.position.y = 1.0
-
-
-func _bomb_process(delta: float) -> void:
-	var hit := _step(delta)
-	if not hit.is_empty():
-		global_position = hit.position + hit.normal * 0.1
-		velocity = velocity.bounce(hit.normal) * 0.4
-	if data.kind == WeaponData.Kind.GRENADE:
-		rotation.x += delta * 7.0
-	if _age >= data.effect_time:
-		_explode()
-
-
-func _step(delta: float) -> Dictionary:
-	velocity.y -= _gravity * data.projectile_gravity * delta
+	velocity.y -= gravity(data) * delta
 	var next := global_position + velocity * delta
-	var query := PhysicsRayQueryParameters3D.create(global_position, next, (1 << 0) | (1 << 2), _exclude)
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	var hit := motion_hit(get_world_3d(), global_position, next, _exclude)
 	if hit.is_empty():
 		global_position = next
-	return hit
+	else:
+		var normal: Vector3 = hit.normal
+		global_position = (hit.position as Vector3) + normal * 0.07
+		velocity = bounce(data, hit, velocity, age)
+		if data.kind == WeaponData.Kind.ROCKET:
+			explode()
+			return
+		if data.kind == WeaponData.Kind.FLARE and velocity == Vector3.ZERO:
+			if data.mechanic == "burn" and WeaponCombat.is_damageable(hit.collider):
+				var source: Node = shooter if is_instance_valid(shooter) else null
+				var scale: float = float(ItemCatalog.DAMAGE_SCALE[tier])
+				hit.collider.take_damage(data.damage * scale, source)
+				if hit.collider is EnemyBase:
+					hit.collider.ignite(3.0, 14.0 * scale, source)
+			_host_deploy()
+			return
+	if data.kind == WeaponData.Kind.GRENADE and age >= flight_time(data):
+		if id == "frag":
+			explode()
+		else:
+			_host_deploy()
+	elif age > 5.0:
+		registry.effect_finished(seq, global_position, false)
 
+func _host_deploy() -> void:
+	deploy(global_position, data.effect_time, yaw)
+	registry.effect_deployed(seq, global_position, data.effect_time, yaw)
 
-func _has_los(from: Vector3, to: Vector3) -> bool:
-	var query := PhysicsRayQueryParameters3D.create(from, to, 1)
-	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
-
-
-func _explode() -> void:
-	Juice.shake(0.7 if data.kind == WeaponData.Kind.GRENADE else 0.5, global_position)
-	Sound.play_at("explosion_big" if data.kind == WeaponData.Kind.GRENADE else "explosion", global_position)
-	_done = true
-	if is_in_group("enemy_lures"):
-		remove_from_group("enemy_lures")
-	var center := global_position
-	var blast_eye := center + Vector3.UP * 0.35
-	var blast_radius := data.effect_radius * GameManager.explosive_radius_scale()
-	var dmg_scale := GameManager.explosive_damage_scale()
-	var kb_scale := GameManager.explosive_knockback_scale()
-	if authoritative:
-		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
-		for target in targets:
-			if not WeaponHolder.is_damageable(target):
-				continue
-			var d: float = target.global_position.distance_to(center)
-			if d <= blast_radius:
-				var aim_point: Vector3 = target.global_position + (Vector3.ZERO if target.is_in_group("boss_parts") else Vector3.UP * 0.9)
-				if not _has_los(blast_eye, aim_point):
-					continue
-				var falloff := 1.0 - 0.6 * d / blast_radius
-				target.take_damage(data.damage * falloff * dmg_scale, shooter)
-				if target.has_method("knockback"):
-					var push: Vector3 = (target.global_position - center)
-					push.y = 0.0
-					target.knockback(push.normalized() * data.knockback * falloff * kb_scale)
-	for puddle in get_tree().get_nodes_in_group("puddles"):
-		if puddle.global_position.distance_to(center) <= blast_radius + puddle.radius() \
-				and _has_los(blast_eye, puddle.global_position + Vector3.UP * 0.2):
-			puddle.clear()
-	var parent := get_parent()
-	if data.kind == WeaponData.Kind.ROCKET:
-		ShotFX.puff(parent, center, Color(1.0, 0.5, 0.8, 0.7), blast_radius * 0.4, 0.6)
-		ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.4, 0.8), 8.0, 0.12)
-		queue_free()
+func deploy(at: Vector3, duration: float, angle: float, announce := true) -> void:
+	if deployed:
 		return
-	# Frag: white-hot core, orange fireball, dark smoke, flying debris.
-	ShotFX.puff(parent, center + Vector3.UP * 0.4, Color(1.0, 0.95, 0.75, 0.95), blast_radius * 0.15, 0.18)
-	ShotFX.puff(parent, center + Vector3.UP * 0.5, Color(1.0, 0.55, 0.15, 0.85), blast_radius * 0.3, 0.45)
-	ShotFX.puff(parent, center + Vector3.UP * 1.0, Color(0.18, 0.17, 0.16, 0.6), blast_radius * 0.38, 1.1)
-	ShotFX.sparks(parent, center + Vector3.UP * 0.3, Vector3.UP, 14)
-	ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.6, 0.25), 10.0, 0.15)
+	global_position = at
+	deployed = true
+	left = duration
+	yaw = angle
+	rotation.y = yaw
+	if _visual:
+		_visual.hide()
+	match id:
+		"shield_dome", "umbrella":
+			_make_shelter()
+			add_to_group("active_flares")
+		"flare_launcher":
+			add_to_group("dry_weapon_zones")
+		"bait_radio":
+			if Net.is_host():
+				add_to_group("enemy_lures")
+		"sandbag":
+			_make_wall()
+			add_to_group("sandbag_walls")
+		"lightning_rod":
+			if Net.is_host():
+				add_to_group("lightning_rods")
+				WeatherManager.lightning_struck.connect(_strike_rod)
+	if not Net.dedicated:
+		_build_zone(announce)
+
+func _make_shelter() -> void:
+	var area := Area3D.new()
+	area.collision_layer = 8
+	area.collision_mask = 0
+	area.monitoring = false
+	area.add_to_group("shelter")
+	var collider := CollisionShape3D.new()
+	if id == "umbrella":
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = data.effect_radius
+		cylinder.height = 2.7
+		collider.shape = cylinder
+		collider.position.y = 1.25
+	else:
+		var bubble := SphereShape3D.new()
+		bubble.radius = data.effect_radius
+		collider.shape = bubble
+	area.add_child(collider)
+	add_child(area)
+	_body = area
+
+func _make_wall() -> void:
+	var wall := StaticBody3D.new()
+	wall.collision_layer = 1
+	wall.collision_mask = 0
+	var collider := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.8, 0.78, 0.72)
+	collider.shape = shape
+	collider.position.y = 0.39
+	wall.add_child(collider)
+	add_child(wall)
+	_body = wall
+
+func _build_zone(announce: bool) -> void:
+	var color := data.tracer_color
+	if id == "sandbag":
+		var custom := ItemCatalog.prop_model("sandbag_wall")
+		if custom:
+			add_child(custom)
+		else:
+			var bag := ItemCatalog.placeholder(color)
+			bag.scale = Vector3(1.8, 0.78, 0.72)
+			bag.position.y = 0.39
+			add_child(bag)
+		return
+	if id in ["bait_radio", "lightning_rod", "flare_launcher"]:
+		_visual.show()
+		_visual.position.y = 0.25
+		if id == "lightning_rod":
+			_visual.rotation.x = PI * 0.5
+	if id == "bait_radio":
+		var audio := AudioStreamPlayer3D.new()
+		var tune := load("res://assets/audio/sfx/gun_bait_loop.wav").duplicate() as AudioStreamWAV
+		tune.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		tune.loop_end = int(tune.get_length() * tune.mix_rate)
+		audio.stream = tune
+		audio.volume_db = -16.0
+		audio.max_distance = data.effect_radius
+		add_child(audio)
+		audio.play()
+	if announce and id == "shield_dome":
+		Sound.play_at("dome_deploy", global_position, -7.0)
+	elif announce:
+		Sound.play_at("gun_field_deploy", global_position, -13.0)
+	if data.effect_radius <= 0.0:
+		return
+	if _ring == null:
+		_ring = TorusMesh.new()
+		_ring.inner_radius = 0.96
+		_ring.outer_radius = 1.0
+		_ring.rings = 28
+		_ring.ring_segments = 5
+	var rim := MeshInstance3D.new()
+	rim.mesh = _ring
+	rim.material_override = _zone_material(color, 0.65)
+	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rim.scale = Vector3(data.effect_radius, 1.0, data.effect_radius)
+	rim.position.y = 0.055
+	add_child(rim)
+	if id == "umbrella":
+		var custom_umbrella := ItemCatalog.prop_model("umbrella_open")
+		if custom_umbrella:
+			add_child(custom_umbrella)
+	if id in ["shield_dome", "umbrella", "bleach_bomb", "disruptor"]:
+		if _hemisphere == null:
+			_hemisphere = SphereMesh.new()
+			_hemisphere.radius = 1.0
+			_hemisphere.height = 1.0
+			_hemisphere.is_hemisphere = true
+			_hemisphere.radial_segments = 24
+			_hemisphere.rings = 8
+		var dome := MeshInstance3D.new()
+		dome.mesh = _hemisphere
+		dome.material_override = _zone_material(color, 0.16)
+		dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		dome.scale = Vector3(data.effect_radius, 2.4 if id == "umbrella" else data.effect_radius, data.effect_radius)
+		add_child(dome)
+	if not OS.has_feature("web") and id in ["shield_dome", "flare_launcher"]:
+		_light = OmniLight3D.new()
+		_light.light_color = color
+		_light.light_energy = 1.8
+		_light.omni_range = data.effect_radius * 1.5
+		_light.position.y = 0.6
+		add_child(_light)
+
+static func _zone_material(color: Color, alpha: float) -> StandardMaterial3D:
+	var key := Color(color, alpha).to_rgba32()
+	if not _zone_mats.has(key):
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		material.albedo_color = Color(color, alpha)
+		_zone_mats[key] = material
+	return _zone_mats[key]
+
+func _tick_zone() -> void:
+	if id not in ["shield_dome", "flare_launcher", "bleach_bomb", "disruptor"]:
+		return
+	var source: Node = shooter if is_instance_valid(shooter) else null
+	if source:
+		source.begin_hit_batch()
+	for enemy: EnemyBase in get_tree().get_nodes_in_group("enemies"):
+		var at := enemy.global_position + Vector3.UP
+		if not _contains(at):
+			continue
+		match id:
+			"shield_dome":
+				enemy.reveal(0.65)
+				enemy.weaken(0.6)
+				var away := enemy.global_position - global_position
+				away.y = 0.0
+				if not enemy.has_method("blocks_impact") or not enemy.blocks_impact(global_position):
+					enemy.knockback(away.normalized() * 3.5)
+			"disruptor":
+				enemy.suppress_mutations(0.45)
+				enemy.reveal(0.65)
+			"flare_launcher", "bleach_bomb":
+				enemy.reveal(0.65)
+				var dps: float = 14.0 * float(ItemCatalog.DAMAGE_SCALE[tier]) if id == "flare_launcher" else data.damage
+				if id == "flare_launcher":
+					enemy.ignite(2.5, dps, source)
+				else:
+					enemy.take_damage(dps * 0.25, source)
+	if source:
+		source.end_hit_batch()
+	if id == "bleach_bomb":
+		for target: Node3D in GameManager.players():
+			if _contains(target.global_position + Vector3.UP):
+				WeaponCombat.repair(target, 2.6)
+		for cloud: Node3D in get_tree().get_nodes_in_group("spore_clouds"):
+			if cloud.get("acid") and not cloud.is_queued_for_deletion() and _contains(cloud.global_position + Vector3.UP * 0.25):
+				GameManager.disperse_cloud(cloud)
+
+func _contains(point: Vector3) -> bool:
+	return global_position.distance_to(point) <= data.effect_radius 		and WeaponCombat.clear_path(get_world_3d(), global_position + Vector3.UP * 0.25, point)
+
+func _strike_rod(at: Vector3, _seed: int) -> void:
+	if not is_queued_for_deletion() and at.is_equal_approx(global_position) and Net.is_host():
+		explode()
+
+func explode() -> void:
+	if not Net.is_host() or is_queued_for_deletion():
+		return
+	var at := global_position
+	var eye := at + Vector3.UP * 0.32
+	var radius: float = data.effect_radius * GameManager.explosive_radius_scale()
+	var damage: float = data.damage * float(ItemCatalog.DAMAGE_SCALE[tier]) * GameManager.explosive_damage_scale()
+	var source: Node = shooter if is_instance_valid(shooter) else null
+	if source:
+		source.begin_hit_batch()
+	var targets := get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + GameManager.players()
+	for target: Node3D in targets:
+		if not WeaponCombat.is_damageable(target):
+			continue
+		var distance := target.global_position.distance_to(at)
+		if distance > radius:
+			continue
+		var to := target.global_position + (Vector3.ZERO if target.is_in_group("boss_parts") else Vector3.UP * 0.9)
+		if not WeaponCombat.clear_path(get_world_3d(), eye, to):
+			continue
+		var falloff := 1.0 - 0.6 * distance / radius
+		if target is EnemyBase:
+			var push := target.global_position - at
+			push.y = 0.0
+			var impulse := push.normalized() * data.knockback * falloff * GameManager.explosive_knockback_scale()
+			target.take_blast(damage * falloff, source, at, impulse)
+		else:
+			target.take_damage(damage * falloff, source)
+	if source:
+		source.end_hit_batch()
+	var dry: Dictionary = {}
+	for puddle: Node3D in get_tree().get_nodes_in_group("puddles"):
+		if puddle.global_position.distance_to(at) <= radius + puddle.radius() 				and WeaponCombat.clear_path(get_world_3d(), eye, puddle.global_position + Vector3.UP * 0.2):
+			puddle.clear()
+			dry[puddle.get_path()] = 0.0
+	WeatherManager.replicate_puddle_growth(dry)
+	registry.effect_finished(seq, at, true)
+
+func finish(at: Vector3, blast: bool) -> void:
+	hide()
+	if WeatherManager.lightning_struck.is_connected(_strike_rod):
+		WeatherManager.lightning_struck.disconnect(_strike_rod)
+	for group: String in ["active_flares", "dry_weapon_zones", "enemy_lures", "sandbag_walls", "lightning_rods"]:
+		if is_in_group(group):
+			remove_from_group(group)
+	if not Net.dedicated:
+		if blast:
+			Juice.shake(0.7, at)
+			Sound.play_at("explosion_big" if id == "frag" else "explosion", at)
+			ShotFX.puff(registry, at + Vector3.UP * 0.4, data.tracer_color, data.effect_radius * 0.3, 0.45)
+			ShotFX.sparks(registry, at + Vector3.UP * 0.3, Vector3.UP, 12)
+			ShotFX.flash(registry, at + Vector3.UP, data.tracer_color, 8.0, 0.15)
+		elif id == "shield_dome" and deployed:
+			Sound.play_at("dome_collapse", at, -10.0)
 	queue_free()
 
-
-## True if `point` is under an active Shield Dome.
 static func protects(point: Vector3, tree: SceneTree) -> bool:
-	for dome in tree.get_nodes_in_group("active_flares"):
-		if dome.is_queued_for_deletion():
-			continue
-		if dome.global_position.distance_to(point) <= dome.data.effect_radius:
+	for dome: WeaponProjectile in tree.get_nodes_in_group("active_flares"):
+		var offset := point - dome.global_position
+		if dome.id == "umbrella" and Vector2(offset.x, offset.z).length() <= dome.data.effect_radius and absf(offset.y) < 2.7:
+			return true
+		if dome.id == "shield_dome" and offset.length() <= dome.data.effect_radius:
+			return true
+	return false
+
+static func dries(point: Vector3, tree: SceneTree) -> bool:
+	for zone: WeaponProjectile in tree.get_nodes_in_group("dry_weapon_zones"):
+		if zone._contains(point):
 			return true
 	return false

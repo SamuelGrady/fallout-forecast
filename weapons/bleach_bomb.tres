@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Bleach Bomb"
+shot_sound = "gun_bleach_bomb"
+kind = 2
+mechanic = "bleach_bomb"
+damage = 9.0
+mag_size = 1
+fire_interval = 0.7
+spread_degrees = 0
+max_range = 0.0
+tracer_color = Color(0.722, 1.000, 0.843, 1)
+projectile_speed = 14
+effect_radius = 4.3
+effect_time = 8
+fuse = 1.35
