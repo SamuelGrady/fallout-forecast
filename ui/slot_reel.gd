@@ -14,6 +14,9 @@ var _clock := 0.0
 var _spin_t := 0.0
 var _hide_at := -1.0
 var _options: Array = []
+## How the roll works, then the result: the wave's mutation and your perk.
+var _info := Label.new()
+var _pull_wait := 0.0
 
 func _ready() -> void:
 	layer = 2
@@ -22,8 +25,8 @@ func _ready() -> void:
 	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_panel.offset_left = -370
 	_panel.offset_right = 370
-	_panel.offset_top = -220
-	_panel.offset_bottom = 220
+	_panel.offset_top = -270
+	_panel.offset_bottom = 270
 	add_child(_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation",14)
@@ -42,6 +45,10 @@ func _ready() -> void:
 		var index := i
 		card.pressed.connect(func(): _vote(index))
 		_cards.append(card)
+	_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_info.add_theme_font_size_override("font_size", 19)
+	box.add_child(_info)
 	_lever.custom_minimum_size = Vector2(260,65)
 	_lever.text = "PULL"
 	_lever.pressed.connect(GameManager.pull_lever)
@@ -98,6 +105,11 @@ func _process(delta: float) -> void:
 	_countdown.value = roll._timer / (roll.VOTE_TIME if roll.stage == "voting" else roll.PULL_TIME)
 	_countdown.visible = roll.stage in ["pulling","voting"]
 	_lever.text = "[%s] PULL" % BroadcastUI.input_hint("interact")
+	# Solo: one pull, made for you after a beat, so the roll just happens.
+	if roll.stage == "pulling" and GameManager.is_solo() and not _lever.disabled:
+		_pull_wait += delta
+		if _pull_wait >= 0.9:
+			GameManager.pull_lever()
 	_spin_t += delta
 	if _spin_t >= SPIN_STEP:
 		_spin_t = 0
@@ -115,7 +127,9 @@ func _process(delta: float) -> void:
 func _on_started() -> void:
 	_panel.visible = true
 	BroadcastUI.reveal(_panel)
-	_title.text = "MUTATION"
+	_title.text = "MUTATION ROLL"
+	_info.text = "Enemies mutate this wave. Two matching reels decide it; three of a kind is a JACKPOT (two mutations, vote one off). You get a matching perk."
+	_pull_wait = 0.0
 	_targets.clear()
 	_options.clear()
 	_spinning = [true,true,true]
@@ -151,6 +165,7 @@ func _on_vote(options: Array) -> void:
 	_spinning = [false,false,false]
 	_options = options.duplicate()
 	_title.text = "CANCEL ONE"
+	_info.text = "JACKPOT: two mutations landed. Vote which one to cancel."
 	_cards[2].visible = false
 	for i in 2:
 		_cards[i].show_entry(_table.get_entry(options[i]),true,BroadcastUI.input_hint("vote_%d" % (i+1)))
@@ -182,6 +197,14 @@ func _on_final(active: Array) -> void:
 			_cards[i].visible = i < active.size()
 			if i < active.size():
 				_cards[i].show_entry(_table.get_entry(active[i]),true)
-	_hide_at = _clock + 2.5
+	var lines := []
+	for id in active:
+		var entry := _table.get_entry(id)
+		var perk: Array = GameManager.PERKS.get(id, ["", ""])
+		lines.append("ENEMIES: %s. %s
+YOUR PERK: %s. %s" % [entry.display_name.to_upper(), entry.description, perk[0], perk[1]])
+	_info.text = "
+".join(PackedStringArray(lines))
+	_hide_at = _clock + 4.0
 	if MenuState.stack.is_empty():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

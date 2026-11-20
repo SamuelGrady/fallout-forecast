@@ -64,7 +64,55 @@ var _boss_label := Label.new()
 var _boss_bar := ProgressBar.new()
 
 
+## Lightning outlines every infected within 40 m through walls for 2 s
+## (LightningFX). The playtest didn't know that, so each strike says so.
+func _on_lightning(_at: Vector3, _seed: int) -> void:
+	var tip := Label.new()
+	tip.text = "LIGHTNING  -  INFECTED REVEALED THROUGH WALLS"
+	tip.theme = BroadcastUI.theme()
+	tip.add_theme_font_size_override("font_size", 22)
+	tip.add_theme_color_override("font_color", Color("#9fe8ff"))
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	tip.offset_left = -320
+	tip.offset_right = 320
+	tip.offset_top = 112
+	add_child(tip)
+	var tween := tip.create_tween()
+	tween.tween_interval(1.6)
+	tween.tween_property(tip, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(tip.queue_free)
+
+
+var _countdown_label: Label
+var _last_countdown := -1
+
+
+## Big "STORM IN 5..1" in the last seconds of Calm, with a tick each second,
+## so the start of a wave is never a surprise.
+func _update_storm_countdown(seconds: int) -> void:
+	if _countdown_label == null:
+		_countdown_label = Label.new()
+		_countdown_label.theme = BroadcastUI.theme()
+		_countdown_label.add_theme_font_size_override("font_size", 46)
+		_countdown_label.add_theme_color_override("font_color", Color("#ffb04a"))
+		_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_countdown_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		_countdown_label.offset_left = -300
+		_countdown_label.offset_right = 300
+		_countdown_label.offset_top = 150
+		add_child(_countdown_label)
+	var show := WeatherManager.phase == WeatherManager.Phase.CALM and WeatherManager.running and seconds <= 5 and seconds > 0
+	_countdown_label.visible = show
+	if show:
+		_countdown_label.text = "STORM IN  %d" % seconds
+		if seconds != _last_countdown:
+			Sound.play("reel_tick", -6.0, 0.8)
+	_last_countdown = seconds if show else -1
+
+
 func _ready() -> void:
+	WeatherManager.lightning_struck.connect(_on_lightning)
 	_combat_status.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_combat_status.offset_left = -280
 	_combat_status.offset_right = 280
@@ -251,6 +299,7 @@ func _update_storm() -> void:
 	storm_label.visible = false
 	var seconds := maxi(0,ceili(WeatherManager.phase_time_left))
 	wave_label.text = "WAVE %d / %d    %d:%02d" % [WeatherManager.wave,WeatherManager.FINAL_WAVE,seconds/60,seconds%60]
+	_update_storm_countdown(seconds)
 	if GameManager.can_ready_up():
 		var hint := "[%s] READY" % BroadcastUI.input_hint("ready_up")
 		if GameManager.player_count() > 1:
@@ -331,8 +380,8 @@ func _update_vitals(player: Node) -> void:
 	_last_suit = suit_bar.value
 	_suit_flash = maxf(0.0, _suit_flash - delta)
 	(_acid.material as ShaderMaterial).set_shader_parameter("strength", _suit_flash * (0.5 + 0.12 * sin(_time * 18.0)))
-	$BottomLeft/SuitText.text = "     %03d" % int(suit_bar.value)
-	$BottomLeft/HealthText.text = "     %03d" % int(health_bar.value)
+	$BottomLeft/SuitText.text = "SUIT  %d%%" % int(suit_bar.value)
+	$BottomLeft/HealthText.text = "HEALTH  %d" % int(health_bar.value)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
 	exposed_label.visible = false
 	_exposure.visible = exposed_in_rain
@@ -460,6 +509,12 @@ func _build_visual_status() -> void:
 		icon.position = spec[2]
 		icon.size = Vector2(22,22)
 		spec[1].add_child(icon)
+		if spec[1] is Label and spec[2] == Vector2(0, -1):
+			# Real gutter for the icon instead of padding the number with spaces
+			# (the playtest found the icons overlapping zero-padded numbers).
+			var gutter := StyleBoxEmpty.new()
+			gutter.content_margin_left = 30
+			spec[1].add_theme_stylebox_override("normal", gutter)
 	_tarp_icon.kind = "tarp"
 	_tarp_icon.color = Color(0.6, 0.85, 1.0)
 	_tarp_icon.position = Vector2(-28,0)

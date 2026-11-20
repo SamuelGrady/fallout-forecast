@@ -55,6 +55,23 @@ func spawn_for_calm() -> void:
 		var yaw := randf() * TAU
 		_spawn(parent, node_name, double, at, yaw)
 		_spawn_crate.rpc(node_name, double, at, yaw)
+	# Playtest: the gap between rounds felt empty. Drop one crate a few steps
+	# in front of every player so there's always something to open nearby.
+	var map: RID = parent.get_world_3d().navigation_map
+	for player in GameManager.players():
+		if player.get("state") == "dead" or not (player is Node3D):
+			continue
+		var forward: Vector3 = -(player as Node3D).global_basis.z
+		forward.y = 0.0
+		var want: Vector3 = (player as Node3D).global_position + forward.normalized() * 3.0
+		var at: Vector3 = want
+		if NavigationServer3D.map_get_iteration_id(map) > 0:
+			at = NavigationServer3D.map_get_closest_point(map, want)
+		_crate_seq += 1
+		var node_name := "C_%d" % _crate_seq
+		var yaw := randf() * TAU
+		_spawn(parent, node_name, false, at, yaw)
+		_spawn_crate.rpc(node_name, false, at, yaw)
 
 
 func _spawn(parent: Node, node_name: String, double: bool, at: Vector3, yaw: float) -> void:

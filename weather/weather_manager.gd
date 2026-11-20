@@ -34,6 +34,8 @@ const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 
 @export var auto_cycle := true
 @export var calm_duration := 30.0
+## Wave 1 starts faster: the playtest sat through 30 s of nothing.
+@export var first_calm_duration := 12.0
 ## Placeholder until the slot reel exists; the roll itself is Sam's.
 @export var mutation_roll_duration := 5.0
 @export var drizzle_duration := 30.0
@@ -163,6 +165,8 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 		push_warning("WeatherManager.set_phase called on a client")
 		return
 	var duration := _duration_for(new_phase)
+	if new_phase == Phase.CALM and new_wave == 1:
+		duration = first_calm_duration
 	_apply_phase(new_phase, new_wave, duration)
 	if Net.is_online():
 		_receive_phase.rpc(new_phase, new_wave, duration)
