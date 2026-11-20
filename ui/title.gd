@@ -4,6 +4,8 @@ extends Control
 ## goes in.)
 
 const RUN_SCENE := "res://main.tscn"
+const LOBBY_SCENE := "res://ui/lobby.tscn"
+const BROWSER_SCENE := "res://ui/server_browser.tscn"
 
 var _menu := VBoxContainer.new()
 var _settings := VBoxContainer.new()
@@ -88,12 +90,14 @@ func _ready() -> void:
 	_menu.anchor_top = 0.0
 	_menu.anchor_bottom = 0.0
 	_menu.grow_vertical = Control.GROW_DIRECTION_END
-	_menu.offset_top = 365
-	_menu.offset_bottom = 365
-	_menu.add_theme_constant_override("separation", 14)
+	_menu.offset_top = 340
+	_menu.offset_bottom = 340
+	_menu.add_theme_constant_override("separation", 10)
 	_menu.modulate.a = 0.0
 	add_child(_menu)
-	_button(_menu, "PLAY", _on_play)
+	_button(_menu, "PLAY SOLO", _on_play)
+	_button(_menu, "HOST GAME", _on_host)
+	_button(_menu, "JOIN GAME", _on_join)
 	_button(_menu, "SETTINGS", _on_settings)
 	_button(_menu, "QUIT", get_tree().quit)
 
@@ -184,7 +188,49 @@ func _slider(parent: Control, label: String, lo: float, hi: float, value: float,
 
 func _on_play() -> void:
 	Settings.save()
+	Net.leave()
 	get_tree().change_scene_to_file(RUN_SCENE)
+
+
+func _on_host() -> void:
+	Settings.save()
+	var err := Net.host()
+	if err != OK:
+		_show_error("Could not open port %d (error %d). Another copy running?" % [Net.PORT, err])
+		return
+	get_tree().change_scene_to_file(LOBBY_SCENE)
+
+
+func _on_join() -> void:
+	Settings.save()
+	Net.leave()
+	get_tree().change_scene_to_file(BROWSER_SCENE)
+
+
+## Replaces the menu with a one-line error, e.g. a busy port, plus a way back.
+func _show_error(text: String) -> void:
+	Sound.play("ui_click")
+	_menu.visible = false
+	var row := VBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	row.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	row.grow_vertical = Control.GROW_DIRECTION_BOTH
+	row.offset_top = 340
+	row.offset_bottom = 340
+	row.add_theme_constant_override("separation", 16)
+	add_child(row)
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = 520
+	label.add_theme_font_size_override("font_size", 22)
+	label.add_theme_color_override("font_color", Color("FF3EA5"))
+	row.add_child(label)
+	_button(row, "BACK", func():
+		row.queue_free()
+		_menu.visible = true)
+	BroadcastUI.reveal(row)
 
 
 func _on_settings() -> void:

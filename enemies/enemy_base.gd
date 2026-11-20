@@ -15,6 +15,8 @@ signal died(enemy: EnemyBase)
 
 var health := 0.0
 var _bullet_critical := false
+## Where the last bullet landed; falls back to the body for splash damage.
+var _hit_point := Vector3.ZERO
 var target: Node3D
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -186,8 +188,12 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		if (-global_basis.z).dot(to_source.normalized()) > 0.3:
 			amount *= 0.5
 	health -= amount
-	if is_instance_valid(_source) and _source.is_in_group("local_player"):
-		GameManager.combat_hit.emit(health <= 0.0, _bullet_critical)
+	# Hit feedback belongs to whoever fired, host or client, so the shooter's
+	# Player node decides where it appears (see Player.notify_hit).
+	if is_instance_valid(_source) and _source.has_method("notify_hit"):
+		var where := _hit_point if _hit_point != Vector3.ZERO else global_position
+		_source.notify_hit(health <= 0.0, _bullet_critical, where, ceili(amount))
+	_hit_point = Vector3.ZERO
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
 		die()
@@ -274,15 +280,7 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		"gutter": head_height = 1.16
 		"mister": head_height = 1.63
 	_bullet_critical = height >= head_height
-	var before := health
+	# Where the shot landed, so the shooter's damage number floats there.
+	_hit_point = point + Vector3.UP * 0.25
 	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
-	if is_instance_valid(source) and source.is_in_group("local_player"):
-		var number := Label3D.new()
-		number.set_script(preload("res://weapons/damage_number.gd"))
-		number.amount = ceili(minf(before, before - health))
-		number.critical = _bullet_critical
-		get_parent().add_child(number)
-		number.global_position = point + Vector3.UP * .25
-		if _bullet_critical:
-			Sound.play("headshot", -10.0)
 	_bullet_critical = false
