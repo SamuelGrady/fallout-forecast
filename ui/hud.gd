@@ -69,26 +69,6 @@ var _boss_label := Label.new()
 var _boss_bar := ProgressBar.new()
 
 
-## Lightning outlines every infected within 40 m through walls for 2 s
-## (LightningFX). The playtest didn't know that, so each strike says so.
-func _on_lightning(_at: Vector3, _seed: int) -> void:
-	var tip := Label.new()
-	tip.text = "LIGHTNING  -  INFECTED REVEALED THROUGH WALLS"
-	tip.theme = BroadcastUI.theme()
-	tip.add_theme_font_size_override("font_size", 22)
-	tip.add_theme_color_override("font_color", Color("#9fe8ff"))
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tip.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	tip.offset_left = -320
-	tip.offset_right = 320
-	tip.offset_top = 112
-	add_child(tip)
-	var tween := tip.create_tween()
-	tween.tween_interval(1.6)
-	tween.tween_property(tip, "modulate:a", 0.0, 0.5)
-	tween.tween_callback(tip.queue_free)
-
-
 var _countdown_label: Label
 var _last_countdown := -1
 
@@ -117,7 +97,6 @@ func _update_storm_countdown(seconds: int) -> void:
 
 
 func _ready() -> void:
-	WeatherManager.lightning_struck.connect(_on_lightning)
 	_combat_status.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_combat_status.offset_left = -280
 	_combat_status.offset_right = 280
