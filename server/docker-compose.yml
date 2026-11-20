@@ -12,7 +12,12 @@ services:
     networks: [coolify]
     labels:
       caddy: fallout.drew.place
-      caddy.reverse_proxy: "{{upstreams 7777}}"
+      # Only WebSocket upgrades reach Godot; plain HTTP (browsers, scanners,
+      # uptime checks) gets a 200 text reply from Caddy instead.
+      caddy.@ws.header: Upgrade websocket
+      caddy.@notws.not.header: Upgrade websocket
+      caddy.reverse_proxy: "@ws {{upstreams 7777}}"
+      caddy.respond: "@notws \"Fallout Forecast game server. Join from the game: wss://fallout.drew.place/\" 200"
       caddy_ingress_network: coolify
     logging:
       driver: json-file
