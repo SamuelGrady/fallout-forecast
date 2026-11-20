@@ -72,6 +72,8 @@ func _process(delta: float) -> void:
 	_camera_kick = move_toward(_camera_kick, 0.0, delta * deg_to_rad(8.0))
 	if player and player.is_multiplayer_authority():
 		camera.rotation.x = _camera_kick
+		_roll = move_toward(_roll, 0.0, delta * deg_to_rad(20.0))
+		camera.rotation.z = _roll
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
 	if _reload_left > 0.0:
@@ -154,6 +156,7 @@ func fire() -> void:
 	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, ads_recoil, _aim), deg_to_rad(5.0))
 	_heat = minf(1.0, _heat + 0.22)
 	fired.emit(data)
+	_shot_juice(data)
 	if _model and _model.has_node("Pump") and ammo[current] > 0:
 		# Rack sound lines up with the forend animation in _animate.
 		get_tree().create_timer(interval * 0.2).timeout.connect(func(): Sound.play("shotgun_pump", -11.0))
@@ -351,6 +354,8 @@ func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int,
 					ShotFX.puff(world, end, Color(0.6, 1.0, 0.4, 0.8) if enemy_hit else Color(0.8, 0.8, 0.75, 0.7), 0.08, 0.2)
 					if enemy_hit:
 						hit_points.append(end)
+						if is_local or randf() < 0.5:
+							_splat_behind(end, ray)
 						if hit.collider.has_method("hit_flash"):
 							hit.collider.hit_flash()
 			# One layered impact per shot, louder for more pellets, instead of
@@ -464,6 +469,108 @@ func _cast(origin: Vector3, ray: Vector3, max_range: float, extra_exclude: Array
 
 
 # ------------------------------------------------------------------ viewmodel
+# ------------------------------------------------------------------ juice
+static var _splat_mesh: QuadMesh
+static var _splat_mat: StandardMaterial3D
+static var _splats: Array[Node3D] = []
+
+
+## Green gore splat on whatever is behind the enemy that was hit.
+func _splat_behind(at: Vector3, ray: Vector3) -> void:
+	var query := PhysicsRayQueryParameters3D.create(at, at + ray * 3.5, 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return
+	if _splat_mesh == null:
+		_splat_mesh = QuadMesh.new()
+		_splat_mesh.size = Vector2.ONE
+		var grad := Gradient.new()
+		grad.set_color(0, Color(0.55, 0.9, 0.25, 0.85))
+		grad.set_color(1, Color(0.35, 0.6, 0.15, 0.0))
+		var tex := GradientTexture2D.new()
+		tex.gradient = grad
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		tex.width = 32
+		tex.height = 32
+		_splat_mat = StandardMaterial3D.new()
+		_splat_mat.albedo_texture = tex
+		_splat_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_splat_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_splat_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	var splat := MeshInstance3D.new()
+	splat.mesh = _splat_mesh
+	splat.material_override = _splat_mat
+	splat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	player.get_parent().add_child(splat)
+	var normal: Vector3 = hit.normal
+	var up := Vector3.UP if absf(normal.y) < 0.95 else Vector3.FORWARD
+	splat.global_transform = Transform3D(Basis.looking_at(-normal, up), hit.position + normal * 0.02)
+	splat.scale = Vector3.ONE * randf_range(0.35, 0.8)
+	splat.rotate_object_local(Vector3.FORWARD, randf() * TAU)
+	var tween := splat.create_tween()
+	tween.tween_interval(18.0)
+	tween.tween_property(splat, "scale", Vector3.ZERO, 2.0)
+	tween.tween_callback(splat.queue_free)
+	_splats = _splats.filter(func(n): return is_instance_valid(n))
+	_splats.append(splat)
+	while _splats.size() > (16 if OS.has_feature("web") else 40):
+		_splats.pop_front().queue_free()
+
+var _roll := 0.0
+var _sprint_fov := 0.0
+static var _casing_mesh: BoxMesh
+static var _casing_mat: StandardMaterial3D
+var _casings: Array[Node3D] = []
+
+
+## Local feel for every shot: ejected brass, muzzle smoke, a camera roll and
+## shake on heavy guns.
+func _shot_juice(data: WeaponData) -> void:
+	if data.kind != WeaponData.Kind.HITSCAN or _model == null:
+		return
+	var heavy := data.pellets > 1
+	_roll += deg_to_rad(randf_range(1.2, 2.2) if heavy else randf_range(0.2, 0.5)) * (1 if randf() < 0.5 else -1)
+	Juice.shake(0.28 if heavy else 0.05)
+	var muzzle := _muzzle_position()
+	ShotFX.puff(player.get_parent(), muzzle + (-camera.global_basis.z) * 0.1, Color(0.75, 0.75, 0.72, 0.35), 0.06 if not heavy else 0.11, 0.5)
+	_eject_casing(heavy)
+
+
+func _eject_casing(heavy: bool) -> void:
+	if _casing_mesh == null:
+		_casing_mesh = BoxMesh.new()
+		_casing_mesh.size = Vector3(0.012, 0.012, 0.03)
+		_casing_mat = StandardMaterial3D.new()
+		_casing_mat.albedo_color = Color("#c9a24a") if not heavy else Color("#b8322a")
+		_casing_mat.metallic = 0.8
+		_casing_mat.roughness = 0.3
+	var casing := MeshInstance3D.new()
+	casing.mesh = _casing_mesh
+	casing.material_override = _casing_mat
+	casing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var world := player.get_parent()
+	world.add_child(casing)
+	var start := _model.global_transform * Vector3(0.03, 0.03, -0.05)
+	casing.global_position = start
+	var side := camera.global_basis.x
+	var land := player.global_position + side * randf_range(0.5, 0.9) + (-camera.global_basis.z) * randf_range(-0.1, 0.3) + Vector3.UP * 0.02
+	var peak := start + side * 0.25 + Vector3.UP * 0.25
+	var tween := casing.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(casing, "global_position", peak, 0.12).set_ease(Tween.EASE_OUT)
+	tween.tween_property(casing, "rotation", Vector3(randf() * 9, randf() * 9, randf() * 9), 0.5)
+	tween.chain().tween_property(casing, "global_position", land, 0.3).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	tween.chain().tween_callback(func(): Sound.play_at("casing_%d" % randi_range(0, 2), land, -20.0, randf_range(0.9, 1.15)))
+	tween.chain().tween_interval(4.0)
+	tween.chain().tween_callback(casing.queue_free)
+	_casings.append(casing)
+	_casings = _casings.filter(func(c): return is_instance_valid(c))
+	while _casings.size() > 20:
+		_casings.pop_front().queue_free()
+
+
 func _equip(index: int) -> void:
 	if index < 0 or index >= loadout.size():
 		return
@@ -497,7 +604,9 @@ func _animate(delta: float) -> void:
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
-	camera.fov = lerpf(_hip_fov, data.ads_fov, _aim)
+	# Sprinting widens the view a little for a sense of speed.
+	_sprint_fov = lerpf(_sprint_fov, 6.0 if player.get("is_sprinting") else 0.0, 1.0 - exp(-6.0 * delta))
+	camera.fov = lerpf(_hip_fov + _sprint_fov, data.ads_fov, _aim)
 	var speed := 0.0
 	if player is CharacterBody3D:
 		speed = Vector2(player.velocity.x, player.velocity.z).length()

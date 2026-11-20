@@ -481,6 +481,7 @@ func _despawn_enemy(net_id: int, drops: Array, at: Vector3, throw_vec: Vector3, 
 	EnemyBase.spawn_death_fragments(self, pos, throw_vec, critical)
 	Sound.play_at("enemy_death", pos)
 	if enemy:
+		enemy.make_corpse(throw_vec)
 		enemy.remove_from_group("enemies")
 		enemy.queue_free()
 	for entry in drops:

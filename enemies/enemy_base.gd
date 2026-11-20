@@ -591,6 +591,7 @@ func die() -> void:
 	# further along the shot direction, replicated to every client.
 	var throw_vec := _last_hit_dir * clampf(0.6 + _last_hit_force * 0.12, 0.6, 2.6)
 	spawn_death_fragments(get_parent(), global_position, throw_vec, _bullet_critical)
+	make_corpse(throw_vec)
 	if miniboss_wave > 0:
 		spawn_death_fragments(get_parent(), global_position + Vector3.UP * 1.1, throw_vec * 1.3, true)
 	Sound.play_at("enemy_death", global_position)
@@ -677,7 +678,55 @@ func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vec
 	_bullet_critical = false
 
 
+## Every peer: leave a body that topples along the killing hit, lies a moment
+## and sinks away, instead of the model just vanishing. Heavy hits (shotgun
+## blasts) also tear an arm loose.
+func make_corpse(throw_vec: Vector3) -> void:
+	var model: Node3D = null
+	for child in get_children():
+		if child.get_script() and (child.get_script() as Script).resource_path.ends_with("infected_model.gd"):
+			model = child
+	var world := get_parent()
+	if model == null or world == null or OS.has_feature("web") and get_tree().get_nodes_in_group("corpses").size() > 6:
+		return
+	var xf := model.global_transform
+	model.set_process(false)
+	remove_child(model)
+	world.add_child(model)
+	model.global_transform = xf
+	model.add_to_group("corpses")
+	for mesh in model.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_overlay = null
+	var dir := throw_vec
+	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		dir = model.global_basis.z
+	dir = dir.normalized()
+	var axis := Vector3.UP.cross(dir).normalized()
+	var fallen := Basis(axis, deg_to_rad(84.0)) * model.global_basis
+	if throw_vec.length() > 1.6 and model.get("limbs") is Array and not (model.get("limbs") as Array).is_empty():
+		var arm: Node3D = (model.get("limbs") as Array)[0]
+		var arm_xf := arm.global_transform
+		arm.get_parent().remove_child(arm)
+		world.add_child(arm)
+		arm.global_transform = arm_xf
+		var arm_tween := arm.create_tween().set_parallel(true)
+		arm_tween.tween_property(arm, "global_position", arm_xf.origin + dir * 2.2 + Vector3.UP * 0.6, 0.35).set_ease(Tween.EASE_OUT)
+		arm_tween.tween_property(arm, "rotation", arm.rotation + Vector3(randf() * 6, randf() * 6, 0), 0.6)
+		arm_tween.chain().tween_property(arm, "global_position", arm_xf.origin + dir * 2.8 + Vector3.DOWN * 1.1, 0.3).set_ease(Tween.EASE_IN)
+		arm_tween.chain().tween_interval(2.2)
+		arm_tween.chain().tween_callback(arm.queue_free)
+	var tween := model.create_tween()
+	tween.tween_property(model, "global_basis", fallen, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(model, "global_position", xf.origin + dir * 0.6, 0.38)
+	tween.tween_interval(2.4)
+	tween.tween_property(model, "global_position", xf.origin + dir * 0.6 + Vector3.DOWN * 0.8, 1.2)
+	tween.tween_callback(model.queue_free)
+
+
 func stagger(duration: float) -> void:
+	if _stagger_left <= 0.0:
+		Sound.play_at("turned", global_position + Vector3.UP, -12.0, randf_range(0.65, 0.8))
 	_stagger_left = maxf(_stagger_left, duration)
 	_windup_left = 0.0
 	_attack_victim = null

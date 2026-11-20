@@ -30,6 +30,12 @@ func _ready() -> void:
 		warm.set_script(preload("res://game/warmup.gd"))
 		add_child.call_deferred(warm)
 	if not Net.dedicated:
+		# Screen-level juice: trailing bars, suit breach, downed view, rain
+		# drips, wave cards, popup ticker.
+		var juice_hud := CanvasLayer.new()
+		juice_hud.name = "JuiceHud"
+		juice_hud.set_script(preload("res://ui/juice_hud.gd"))
+		add_child(juice_hud)
 		# Red arcs pointing at whatever just hurt you.
 		var hits := CanvasLayer.new()
 		hits.name = "HitIndicator"
