@@ -53,6 +53,7 @@ func _physics_blast(early: bool) -> void:
 func die() -> void:
 	if _dead:
 		return
+	Perf.mark("thunderhead blast")
 	# Defer so chained Thunderheads each complete their own death before blasting.
 	_physics_blast.call_deferred(not _natural_blast)
 	super.die()

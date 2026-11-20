@@ -108,6 +108,7 @@ func can_ping() -> bool:
 
 ## Every peer: open the lid and lift the actual reward hovering out of the crate.
 func play_spin(result: String, tier: String, _pool: Array, item_id := "") -> void:
+	Perf.mark("crate open " + (item_id if not item_id.is_empty() else tier))
 	Sound.play_at("crate_open", global_position)
 	_result = result
 	_result_item = item_id
@@ -115,16 +116,18 @@ func play_spin(result: String, tier: String, _pool: Array, item_id := "") -> voi
 	_reveal_left = 0.65
 	_partner_waiting = 0.0
 	label.visible = false
-	_glow = OmniLight3D.new()
-	_glow.light_color = _result_color
-	_glow.light_energy = 0.2
-	_glow.omni_range = 4.5
-	_glow.position = Vector3(0, 0.9, 0)
-	add_child(_glow)
+	if not OS.has_feature("web") and not Net.dedicated:
+		_glow = OmniLight3D.new()
+		_glow.light_color = _result_color
+		_glow.light_energy = 0.2
+		_glow.omni_range = 4.5
+		_glow.position = Vector3(0, 0.9, 0)
+		add_child(_glow)
 	# Swing lid open smoothly and brighten the interior glow.
 	var t := create_tween().set_parallel(true)
 	t.tween_property(_lid_hinge, "rotation_degrees:z", 108.0, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(_glow, "light_energy", 3.2, 0.55)
+	if _glow:
+		t.tween_property(_glow, "light_energy", 3.2, 0.55)
 	_build_reward_mesh(item_id, _result_color)
 	_reward_root.position = Vector3(0, 0.5, 0)
 	_reward_root.scale = Vector3.ONE * 0.1

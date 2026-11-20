@@ -24,6 +24,7 @@ func _ready() -> void:
 		var path := str(Maps.entry(map_id).get("scene", ""))
 		if not path.is_empty():
 			map_scene = load(path) as PackedScene
+	var inst_started := Time.get_ticks_usec()
 	var level_root := map_scene.instantiate() if map_scene else null
 	_level = level_root as Node3D
 	if _level == null:
@@ -37,14 +38,11 @@ func _ready() -> void:
 			_leave_to_title.call_deferred()
 		return
 	_level.name = "Level"
+	$WeatherFX.configure_level(_level, map_id)
 	add_child(_level)
+	Perf.mark("map %s inst %.1f ms" % [map_id, (Time.get_ticks_usec() - inst_started) / 1000.0])
 	GameManager.map_id = map_id
 	Telemetry.run_started(map_id)
-	if map_id == Maps.DEFAULT_ID and not Net.dedicated:
-		preload("res://props/building_restyle.gd").apply(_level)
-		var signs := Node.new()
-		signs.set_script(preload("res://props/map_signs.gd"))
-		_level.add_child(signs)
 	_setup_decon_showers()
 	_setup_objectives()
 	_setup_players()
@@ -55,13 +53,6 @@ func _ready() -> void:
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
-	# Compile shaders for enemies, guns and FX behind a brief card so the
-	# first fight doesn't hitch (most noticeable on web).
-	if not Net.dedicated:
-		var warm := Node3D.new()
-		warm.name = "WarmUp"
-		warm.set_script(preload("res://game/warmup.gd"))
-		add_child.call_deferred(warm)
 	if not Net.dedicated:
 		# Screen-level juice: trailing bars, suit breach, downed view, rain
 		# drips, wave cards, popup ticker.
@@ -80,10 +71,11 @@ func _ready() -> void:
 		spectator.set_script(preload("res://ui/spectator.gd"))
 		add_child(spectator)
 	# Teammate nameplates and off-screen pointers, visible through walls.
-	var markers := CanvasLayer.new()
-	markers.name = "TeammateMarkers"
-	markers.set_script(preload("res://ui/teammate_markers.gd"))
-	add_child(markers)
+	if not Net.dedicated:
+		var markers := CanvasLayer.new()
+		markers.name = "TeammateMarkers"
+		markers.set_script(preload("res://ui/teammate_markers.gd"))
+		add_child(markers)
 	if OS.is_debug_build():
 		var dev_menu := CanvasLayer.new()
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
@@ -134,17 +126,53 @@ func _prepare_navigation() -> void:
 			mesh.geometry_source_group_name = &""
 		if region.navigation_mesh.get_polygon_count() == 0:
 			push_warning("No walkable navigation geometry for %s in %s" % [region.name, map_id])
+	# Dress Pinecrest facades & neon signs behind the loading card (visual only).
+	if map_id == Maps.DEFAULT_ID and not Net.dedicated and DisplayServer.get_name() != "headless" and is_instance_valid(_level):
+		SceneLoader.set_stage("DRESSING DISTRICT", 0.46)
+		await get_tree().process_frame
+		if _finishing or not is_inside_tree():
+			return
+		var restyle_started := Time.get_ticks_usec()
+		preload("res://props/building_restyle.gd").apply(_level)
+		var signs := Node.new()
+		signs.set_script(preload("res://props/map_signs.gd"))
+		_level.add_child(signs)
+		Perf.mark("restyle+signs %.1f ms" % ((Time.get_ticks_usec() - restyle_started) / 1000.0))
+		await get_tree().process_frame
+		if _finishing or not is_inside_tree():
+			return
+	# Incremental static batching on web behind the loading card.
+	if OS.has_feature("web") and not Net.dedicated and is_instance_valid(_level):
+		Perf.mark("static batch start")
+		var job := StaticBatcher.begin(_level)
+		SceneLoader.set_stage("BATCHING DISTRICT", 0.45, "0%")
+		while not job.step(8.0):
+			if _finishing or not is_inside_tree():
+				return
+			SceneLoader.set_stage("BATCHING DISTRICT", 0.45 + job.progress() * 0.15, "%d%%" % int(job.progress() * 100.0))
+			await get_tree().process_frame
+		Perf.mark("static batch merged %d meshes (%d reads) in %.1f ms (%d frames)" % [job.merged_count, job.unique_reads, job.total_ms(), job.slices])
+		$WeatherFX.refresh_wet_surfaces(_level)
+	# Time-sliced shader warm-up behind the loading card so the first fight
+	# doesn't stall ANGLE/D3D11 or spike draw calls.
+	if DisplayServer.get_name() != "headless" and not Net.dedicated and not _finishing and is_inside_tree():
+		var warm := Node3D.new()
+		warm.name = "WarmUp"
+		warm.set_script(preload("res://game/warmup.gd"))
+		add_child(warm)
+		await warm.finished
 	# NavigationServer syncs region changes on a physics tick.
+	if _finishing or not is_inside_tree():
+		return
 	await get_tree().physics_frame
 	await get_tree().process_frame
-	if _finishing:
+	if _finishing or not is_inside_tree():
 		return
-	if OS.has_feature("web") and not Net.dedicated:
-		var merged := StaticBatcher.batch(_level)
-		Perf.mark("static batch merged %d meshes" % merged)
 	loading_map = false
 	if GameManager.is_host():
 		GameManager.start_run()
+		if Net.is_online():
+			Net.accept_run_peers()
 	else:
 		Net.report_in_run(true)
 
@@ -244,7 +272,9 @@ func _setup_objectives() -> void:
 			var data: Dictionary = DistrictObjective.PINECREST_SITES[site]
 			_add_objective(root, site, data.label, _level.to_global(data.at))
 	else:
-		var markers := get_tree().get_nodes_in_group("drain_spawn")
+		var markers := get_tree().get_nodes_in_group("district_objective_spawn")
+		if markers.is_empty():
+			markers = get_tree().get_nodes_in_group("drain_spawn")
 		for i in mini(3, markers.size()):
 			var marker := markers[i] as Node3D
 			_add_objective(root, "drain_%d" % (i + 1), "SEAL DRAIN %d" % (i + 1), marker.global_position)

@@ -43,11 +43,12 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 		add_child(model)
 	if weapon.kind == WeaponData.Kind.FLARE:
 		velocity += Vector3.UP * 3.0
-		_light = OmniLight3D.new()
-		_light.light_color = Color(0.35, 0.95, 1.0)
-		_light.light_energy = 1.0
-		_light.omni_range = 3.0
-		add_child(_light)
+		if not OS.has_feature("web") and not Net.dedicated:
+			_light = OmniLight3D.new()
+			_light.light_color = Color(0.35, 0.95, 1.0)
+			_light.light_energy = 1.0
+			_light.omni_range = 3.0
+			add_child(_light)
 
 
 func _physics_process(delta: float) -> void:
@@ -66,6 +67,9 @@ func _physics_process(delta: float) -> void:
 
 func _flare_process(delta: float) -> void:
 	if not _stuck:
+		if _age > 5.0:
+			queue_free()
+			return
 		var hit := _step(delta)
 		if not hit.is_empty():
 			global_position = hit.position + hit.normal * 0.05
@@ -84,7 +88,8 @@ func _flare_process(delta: float) -> void:
 		var fade := clampf(left, 0.0, 1.0)
 		_dome_material.albedo_color.a = (0.16 + 0.04 * sin(_age * 6.0)) * fade * (1.0 if left > 1.0 or fmod(_age, 0.2) < 0.1 else 0.3)
 		_dome_rim.albedo_color.a = 0.7 * fade
-		_light.light_energy = 2.2 * fade
+		if _light:
+			_light.light_energy = 2.2 * fade
 	_reveal_tick -= delta
 	if _reveal_tick <= 0.0 and left > 0.0:
 		_reveal_tick = 0.25
@@ -113,6 +118,7 @@ var _deployed_at := 0.0
 
 
 func _deploy_dome() -> void:
+	Perf.mark("shield dome deploy")
 	_deployed_at = _age
 	add_to_group("active_flares")
 	rotation = Vector3.ZERO
@@ -151,8 +157,9 @@ func _deploy_dome() -> void:
 	add_child(rim)
 	_dome.scale = Vector3.ONE * 0.1
 	_dome.create_tween().tween_property(_dome, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_light.omni_range = r * 1.4
-	_light.position.y = 1.0
+	if _light:
+		_light.omni_range = r * 1.4
+		_light.position.y = 1.0
 
 
 func _bomb_process(delta: float) -> void:
@@ -182,6 +189,7 @@ func _has_los(from: Vector3, to: Vector3) -> bool:
 
 
 func _explode() -> void:
+	Perf.mark("explosion " + data.display_name)
 	Juice.shake(0.7 if data.kind == WeaponData.Kind.GRENADE else 0.5, global_position)
 	Sound.play_at("explosion_big" if data.kind == WeaponData.Kind.GRENADE else "explosion", global_position)
 	_done = true

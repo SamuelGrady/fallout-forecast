@@ -44,6 +44,7 @@ var _shelter_mix := 0.0
 var _pressure := 0.0
 var _last_phase := Vector2i(-1, -1)
 var _web := OS.has_feature("web")
+var _headless := DisplayServer.get_name() == "headless"
 var _stream_cache := {}
 var _active_sfx := 0
 const WEB_MAX_SFX := 8
@@ -129,7 +130,7 @@ func _get_sfx(cue: String) -> AudioStream:
 
 
 func start_run() -> void:
-	if Net.dedicated:
+	if Net.dedicated or _headless:
 		return
 	var music_bus := &"Music"
 	var rain_bus := RAIN_BUS
@@ -217,9 +218,11 @@ func _process(delta: float) -> void:
 				_layers[i].stream_paused = want_paused
 	var boss_track := _layers.back() as AudioStreamPlayer
 	if boss and not _boss_active:
+		var started := Time.get_ticks_usec()
 		if _web:
 			boss_track.stream_paused = false
 		boss_track.seek(0.0)
+		Perf.mark("boss music started in %.1f ms" % ((Time.get_ticks_usec() - started) / 1000.0))
 	_boss_active = boss
 	var boss_vol := lerpf(boss_track.volume_linear, (0.20 * MUSIC_GAIN) if boss else 0.0, blend)
 	boss_track.volume_linear = boss_vol
@@ -270,7 +273,7 @@ func _first_play(cue: String) -> void:
 
 
 func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
-	if Net.dedicated:
+	if Net.dedicated or _headless:
 		return
 	_first_play(cue)
 	if cue == "pickup":
@@ -308,7 +311,7 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 
 
 func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) -> void:
-	if Net.dedicated:
+	if Net.dedicated or _headless:
 		return
 	_first_play(cue)
 	if cue == "pickup" and _recent(cue, 0.3):

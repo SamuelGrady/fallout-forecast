@@ -31,9 +31,11 @@ func _process(delta: float) -> void:
 func _draw_markers() -> void:
 	var camera := get_viewport().get_camera_3d()
 	var me := get_tree().get_first_node_in_group("local_player") as Node3D
-	if camera == null or me == null:
+	if camera == null or not camera.is_inside_tree() or me == null or DisplayServer.get_name() == "headless":
 		return
 	var view := _canvas.get_viewport_rect().size
+	if view.x <= EDGE * 2.0 or view.y <= EDGE * 2.0:
+		return
 	for node in get_tree().get_nodes_in_group("players"):
 		var p := node as Node3D
 		if p == null or p == me or not p.is_inside_tree():
@@ -45,7 +47,16 @@ func _draw_markers() -> void:
 		var head := p.global_position + Vector3.UP * 2.15
 		var dist := me.global_position.distance_to(p.global_position)
 		var behind := camera.is_position_behind(head)
-		var screen := camera.unproject_position(head)
+		var screen := Vector2.ZERO
+		if behind:
+			# Projecting an exact camera-plane point can divide by zero.
+			# Use camera-local lateral displacement for the behind-view arrow.
+			var local := camera.to_local(head)
+			screen = view * 0.5 + Vector2(local.x, -local.y) * 20.0
+		else:
+			screen = camera.unproject_position(head)
+			if not screen.is_finite():
+				continue
 		var on_screen := not behind and Rect2(Vector2.ZERO, view).grow(-EDGE).has_point(screen)
 		var name := str(p.get("display_name")) if p.get("display_name") != null else "PLAYER"
 		var label := name.to_upper()
@@ -86,9 +97,7 @@ func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, label: String, di
 	var center := view * 0.5
 	var dir := screen - center
 	if behind:
-		# Behind you: point from the bottom edge, toward the side they're on.
-		dir = -dir
-		dir.y = absf(dir.y) + 0.6
+		dir.y = absf(dir.y) + 16.0
 	if dir.length_squared() < 1.0:
 		dir = Vector2.DOWN
 	dir = dir.normalized()

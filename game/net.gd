@@ -26,7 +26,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 9
+const PROTOCOL := 10
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -70,6 +70,9 @@ var _ping_sent_ms := {}  # peer_id -> {"seq": int, "ms": int}
 
 
 func _ready() -> void:
+	# Clients only communicate with the server. In particular, it shouldn't
+	# relay peer-disconnect packets to another socket that's already closing.
+	(multiplayer as SceneMultiplayer).server_relay = false
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected)
 	multiplayer.connection_failed.connect(_on_connection_failed)
@@ -201,6 +204,7 @@ func leave() -> void:
 	lobby_my_vote = ""
 	_map_votes.clear()
 	run_peers.clear()
+	_reset_run_readiness()
 	_connect_left = 0.0
 	roster.clear()
 	peer_rtt_ms.clear()
@@ -419,6 +423,7 @@ func end_run() -> void:
 	var was_active := run_active
 	run_active = false
 	run_peers.clear()
+	_reset_run_readiness()
 	if was_active and is_host() and lobby_votes_enabled:
 		_map_votes.clear()
 		_broadcast_roster()
@@ -445,6 +450,9 @@ func _on_connected() -> void:
 ## to these, so a client still loading or leaving the run doesn't get RPCs
 ## for nodes it doesn't have yet ("Node not found" spam).
 var run_peers := {}
+var _pending_run_peers := {}
+var _host_run_ready := false
+var _server_confirmed_run := false
 
 
 ## True when `peer_id` is connected and its underlying WebSocket is still OPEN.
@@ -490,11 +498,42 @@ signal run_peer_loaded(peer_id: int)
 
 
 func report_in_run(value: bool) -> void:
-	if not is_online():
-		return
-	if is_host():
+	if not value:
+		_server_confirmed_run = false
+	if is_host() or not _is_peer_open(1):
 		return
 	_report_in_run.rpc_id(1, value)
+
+
+func can_send_run_rpc() -> bool:
+	return is_host() or (_server_confirmed_run and _is_peer_open(1))
+
+
+## Called after the host has created the map and every player's RPC nodes.
+func accept_run_peers() -> void:
+	_host_run_ready = true
+	for peer: int in _pending_run_peers:
+		_accept_run_peer(peer)
+	_pending_run_peers.clear()
+
+
+func _reset_run_readiness() -> void:
+	_pending_run_peers.clear()
+	_host_run_ready = false
+	_server_confirmed_run = false
+
+
+func _accept_run_peer(peer: int) -> void:
+	if not _is_peer_open(peer):
+		return
+	run_peers[peer] = true
+	run_peer_loaded.emit(peer)
+	_confirm_run_ready.rpc_id(peer)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _confirm_run_ready() -> void:
+	_server_confirmed_run = run_active
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -505,9 +544,12 @@ func _report_in_run(value: bool) -> void:
 	if value:
 		if not run_active or not roster.has(peer) or run_peers.has(peer):
 			return
-		run_peers[peer] = true
-		run_peer_loaded.emit(peer)
+		if _host_run_ready:
+			_accept_run_peer(peer)
+		else:
+			_pending_run_peers[peer] = true
 	else:
+		_pending_run_peers.erase(peer)
 		run_peers.erase(peer)
 
 
@@ -520,6 +562,7 @@ func rpc_to_run(method: Callable, args: Array) -> void:
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	run_peers.erase(peer_id)
+	_pending_run_peers.erase(peer_id)
 	peer_rtt_ms.erase(peer_id)
 	_ping_sent_ms.erase(peer_id)
 	if not is_host():

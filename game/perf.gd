@@ -10,7 +10,7 @@ extends CanvasLayer
 
 const SPIKE_MS := 100.0
 const MAX_SPIKES := 200
-const MAX_EVENTS := 40
+const MAX_EVENTS := 80
 ## Histogram buckets (upper bounds, ms) for frame-time percentiles.
 const BUCKETS := [8, 12, 17, 25, 33, 50, 75, 100, 150, 250, 500, 1000, 2500, 5000, 1000000]
 

@@ -135,7 +135,7 @@ func enemy_count_scale() -> float:
 
 
 func enemy_health_scale() -> float:
-	var escalation := 1.0 + maxf(0.0, WeatherManager.wave - WeatherManager.FINAL_WAVE) * .08
+	var escalation := 1.0 + clampf(WeatherManager.wave - WeatherManager.FINAL_WAVE, 0.0, 10.0) * .08
 	return ENEMY_HEALTH_SCALE[player_count()] * escalation * (0.5 if has_mutation("swarm") else 1.0)
 
 
@@ -630,6 +630,7 @@ func broadcast_arc(points: Array, color: Color) -> void:
 func _draw_arc(points: Array, color: Color) -> void:
 	if Net.dedicated or points.size() < 2:
 		return
+	Perf.mark("arc fx")
 	var world := _world()
 	if world == null:
 		return
@@ -650,6 +651,7 @@ func broadcast_blast(at: Vector3, size: float, color: Color) -> void:
 
 @rpc("authority", "call_remote", "unreliable")
 func _draw_blast(at: Vector3, size: float, color: Color) -> void:
+	Perf.mark("blast fx")
 	if Net.dedicated:
 		return
 	var world := _world()
@@ -699,10 +701,13 @@ func spawn_boss() -> void:
 
 
 func _spawn_boss_node(parent: Node3D, at: Vector3) -> void:
+	Perf.mark("spawn boss cumulus")
+	var started := Time.get_ticks_usec()
 	var boss := (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate() as Node3D
 	boss.name = "BossCumulus"
 	boss.position = parent.to_local(at)
 	parent.add_child(boss, true)
+	Perf.mark("boss built %.1f ms" % ((Time.get_ticks_usec() - started) / 1000.0))
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -869,20 +874,25 @@ func _finish(won: bool, results: Dictionary) -> void:
 
 # ------------------------------------------------------------------ shared effects
 ## Host: a glob on an arc, simulated on every peer; only the host's hazard hurts.
-func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false) -> void:
+func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false, source: Node = null) -> void:
 	if _online():
 		Net.rpc_to_run(_spawn_spore, [from, to, flight, damage_per_second, acid])
-	_spawn_spore(from, to, flight, damage_per_second, acid)
+	_make_spore(from, to, flight, damage_per_second, acid, source)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool) -> void:
+	_make_spore(from, to, flight, damage_per_second, acid, null)
+
+
+func _make_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool, source: Node) -> void:
 	var world := _world()
 	if world == null:
 		return
 	var spore := SporeProjectile.new()
 	spore.damage_per_second = damage_per_second
 	spore.acid = acid
+	spore.source = source
 	world.add_child(spore)
 	spore.launch(from, to, flight)
 
@@ -890,7 +900,7 @@ func _spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: 
 ## Host: a spore cloud right here (Spores mutation, boss).
 func spawn_cloud(at: Vector3, damage_per_second: float, radius := 2.5) -> void:
 	if _online():
-		_spawn_cloud.rpc(at, damage_per_second, radius)
+		Net.rpc_to_run(_spawn_cloud, [at, damage_per_second, radius])
 	_spawn_cloud(at, damage_per_second, radius)
 
 

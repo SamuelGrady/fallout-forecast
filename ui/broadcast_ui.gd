@@ -85,14 +85,16 @@ static func bar(control: ProgressBar, color: Color) -> void:
 	control.add_theme_stylebox_override("background", background)
 	control.add_theme_stylebox_override("fill", fill)
 
+static var _backdrop_shader: Shader
+
 static func backdrop(parent: Control) -> void:
 	var background := ColorRect.new()
 	background.color = INK
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var material := ShaderMaterial.new()
-	var shader := Shader.new()
-	shader.code = """shader_type canvas_item;
+	if _backdrop_shader == null:
+		_backdrop_shader = Shader.new()
+		_backdrop_shader.code = """shader_type canvas_item;
 void fragment() {
 	vec2 uv = UV;
 	vec3 base = mix(vec3(.025,.055,.09), vec3(.07,.16,.20), 1.0-uv.y);
@@ -103,7 +105,8 @@ void fragment() {
 	base += vec3(.06,.16,.17)*grid*smoothstep(.55,1.0,uv.y);
 	COLOR = vec4(base-lines,1.0);
 }"""
-	material.shader = shader
+	var material := ShaderMaterial.new()
+	material.shader = _backdrop_shader
 	background.material = material
 	parent.add_child(background)
 	parent.move_child(background, 0)

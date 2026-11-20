@@ -7,7 +7,7 @@ extends Area3D
 ##   area, refreshed lifetime) instead of stacking damage.
 ## - A cloud landing under an active Shield Dome fizzles, and existing clouds
 ##   inside a fresh dome dissipate: the dome keeps acid and spores out.
-## - A player takes damage from at most one cloud per physics frame, and none
+## - A player takes damage from at most one cloud per tick, and none
 ##   while under a dome.
 
 const MAX_RADIUS_ACID := 5.5
@@ -20,12 +20,13 @@ var source: Node = null
 var acid := false
 
 var _age := 0.0
+var _damage_time := 0.0
 var _mesh_material := StandardMaterial3D.new()
 var _shape_resource: Shape3D
 var _visuals: Array[Node3D] = []
 var _base_radius := 2.5
 
-## body instance id -> physics frame it was last damaged by any cloud.
+## body instance id -> msec it was last damaged by any cloud (one tick per 0.2 s).
 static var _hit_frame := {}
 
 
@@ -170,23 +171,28 @@ func _physics_process(delta: float) -> void:
 	if _age >= lifetime or GameManager.victory_locked or GameManager.finished:
 		queue_free()
 		return
-	if not Net.is_host():
+	if not Net.is_host() or damage_per_second <= 0.0:
 		return
-	var frame := Engine.get_physics_frames()
+	_damage_time += delta
+	if _damage_time < 0.2:
+		return
+	var amount := damage_per_second * _damage_time
+	_damage_time = 0.0
+	var now := Time.get_ticks_msec()
 	for body in get_overlapping_bodies():
-		if not body.has_method("take_damage"):
+		if not body is Player:
 			continue
 		var id := body.get_instance_id()
-		if int(_hit_frame.get(id, -1)) == frame:
-			continue  # Already hurt by an overlapping cloud this frame.
+		if now - int(_hit_frame.get(id, -100000)) < 190:
+			continue  # An overlapping cloud already ticked on this player.
 		if _in_dome(body.global_position, get_tree()):
 			continue
 		if acid:
 			var ray := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * .35, body.global_position + Vector3.UP * .35, 1)
 			if not get_world_3d().direct_space_state.intersect_ray(ray).is_empty():
 				continue
-		_hit_frame[id] = frame
+		_hit_frame[id] = now
 		# The cloud outlives the enemy that spat it out.
-		body.take_damage(damage_per_second * delta, source if is_instance_valid(source) else null)
+		body.take_damage(amount, source if is_instance_valid(source) else null, true)
 	if _hit_frame.size() > 64:
 		_hit_frame.clear()

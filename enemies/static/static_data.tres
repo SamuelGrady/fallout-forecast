@@ -7,6 +7,6 @@ script = ExtResource("1")
 display_name = "Static"
 max_health = 69.0
 move_speed = 3.5
-damage = 19.0
+damage = 17.0
 attack_range = 9.2
 attack_cooldown = 3.6

@@ -34,19 +34,19 @@ const DOWNPOUR_OPENERS := [
 ]
 const DRIZZLE_MIX := [
 	[9, 3, 0, 0, 0, 0, 0, 0, 0],
-	[8, 3, 2, 2, 0, 0, 0, 0, 0],
+	[9, 3, 2, 1, 0, 0, 0, 0, 0],
 	[7, 2, 2, 2, 2, 0, 0, 0, 0],
 	[6, 2, 2, 4, 2, 1, 2, 0, 0],
-	[6, 2, 2, 3, 2, 1, 2, 2, 3],
-	[5, 2, 2, 3, 3, 3, 3, 3, 3],
+	[7, 2, 2, 3, 2, 1, 2, 2, 2],
+	[6, 2, 2, 3, 2, 3, 3, 2, 2],
 ]
 const DOWNPOUR_MIX := [
 	[8, 3, 0, 3, 0, 0, 0, 0, 0],
-	[7, 3, 2, 3, 3, 0, 0, 0, 0],
-	[6, 3, 2, 2, 3, 5, 0, 0, 0],
-	[5, 2, 2, 5, 2, 2, 3, 3, 0],
-	[5, 2, 2, 3, 2, 2, 3, 3, 5],
-	[4, 2, 2, 4, 3, 3, 4, 4, 5],
+	[8, 3, 2, 2, 2, 0, 0, 0, 0],
+	[7, 3, 2, 2, 2, 4, 0, 0, 0],
+	[6, 2, 2, 4, 2, 2, 3, 2, 0],
+	[6, 2, 2, 3, 2, 2, 3, 2, 4],
+	[5, 2, 2, 4, 2, 3, 3, 3, 4],
 ]
 
 
@@ -66,10 +66,10 @@ static func weights(wave: int, downpour: bool) -> Array:
 	var mix: Array = mixes[clampi(wave - 1, 0, mixes.size() - 1)].duplicate()
 	match modifier(wave):
 		SWARM:
-			mix[Kind.SLEET] += 6
+			mix[Kind.SLEET] += 4
 		FLOOD:
 			if downpour or wave > 5:
-				mix[Kind.UNDERTOW] += 4
+				mix[Kind.UNDERTOW] += 3
 		HEAVY_WEATHER:
-			mix[Kind.THUNDERHEAD] += 3
+			mix[Kind.THUNDERHEAD] += 2
 	return mix

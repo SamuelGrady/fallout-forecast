@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 display_name = "Thunderhead"
-max_health = 83.0
+max_health = 98.0
 move_speed = 3.35
-damage = 32.0
+damage = 28.0
 attack_range = 3.2
 attack_cooldown = 3.0

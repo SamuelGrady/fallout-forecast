@@ -29,7 +29,7 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 
 func attack(victim: Node3D, amount: float) -> void:
 	var start := global_position - global_basis.z.normalized() * .56 + Vector3.UP * 1.61 * scale.y
-	GameManager.spawn_spore(start, victim.global_position + Vector3.UP * .045, 1.45, amount, true)
+	GameManager.spawn_spore(start, victim.global_position + Vector3.UP * .045, 1.45, amount, true, self)
 	attacked.emit(victim, amount)
 
 

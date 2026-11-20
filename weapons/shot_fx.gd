@@ -6,6 +6,9 @@ class_name ShotFX
 ## Shared unit-length streak mesh and one material per color, so firing
 ## doesn't allocate resources per shot.
 static var _streak_mesh: BoxMesh
+static var _puff_mesh: SphereMesh
+static var _spark_mesh: BoxMesh
+static var _spark_mats: Array[StandardMaterial3D] = []
 static var _materials := {}
 
 
@@ -62,39 +65,45 @@ static func flash(parent: Node, at: Vector3, color := Color(1.0, 0.8, 0.4), ener
 
 
 static func puff(parent: Node, at: Vector3, color: Color, size := 0.18, life := 0.25) -> void:
+	if _puff_mesh == null:
+		_puff_mesh = SphereMesh.new()
+		_puff_mesh.radius = 1.0
+		_puff_mesh.height = 2.0
+		_puff_mesh.radial_segments = 8
+		_puff_mesh.rings = 4
 	var mesh := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = size
-	sphere.height = size * 2.0
-	sphere.radial_segments = 8
-	sphere.rings = 4
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.albedo_color = color
-	sphere.material = material
-	mesh.mesh = sphere
+	mesh.mesh = _puff_mesh
+	mesh.material_override = material
+	mesh.scale = Vector3.ONE * size
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mesh)
 	mesh.global_position = at
 	var tween := mesh.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(mesh, "scale", Vector3.ONE * 2.5, life)
+	tween.tween_property(mesh, "scale", Vector3.ONE * (size * 2.5), life)
 	tween.tween_property(material, "albedo_color:a", 0.0, life)
 	tween.chain().tween_callback(mesh.queue_free)
 
 
 static func sparks(parent: Node, at: Vector3, outward := Vector3.UP, count := 6) -> void:
+	if _spark_mesh == null:
+		_spark_mesh = BoxMesh.new()
+		_spark_mesh.size = Vector3(0.03, 0.03, 0.16)
+	if _spark_mats.is_empty():
+		for c in [Color("#ffe599"), Color("#7ce8ff")]:
+			var m := StandardMaterial3D.new()
+			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			m.albedo_color = c
+			_spark_mats.append(m)
 	var dir := outward.normalized() if outward.length_squared() > 0.001 else Vector3.UP
 	for i in count:
 		var spark := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.03, 0.03, 0.16)
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = Color("#ffe599") if i % 2 == 0 else Color("#7ce8ff")
-		box.material = mat
-		spark.mesh = box
+		spark.mesh = _spark_mesh
+		spark.material_override = _spark_mats[i % 2]
 		spark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		parent.add_child(spark)
 		spark.global_position = at

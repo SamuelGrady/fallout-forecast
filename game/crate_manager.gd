@@ -39,6 +39,7 @@ func spawn_for_calm() -> void:
 	var parent := _container()
 	if parent == null:
 		return
+	Perf.mark("crates spawn wave %d" % WeatherManager.wave)
 	for old in get_tree().get_nodes_in_group("crates"):
 		old.queue_free()
 	Net.rpc_to_run(_clear_crates, [])
