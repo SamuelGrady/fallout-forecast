@@ -665,6 +665,7 @@ _surfaces = [{
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rhxng"]
 albedo_color = Color(0.24705882, 0.3137255, 0.24705882, 1)
+metadata/wind_foliage = 0.8
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_y3jre"]
 _surfaces = [{
@@ -681,6 +682,7 @@ _surfaces = [{
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_v0okd"]
 albedo_color = Color(0.18431373, 0.28627452, 0.2627451, 1)
+metadata/wind_foliage = 0.7
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_icyfu"]
 _surfaces = [{
@@ -697,6 +699,7 @@ _surfaces = [{
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_un15m"]
 albedo_color = Color(0.14901961, 0.23921569, 0.25490198, 1)
+metadata/wind_foliage = 0.7
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_gyixw"]
 _surfaces = [{
@@ -713,6 +716,7 @@ _surfaces = [{
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1rq4o"]
 albedo_color = Color(0.32156864, 0.3019608, 0.24705882, 1)
+metadata/wind_foliage = 0.8
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_t16tl"]
 _surfaces = [{
@@ -729,6 +733,7 @@ _surfaces = [{
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ks7qo"]
 albedo_color = Color(0.24313726, 0.37254903, 0.27058825, 1)
+metadata/wind_foliage = 4.0
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_fi5gl"]
 _surfaces = [{
@@ -1266,12 +1271,12 @@ agent_height = 1.75
 agent_max_slope = 30.0
 filter_baking_aabb = AABB(-64, -4, -64, 128, 32, 128)
 
-[node name="MapleHollow" type="Node3D" unique_id=1224691781]
+[node name="MapleHollow" type="Node3D" unique_id=1522248845]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=307662261]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1272026770]
 environment = SubResource("Environment_1p2by")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=681352599]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1747138985]
 transform = Transform3D(0.7880108, 0.2504121, -0.56243473, 0, 0.9135454, 0.40673664, 0.6156615, -0.32051286, 0.7198836, 0, 0, 0)
 light_color = Color(0.76862746, 0.8235294, 0.9098039, 1)
 light_energy = 0.78
@@ -1279,159 +1284,159 @@ shadow_enabled = true
 directional_shadow_mode = 1
 directional_shadow_max_distance = 82.0
 
-[node name="Geometry" type="Node3D" parent="." unique_id=289796588 groups=["navigation_geometry"]]
+[node name="Geometry" type="Node3D" parent="." unique_id=449422566 groups=["navigation_geometry"]]
 
-[node name="ForestGround" type="Node3D" parent="Geometry" unique_id=586761768]
+[node name="ForestGround" type="Node3D" parent="Geometry" unique_id=1172120334]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestGround" unique_id=1141568430]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestGround" unique_id=660589550]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestGround/WorldCollision" unique_id=1905207745]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestGround/WorldCollision" unique_id=1607259418]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.75, -1.55, 0)
 shape = SubResource("BoxShape3D_chjs5")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestGround/WorldCollision" unique_id=1275836267]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestGround/WorldCollision" unique_id=707834441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -57.5, -1.55, 0)
 shape = SubResource("BoxShape3D_vr3ur")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=1909212993]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=1499608880]
 material_override = SubResource("StandardMaterial3D_fgh6r")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_gffsa")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=785214364]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=796691797]
 transform = Transform3D(29.2, 0, 0, 0, 0.024, 0, 0, 0, 55.6, 46.6, 0.012, -24)
 material_override = SubResource("StandardMaterial3D_pi5rq")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=1695371207]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestGround" unique_id=99188936]
 material_override = SubResource("StandardMaterial3D_hhbtt")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_8tn48")
 
-[node name="TrailsAndRoads" type="Node3D" parent="Geometry" unique_id=1521742776]
+[node name="TrailsAndRoads" type="Node3D" parent="Geometry" unique_id=388800072]
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/TrailsAndRoads" unique_id=1412522693]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/TrailsAndRoads" unique_id=1190508519]
 material_override = SubResource("StandardMaterial3D_j7g56")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_hcw0p")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/TrailsAndRoads" unique_id=210775483]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/TrailsAndRoads" unique_id=377582199]
 material_override = SubResource("StandardMaterial3D_gvgmx")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_h2tf3")
 
-[node name="MillCreek" type="Node3D" parent="Geometry" unique_id=1015399251]
+[node name="MillCreek" type="Node3D" parent="Geometry" unique_id=947127291]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/MillCreek" unique_id=1296131632]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/MillCreek" unique_id=637907011]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=21094883]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=581709366]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -3.05, 0)
 shape = SubResource("BoxShape3D_f871x")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=2001186261]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=448677486]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -0.15, -34)
 shape = SubResource("BoxShape3D_6pu4i")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=63975222]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1385461099]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, 0.42, -37.72)
 shape = SubResource("BoxShape3D_ovw8k")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=2066386924]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1249642076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49.1, -1.48, -37.75)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=677074768]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1030080484]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.4, -1.48, -37.75)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1688400617]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=459997541]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, 0.42, -30.28)
 shape = SubResource("BoxShape3D_ovw8k")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1265221845]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=2028535302]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49.1, -1.48, -30.25)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=411842740]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1199996703]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.4, -1.48, -30.25)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1317855028]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1943550075]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -0.15, 32)
 shape = SubResource("BoxShape3D_6pu4i")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=599373819]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=83246664]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, 0.42, 28.28)
 shape = SubResource("BoxShape3D_ovw8k")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1440049106]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1750546318]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49.1, -1.48, 28.25)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1632536996]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=67300993]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.4, -1.48, 28.25)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1539046762]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=997779384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, 0.42, 35.72)
 shape = SubResource("BoxShape3D_ovw8k")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1509985581]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=157817811]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49.1, -1.48, 35.75)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1496261449]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1188790494]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.4, -1.48, 35.75)
 shape = SubResource("BoxShape3D_v8r6q")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=2037926668]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=812512973]
 transform = Transform3D(1, 0, 0, 0, 0.9809552, -0.19423436, 0, 0.19423436, 0.9809552, -44.6, -1.5, -18)
 shape = SubResource("BoxShape3D_w78y6")
 
-[node name="Hull17" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=879356246]
+[node name="Hull17" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=448312990]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.6, -0.14, -25.2)
 shape = SubResource("BoxShape3D_lt0hd")
 
-[node name="Hull18" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=522937437]
+[node name="Hull18" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=1746374073]
 transform = Transform3D(1, 0, 0, 0, 0.9809552, 0.19423436, 0, -0.19423436, 0.9809552, -44.6, -1.5, 15)
 shape = SubResource("BoxShape3D_w78y6")
 
-[node name="Hull19" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=993763294]
+[node name="Hull19" type="CollisionShape3D" parent="Geometry/MillCreek/WorldCollision" unique_id=355291327]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.6, -0.14, 22.2)
 shape = SubResource("BoxShape3D_lt0hd")
 
-[node name="CreekWater" type="Area3D" parent="Geometry/MillCreek" unique_id=1079462969]
+[node name="CreekWater" type="Area3D" parent="Geometry/MillCreek" unique_id=467889569]
 collision_layer = 16
 collision_mask = 0
 monitoring = false
 
-[node name="Waterline" type="CollisionShape3D" parent="Geometry/MillCreek/CreekWater" unique_id=942388686]
+[node name="Waterline" type="CollisionShape3D" parent="Geometry/MillCreek/CreekWater" unique_id=95739331]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -2.7, 0)
 shape = SubResource("BoxShape3D_vqtjf")
 
-[node name="Culvert" type="Area3D" parent="Geometry/MillCreek" unique_id=1586600200 groups=["shelter"]]
+[node name="Culvert" type="Area3D" parent="Geometry/MillCreek" unique_id=1908706160 groups=["shelter"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -1.58, -34)
 collision_layer = 8
 collision_mask = 0
 monitoring = false
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MillCreek/Culvert" unique_id=1929340981]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MillCreek/Culvert" unique_id=2120015392]
 shape = SubResource("BoxShape3D_oi7bv")
 
-[node name="Culvert2" type="Area3D" parent="Geometry/MillCreek" unique_id=1436770017 groups=["shelter"]]
+[node name="Culvert2" type="Area3D" parent="Geometry/MillCreek" unique_id=913649158 groups=["shelter"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -1.58, 32)
 collision_layer = 8
 collision_mask = 0
 monitoring = false
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MillCreek/Culvert2" unique_id=1669950613]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MillCreek/Culvert2" unique_id=1559572459]
 shape = SubResource("BoxShape3D_h0vbt")
 
-[node name="Footbridge" type="Node3D" parent="Geometry/MillCreek" unique_id=271150148 instance=ExtResource("4_6a6yu")]
+[node name="Footbridge" type="Node3D" parent="Geometry/MillCreek" unique_id=510643436 instance=ExtResource("4_6a6yu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, 0.04, -2)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/MillCreek" unique_id=375372904]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/MillCreek" unique_id=1918455053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.5, 2.6, 0)
 light_color = Color(1, 0.74509805, 0.45490196, 1)
 light_energy = 2.2
@@ -1440,60 +1445,60 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="MunicipalTank" type="Node3D" parent="Geometry/MillCreek" unique_id=1660889523 instance=ExtResource("5_m5il6")]
+[node name="MunicipalTank" type="Node3D" parent="Geometry/MillCreek" unique_id=830149364 instance=ExtResource("5_m5il6")]
 transform = Transform3D(0.9396926, 0, 0.34202012, 0, 1, 0, -0.34202012, 0, 0.9396926, -56.5, 0, -47)
 
-[node name="RockOutcrop" type="Node3D" parent="Geometry/MillCreek" unique_id=1962865690 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop" type="Node3D" parent="Geometry/MillCreek" unique_id=2033003085 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.95105654, 0, 0.309017, 0, 1, 0, -0.309017, 0, 0.95105654, -41.2, -0.2, 3.2)
 
-[node name="RockOutcrop2" type="Node3D" parent="Geometry/MillCreek" unique_id=881472671 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop2" type="Node3D" parent="Geometry/MillCreek" unique_id=2059095502 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.90630776, 0, -0.42261827, 0, 1, 0, 0.42261827, 0, 0.90630776, -52.6, -0.2, -7)
 
-[node name="RockOutcrop3" type="Node3D" parent="Geometry/MillCreek" unique_id=1819314229 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop3" type="Node3D" parent="Geometry/MillCreek" unique_id=2105597463 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.7431448, 0, 0.6691306, 0, 1, 0, -0.6691306, 0, 0.7431448, -52.4, -0.2, 9.5)
 
-[node name="RockOutcrop4" type="Node3D" parent="Geometry/MillCreek" unique_id=636545440 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop4" type="Node3D" parent="Geometry/MillCreek" unique_id=1917653464 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.9781476, 0, -0.2079117, 0, 1, 0, 0.2079117, 0, 0.9781476, -41, -0.2, -44)
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=974804449]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1113332645]
 transform = Transform3D(8.8, 0, 0, 0, 0.4, 0, 0, 0, 128, -46.75, -3.05, 0)
 material_override = SubResource("StandardMaterial3D_7a80q")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1068766063]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=990266044]
 transform = Transform3D(8.5, 0, 0, 0, 0.06, 0, 0, 0, 128, -46.75, -2.55, 0)
 material_override = SubResource("StandardMaterial3D_idnrt")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=750710527]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1322518528]
 material_override = SubResource("StandardMaterial3D_fhj21")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_dl7t1")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=752132378]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1846839170]
 material_override = SubResource("StandardMaterial3D_7a80q")
 mesh = SubResource("ArrayMesh_gfv64")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=500588247]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1794974158]
 material_override = SubResource("StandardMaterial3D_j7g56")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_2hs5d")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=317992275]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/MillCreek" unique_id=1689304902]
 material_override = SubResource("StandardMaterial3D_fhj21")
 mesh = SubResource("ArrayMesh_6v3ln")
 
-[node name="WaysideGrounds" type="Node3D" parent="Geometry" unique_id=1000160279]
+[node name="WaysideGrounds" type="Node3D" parent="Geometry" unique_id=495878902]
 
-[node name="WaysideChapel" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=135839130 instance=ExtResource("9_mvefq")]
+[node name="WaysideChapel" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=47054640 instance=ExtResource("9_mvefq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -47)
 
-[node name="LowellMausoleum" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1845698456 instance=ExtResource("10_d2hus")]
+[node name="LowellMausoleum" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=176366165 instance=ExtResource("10_d2hus")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 47, 0, -4)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/WaysideGrounds" unique_id=1692986345]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/WaysideGrounds" unique_id=600089279]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 3.2, -35.2)
 light_color = Color(1, 0.7529412, 0.47843137, 1)
 light_energy = 2.2
@@ -1502,7 +1507,7 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="Lamp2" type="OmniLight3D" parent="Geometry/WaysideGrounds" unique_id=1727382908]
+[node name="Lamp2" type="OmniLight3D" parent="Geometry/WaysideGrounds" unique_id=1134262960]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47, 3.6, -10)
 light_color = Color(1, 0.6666667, 0.40784314, 1)
 light_energy = 2.2
@@ -1511,173 +1516,173 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/WaysideGrounds" unique_id=7344979]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/WaysideGrounds" unique_id=703638096]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1777967395]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=698208528]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.4, 1.25, -31.5)
 shape = SubResource("BoxShape3D_45ll6")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=329048601]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=180673681]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.6, 1.25, -31.5)
 shape = SubResource("BoxShape3D_45ll6")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1104376670]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=257248769]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1.85, -31.5)
 shape = SubResource("BoxShape3D_qun2k")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=11043839]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=356279869]
 transform = Transform3D(0.1391731, 0, 0.99026805, 0, 1, 0, -0.99026805, 0, 0.1391731, 14.5, 1.172549, -25.8)
 shape = SubResource("BoxShape3D_uukkk")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=5826073]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=218992256]
 transform = Transform3D(-0.10452851, 0, 0.9945219, 0, 1, 0, -0.9945219, 0, -0.10452851, 14.8, 1.1016951, -17.5)
 shape = SubResource("BoxShape3D_bglc4")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1103909748]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1640466443]
 transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, 26.5, 1.2272726, -14.8)
 shape = SubResource("BoxShape3D_fmypf")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1501144598]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=469626252]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0.65, -45)
 shape = SubResource("BoxShape3D_nyg7d")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=323104737]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=765591477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0.65, -28)
 shape = SubResource("BoxShape3D_crev1")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=407654915]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=169038366]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0.65, -7.5)
 shape = SubResource("BoxShape3D_b8bbc")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=277523123]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1282136707]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.8, 0.65, -52)
 shape = SubResource("BoxShape3D_h5ekd")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=712184839]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2032951539]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.5, 0.65, -24)
 shape = SubResource("BoxShape3D_r7pcl")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=519228727]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=752106136]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0.65, 4.2)
 shape = SubResource("BoxShape3D_6qa2m")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1183746673]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=842276208]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.5, 0.65, 4.2)
 shape = SubResource("BoxShape3D_wuqgc")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1830625781]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=64545195]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 2.0535715, -38.3)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=95715090]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1489625256]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 2.0535715, -30.7)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=635916272]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1139644953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 2.0535715, -25.3)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull17" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1922933285]
+[node name="Hull17" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1212137715]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 2.0535715, -18.2)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull18" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=997902501]
+[node name="Hull18" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2053104569]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.3, 2.0535715, 4.2)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull19" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1221261458]
+[node name="Hull19" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1150693260]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.6, 2.0535715, 4.2)
 shape = SubResource("BoxShape3D_nba4h")
 
-[node name="Hull20" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=705022874]
+[node name="Hull20" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1473527603]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.6, 0.89444447, -46)
 shape = SubResource("BoxShape3D_6472w")
 
-[node name="Hull21" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1942910030]
+[node name="Hull21" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1140090005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.6, 0.48647687, -46)
 shape = SubResource("BoxShape3D_finis")
 
-[node name="Hull22" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=925318173]
+[node name="Hull22" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=794737710]
 transform = Transform3D(0.9975641, 0, 0.06975647, 0, 1, 0, -0.06975647, 0, 0.9975641, 34.6, 1.4233265, -39.2)
 shape = SubResource("BoxShape3D_wbyak")
 
-[node name="Hull23" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1224436796]
+[node name="Hull23" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1492056788]
 transform = Transform3D(0.9961947, 0, -0.08715574, 0, 1, 0, 0.08715574, 0, 0.9961947, 58.6, 0.8527667, -39.2)
 shape = SubResource("BoxShape3D_8aexd")
 
-[node name="Hull24" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=728368485]
+[node name="Hull24" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=604957895]
 transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, 34.6, 0.46970177, -32.4)
 shape = SubResource("BoxShape3D_phubd")
 
-[node name="Hull25" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=207927980]
+[node name="Hull25" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2083938624]
 transform = Transform3D(0.9848077, 0, -0.17364818, 0, 1, 0, 0.17364818, 0, 0.9848077, 58.6, 0.4857984, -32.4)
 shape = SubResource("BoxShape3D_gjd32")
 
-[node name="Hull26" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1085562423]
+[node name="Hull26" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2092303969]
 transform = Transform3D(0.9781476, 0, 0.2079117, 0, 1, 0, -0.2079117, 0, 0.9781476, 34.6, 0.8233609, -25.6)
 shape = SubResource("BoxShape3D_fsdn7")
 
-[node name="Hull27" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1567977917]
+[node name="Hull27" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=282149065]
 transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, 58.6, 0.90556407, -25.6)
 shape = SubResource("BoxShape3D_ncbr5")
 
-[node name="Hull28" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=387101097]
+[node name="Hull28" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=372995149]
 transform = Transform3D(0.9612617, 0, 0.27563736, 0, 1, 0, -0.27563736, 0, 0.9612617, 34.6, 0.46904674, -18.8)
 shape = SubResource("BoxShape3D_wmpdd")
 
-[node name="Hull29" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1518227590]
+[node name="Hull29" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=961493541]
 transform = Transform3D(0.9396926, 0, -0.34202012, 0, 1, 0, 0.34202012, 0, 0.9396926, 58.6, 0.9263889, -18.8)
 shape = SubResource("BoxShape3D_85f7g")
 
-[node name="Hull30" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1294248753]
+[node name="Hull30" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1310834980]
 transform = Transform3D(0.9396926, 0, 0.34202012, 0, 1, 0, -0.34202012, 0, 0.9396926, 34.6, 0.87433773, -12)
 shape = SubResource("BoxShape3D_j5ojd")
 
-[node name="Hull31" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=485869523]
+[node name="Hull31" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1350228519]
 transform = Transform3D(0.90630776, 0, -0.42261827, 0, 1, 0, 0.42261827, 0, 0.90630776, 58.6, 1.4741596, -12)
 shape = SubResource("BoxShape3D_yea01")
 
-[node name="Hull32" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=803414080]
+[node name="Hull32" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1026339097]
 transform = Transform3D(0.9781476, 0, -0.2079117, 0, 1, 0, 0.2079117, 0, 0.9781476, 39, 1.5249927, -49.2)
 shape = SubResource("BoxShape3D_ai0md")
 
-[node name="Hull33" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1633205188]
+[node name="Hull33" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1459332472]
 transform = Transform3D(0.9945219, 0, -0.104528464, 0, 1, 0, 0.104528464, 0, 0.9945219, 44.2, 0.5032519, -49.2)
 shape = SubResource("BoxShape3D_qhvw3")
 
-[node name="Hull34" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1191019890]
+[node name="Hull34" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=863150325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.4, 0.8821724, -49.2)
 shape = SubResource("BoxShape3D_ujn70")
 
-[node name="Hull35" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=395979532]
+[node name="Hull35" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2025366901]
 transform = Transform3D(0.9945219, 0, 0.104528464, 0, 1, 0, -0.104528464, 0, 0.9945219, 54.6, 0.50255007, -49.2)
 shape = SubResource("BoxShape3D_cmw5d")
 
-[node name="Hull36" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=218471715]
+[node name="Hull36" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=564038693]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 36, 0.9123076, -12)
 shape = SubResource("BoxShape3D_26c3v")
 
-[node name="Hull37" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=68110134]
+[node name="Hull37" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1744713221]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 55.5, 0.9123076, -18)
 shape = SubResource("BoxShape3D_26c3v")
 
-[node name="Hull38" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=296701845]
+[node name="Hull38" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=723992585]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 2.1797814, -10.5)
 shape = SubResource("BoxShape3D_xbxt3")
 
-[node name="Hull39" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=913557718]
+[node name="Hull39" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1939190488]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.5, 1.6, -49.5)
 shape = SubResource("BoxShape3D_w620p")
 
-[node name="Hull40" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1753620240]
+[node name="Hull40" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2033381900]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.5, 1.6, -49.5)
 shape = SubResource("BoxShape3D_w620p")
 
-[node name="Hull41" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=2019511706]
+[node name="Hull41" type="CollisionShape3D" parent="Geometry/WaysideGrounds/WorldCollision" unique_id=1450178298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.5, 1.6, -1)
 shape = SubResource("BoxShape3D_w620p")
 
-[node name="Lettering" type="Label3D" parent="Geometry/WaysideGrounds" unique_id=125755046]
+[node name="Lettering" type="Label3D" parent="Geometry/WaysideGrounds" unique_id=372604237]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 2.02, -31.38)
 pixel_size = 0.0069230767
 double_sided = false
@@ -1687,7 +1692,7 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="Lettering2" type="Label3D" parent="Geometry/WaysideGrounds" unique_id=1842776911]
+[node name="Lettering2" type="Label3D" parent="Geometry/WaysideGrounds" unique_id=326584845]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1.56, -31.38)
 double_sided = false
 modulate = Color(0.8509804, 0.7254902, 0.54901963, 1)
@@ -1696,236 +1701,236 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="Sedan" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=661096883]
+[node name="Sedan" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2138912808]
 transform = Transform3D(0.1391731, 0, 0.99026805, 0, 1, 0, -0.99026805, 0, 0.1391731, 14.5, 0, -25.8)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Sedan" unique_id=606985150 instance=ExtResource("12_3epit")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Sedan" unique_id=914240791 instance=ExtResource("12_3epit")]
 transform = Transform3D(1.8039216, 0, 0, 0, 1.8039216, 0, 0, 0, 1.8039216, 0, 0, 0.045097996)
 script = ExtResource("13_y1mwg")
 tint = Color(0.5568628, 0.6431373, 0.6784314, 1)
 texture = ExtResource("14_84bjg")
 
-[node name="Truck" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1108350887]
+[node name="Truck" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1702640417]
 transform = Transform3D(-0.10452851, 0, 0.9945219, 0, 1, 0, -0.9945219, 0, -0.10452851, 14.8, 0, -17.5)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Truck" unique_id=1992510838 instance=ExtResource("15_paxsr")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Truck" unique_id=1205291478 instance=ExtResource("15_paxsr")]
 transform = Transform3D(1.6949155, 0, 0, 0, 1.6949155, 0, 0, 0, 1.6949155, 0, 0, 0.04237285)
 script = ExtResource("13_y1mwg")
 tint = Color(0.7019608, 0.5529412, 0.43529412, 1)
 texture = ExtResource("14_84bjg")
 
-[node name="Van" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=206338261]
+[node name="Van" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1347588590]
 transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, 26.5, 0, -14.8)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Van" unique_id=1512253132 instance=ExtResource("16_613ir")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Van" unique_id=1336374652 instance=ExtResource("16_613ir")]
 transform = Transform3D(1.8181816, 0, 0, 0, 1.8181816, 0, 0, 0, 1.8181816, 0, 0, 0.0454545)
 script = ExtResource("13_y1mwg")
 tint = Color(0.6156863, 0.7019608, 0.6509804, 1)
 texture = ExtResource("14_84bjg")
 
-[node name="PillarSquare" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1728759709]
+[node name="PillarSquare" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=938036677]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0, -38.3)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare" unique_id=472265167 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare" unique_id=172929742 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="PillarSquare2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=201668937]
+[node name="PillarSquare2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=131161367]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0, -30.7)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare2" unique_id=1638068036 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare2" unique_id=944773432 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="PillarSquare3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=187201497]
+[node name="PillarSquare3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=38061710]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0, -25.3)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare3" unique_id=1350780819 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare3" unique_id=359558885 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="PillarSquare4" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2137688232]
+[node name="PillarSquare4" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1228026091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.8, 0, -18.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare4" unique_id=1185377146 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare4" unique_id=723632919 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="PillarSquare5" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=898237286]
+[node name="PillarSquare5" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=165089055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.3, 0, 4.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare5" unique_id=769134586 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare5" unique_id=1006529145 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="PillarSquare6" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=96365921]
+[node name="PillarSquare6" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1934140262]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47.6, 0, 4.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare6" unique_id=810528581 instance=ExtResource("17_d1n0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PillarSquare6" unique_id=1149265344 instance=ExtResource("17_d1n0x")]
 transform = Transform3D(3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0, 3.5714285, 0, 0, 0)
 
-[node name="GravestoneRound" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=427961980]
+[node name="GravestoneRound" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=316488782]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.6, 0, -46)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRound" unique_id=1561222253 instance=ExtResource("18_0o5pq")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRound" unique_id=1626288347 instance=ExtResource("18_0o5pq")]
 transform = Transform3D(3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0)
 
-[node name="GravestoneWide" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1384710583]
+[node name="GravestoneWide" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=206534012]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.6, 0, -46)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide" unique_id=1640241926 instance=ExtResource("19_hc2ou")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide" unique_id=1785442551 instance=ExtResource("19_hc2ou")]
 transform = Transform3D(1.7058823, 0, 0, 0, 1.7058823, 0, 0, 0, 1.7058823, 0, 0, 0)
 
-[node name="GravestoneCross" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1769272122]
+[node name="GravestoneCross" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1627640245]
 transform = Transform3D(0.9975641, 0, 0.06975647, 0, 1, 0, -0.06975647, 0, 0.9975641, 34.6, 0, -39.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross" unique_id=477020570 instance=ExtResource("20_1c43p")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross" unique_id=439613478 instance=ExtResource("20_1c43p")]
 transform = Transform3D(3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0)
 
-[node name="GravestoneBevel" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=421974371]
+[node name="GravestoneBevel" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2098292621]
 transform = Transform3D(0.9961947, 0, -0.08715574, 0, 1, 0, 0.08715574, 0, 0.9961947, 58.6, 0, -39.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel" unique_id=1455974710 instance=ExtResource("21_4m3ee")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel" unique_id=882596867 instance=ExtResource("21_4m3ee")]
 transform = Transform3D(3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0)
 
-[node name="GravestoneWide2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=111659401]
+[node name="GravestoneWide2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=245993019]
 transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, 34.6, 0, -32.4)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide2" unique_id=466315965 instance=ExtResource("19_hc2ou")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide2" unique_id=1139958652 instance=ExtResource("19_hc2ou")]
 transform = Transform3D(1.6470587, 0, 0, 0, 1.6470587, 0, 0, 0, 1.6470587, 0, 0, 0)
 
-[node name="GravestoneBroken" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1933159175]
+[node name="GravestoneBroken" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=712398012]
 transform = Transform3D(0.9848077, 0, -0.17364818, 0, 1, 0, 0.17364818, 0, 0.9848077, 58.6, 0, -32.4)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken" unique_id=473968312 instance=ExtResource("22_nuwoe")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken" unique_id=95540380 instance=ExtResource("22_nuwoe")]
 transform = Transform3D(2.8485808, 0, 0, 0, 2.8485808, 0, 0, 0, 2.8485808, -0.08406932, 0, -0.20160145)
 
-[node name="GravestoneBevel2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=30342155]
+[node name="GravestoneBevel2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=358881794]
 transform = Transform3D(0.9781476, 0, 0.2079117, 0, 1, 0, -0.2079117, 0, 0.9781476, 34.6, 0, -25.6)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel2" unique_id=1080889329 instance=ExtResource("21_4m3ee")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel2" unique_id=408759968 instance=ExtResource("21_4m3ee")]
 transform = Transform3D(3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0, 3.1111112, 0, 0, 0)
 
-[node name="GravestoneRoof" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2097026334]
+[node name="GravestoneRoof" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1126764965]
 transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, 58.6, 0, -25.6)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRoof" unique_id=1266624108 instance=ExtResource("23_ivaun")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRoof" unique_id=2025398560 instance=ExtResource("23_ivaun")]
 transform = Transform3D(2.9808514, 0, 0, 0, 2.9808514, 0, 0, 0, 2.9808514, 0, 0, 0)
 
-[node name="GravestoneBroken2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1308182433]
+[node name="GravestoneBroken2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=599968976]
 transform = Transform3D(0.9612617, 0, 0.27563736, 0, 1, 0, -0.27563736, 0, 0.9612617, 34.6, 0, -18.8)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken2" unique_id=571173284 instance=ExtResource("22_nuwoe")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken2" unique_id=163635227 instance=ExtResource("22_nuwoe")]
 transform = Transform3D(2.750354, 0, 0, 0, 2.750354, 0, 0, 0, 2.750354, -0.08117038, 0, -0.19464968)
 
-[node name="GravestoneRound2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1141902296]
+[node name="GravestoneRound2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=803879660]
 transform = Transform3D(0.9396926, 0, -0.34202012, 0, 1, 0, 0.34202012, 0, 0.9396926, 58.6, 0, -18.8)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRound2" unique_id=230673834 instance=ExtResource("18_0o5pq")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRound2" unique_id=1131017346 instance=ExtResource("18_0o5pq")]
 transform = Transform3D(3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0)
 
-[node name="GravestoneRoof2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=462096614]
+[node name="GravestoneRoof2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1986900095]
 transform = Transform3D(0.9396926, 0, 0.34202012, 0, 1, 0, -0.34202012, 0, 0.9396926, 34.6, 0, -12)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRoof2" unique_id=2068041278 instance=ExtResource("23_ivaun")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneRoof2" unique_id=474209297 instance=ExtResource("23_ivaun")]
 transform = Transform3D(2.8780634, 0, 0, 0, 2.8780634, 0, 0, 0, 2.8780634, 0, 0, 0)
 
-[node name="GravestoneCross2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2020801176]
+[node name="GravestoneCross2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=887713368]
 transform = Transform3D(0.90630776, 0, -0.42261827, 0, 1, 0, 0.42261827, 0, 0.90630776, 58.6, 0, -12)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross2" unique_id=1857214101 instance=ExtResource("20_1c43p")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross2" unique_id=1561455366 instance=ExtResource("20_1c43p")]
 transform = Transform3D(3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0, 3.2222223, 0, 0, 0)
 
-[node name="GravestoneCross3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2101647048]
+[node name="GravestoneCross3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=685175282]
 transform = Transform3D(0.9781476, 0, -0.2079117, 0, 1, 0, 0.2079117, 0, 0.9781476, 39, 0, -49.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross3" unique_id=1748982699 instance=ExtResource("20_1c43p")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneCross3" unique_id=502006346 instance=ExtResource("20_1c43p")]
 transform = Transform3D(3.3333335, 0, 0, 0, 3.3333335, 0, 0, 0, 3.3333335, 0, 0, 0)
 
-[node name="GravestoneWide3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1255626764]
+[node name="GravestoneWide3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1896814203]
 transform = Transform3D(0.9945219, 0, -0.104528464, 0, 1, 0, 0.104528464, 0, 0.9945219, 44.2, 0, -49.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide3" unique_id=238045595 instance=ExtResource("19_hc2ou")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneWide3" unique_id=1789366202 instance=ExtResource("19_hc2ou")]
 transform = Transform3D(1.7647058, 0, 0, 0, 1.7647058, 0, 0, 0, 1.7647058, 0, 0, 0)
 
-[node name="GravestoneBevel3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1475267038]
+[node name="GravestoneBevel3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1837313512]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.4, 0, -49.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel3" unique_id=1256969910 instance=ExtResource("21_4m3ee")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBevel3" unique_id=509222348 instance=ExtResource("21_4m3ee")]
 transform = Transform3D(3.3333335, 0, 0, 0, 3.3333335, 0, 0, 0, 3.3333335, 0, 0, 0)
 
-[node name="GravestoneBroken3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=762995676]
+[node name="GravestoneBroken3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=820066804]
 transform = Transform3D(0.9945219, 0, 0.104528464, 0, 1, 0, -0.104528464, 0, 0.9945219, 54.6, 0, -49.2)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken3" unique_id=1787718273 instance=ExtResource("22_nuwoe")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/GravestoneBroken3" unique_id=1305890535 instance=ExtResource("22_nuwoe")]
 transform = Transform3D(2.9468079, 0, 0, 0, 2.9468079, 0, 0, 0, 2.9468079, -0.086968265, 0, -0.20855322)
 
-[node name="Bench" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1430821064]
+[node name="Bench" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1361918544]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 36, 0, -12)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Bench" unique_id=41709430 instance=ExtResource("24_6k755")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Bench" unique_id=363891915 instance=ExtResource("24_6k755")]
 transform = Transform3D(3.4689848, 0, 0, 0, 3.4689848, 0, 0, 0, 3.4689848, 0, 0, 0)
 
-[node name="Bench2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1447078247]
+[node name="Bench2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1165420190]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 55.5, 0, -18)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Bench2" unique_id=1738620664 instance=ExtResource("24_6k755")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/Bench2" unique_id=1101263076 instance=ExtResource("24_6k755")]
 transform = Transform3D(3.4689848, 0, 0, 0, 3.4689848, 0, 0, 0, 3.4689848, 0, 0, 0)
 
-[node name="LightpostSingle" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1360449384]
+[node name="LightpostSingle" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1890438938]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -10.5)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/LightpostSingle" unique_id=468916634 instance=ExtResource("25_rov0x")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/LightpostSingle" unique_id=364985750 instance=ExtResource("25_rov0x")]
 transform = Transform3D(3.441958, 0, 0, 0, 3.441958, 0, 0, 0, 3.441958, -8.206267e-07, 1.9412412e-16, -0.4503859)
 
-[node name="PineCrooked" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1200706623]
+[node name="PineCrooked" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2054464020]
 transform = Transform3D(-0.23344539, 0, 0.9723699, 0, 1, 0, -0.9723699, 0, -0.23344539, 34.5, 0, -49.5)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked" unique_id=1662256674 instance=ExtResource("26_1el1g")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked" unique_id=1757318289 groups=["wind_sway"] instance=ExtResource("26_1el1g")]
 transform = Transform3D(3.5966983, 0, 0, 0, 3.5966983, 0, 0, 0, 3.5966983, -0.064425886, 0.35966983, 0)
 
-[node name="PineCrooked2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1721430172]
+[node name="PineCrooked2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=768615950]
 transform = Transform3D(-0.99691737, 0, 0.07845904, 0, 1, 0, -0.07845904, 0, -0.99691737, 58.5, 0, -49.5)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked2" unique_id=1837904944 instance=ExtResource("26_1el1g")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked2" unique_id=1493654903 groups=["wind_sway"] instance=ExtResource("26_1el1g")]
 transform = Transform3D(3.5966983, 0, 0, 0, 3.5966983, 0, 0, 0, 3.5966983, -0.064425886, 0.35966983, 0)
 
-[node name="PineCrooked3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2127523501]
+[node name="PineCrooked3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=270548507]
 transform = Transform3D(-0.99691737, 0, 0.07845904, 0, 1, 0, -0.07845904, 0, -0.99691737, 58.5, 0, -1)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked3" unique_id=1724699296 instance=ExtResource("26_1el1g")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineCrooked3" unique_id=1032027304 groups=["wind_sway"] instance=ExtResource("26_1el1g")]
 transform = Transform3D(3.5966983, 0, 0, 0, 3.5966983, 0, 0, 0, 3.5966983, -0.064425886, 0.35966983, 0)
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=258690823]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1134158829]
 material_override = SubResource("StandardMaterial3D_t40wg")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_g5ie0")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=564506674]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1407125572]
 material_override = SubResource("StandardMaterial3D_t40wg")
 mesh = SubResource("ArrayMesh_vnfyb")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1765436159]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1341605091]
 transform = Transform3D(3.8, 0, 0, 0, 1.25, 0, 0, 0, 0.18, 17, 1.85, -31.5)
 material_override = SubResource("StandardMaterial3D_1ip8v")
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1930847388]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1043266233]
 transform = Transform3D(3, 0, 0, 0, 0.04, 0, 0, 0, 34, 47, 0.022, -26)
 material_override = SubResource("StandardMaterial3D_i0wcf")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1083219711]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1426426205]
 material_override = SubResource("StandardMaterial3D_vahpv")
 mesh = SubResource("ArrayMesh_fca7t")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=350907305]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/WaysideGrounds" unique_id=1635260088]
 material_override = SubResource("StandardMaterial3D_nnc4n")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_xkqs2")
 
-[node name="RangerTrailhead" type="Node3D" parent="Geometry" unique_id=1236390477]
+[node name="RangerTrailhead" type="Node3D" parent="Geometry" unique_id=413455486]
 
-[node name="RangerStation" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=523533568 instance=ExtResource("28_epekq")]
+[node name="RangerStation" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1420336923 instance=ExtResource("28_epekq")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -14, 0, 45)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/RangerTrailhead" unique_id=328021793]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/RangerTrailhead" unique_id=1177620755]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 3.1, 40.5)
 light_color = Color(1, 0.72156864, 0.43137255, 1)
 light_energy = 2.2
@@ -1934,54 +1939,54 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="Suv" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=34218677]
+[node name="Suv" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=475463736]
 transform = Transform3D(0.9612617, 0, 0.27563736, 0, 1, 0, -0.27563736, 0, 0.9612617, -24.5, 0, 41.5)
 
-[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/Suv" unique_id=1771565224 instance=ExtResource("29_qku1n")]
+[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/Suv" unique_id=435642597 instance=ExtResource("29_qku1n")]
 transform = Transform3D(1.7407409, 0, 0, 0, 1.7407409, 0, 0, 0, 1.7407409, 0, 0, 0)
 script = ExtResource("13_y1mwg")
 tint = Color(0.41960785, 0.52156866, 0.4627451, 1)
 texture = ExtResource("14_84bjg")
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/RangerTrailhead" unique_id=84079732]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/RangerTrailhead" unique_id=284287500]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1558370181]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=507269773]
 transform = Transform3D(0.9612617, 0, 0.27563736, 0, 1, 0, -0.27563736, 0, 0.9612617, -24.5, 1.1314816, 41.5)
 shape = SubResource("BoxShape3D_g5xss")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1777093277]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=868598418]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 1.55, 39.2)
 shape = SubResource("BoxShape3D_rjlfg")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=2127838850]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1141618332]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1.55, 39.2)
 shape = SubResource("BoxShape3D_rjlfg")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=370267933]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=331727897]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 2.2, 39.2)
 shape = SubResource("BoxShape3D_mgm1q")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=626585370]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=11225259]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.6, 0.55, 36.8)
 shape = SubResource("BoxShape3D_087c7")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1826336420]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=467448131]
 transform = Transform3D(0.034899496, 0, 0.99939084, 0, 1, 0, -0.99939084, 0, 0.034899496, -62, 1.0899999, 30.5)
 shape = SubResource("BoxShape3D_xcii2")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1504074181]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1535258587]
 transform = Transform3D(-0.06975648, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, -0.06975648, -62, 1.0899999, 33.8)
 shape = SubResource("BoxShape3D_xcii2")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1619162311]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1820329445]
 transform = Transform3D(0.034899496, 0, 0.99939084, 0, 1, 0, -0.99939084, 0, 0.034899496, 62, 1.0899999, 13.5)
 shape = SubResource("BoxShape3D_xcii2")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=547678921]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/RangerTrailhead/WorldCollision" unique_id=1017952265]
 transform = Transform3D(-0.06975648, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, -0.06975648, 62, 1.0899999, 16.8)
 shape = SubResource("BoxShape3D_xcii2")
 
-[node name="Lettering" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=1110911714]
+[node name="Lettering" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=751776659]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.6, 2.48, 39.02)
 pixel_size = 0.01076923
 double_sided = false
@@ -1991,7 +1996,7 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="Lettering2" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=820887074]
+[node name="Lettering2" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=243002034]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.6, 1.76, 39.02)
 pixel_size = 0.0069230767
 double_sided = false
@@ -2001,7 +2006,7 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="Lettering3" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=1148340109]
+[node name="Lettering3" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=2137551238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 2.48, 39.38)
 pixel_size = 0.01076923
 double_sided = false
@@ -2011,7 +2016,7 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="Lettering4" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=535013574]
+[node name="Lettering4" type="Label3D" parent="Geometry/RangerTrailhead" unique_id=614420055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 1.76, 39.38)
 pixel_size = 0.0069230767
 double_sided = false
@@ -2021,55 +2026,55 @@ font = ExtResource("11_biiq2")
 font_size = 80
 outline_size = 0
 
-[node name="ConstructionBarrier" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1539709988]
+[node name="ConstructionBarrier" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1233128193]
 transform = Transform3D(0.034899496, 0, 0.99939084, 0, 1, 0, -0.99939084, 0, 0.034899496, -62, 0.05, 30.5)
 
-[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier" unique_id=1451095281 instance=ExtResource("30_xqcll")]
+[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier" unique_id=1629868588 groups=["wind_sway"] instance=ExtResource("30_xqcll")]
 transform = Transform3D(16, 0, 0, 0, 16, 0, 0, 0, 16, 0, 0, 0)
 
-[node name="ConstructionBarrier2" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=721731229]
+[node name="ConstructionBarrier2" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1239415711]
 transform = Transform3D(-0.06975648, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, -0.06975648, -62, 0.05, 33.8)
 
-[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier2" unique_id=650741144 instance=ExtResource("30_xqcll")]
+[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier2" unique_id=1899130955 groups=["wind_sway"] instance=ExtResource("30_xqcll")]
 transform = Transform3D(16, 0, 0, 0, 16, 0, 0, 0, 16, 0, 0, 0)
 
-[node name="ConstructionBarrier3" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1558478004]
+[node name="ConstructionBarrier3" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=1461051388]
 transform = Transform3D(0.034899496, 0, 0.99939084, 0, 1, 0, -0.99939084, 0, 0.034899496, 62, 0.05, 13.5)
 
-[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier3" unique_id=1560418220 instance=ExtResource("30_xqcll")]
+[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier3" unique_id=1552987439 groups=["wind_sway"] instance=ExtResource("30_xqcll")]
 transform = Transform3D(16, 0, 0, 0, 16, 0, 0, 0, 16, 0, 0, 0)
 
-[node name="ConstructionBarrier4" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=302041242]
+[node name="ConstructionBarrier4" type="Node3D" parent="Geometry/RangerTrailhead" unique_id=360755655]
 transform = Transform3D(-0.06975648, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, -0.06975648, 62, 0.05, 16.8)
 
-[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier4" unique_id=2065945253 instance=ExtResource("30_xqcll")]
+[node name="Model" type="Node3D" parent="Geometry/RangerTrailhead/ConstructionBarrier4" unique_id=693666947 groups=["wind_sway"] instance=ExtResource("30_xqcll")]
 transform = Transform3D(16, 0, 0, 0, 16, 0, 0, 0, 16, 0, 0, 0)
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=881294213]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=408923561]
 material_override = SubResource("StandardMaterial3D_x6jdh")
 mesh = SubResource("ArrayMesh_pa0wd")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=1897875101]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=192275637]
 transform = Transform3D(5.8, 0, 0, 0, 1.95, 0, 0, 0, 0.28, 4.6, 2.2, 39.2)
 material_override = SubResource("StandardMaterial3D_ab06a")
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=1748174313]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=323981667]
 transform = Transform3D(6.2, 0, 0, 0, 0.22, 0, 0, 0, 0.56, 4.6, 3.25, 39.2)
 material_override = SubResource("StandardMaterial3D_4a44i")
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=2076023354]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/RangerTrailhead" unique_id=629563990]
 material_override = SubResource("StandardMaterial3D_q0gmk")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_06c1h")
 
-[node name="FireTowerClearing" type="Node3D" parent="Geometry" unique_id=1198864937]
+[node name="FireTowerClearing" type="Node3D" parent="Geometry" unique_id=569684435]
 
-[node name="FireTower" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=1385389247 instance=ExtResource("31_ebqeo")]
+[node name="FireTower" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=26960371 instance=ExtResource("31_ebqeo")]
 transform = Transform3D(0.9781476, 0, 0.2079117, 0, 1, 0, -0.2079117, 0, 0.9781476, -12, 0, -4)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/FireTowerClearing" unique_id=1269840109]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/FireTowerClearing" unique_id=433160265]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 3.1, -4)
 light_color = Color(1, 0.7372549, 0.44705883, 1)
 light_energy = 2.2
@@ -2078,34 +2083,34 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/FireTowerClearing" unique_id=2036388076]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/FireTowerClearing" unique_id=734541833]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/FireTowerClearing/WorldCollision" unique_id=1241865613]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/FireTowerClearing/WorldCollision" unique_id=1412425705]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 1.25, 2.2)
 shape = SubResource("BoxShape3D_45ll6")
 
-[node name="RockOutcrop" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=426851010 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=2056740568 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.90630776, 0, 0.42261827, 0, 1, 0, -0.42261827, 0, 0.90630776, -21, 0, -10.5)
 
-[node name="RockOutcrop2" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=1822458658 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop2" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=1877971803 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.76604444, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, 0.76604444, -2.5, 0, -12.5)
 
-[node name="FallenLog" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=148498684 instance=ExtResource("32_heeoc")]
+[node name="FallenLog" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=1239945933 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.88294756, 0, 0.46947157, 0, 1, 0, -0.46947157, 0, 0.88294756, -19.5, 0, 4.5)
 
-[node name="FallenLog2" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=906288615 instance=ExtResource("32_heeoc")]
+[node name="FallenLog2" type="Node3D" parent="Geometry/FireTowerClearing" unique_id=372391422 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.92718387, 0, -0.37460658, 0, 1, 0, 0.37460658, 0, 0.92718387, -1, 0, 6)
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/FireTowerClearing" unique_id=1736341771]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/FireTowerClearing" unique_id=1093639973]
 material_override = SubResource("StandardMaterial3D_5mf4r")
 mesh = SubResource("ArrayMesh_i0e70")
 
-[node name="Campground" type="Node3D" parent="Geometry" unique_id=2017800378]
+[node name="Campground" type="Node3D" parent="Geometry" unique_id=1045428179]
 
-[node name="CampShelter" type="Node3D" parent="Geometry/Campground" unique_id=1717332318 instance=ExtResource("33_asypk")]
+[node name="CampShelter" type="Node3D" parent="Geometry/Campground" unique_id=803900975 instance=ExtResource("33_asypk")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -38)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/Campground" unique_id=804875617]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/Campground" unique_id=154500285]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 3, -38)
 light_color = Color(1, 0.74509805, 0.4627451, 1)
 light_energy = 2.2
@@ -2114,59 +2119,59 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="LeanTo" type="Node3D" parent="Geometry/Campground" unique_id=1106231614 instance=ExtResource("34_8y1rk")]
+[node name="LeanTo" type="Node3D" parent="Geometry/Campground" unique_id=455650347 instance=ExtResource("34_8y1rk")]
 transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, -28, 0, -46)
 
-[node name="LeanTo2" type="Node3D" parent="Geometry/Campground" unique_id=101817413 instance=ExtResource("34_8y1rk")]
+[node name="LeanTo2" type="Node3D" parent="Geometry/Campground" unique_id=2111939057 instance=ExtResource("34_8y1rk")]
 transform = Transform3D(-0.08715577, 0, 0.9961947, 0, 1, 0, -0.9961947, 0, -0.08715577, -30, 0, 12)
 
-[node name="WoodlandCabin" type="Node3D" parent="Geometry/Campground" unique_id=1287007396 instance=ExtResource("35_ed18j")]
+[node name="WoodlandCabin" type="Node3D" parent="Geometry/Campground" unique_id=600791828 instance=ExtResource("35_ed18j")]
 transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, 2, 0, -51)
 
-[node name="WoodlandCabin2" type="Node3D" parent="Geometry/Campground" unique_id=1542923272 instance=ExtResource("35_ed18j")]
+[node name="WoodlandCabin2" type="Node3D" parent="Geometry/Campground" unique_id=821045476 instance=ExtResource("35_ed18j")]
 transform = Transform3D(-0.99026805, 0, 0.13917318, 0, 1, 0, -0.13917318, 0, -0.99026805, -28, 0, 21)
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/Campground" unique_id=602520306]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/Campground" unique_id=375139382]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=505665292]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=719151691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.25, -30)
 shape = SubResource("CylinderShape3D_bx6ad")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=611562231]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=2140927878]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.26, -26.8)
 shape = SubResource("BoxShape3D_wn7yn")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=1660670055]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/Campground/WorldCollision" unique_id=628272114]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.26, -30)
 shape = SubResource("BoxShape3D_u2tcv")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/Campground" unique_id=2039067884]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/Campground" unique_id=1446361707]
 material_override = SubResource("StandardMaterial3D_hp2ap")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_iaanm")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/Campground" unique_id=1499319414]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/Campground" unique_id=772048788]
 transform = Transform3D(1.44, 0, 0, 0, 0.2, 0, 0, 0, 1.44, -4, 0.12, -30)
 material_override = SubResource("StandardMaterial3D_1iayf")
 cast_shadow = 0
 mesh = SubResource("CylinderMesh_b0aer")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/Campground" unique_id=1887079360]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/Campground" unique_id=937229923]
 material_override = SubResource("StandardMaterial3D_q5u6m")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_ny6na")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/Campground" unique_id=1149087271]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/Campground" unique_id=499214048]
 material_override = SubResource("StandardMaterial3D_8sv0l")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_vsdmb")
 
-[node name="LoggingYard" type="Node3D" parent="Geometry" unique_id=2038241354]
+[node name="LoggingYard" type="Node3D" parent="Geometry" unique_id=1665840799]
 
-[node name="LoggingShed" type="Node3D" parent="Geometry/LoggingYard" unique_id=425463875 instance=ExtResource("36_iqs5i")]
+[node name="LoggingShed" type="Node3D" parent="Geometry/LoggingYard" unique_id=2115313967 instance=ExtResource("36_iqs5i")]
 transform = Transform3D(0.95105654, 0, -0.309017, 0, 1, 0, 0.309017, 0, 0.95105654, 34, 0, 35)
 
-[node name="Lamp" type="OmniLight3D" parent="Geometry/LoggingYard" unique_id=280259571]
+[node name="Lamp" type="OmniLight3D" parent="Geometry/LoggingYard" unique_id=1278500214]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.5, 3, 33.5)
 light_color = Color(1, 0.72156864, 0.42352942, 1)
 light_energy = 2.2
@@ -2175,916 +2180,916 @@ distance_fade_begin = 28.0
 distance_fade_length = 12.0
 omni_range = 13.0
 
-[node name="Tractor" type="Node3D" parent="Geometry/LoggingYard" unique_id=302598260]
+[node name="Tractor" type="Node3D" parent="Geometry/LoggingYard" unique_id=942319783]
 transform = Transform3D(0.7431448, 0, -0.6691306, 0, 1, 0, 0.6691306, 0, 0.7431448, 45.5, 0, 31)
 
-[node name="Model" type="Node3D" parent="Geometry/LoggingYard/Tractor" unique_id=2043328785 instance=ExtResource("37_2qkin")]
+[node name="Model" type="Node3D" parent="Geometry/LoggingYard/Tractor" unique_id=1438197761 instance=ExtResource("37_2qkin")]
 transform = Transform3D(2.0894344, 0, 0, 0, 2.0894344, 0, 0, 0, 2.0894344, 0, 0, 0)
 script = ExtResource("13_y1mwg")
 tint = Color(0.7607843, 0.5254902, 0.34509805, 1)
 texture = ExtResource("14_84bjg")
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/LoggingYard" unique_id=1911430254]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/LoggingYard" unique_id=1885264540]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=1040593984]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=1332926467]
 transform = Transform3D(0.7431448, 0, -0.6691306, 0, 1, 0, 0.6691306, 0, 0.7431448, 45.5, 1.6736925, 31)
 shape = SubResource("BoxShape3D_3eott")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=1386785698]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=562219397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.5, 0.68, 38.5)
 shape = SubResource("BoxShape3D_jr4u3")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=1108451387]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/LoggingYard/WorldCollision" unique_id=590321622]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.5, 0.68, 23)
 shape = SubResource("BoxShape3D_jr4u3")
 
-[node name="FallenLog" type="Node3D" parent="Geometry/LoggingYard" unique_id=1383885625 instance=ExtResource("32_heeoc")]
+[node name="FallenLog" type="Node3D" parent="Geometry/LoggingYard" unique_id=855780735 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.8290376, 0, 0.5591929, 0, 1, 0, -0.5591929, 0, 0.8290376, 26, 0, 10)
 
-[node name="FallenLog2" type="Node3D" parent="Geometry/LoggingYard" unique_id=1367739836 instance=ExtResource("32_heeoc")]
+[node name="FallenLog2" type="Node3D" parent="Geometry/LoggingYard" unique_id=1291204729 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.95105654, 0, -0.309017, 0, 1, 0, 0.309017, 0, 0.95105654, 10, 0, 17)
 
-[node name="FallenLog3" type="Node3D" parent="Geometry/LoggingYard" unique_id=1902965451 instance=ExtResource("32_heeoc")]
+[node name="FallenLog3" type="Node3D" parent="Geometry/LoggingYard" unique_id=1532532948 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.25881907, 0, 0.9659258, 0, 1, 0, -0.9659258, 0, 0.25881907, 28, 0, -5)
 
-[node name="FallenLog4" type="Node3D" parent="Geometry/LoggingYard" unique_id=973245260 instance=ExtResource("32_heeoc")]
+[node name="FallenLog4" type="Node3D" parent="Geometry/LoggingYard" unique_id=837445200 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.9781476, 0, 0.2079117, 0, 1, 0, -0.2079117, 0, 0.9781476, 5, 0, -28)
 
-[node name="FallenLog5" type="Node3D" parent="Geometry/LoggingYard" unique_id=852157174 instance=ExtResource("32_heeoc")]
+[node name="FallenLog5" type="Node3D" parent="Geometry/LoggingYard" unique_id=1637349112 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.81915206, 0, -0.57357645, 0, 1, 0, 0.57357645, 0, 0.81915206, -22, 0, -26)
 
-[node name="FallenLog6" type="Node3D" parent="Geometry/LoggingYard" unique_id=924033705 instance=ExtResource("32_heeoc")]
+[node name="FallenLog6" type="Node3D" parent="Geometry/LoggingYard" unique_id=150917366 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.4694716, 0, 0.88294756, 0, 1, 0, -0.88294756, 0, 0.4694716, -36, 0, -14)
 
-[node name="FallenLog7" type="Node3D" parent="Geometry/LoggingYard" unique_id=612223030 instance=ExtResource("32_heeoc")]
+[node name="FallenLog7" type="Node3D" parent="Geometry/LoggingYard" unique_id=545727587 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.99026805, 0, -0.1391731, 0, 1, 0, 0.1391731, 0, 0.99026805, 14, 0, 47)
 
-[node name="FallenLog8" type="Node3D" parent="Geometry/LoggingYard" unique_id=870774249 instance=ExtResource("32_heeoc")]
+[node name="FallenLog8" type="Node3D" parent="Geometry/LoggingYard" unique_id=1650272561 instance=ExtResource("32_heeoc")]
 transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, -36, 0, 44)
 
-[node name="RockOutcrop" type="Node3D" parent="Geometry/LoggingYard" unique_id=448350374 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop" type="Node3D" parent="Geometry/LoggingYard" unique_id=1937100529 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.9659258, 0, 0.25881904, 0, 1, 0, -0.25881904, 0, 0.9659258, 12, 0, -4)
 
-[node name="RockOutcrop2" type="Node3D" parent="Geometry/LoggingYard" unique_id=566956153 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop2" type="Node3D" parent="Geometry/LoggingYard" unique_id=716747480 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.8660254, 0, -0.5, 0, 1, 0, 0.5, 0, 0.8660254, 32, 0, 18)
 
-[node name="RockOutcrop3" type="Node3D" parent="Geometry/LoggingYard" unique_id=11806777 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop3" type="Node3D" parent="Geometry/LoggingYard" unique_id=163121629 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.64278764, 0, 0.76604444, 0, 1, 0, -0.76604444, 0, 0.64278764, -18, 0, 16)
 
-[node name="RockOutcrop4" type="Node3D" parent="Geometry/LoggingYard" unique_id=752897535 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop4" type="Node3D" parent="Geometry/LoggingYard" unique_id=1326878067 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, -36, 0, -24)
 
-[node name="RockOutcrop5" type="Node3D" parent="Geometry/LoggingYard" unique_id=13185056 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop5" type="Node3D" parent="Geometry/LoggingYard" unique_id=239553941 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.30901697, 0, 0.95105654, 0, 1, 0, -0.95105654, 0, 0.30901697, 4, 0, -42)
 
-[node name="RockOutcrop6" type="Node3D" parent="Geometry/LoggingYard" unique_id=536490023 instance=ExtResource("6_um60w")]
+[node name="RockOutcrop6" type="Node3D" parent="Geometry/LoggingYard" unique_id=553416352 instance=ExtResource("6_um60w")]
 transform = Transform3D(0.57357645, 0, -0.81915206, 0, 1, 0, 0.81915206, 0, 0.57357645, 52, 0, 44)
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/LoggingYard" unique_id=423513628]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/LoggingYard" unique_id=1626244545]
 material_override = SubResource("StandardMaterial3D_8sv0l")
 mesh = SubResource("ArrayMesh_a87xh")
 
-[node name="ForestNW" type="Node3D" parent="Geometry" unique_id=377453330]
+[node name="ForestNW" type="Node3D" parent="Geometry" unique_id=1858408550]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNW" unique_id=478534484]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNW" unique_id=495914427]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=573800880]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=375497452]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.970726, 1.8, -57.90808)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1737676691]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1836865434]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.12813, 1.8, -53.325275)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1965530851]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=528291703]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.312122, 1.8, -28.107733)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=386755427]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1462806558]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38.212185, 1.8, -18.230812)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=882136673]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1083682480]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.836563, 1.8, -9.876354)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=2117846144]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=653645193]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.97769, 1.8, -60.421104)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1976111630]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1380619915]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.45939, 1.8, -55.711246)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=263572800]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=2000543824]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30.7589, 1.8, -28.558052)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=2046070510]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1280282898]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.177147, 1.8, -22.703796)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1709593637]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=743387057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31.704344, 1.8, -11.047064)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=332781279]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1079827955]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.175482, 1.8, -59.422443)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1130817623]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1840381016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.649511, 1.8, -25.520617)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1412957031]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=866485606]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.576927, 1.8, -16.70935)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=3745822]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=158841613]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26.246042, 1.8, -12.337084)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1636783440]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1240974947]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.73762, 1.8, -60.29289)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1787247149]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=362312863]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.252748, 1.8, -53.493538)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1257725123]
+[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=23471980]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.629532, 1.8, -24.91422)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=295969871]
+[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1415317975]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.764809, 1.8, -18.892288)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1853221120]
+[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1978058293]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.8308325, 1.8, -59.595566)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1430862664]
+[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1583358776]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.029227, 1.8, -54.01107)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull21" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1876846904]
+[node name="Hull21" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1973821668]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.142215, 1.8, -17.129179)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull22" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1989305105]
+[node name="Hull22" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=1653856935]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.915423, 1.8, -60.76039)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=683913684]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1782685480]
 material_override = SubResource("StandardMaterial3D_eslfg")
 mesh = SubResource("ArrayMesh_ss4mg")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=428388056]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=421195484]
 material_override = SubResource("StandardMaterial3D_rhxng")
 mesh = SubResource("ArrayMesh_y3jre")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1941297280]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1076935591]
 material_override = SubResource("StandardMaterial3D_v0okd")
 mesh = SubResource("ArrayMesh_icyfu")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=95249812]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=166764754]
 material_override = SubResource("StandardMaterial3D_un15m")
 mesh = SubResource("ArrayMesh_gyixw")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1821959175]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1292143571]
 material_override = SubResource("StandardMaterial3D_1rq4o")
 mesh = SubResource("ArrayMesh_t16tl")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1243718308]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestNW" unique_id=1067336315]
 material_override = SubResource("StandardMaterial3D_ks7qo")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_fi5gl")
 
-[node name="ForestNE" type="Node3D" parent="Geometry" unique_id=2042170995]
+[node name="ForestNE" type="Node3D" parent="Geometry" unique_id=1380273735]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNE" unique_id=1448693523]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNE" unique_id=1397718993]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1913446042]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=2081941027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1372046, 1.8, -24.425592)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1472138721]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=520130640]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6583955, 1.8, -18.975903)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1892515556]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=549867892]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.2955155, 1.8, -60.383026)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1121904425]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1674519122]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.6204324, 1.8, -22.682901)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=701376234]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1503541940]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1234684, 1.8, -3.8619487)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=9684667]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1756701022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.016756, 1.8, -58.463715)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1324115730]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=29579798]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.230376, 1.8, -47.05758)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1672093478]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1248858165]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.596152, 1.8, -42.367405)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1873441434]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=337520857]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.273155, 1.8, -60.271282)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1086715749]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1190471593]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.380352, 1.8, -1.6431725)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1212119383]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=840990954]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.740524, 1.8, -60.51981)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1646259960]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1150557354]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.9918, 1.8, -54.14373)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=688323905]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1750923499]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.186333, 1.8, -58.522884)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=218341843]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=679396767]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.24032, 1.8, -53.79633)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1614373762]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=1614252155]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.509773, 1.8, -60.459232)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=311184150]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=2052860026]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.627205, 1.8, -55.244522)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=878608423]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=459208244]
 material_override = SubResource("StandardMaterial3D_eslfg")
 mesh = SubResource("ArrayMesh_h6co1")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=510240477]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1132341307]
 material_override = SubResource("StandardMaterial3D_un15m")
 mesh = SubResource("ArrayMesh_arnbm")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=814337529]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1269838436]
 material_override = SubResource("StandardMaterial3D_v0okd")
 mesh = SubResource("ArrayMesh_r0eay")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1187602959]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=802749436]
 material_override = SubResource("StandardMaterial3D_rhxng")
 mesh = SubResource("ArrayMesh_317qt")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1890727770]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=106876116]
 material_override = SubResource("StandardMaterial3D_1rq4o")
 mesh = SubResource("ArrayMesh_h5o28")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1433084097]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestNE" unique_id=1668973002]
 material_override = SubResource("StandardMaterial3D_ks7qo")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_62mc2")
 
-[node name="ForestSW" type="Node3D" parent="Geometry" unique_id=1803900896]
+[node name="ForestSW" type="Node3D" parent="Geometry" unique_id=1185419383]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSW" unique_id=585841304]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSW" unique_id=263894229]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=536918936]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1965988386]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.649654, 1.8, 42.221344)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=121833021]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=130605863]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.725666, 1.8, 48.482597)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=514390218]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=456688211]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.13637, 1.8, 53.33422)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=2042032698]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=557277632]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.59057, 1.8, 58.724705)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1819288726]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1701159928]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.669344, 1.8, 43.80152)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=642220756]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=521523400]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.642849, 1.8, 48.752384)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1588960313]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=33820403]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29.815058, 1.8, 57.973343)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=365511814]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1561254086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25.7323, 1.8, 46.506165)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=764622928]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1389954574]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.858467, 1.8, 54.897316)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1389424933]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1086508216]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.92322, 1.8, 11.991526)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=220522062]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=911967709]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.838747, 1.8, 17.892601)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1437661081]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1217067051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.16612, 1.8, 22.334795)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1707622493]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1225939617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.059149, 1.8, 53.623432)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=475316598]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1316430920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.299152, 1.8, 60.660816)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=654764176]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1617835383]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.393175, 1.8, 55.78116)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=2054576947]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1513929442]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2647085, 1.8, 54.084465)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=952103495]
+[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=288856571]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.493704, 1.8, 59.63069)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=984808358]
+[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=961124636]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.0929041, 1.8, 4.946027)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1322126793]
+[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=819434407]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2517891, 1.8, 10.062212)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=291564647]
+[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1371181429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7017424, 1.8, 47.720177)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=136507347]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1448414512]
 material_override = SubResource("StandardMaterial3D_eslfg")
 mesh = SubResource("ArrayMesh_rohub")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=974183617]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1749311788]
 material_override = SubResource("StandardMaterial3D_un15m")
 mesh = SubResource("ArrayMesh_w450w")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=882958683]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1999701681]
 material_override = SubResource("StandardMaterial3D_v0okd")
 mesh = SubResource("ArrayMesh_mc7xx")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=2020432134]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1336350403]
 material_override = SubResource("StandardMaterial3D_rhxng")
 mesh = SubResource("ArrayMesh_s1pgy")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=970492481]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1507215603]
 material_override = SubResource("StandardMaterial3D_1rq4o")
 mesh = SubResource("ArrayMesh_k8c56")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=1669382378]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestSW" unique_id=526846764]
 material_override = SubResource("StandardMaterial3D_ks7qo")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_7st10")
 
-[node name="ForestSE" type="Node3D" parent="Geometry" unique_id=578633033]
+[node name="ForestSE" type="Node3D" parent="Geometry" unique_id=1796605579]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSE" unique_id=6130266]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSE" unique_id=471286640]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=585661471]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=544018046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1249001, 1.8, 18.53014)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=250731845]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=835367426]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8639257, 1.8, 22.807781)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=989894503]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1908934991]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8528626, 1.8, 59.209743)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=78312875]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1006019010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.488571, 1.8, 4.3377295)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=213360395]
+[node name="Hull5" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1430956277]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.410959, 1.8, 10.962965)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1712539104]
+[node name="Hull6" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=862530417]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.262883, 1.8, 19.137655)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1878470228]
+[node name="Hull7" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=2071007520]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.604932, 1.8, 43.364986)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=564703844]
+[node name="Hull8" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=482341326]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.7378635, 1.8, 48.83922)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=140074798]
+[node name="Hull9" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=849447587]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.295766, 1.8, 59.58741)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1163888856]
+[node name="Hull10" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1485544256]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.336406, 1.8, 43.251175)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=183695455]
+[node name="Hull11" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1522034533]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.490182, 1.8, 49.472275)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1625613109]
+[node name="Hull12" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=764377738]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.221068, 1.8, 55.511147)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=579116235]
+[node name="Hull13" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1725103298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.402179, 1.8, 61.20395)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1752180017]
+[node name="Hull14" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1942130984]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.070406, 1.8, 35.33082)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=993234483]
+[node name="Hull15" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1934287062]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.736399, 1.8, 43.007305)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1788049915]
+[node name="Hull16" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=422072393]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.946678, 1.8, 54.549496)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=486850855]
+[node name="Hull17" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1320714190]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.995926, 1.8, 59.726685)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=680330928]
+[node name="Hull18" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1655202824]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.440607, 1.8, 6.914489)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=979226058]
+[node name="Hull19" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1145402537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.169706, 1.8, 16.480831)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1051655356]
+[node name="Hull20" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1352532957]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.000395, 1.8, 48.460793)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull21" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1613768860]
+[node name="Hull21" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=680514156]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.521584, 1.8, 58.766407)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull22" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=998846690]
+[node name="Hull22" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=469270921]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.273779, 1.8, 4.71974)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull23" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1295611210]
+[node name="Hull23" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=563273386]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.578287, 1.8, 11.149729)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull24" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1659380232]
+[node name="Hull24" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1013142100]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.732122, 1.8, 54.815784)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull25" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=783159791]
+[node name="Hull25" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1132117552]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.166594, 1.8, 58.968884)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull26" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=454023173]
+[node name="Hull26" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=445733684]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.902157, 1.8, 5.708353)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull27" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=2128175652]
+[node name="Hull27" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=162585080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.51736, 1.8, 50.085117)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull28" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1602039330]
+[node name="Hull28" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1467537937]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.5671, 1.8, 55.297173)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull29" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=373248284]
+[node name="Hull29" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=540268701]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.57943, 1.8, 49.458687)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull30" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=972189735]
+[node name="Hull30" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1146094401]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.029366, 1.8, 55.61915)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull31" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1115509928]
+[node name="Hull31" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1805956566]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.597782, 1.8, 60.70178)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull32" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=603449767]
+[node name="Hull32" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1712200221]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.39775, 1.8, 47.35234)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull33" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=497480939]
+[node name="Hull33" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=80900062]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.66871, 1.8, 54.983704)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull34" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=805504040]
+[node name="Hull34" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1065591572]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.65338, 1.8, 60.4333)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull35" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=239653013]
+[node name="Hull35" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1254684890]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.056667, 1.8, 31.430855)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull36" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1788111082]
+[node name="Hull36" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=208649155]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53.54744, 1.8, 36.93461)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull37" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=943928718]
+[node name="Hull37" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1720263586]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53.339413, 1.8, 41.795944)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull38" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1501120216]
+[node name="Hull38" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1713835652]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.173336, 1.8, 46.917923)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Hull39" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1979613285]
+[node name="Hull39" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1137847577]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.472168, 1.8, 60.258564)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull40" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1191976645]
+[node name="Hull40" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1754254150]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 57.714256, 1.8, 26.22202)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull41" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=292450430]
+[node name="Hull41" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1871276836]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.38924, 1.8, 36.24786)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull42" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1311047803]
+[node name="Hull42" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=485139441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 59.223904, 1.8, 40.62647)
 shape = SubResource("CylinderShape3D_5afv7")
 
-[node name="Hull43" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=1354659355]
+[node name="Hull43" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=2078273058]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60.922264, 1.8, 51.78756)
 shape = SubResource("CylinderShape3D_qf5dr")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=544461818]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=154671244]
 material_override = SubResource("StandardMaterial3D_eslfg")
 mesh = SubResource("ArrayMesh_guxlc")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=1006585549]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=1758200456]
 material_override = SubResource("StandardMaterial3D_un15m")
 mesh = SubResource("ArrayMesh_k2im4")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=1690753815]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=848536358]
 material_override = SubResource("StandardMaterial3D_v0okd")
 mesh = SubResource("ArrayMesh_j1i7n")
 
-[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=764593496]
+[node name="Finish4" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=1901441936]
 material_override = SubResource("StandardMaterial3D_rhxng")
 mesh = SubResource("ArrayMesh_x5b7b")
 
-[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=408483162]
+[node name="Finish5" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=22242454]
 material_override = SubResource("StandardMaterial3D_1rq4o")
 mesh = SubResource("ArrayMesh_srbvq")
 
-[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=336624464]
+[node name="Finish6" type="MeshInstance3D" parent="Geometry/ForestSE" unique_id=1123432912]
 material_override = SubResource("StandardMaterial3D_ks7qo")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_06b3e")
 
-[node name="AutumnMaples" type="Node3D" parent="Geometry" unique_id=1311987340]
+[node name="AutumnMaples" type="Node3D" parent="Geometry" unique_id=2135668125]
 
-[node name="OctoberMaple" type="Node3D" parent="Geometry/AutumnMaples" unique_id=512049088 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple" type="Node3D" parent="Geometry/AutumnMaples" unique_id=834468695 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.4694716, 0, -0.88294756, 0, 1, 0, 0.88294756, 0, 0.4694716, 8, 0, -34)
 
-[node name="OctoberMaple2" type="Node3D" parent="Geometry/AutumnMaples" unique_id=702963135 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple2" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1781959818 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, 31, 0, -49)
 
-[node name="OctoberMaple3" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1693123102 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple3" type="Node3D" parent="Geometry/AutumnMaples" unique_id=607046342 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, 10, 0, -14)
 
-[node name="OctoberMaple4" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1205508403 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple4" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1622243301 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.5877853, 0, 0.809017, 0, 1, 0, -0.809017, 0, 0.5877853, -3, 0, 23)
 
-[node name="OctoberMaple5" type="Node3D" parent="Geometry/AutumnMaples" unique_id=904918662 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple5" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1678852760 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(-0.8480481, 0, 0.52991927, 0, 1, 0, -0.52991927, 0, -0.8480481, -22, 0, -34)
 
-[node name="OctoberMaple6" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1996661550 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple6" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1389796510 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(-0.40673658, 0, -0.9135455, 0, 1, 0, 0.9135455, 0, -0.40673658, -24, 0, 2)
 
-[node name="OctoberMaple7" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1112412341 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple7" type="Node3D" parent="Geometry/AutumnMaples" unique_id=28594744 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(-0.9271838, 0, -0.37460664, 0, 1, 0, 0.37460664, 0, -0.9271838, 26, 0, 24)
 
-[node name="OctoberMaple8" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1407224213 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple8" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1412904047 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.2756372, 0, -0.96126175, 0, 1, 0, 0.96126175, 0, 0.2756372, 50, 0, 12)
 
-[node name="OctoberMaple9" type="Node3D" parent="Geometry/AutumnMaples" unique_id=615897513 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple9" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1847262230 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(-0.82903755, 0, 0.55919296, 0, 1, 0, -0.55919296, 0, -0.82903755, -56, 0, 22)
 
-[node name="OctoberMaple10" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1708546872 instance=ExtResource("38_ib1xa")]
+[node name="OctoberMaple10" type="Node3D" parent="Geometry/AutumnMaples" unique_id=1298068225 instance=ExtResource("38_ib1xa")]
 transform = Transform3D(0.99026805, 0, 0.13917309, 0, 1, 0, -0.13917309, 0, 0.99026805, -56, 0, -24)
 
-[node name="FogPockets" type="Node3D" parent="Geometry" unique_id=154192014]
+[node name="FogPockets" type="Node3D" parent="Geometry" unique_id=361436919]
 
-[node name="MistLayers" type="MeshInstance3D" parent="Geometry/FogPockets" unique_id=1683014291]
+[node name="MistLayers" type="MeshInstance3D" parent="Geometry/FogPockets" unique_id=308729280]
 material_override = SubResource("ShaderMaterial_8rxju")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_fl32v")
 
-[node name="OutlyingWoodland" type="Node3D" parent="Geometry" unique_id=962050690]
+[node name="OutlyingWoodland" type="Node3D" parent="Geometry" unique_id=2136357755]
 
-[node name="BackgroundPinesDark" type="MultiMeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=222211885]
+[node name="BackgroundPinesDark" type="MultiMeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=226524983]
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_c24ev")
 
-[node name="BackgroundPinesSpruce" type="MultiMeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=408482199]
+[node name="BackgroundPinesSpruce" type="MultiMeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=266142304]
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_jvj7i")
 
-[node name="Finish" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=1396952374]
+[node name="Finish" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=1480817998]
 material_override = SubResource("StandardMaterial3D_0b1mb")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_5gqrt")
 
-[node name="Finish2" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=714135071]
+[node name="Finish2" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=67170179]
 material_override = SubResource("StandardMaterial3D_idnrt")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_j2oyn")
 
-[node name="Finish3" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=611461552]
+[node name="Finish3" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=1990493560]
 material_override = SubResource("StandardMaterial3D_j53dd")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_qequ0")
 
-[node name="Bounds" type="Node3D" parent="Geometry" unique_id=139457897]
+[node name="Bounds" type="Node3D" parent="Geometry" unique_id=1537104135]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/Bounds" unique_id=822964316]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/Bounds" unique_id=852990877]
 
-[node name="Hull" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1203656472]
+[node name="Hull" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=2034857848]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64, 8, 0)
 shape = SubResource("BoxShape3D_y0650")
 
-[node name="Hull2" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=740329066]
+[node name="Hull2" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1182534913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -64)
 shape = SubResource("BoxShape3D_4pgdj")
 
-[node name="Hull3" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1808816089]
+[node name="Hull3" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1463723372]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 8, 0)
 shape = SubResource("BoxShape3D_y0650")
 
-[node name="Hull4" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1132306355]
+[node name="Hull4" type="CollisionShape3D" parent="Geometry/Bounds/WorldCollision" unique_id=1632324794]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 64)
 shape = SubResource("BoxShape3D_4pgdj")
 
-[node name="PlayerSpawns" type="Node3D" parent="." unique_id=1596970527]
+[node name="PlayerSpawns" type="Node3D" parent="." unique_id=1096831633]
 
-[node name="PlayerSpawn" type="Marker3D" parent="PlayerSpawns" unique_id=1847851209 groups=["player_spawn"]]
+[node name="PlayerSpawn" type="Marker3D" parent="PlayerSpawns" unique_id=142113754 groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2, 0.08, 35)
 
-[node name="PlayerSpawn2" type="Marker3D" parent="PlayerSpawns" unique_id=1085667327 groups=["player_spawn"]]
+[node name="PlayerSpawn2" type="Marker3D" parent="PlayerSpawns" unique_id=290177288 groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.08, 35)
 
-[node name="PlayerSpawn3" type="Marker3D" parent="PlayerSpawns" unique_id=2005629554 groups=["player_spawn"]]
+[node name="PlayerSpawn3" type="Marker3D" parent="PlayerSpawns" unique_id=1402124838 groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2, 0.08, 37.4)
 
-[node name="PlayerSpawn4" type="Marker3D" parent="PlayerSpawns" unique_id=1494122631 groups=["player_spawn"]]
+[node name="PlayerSpawn4" type="Marker3D" parent="PlayerSpawns" unique_id=948771277 groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.08, 37.4)
 
-[node name="EnemySpawns" type="Node3D" parent="." unique_id=1500157518]
+[node name="EnemySpawns" type="Node3D" parent="." unique_id=1789179094]
 
-[node name="EnemySpawn" type="Marker3D" parent="EnemySpawns" unique_id=959173110 groups=["enemy_spawn"]]
+[node name="EnemySpawn" type="Marker3D" parent="EnemySpawns" unique_id=544223658 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.08, 52)
 
-[node name="EnemySpawn2" type="Marker3D" parent="EnemySpawns" unique_id=1002479852 groups=["enemy_spawn"]]
+[node name="EnemySpawn2" type="Marker3D" parent="EnemySpawns" unique_id=2053291219 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.08, 12)
 
-[node name="EnemySpawn3" type="Marker3D" parent="EnemySpawns" unique_id=2001828323 groups=["enemy_spawn"]]
+[node name="EnemySpawn3" type="Marker3D" parent="EnemySpawns" unique_id=218634068 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.08, -22)
 
-[node name="EnemySpawn4" type="Marker3D" parent="EnemySpawns" unique_id=756056628 groups=["enemy_spawn"]]
+[node name="EnemySpawn4" type="Marker3D" parent="EnemySpawns" unique_id=1924724927 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -59, 0.08, -58)
 
-[node name="EnemySpawn5" type="Marker3D" parent="EnemySpawns" unique_id=173473593 groups=["enemy_spawn"]]
+[node name="EnemySpawn5" type="Marker3D" parent="EnemySpawns" unique_id=1578434110 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0.08, -59)
 
-[node name="EnemySpawn6" type="Marker3D" parent="EnemySpawns" unique_id=1968580553 groups=["enemy_spawn"]]
+[node name="EnemySpawn6" type="Marker3D" parent="EnemySpawns" unique_id=693313317 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.08, -59)
 
-[node name="EnemySpawn7" type="Marker3D" parent="EnemySpawns" unique_id=572749386 groups=["enemy_spawn"]]
+[node name="EnemySpawn7" type="Marker3D" parent="EnemySpawns" unique_id=962308760 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.08, -59)
 
-[node name="EnemySpawn8" type="Marker3D" parent="EnemySpawns" unique_id=1278704324 groups=["enemy_spawn"]]
+[node name="EnemySpawn8" type="Marker3D" parent="EnemySpawns" unique_id=2097557559 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0.08, -58)
 
-[node name="EnemySpawn9" type="Marker3D" parent="EnemySpawns" unique_id=1239505 groups=["enemy_spawn"]]
+[node name="EnemySpawn9" type="Marker3D" parent="EnemySpawns" unique_id=1027040670 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56, 0.08, -34)
 
-[node name="EnemySpawn10" type="Marker3D" parent="EnemySpawns" unique_id=627130589 groups=["enemy_spawn"]]
+[node name="EnemySpawn10" type="Marker3D" parent="EnemySpawns" unique_id=1804869931 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.5, 0.08, 1)
 
-[node name="EnemySpawn11" type="Marker3D" parent="EnemySpawns" unique_id=1950853129 groups=["enemy_spawn"]]
+[node name="EnemySpawn11" type="Marker3D" parent="EnemySpawns" unique_id=1927629943 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 59, 0.08, 28)
 
-[node name="EnemySpawn12" type="Marker3D" parent="EnemySpawns" unique_id=314432848 groups=["enemy_spawn"]]
+[node name="EnemySpawn12" type="Marker3D" parent="EnemySpawns" unique_id=1304464752 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, 0.08, 54)
 
-[node name="EnemySpawn13" type="Marker3D" parent="EnemySpawns" unique_id=1257106007 groups=["enemy_spawn"]]
+[node name="EnemySpawn13" type="Marker3D" parent="EnemySpawns" unique_id=293496103 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0.08, 57)
 
-[node name="EnemySpawn14" type="Marker3D" parent="EnemySpawns" unique_id=1005861317 groups=["enemy_spawn"]]
+[node name="EnemySpawn14" type="Marker3D" parent="EnemySpawns" unique_id=1479682522 groups=["enemy_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0.08, 56)
 
-[node name="StormDrains" type="Node3D" parent="." unique_id=850391558]
+[node name="StormDrains" type="Node3D" parent="." unique_id=752674437]
 
-[node name="Grate" type="Marker3D" parent="StormDrains" unique_id=1303783515 groups=["drain_spawn"]]
+[node name="Grate" type="Marker3D" parent="StormDrains" unique_id=2134347928 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39, 0.06, -34)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate" unique_id=991933059]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate" unique_id=1231837959]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate" unique_id=1663052963]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate" unique_id=1311501220]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_2k8l3")
 
-[node name="Grate2" type="Marker3D" parent="StormDrains" unique_id=876766314 groups=["drain_spawn"]]
+[node name="Grate2" type="Marker3D" parent="StormDrains" unique_id=814632832 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39, 0.06, -2)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate2" unique_id=204241104]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate2" unique_id=2133023924]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate2" unique_id=2066962464]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate2" unique_id=1077789496]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_oss5g")
 
-[node name="Grate3" type="Marker3D" parent="StormDrains" unique_id=1507276561 groups=["drain_spawn"]]
+[node name="Grate3" type="Marker3D" parent="StormDrains" unique_id=1148627667 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39, 0.06, 30)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate3" unique_id=327383164]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate3" unique_id=830234826]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate3" unique_id=12197415]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate3" unique_id=994690999]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_k8h1q")
 
-[node name="Grate4" type="Marker3D" parent="StormDrains" unique_id=1606937720 groups=["drain_spawn"]]
+[node name="Grate4" type="Marker3D" parent="StormDrains" unique_id=40879441 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -2.76, -28)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate4" unique_id=1085781572]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate4" unique_id=54787223]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate4" unique_id=1514063879]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate4" unique_id=425342294]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_08gwt")
 
-[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=1131766744 groups=["drain_spawn"]]
+[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=1279398486 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.75, -2.76, 5.5)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=701771853]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=654825901]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=1493342996]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=1126682013]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_nry1g")
 
-[node name="Grate6" type="Marker3D" parent="StormDrains" unique_id=105997394 groups=["drain_spawn"]]
+[node name="Grate6" type="Marker3D" parent="StormDrains" unique_id=522097714 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0.06, -15.5)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate6" unique_id=876991794]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate6" unique_id=1132117182]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate6" unique_id=761860228]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate6" unique_id=1048537151]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_6djro")
 
-[node name="Grate7" type="Marker3D" parent="StormDrains" unique_id=1289302605 groups=["drain_spawn"]]
+[node name="Grate7" type="Marker3D" parent="StormDrains" unique_id=639142911 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.06, 28)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate7" unique_id=1146274421]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate7" unique_id=246227126]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate7" unique_id=1961800086]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate7" unique_id=1099681262]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_y4na2")
 
-[node name="Grate8" type="Marker3D" parent="StormDrains" unique_id=636414654 groups=["drain_spawn"]]
+[node name="Grate8" type="Marker3D" parent="StormDrains" unique_id=1449863918 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 0.06, 17.5)
 
-[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate8" unique_id=1291169633]
+[node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate8" unique_id=55837967]
 transform = Transform3D(1.5, 0, 0, 0, 0.035, 0, 0, 0, 0.85, 0, 0.01, 0)
 material_override = SubResource("StandardMaterial3D_p32ip")
 cast_shadow = 0
 mesh = SubResource("BoxMesh_28nf5")
 
-[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate8" unique_id=781279037]
+[node name="Finish2" type="MeshInstance3D" parent="StormDrains/Grate8" unique_id=1716498919]
 material_override = SubResource("StandardMaterial3D_lk40s")
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_i3nl4")
 
-[node name="CrateSpawns" type="Node3D" parent="." unique_id=1202632034]
+[node name="CrateSpawns" type="Node3D" parent="." unique_id=83172651]
 
-[node name="CrateSpawn" type="Marker3D" parent="CrateSpawns" unique_id=108641770 groups=["crate_spawn"]]
+[node name="CrateSpawn" type="Marker3D" parent="CrateSpawns" unique_id=669644251 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56, 0.08, 20)
 
-[node name="CrateSpawn2" type="Marker3D" parent="CrateSpawns" unique_id=1412926655 groups=["crate_spawn"]]
+[node name="CrateSpawn2" type="Marker3D" parent="CrateSpawns" unique_id=2041374768 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56, 0.08, -16)
 
-[node name="CrateSpawn3" type="Marker3D" parent="CrateSpawns" unique_id=1435782509 groups=["crate_spawn"]]
+[node name="CrateSpawn3" type="Marker3D" parent="CrateSpawns" unique_id=448729949 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.08, -26)
 
-[node name="CrateSpawn4" type="Marker3D" parent="CrateSpawns" unique_id=1874874612 groups=["crate_spawn"]]
+[node name="CrateSpawn4" type="Marker3D" parent="CrateSpawns" unique_id=1131225898 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.08, -24)
 
-[node name="CrateSpawn5" type="Marker3D" parent="CrateSpawns" unique_id=1786856568 groups=["crate_spawn"]]
+[node name="CrateSpawn5" type="Marker3D" parent="CrateSpawns" unique_id=644193853 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.08, -42)
 
-[node name="CrateSpawn6" type="Marker3D" parent="CrateSpawns" unique_id=1110570489 groups=["crate_spawn"]]
+[node name="CrateSpawn6" type="Marker3D" parent="CrateSpawns" unique_id=27330601 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.08, -22)
 
-[node name="CrateSpawn7" type="Marker3D" parent="CrateSpawns" unique_id=1960803278 groups=["crate_spawn"]]
+[node name="CrateSpawn7" type="Marker3D" parent="CrateSpawns" unique_id=435133253 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0.08, -34)
 
-[node name="CrateSpawn8" type="Marker3D" parent="CrateSpawns" unique_id=638411752 groups=["crate_spawn"]]
+[node name="CrateSpawn8" type="Marker3D" parent="CrateSpawns" unique_id=33354609 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0.08, -16)
 
-[node name="CrateSpawn9" type="Marker3D" parent="CrateSpawns" unique_id=384031373 groups=["crate_spawn"]]
+[node name="CrateSpawn9" type="Marker3D" parent="CrateSpawns" unique_id=1399592295 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34, 0.08, 12)
 
-[node name="CrateSpawn10" type="Marker3D" parent="CrateSpawns" unique_id=809057189 groups=["crate_spawn"]]
+[node name="CrateSpawn10" type="Marker3D" parent="CrateSpawns" unique_id=928732713 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0.08, 28)
 
-[node name="CrateSpawn11" type="Marker3D" parent="CrateSpawns" unique_id=803735545 groups=["crate_spawn"]]
+[node name="CrateSpawn11" type="Marker3D" parent="CrateSpawns" unique_id=725380587 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.08, 14)
 
-[node name="CrateSpawn12" type="Marker3D" parent="CrateSpawns" unique_id=726476968 groups=["crate_spawn"]]
+[node name="CrateSpawn12" type="Marker3D" parent="CrateSpawns" unique_id=1172618787 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.08, -2)
 
-[node name="DeconShowers" type="Node3D" parent="." unique_id=798164246]
+[node name="DeconShowers" type="Node3D" parent="." unique_id=893245351]
 
-[node name="RangerDecon" type="Marker3D" parent="DeconShowers" unique_id=1372461126 groups=["decon_shower"]]
+[node name="RangerDecon" type="Marker3D" parent="DeconShowers" unique_id=1938697033 groups=["decon_shower"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, 38.5)
 
-[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=640943060]
+[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=864762630]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
 radius = 0.08
 height = 2.6
 sides = 6
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Head" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=1405691126]
+[node name="Head" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=401871981]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 radius = 0.35
 height = 0.1
 sides = 10
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=1038794381]
+[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/RangerDecon" unique_id=336013646]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
 radius = 0.7
 height = 0.05
 sides = 12
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Label" type="Label3D" parent="DeconShowers/RangerDecon" unique_id=1823423345]
+[node name="Label" type="Label3D" parent="DeconShowers/RangerDecon" unique_id=1355714365]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.95, 0)
 pixel_size = 0.01
 billboard = 1
@@ -3092,31 +3097,31 @@ modulate = Color(0.2, 1, 0.9, 1)
 text = "DECON"
 font_size = 64
 
-[node name="CampgroundDecon" type="Marker3D" parent="DeconShowers" unique_id=1125449697 groups=["decon_shower"]]
+[node name="CampgroundDecon" type="Marker3D" parent="DeconShowers" unique_id=1464454611 groups=["decon_shower"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.5, 0, -35)
 
-[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=2089710697]
+[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=309024464]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
 radius = 0.08
 height = 2.6
 sides = 6
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Head" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=718927232]
+[node name="Head" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=1048173418]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 radius = 0.35
 height = 0.1
 sides = 10
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=827961784]
+[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/CampgroundDecon" unique_id=1603393429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
 radius = 0.7
 height = 0.05
 sides = 12
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Label" type="Label3D" parent="DeconShowers/CampgroundDecon" unique_id=713417722]
+[node name="Label" type="Label3D" parent="DeconShowers/CampgroundDecon" unique_id=1243867737]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.95, 0)
 pixel_size = 0.01
 billboard = 1
@@ -3124,31 +3129,31 @@ modulate = Color(0.2, 1, 0.9, 1)
 text = "DECON"
 font_size = 64
 
-[node name="ChapelDecon" type="Marker3D" parent="DeconShowers" unique_id=397453551 groups=["decon_shower"]]
+[node name="ChapelDecon" type="Marker3D" parent="DeconShowers" unique_id=2130334669 groups=["decon_shower"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.5, 0, -35.8)
 
-[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=1343535329]
+[node name="Pipe" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=1059086874]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
 radius = 0.08
 height = 2.6
 sides = 6
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Head" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=84547403]
+[node name="Head" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=847344238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 radius = 0.35
 height = 0.1
 sides = 10
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=394378766]
+[node name="Pad" type="CSGCylinder3D" parent="DeconShowers/ChapelDecon" unique_id=1358049721]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
 radius = 0.7
 height = 0.05
 sides = 12
 material = SubResource("StandardMaterial3D_vp0uf")
 
-[node name="Label" type="Label3D" parent="DeconShowers/ChapelDecon" unique_id=1431719429]
+[node name="Label" type="Label3D" parent="DeconShowers/ChapelDecon" unique_id=648446039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.95, 0)
 pixel_size = 0.01
 billboard = 1
@@ -3156,16 +3161,16 @@ modulate = Color(0.2, 1, 0.9, 1)
 text = "DECON"
 font_size = 64
 
-[node name="Puddles" type="Node3D" parent="." unique_id=1948108574]
+[node name="Puddles" type="Node3D" parent="." unique_id=1023443632]
 
-[node name="Pool" type="Area3D" parent="Puddles" unique_id=839261446]
+[node name="Pool" type="Area3D" parent="Puddles" unique_id=1781143333]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37, 0.04, 32)
 collision_layer = 16
 collision_mask = 0
 monitoring = false
 script = ExtResource("39_mld3y")
 
-[node name="Pool2" type="Area3D" parent="Puddles" unique_id=46763882]
+[node name="Pool2" type="Area3D" parent="Puddles" unique_id=53207368]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0.04, 33)
 collision_layer = 16
 collision_mask = 0
@@ -3173,7 +3178,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="Pool3" type="Area3D" parent="Puddles" unique_id=1726824703]
+[node name="Pool3" type="Area3D" parent="Puddles" unique_id=1640610599]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.04, 30)
 collision_layer = 16
 collision_mask = 0
@@ -3181,7 +3186,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.4
 
-[node name="Pool4" type="Area3D" parent="Puddles" unique_id=435552902]
+[node name="Pool4" type="Area3D" parent="Puddles" unique_id=517619845]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 0.04, 24)
 collision_layer = 16
 collision_mask = 0
@@ -3189,7 +3194,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.4
 
-[node name="Pool5" type="Area3D" parent="Puddles" unique_id=891172404]
+[node name="Pool5" type="Area3D" parent="Puddles" unique_id=470482817]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0.04, 16)
 collision_layer = 16
 collision_mask = 0
@@ -3197,7 +3202,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="Pool6" type="Area3D" parent="Puddles" unique_id=657518160]
+[node name="Pool6" type="Area3D" parent="Puddles" unique_id=1971620819]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0.04, 16)
 collision_layer = 16
 collision_mask = 0
@@ -3205,7 +3210,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="Pool7" type="Area3D" parent="Puddles" unique_id=1040298985]
+[node name="Pool7" type="Area3D" parent="Puddles" unique_id=623135148]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 0.04, -18)
 collision_layer = 16
 collision_mask = 0
@@ -3213,7 +3218,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.0
 
-[node name="Pool8" type="Area3D" parent="Puddles" unique_id=770660238]
+[node name="Pool8" type="Area3D" parent="Puddles" unique_id=938344721]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.04, -34)
 collision_layer = 16
 collision_mask = 0
@@ -3221,7 +3226,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="Pool9" type="Area3D" parent="Puddles" unique_id=815208580]
+[node name="Pool9" type="Area3D" parent="Puddles" unique_id=1177691769]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37, 0.04, -34)
 collision_layer = 16
 collision_mask = 0
@@ -3229,7 +3234,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.4
 
-[node name="Pool10" type="Area3D" parent="Puddles" unique_id=1386892877]
+[node name="Pool10" type="Area3D" parent="Puddles" unique_id=2046842298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56.5, 0.04, -14)
 collision_layer = 16
 collision_mask = 0
@@ -3237,7 +3242,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.0
 
-[node name="Pool11" type="Area3D" parent="Puddles" unique_id=220545022]
+[node name="Pool11" type="Area3D" parent="Puddles" unique_id=1312859435]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56.5, 0.04, 14)
 collision_layer = 16
 collision_mask = 0
@@ -3245,7 +3250,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.0
 
-[node name="Pool12" type="Area3D" parent="Puddles" unique_id=1836617895]
+[node name="Pool12" type="Area3D" parent="Puddles" unique_id=1199668389]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28, 0.04, -3)
 collision_layer = 16
 collision_mask = 0
@@ -3253,7 +3258,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="Pool13" type="Area3D" parent="Puddles" unique_id=575022753]
+[node name="Pool13" type="Area3D" parent="Puddles" unique_id=1201992880]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.04, -20)
 collision_layer = 16
 collision_mask = 0
@@ -3261,7 +3266,7 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.6
 
-[node name="Pool14" type="Area3D" parent="Puddles" unique_id=1110296630]
+[node name="Pool14" type="Area3D" parent="Puddles" unique_id=1180885704]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39, 0.04, -28)
 collision_layer = 16
 collision_mask = 0
@@ -3269,14 +3274,14 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.8
 
-[node name="Pool15" type="Area3D" parent="Puddles" unique_id=683198391]
+[node name="Pool15" type="Area3D" parent="Puddles" unique_id=443810077]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, 0.04, -36)
 collision_layer = 16
 collision_mask = 0
 monitoring = false
 script = ExtResource("39_mld3y")
 
-[node name="Pool16" type="Area3D" parent="Puddles" unique_id=759422177]
+[node name="Pool16" type="Area3D" parent="Puddles" unique_id=202160299]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0.04, 8)
 collision_layer = 16
 collision_mask = 0
@@ -3284,33 +3289,35 @@ monitoring = false
 script = ExtResource("39_mld3y")
 max_radius = 2.2
 
-[node name="CrateStations" type="Node3D" parent="." unique_id=1380105853]
+[node name="StreetSupplySpawns" type="Node3D" parent="." unique_id=146206679]
 
-[node name="ChapelSteps" type="Marker3D" parent="CrateStations" unique_id=1352159921 groups=["crate_station"]]
+[node name="CrateStations" type="Node3D" parent="." unique_id=808369556]
+
+[node name="ChapelSteps" type="Marker3D" parent="CrateStations" unique_id=1096597712 groups=["crate_station"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0.08, -33.2)
 
-[node name="RangerStation" type="Marker3D" parent="CrateStations" unique_id=1584189802 groups=["crate_station"]]
+[node name="RangerStation" type="Marker3D" parent="CrateStations" unique_id=460481708 groups=["crate_station"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.08, 37.8)
 
-[node name="Campground" type="Marker3D" parent="CrateStations" unique_id=706886610 groups=["crate_station"]]
+[node name="Campground" type="Marker3D" parent="CrateStations" unique_id=1038336525 groups=["crate_station"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.08, -37)
 
-[node name="StreetSupplySpawns" type="Node3D" parent="." unique_id=815865844]
+[node name="StreetSupplySpawns2" type="Node3D" parent="." unique_id=843320688]
 
-[node name="TrailheadJunction" type="Marker3D" parent="StreetSupplySpawns" unique_id=353741609 groups=["street_supply_spawn"]]
+[node name="TrailheadJunction" type="Marker3D" parent="StreetSupplySpawns2" unique_id=1710104581 groups=["street_supply_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.08, 31.5)
 
-[node name="TowerClearing" type="Marker3D" parent="StreetSupplySpawns" unique_id=1093353299 groups=["street_supply_spawn"]]
+[node name="TowerClearing" type="Marker3D" parent="StreetSupplySpawns2" unique_id=1561751556 groups=["street_supply_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.08, -4)
 
-[node name="ChapelLot" type="Marker3D" parent="StreetSupplySpawns" unique_id=374902696 groups=["street_supply_spawn"]]
+[node name="ChapelLot" type="Marker3D" parent="StreetSupplySpawns2" unique_id=589802446 groups=["street_supply_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.08, -24)
 
-[node name="CampgroundEdge" type="Marker3D" parent="StreetSupplySpawns" unique_id=515832891 groups=["street_supply_spawn"]]
+[node name="CampgroundEdge" type="Marker3D" parent="StreetSupplySpawns2" unique_id=16089840 groups=["street_supply_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0.08, -30)
 
-[node name="BossAnchor" type="Marker3D" parent="." unique_id=1014216825 groups=["boss_anchor"]]
+[node name="BossAnchor" type="Marker3D" parent="." unique_id=1688692322 groups=["boss_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 18, -26)
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=560681903]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1676258290]
 navigation_mesh = SubResource("NavigationMesh_g3l4q")

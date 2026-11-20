@@ -226,6 +226,9 @@ func _convert(material: Material) -> ShaderMaterial:
 	s.set_shader_parameter("uv_scale", m.uv1_scale)
 	s.set_shader_parameter("uv_offset", m.uv1_offset)
 	s.set_shader_parameter("snap", vertex_snap if enabled else 0.0)
+	if m.has_meta(WeatherFX.WIND_FOLIAGE):
+		s.set_meta(WeatherFX.WIND_FOLIAGE, true)
+		s.set_shader_parameter("foliage", float(m.get_meta(WeatherFX.WIND_FOLIAGE)))
 	if WeatherFX.is_wet_surface(m):
 		s.set_meta(WeatherFX.WET_SURFACE, true)
 		s.set_shader_parameter("dry_roughness", m.roughness)
