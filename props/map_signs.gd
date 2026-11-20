@@ -1,8 +1,7 @@
 extends Node
-## Convert fixed map labels into extruded, lit sign lettering and 3D destination pictograms.
+## Convert fixed map labels into modelled neon tube signs (NeonLettering) and 3D pictograms.
 ## Simplifies repeated town-name text while preserving approach-angle readability.
 
-const FONT := preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
 
 const RENAME := {
 	"GasSign": "GAS",
@@ -52,17 +51,20 @@ func _ready() -> void:
 
 
 func _build_text_sign(label: Label3D, text: String, double_sided: bool, add_board: bool) -> void:
-	var lettering := _make_text_mesh(text, label.font_size, label.pixel_size, label.modulate, 0.07)
-	var aabb := lettering.mesh.get_aabb()
+	# Cap height that matches the old Label3D's on-screen size.
+	var height := label.font_size * label.pixel_size * 0.62
+	var painted := label.name == "PinecrestSign"
+	var lettering := NeonLettering.build(text, height, label.modulate, not painted, not add_board)
 	if add_board:
+		var aabb: AABB = (lettering.get_meta("tubes") as MeshInstance3D).mesh.get_aabb()
 		var board := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = Vector3(aabb.size.x + 0.42, aabb.size.y + 0.24, 0.08)
+		box.size = Vector3(aabb.size.x + 0.42, aabb.size.y + 0.34, 0.08)
 		board.mesh = box
 		board.position = Vector3(aabb.get_center().x, aabb.get_center().y, -0.07)
 		board.material_override = _solid_mat(Color("#121a20"), 0.85)
 		label.add_child(board)
-		# Crisp rim frame so the sign reads cleanly at oblique angles.
+		# Thin colored rim, like a backlit sign box.
 		var frame := MeshInstance3D.new()
 		var frame_box := BoxMesh.new()
 		frame_box.size = Vector3(box.size.x + 0.08, box.size.y + 0.08, 0.05)
@@ -71,7 +73,7 @@ func _build_text_sign(label: Label3D, text: String, double_sided: bool, add_boar
 		frame.material_override = _solid_mat(label.modulate.darkened(0.45), 0.7)
 		label.add_child(frame)
 	if double_sided:
-		var back := _make_text_mesh(text, label.font_size, label.pixel_size, label.modulate, 0.07)
+		var back := NeonLettering.build(text, height, label.modulate, not painted, false)
 		back.rotation.y = PI
 		back.position = Vector3(0.0, 0.0, -0.14)
 		lettering.add_child(back)
@@ -160,11 +162,11 @@ func _build_quarantine_sign(label: Label3D) -> void:
 		var dot := _make_box(Vector3(0.06, 0.05, 0.05), Color("#15181b"))
 		dot.position = Vector3(-1.15 * side, -0.1, z + side * 0.008)
 		label.add_child(dot)
-	var front := _make_text_mesh("QUARANTINE", 56, 0.009, Color("#f5d142"), 0.05)
+	var front := NeonLettering.build("QUARANTINE", 0.36, Color("#f5d142"), true, false)
 	front.position = Vector3(0.22, 0.0, 0.055)
-	var back := _make_text_mesh("QUARANTINE", 56, 0.009, Color("#f5d142"), 0.05)
+	var back := NeonLettering.build("QUARANTINE", 0.36, Color("#f5d142"), true, false)
 	back.rotation.y = PI
-	back.position = Vector3(-0.44, 0.0, -0.11)
+	back.position = Vector3(0.44, 0.0, -0.11)
 	front.add_child(back)
 	label.add_child(front)
 	label.set_meta("lettering", front)
@@ -183,24 +185,6 @@ func _build_fountain_emblem(label: Label3D) -> void:
 	crest.position = Vector3(0.0, 0.02, 0.045)
 	crest.material_override = _solid_mat(Color("#b5985e"), 0.5)
 	label.add_child(crest)
-
-
-func _make_text_mesh(text: String, font_size: int, pixel_size: float, color: Color, depth: float) -> MeshInstance3D:
-	var lettering := MeshInstance3D.new()
-	var mesh := TextMesh.new()
-	mesh.font = FONT
-	mesh.text = text
-	mesh.font_size = font_size
-	mesh.pixel_size = pixel_size
-	mesh.depth = depth
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = 0.85
-	mesh.material = material
-	lettering.mesh = mesh
-	return lettering
 
 
 func _make_box(size: Vector3, color: Color, emissive := false) -> MeshInstance3D:

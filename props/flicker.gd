@@ -42,5 +42,5 @@ func _process(delta: float) -> void:
 	elif target is Label3D:
 		target.modulate.a = _base_alpha * level
 		if target.has_meta("lettering"):
-			var mesh: MeshInstance3D = target.get_meta("lettering")
+			var mesh: Node3D = target.get_meta("lettering")
 			mesh.visible = level > 0.3
