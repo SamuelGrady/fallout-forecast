@@ -52,13 +52,14 @@ func _process(delta: float) -> void:
 		_rain.global_position = Vector3(p.x, p.y + spawn_height, p.z)
 		_collision.global_position = Vector3(p.x, p.y, p.z)
 
-	_rain.amount_ratio = intensity
+	var flare_cover := camera and preload("res://weapons/projectile.gd").protects(camera.global_position, get_tree())
+	_rain.amount_ratio = intensity * (0.25 if flare_cover else 1.0)
 	_rain.emitting = intensity > 0.01
 	_rain_material.albedo_color = rain_color.lerp(acid_color, acid)
 
 	if _environment:
 		_environment.fog_enabled = intensity > 0.01
-		_environment.fog_density = _sample_fog(intensity)
+		_environment.fog_density = _sample_fog(intensity) * (0.65 if flare_cover else 1.0)
 		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
 		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) + flash * 3.0
 		_environment.fog_density *= 1.0 - flash * 0.6

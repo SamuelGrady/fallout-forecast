@@ -33,6 +33,8 @@ var _aim := 0.0
 var _equip_left := 0.0
 var _fire_buffer := 0.0
 var _recoil := 0.0
+var _camera_kick := 0.0
+var _heat := 0.0
 var _hip_fov := 75.0
 var _model: Node3D
 var player: Node3D
@@ -54,6 +56,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_cooldown -= delta
 	_fire_buffer = maxf(0.0, _fire_buffer - delta)
+	_heat = move_toward(_heat, 0.0, delta * 1.6)
+	_camera_kick = move_toward(_camera_kick, 0.0, delta * deg_to_rad(8.0))
+	if player and player.is_multiplayer_authority():
+		camera.rotation.x = _camera_kick
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
 	if _reload_left > 0.0:
@@ -68,6 +74,8 @@ func _process(delta: float) -> void:
 
 func _handle_input() -> void:
 	if loadout.is_empty() or player.get("state") != "ok":
+		_fire_buffer = 0.0
+		_reload_left = 0.0
 		return
 	if not GameManager.has_method("is_voting") or not GameManager.is_voting():
 		for i in range(mini(loadout.size(), 5)):
@@ -80,6 +88,7 @@ func _handle_input() -> void:
 	if Input.is_action_just_pressed("reload"):
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
+		_fire_buffer = 0.0
 		return
 	if player.get("tarp_raised"):
 		return
@@ -87,6 +96,8 @@ func _handle_input() -> void:
 	if Input.is_action_just_pressed("fire"):
 		_fire_buffer = 0.15
 	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
+	if wants and data.shell_reload and ammo[current] > 0:
+		_reload_left = 0.0
 	if wants and _cooldown <= 0.0 and _reload_left <= 0.0:
 		if ammo[current] > 0:
 			fire()
@@ -96,6 +107,10 @@ func _handle_input() -> void:
 
 func fire() -> void:
 	var data := loadout[current]
+	if data.shell_reload and ammo[current] > 0:
+		_reload_left = 0.0
+	if ammo[current] <= 0 or _cooldown > 0.0 or _reload_left > 0.0:
+		return
 	_fire_buffer = 0.0
 	ammo[current] -= 1
 	_cooldown = data.fire_interval
@@ -116,24 +131,31 @@ func fire() -> void:
 		_broadcast_fx(current, origin, dir, shot_seed, player.get_multiplayer_authority())
 	else:
 		_request_shot.rpc_id(1, current, origin, dir, shot_seed)
+	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, 0.65, _aim), deg_to_rad(5.0))
+	_heat = minf(1.0, _heat + 0.22)
 	fired.emit(data)
 	if ammo[current] == 0 and reserve[current] > 0:
-		get_tree().create_timer(data.fire_interval).timeout.connect(start_reload)
+		get_tree().create_timer(data.fire_interval).timeout.connect(func():
+			if is_instance_valid(player) and player.get("state") == "ok" and loadout[current] == data and ammo[current] == 0:
+				start_reload())
 
 
 func start_reload() -> void:
 	var data := loadout[current]
 	if _reload_left > 0.0 or ammo[current] >= data.mag_size or reserve[current] <= 0:
 		return
-	Sound.play("reload")
+	Sound.play("reel_tick" if data.shell_reload else "reload", -12.0 if data.shell_reload else -10.0)
 	_reload_left = data.reload_time
 
 
 func _finish_reload() -> void:
 	var data := loadout[current]
-	var take := mini(data.mag_size - ammo[current], reserve[current])
+	var missing := 1 if data.shell_reload else data.mag_size - ammo[current]
+	var take := mini(missing, reserve[current])
 	ammo[current] += take
 	reserve[current] -= take
+	if data.shell_reload and ammo[current] < data.mag_size and reserve[current] > 0:
+		start_reload()
 
 
 # ------------------------------------------------------------------ network
@@ -238,7 +260,7 @@ func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: i
 	if side.length_squared() < 0.01:
 		side = Vector3.RIGHT
 	var up := side.cross(dir).normalized()
-	var spread := deg_to_rad(data.spread_degrees * lerpf(1.0, 0.45, _aim))
+	var spread := deg_to_rad((data.spread_degrees + data.burst_spread * _heat) * lerpf(1.0, 0.45, _aim))
 	for i in data.pellets:
 		var angle := rng.randf() * TAU
 		var radius := sqrt(rng.randf()) * spread
@@ -310,6 +332,8 @@ func _equip(index: int) -> void:
 	if index < 0 or index >= loadout.size():
 		return
 	_equip_left = 1.0
+	_heat = 0.0
+	_fire_buffer = 0.0
 	current = index
 	_reload_left = 0.0
 	_cooldown = maxf(_cooldown, 0.25)

@@ -31,6 +31,7 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 	global_position = from
 	velocity = direction * weapon.projectile_speed
 	if weapon.kind == WeaponData.Kind.GRENADE:
+		add_to_group("enemy_lures")
 		velocity += Vector3.UP * 3.0
 	if from_shooter is CollisionObject3D:
 		_exclude.append(from_shooter.get_rid())
@@ -65,6 +66,8 @@ func _flare_process(delta: float) -> void:
 		var hit := _step(delta)
 		if not hit.is_empty():
 			_stuck = true
+			add_to_group("active_flares")
+			_build_flare_ring()
 			global_position = hit.position + hit.normal * 0.1
 			_light.light_energy = 4.0
 			_light.omni_range = data.effect_radius * 1.6
@@ -78,6 +81,8 @@ func _flare_process(delta: float) -> void:
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.global_position.distance_to(global_position) <= data.effect_radius:
 				enemy.reveal(1.0)
+				if authoritative:
+					enemy.weaken(0.7)
 		for boss in get_tree().get_nodes_in_group("boss"):
 			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0:
 				boss.burn(1.0)
@@ -90,6 +95,8 @@ func _bomb_process(delta: float) -> void:
 	if not hit.is_empty():
 		global_position = hit.position + hit.normal * 0.1
 		velocity = velocity.bounce(hit.normal) * 0.4
+	if data.kind == WeaponData.Kind.GRENADE:
+		rotation.y += delta * 4.0
 	if _age >= data.effect_time:
 		_explode()
 
@@ -107,6 +114,8 @@ func _step(delta: float) -> Dictionary:
 func _explode() -> void:
 	Sound.play_at("explosion", global_position)
 	_done = true
+	if is_in_group("enemy_lures"):
+		remove_from_group("enemy_lures")
 	var center := global_position
 	if authoritative:
 		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
@@ -133,3 +142,28 @@ func _explode() -> void:
 	ShotFX.puff(parent, center, Color(0.7, 0.95, 0.3, 0.6), data.effect_radius * 0.4, 0.7)
 	ShotFX.flash(parent, center + Vector3.UP, Color(0.8, 1.0, 0.4), 8.0, 0.12)
 	queue_free()
+
+
+func _build_flare_ring() -> void:
+	var ring := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = data.effect_radius - 0.1
+	mesh.outer_radius = data.effect_radius
+	ring.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(1.0, 0.45, 0.2, 0.45)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ring.material_override = material
+	add_child(ring)
+	ring.position.y = 0.08
+
+
+static func protects(point: Vector3, tree: SceneTree) -> bool:
+	for flare in tree.get_nodes_in_group("active_flares"):
+		if flare.is_queued_for_deletion() or flare.global_position.distance_to(point) > flare.data.effect_radius:
+			continue
+		var query := PhysicsRayQueryParameters3D.create(flare.global_position + Vector3.UP * 0.2, point, 1)
+		if flare.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			return true
+	return false

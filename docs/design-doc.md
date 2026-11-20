@@ -400,7 +400,7 @@ Infected grow into view on spawn, breathe and sway while idle, swing limbs with 
 
 Full-size enemies drop a small animated ammo pack on death, capped at 32 packs and expiring after 35 seconds. Within 1.8 m and clear line of sight, packs refill 40% of each carried gun's magazine into reserve up to its normal reserve cap. Small Splitter copies drop no ammo.
 
-Semi-auto shots have a 0.15-second input buffer. Recoil stacks and settles between shots. White hit markers confirm hits, pink confirms kills and gold stars confirm headshots. Hitscan headshots deal double damage using each infected type's head-height region. Gutter collision height matches its taller remodeled silhouette. Floating damage numbers show damage applied, capped at remaining health, with gold enlarged headshot numbers and a distinct headshot cue.
+Semi-auto shots have a 0.15-second input buffer. Recoil stacks and settles between shots. White hit markers confirm hits, pink confirms kills and gold X markers confirm headshots. Hitscan headshots deal double damage using each infected type's head-height region. Gutter collision height matches its taller remodeled silhouette. Floating damage numbers show damage applied, capped at remaining health, with gold enlarged headshot numbers and a distinct headshot cue.
 
 Further gunplay ideas for consideration
 - Perfect reload. A timed second reload press grants a small temporary handling bonus.
@@ -411,3 +411,18 @@ Further gunplay ideas for consideration
 - Ricochet revolver. Marked street signs bounce a shot toward a nearby enemy.
 
 VHS readability uses two composites. The world keeps the coarse pixel grid and tracking effects. HUD, cards, title text, REC and timestamp receive a native-resolution pass with subtle scanlines and subpixel color bleed. Tracking displacement and snow affect the world. Each screen duplicates its shader material to keep title settings local.
+
+
+### Combat loop and weapon roles - November 19, 2026
+
+- [x] Shotgun crowd control and interruptible shell reloads. The pump loads one shell every 0.48 seconds, can fire between shells, and pierces one additional enemy. Close hits stagger and push enemies, including interrupting a Gutter pounce.
+- [x] Rifle burst handling and recoverable aiming recoil. Opening rifle spread is 0.65 degrees, sustained fire adds up to 3.2 degrees, and spread recovers between bursts. Each gun applies a small upward camera kick that settles, reduced during ADS.
+- [x] Flare fighting zones. Stuck flares mark a radius, weaken infected speed and attacks by 35%, reduce exposed suit drain by 75%, and thin local rain and fog. Coverage checks line of sight and ends with the flare. Leaky weapons retain their cursed drain.
+- [x] Bug Bomb crowd setup. Bombs bounce and attract nearby infected for their 2.8-second fuse, then explode with damage, knockback and puddle clearing.
+- [x] Reactive infected. Leg hits slow movement for 1.8 seconds, head hits recoil the head, and knockback cancels attack windups. Drips and Misters anticipate attacks for 0.45 seconds and recover for 0.5 seconds. Melee checks range, facing and walls at impact. Gutters retain their directional pounce and recovery.
+- [x] Finite hordes and breathing room. Solo starts with 26 infected and adds eight per wave, modified by the existing player-count and Swarm scaling. Drizzle introduces 35% of the wave, then Downpour introduces the rest. Groups of five to nine arrive at half-second intervals, with eight-second Drizzle breaks and six-second Downpour breaks. The active cap is 30 in solo, bounded at 60 after scaling, and at most three specials are maintained by the director.
+- [x] Decisive wave endings. Downpour lasts at least 40-50 seconds and then waits for all budgeted enemies and surviving infected to be cleared. Last-five enemies are highlighted. HUD shows remaining enemies and resupply windows. Clearing has a completion banner and sound. The final Cumulus encounter retains its boss hold and win condition.
+- [x] Shelter and exposed rewards. Existing roof protection and navigation funnel pursuers toward shelter entrances. Four marked supply caches on Main Street, the parking lot and park restore partial ammo, health and suit, refreshing each wave. Existing walkable geometry provides open escape routes around these fighting areas.
+- [x] Aggressive recovery. Ammo drops remain automatic within 1.8 m and clear line of sight. Full-size Gutters and Misters also have a 40% chance of dropping a small health or suit pickup. Health restores 20 and suit restores 25, capped at their maximums. Full players leave unnecessary pickups in place.
+
+Verification covered the normal Title-to-Play entry, one-shell ammo accounting and interruption, rifle spread recovery, stagger and pounce cancellation, leg shots, bomb attraction, flare protection and expiry, pickup caps, wave cleanup gating and navigation paths through three combat areas. A scripted five-wave simulation reached the win condition with 291 kills and a peak of 18 active infected. Combat and flare effects were also rendered in Godot. These are starting balance values for hands-on playtesting.

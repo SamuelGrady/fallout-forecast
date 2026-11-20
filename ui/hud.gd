@@ -25,6 +25,7 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 
 var _cards := {}
 var _time := 0.0
+var _combat_status := Label.new()
 var _hit_marker := Label.new()
 var _hit_time := 0.0
 var _last_health := -1.0
@@ -48,6 +49,13 @@ var _boss_bar := ProgressBar.new()
 
 
 func _ready() -> void:
+	_combat_status.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_combat_status.offset_left = -280
+	_combat_status.offset_right = 280
+	_combat_status.offset_top = 88
+	_combat_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_style(_combat_status, 18, BroadcastUI.CYAN)
+	add_child(_combat_status)
 	_hit_marker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_hit_marker.offset_left = -30
 	_hit_marker.offset_right = 30
@@ -59,7 +67,7 @@ func _ready() -> void:
 	add_child(_hit_marker)
 	GameManager.combat_hit.connect(func(killed: bool, critical: bool):
 		_hit_time = .28 if killed else .12
-		_hit_marker.text = "?" if critical else "?"
+		_hit_marker.text = "X" if critical else "?"
 		_hit_marker.modulate = Color("#ffcc66") if critical else (Color("#ff5689") if killed else Color.WHITE))
 	_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -136,21 +144,21 @@ func _ready() -> void:
 	GameManager.banner.connect(_show_banner)
 	_mutation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_mutation.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_mutation.offset_top = 100
+	_mutation.offset_top = 114
 	_mutation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_style(_mutation, 16, Color("FF3EA5"))
 	add_child(_mutation)
 	_boss_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_boss_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_boss_label.offset_top = 128
+	_boss_label.offset_top = 140
 	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_style(_boss_label, 18, Color("8FD65A"))
 	add_child(_boss_label)
 	_boss_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_boss_bar.offset_left = -260
 	_boss_bar.offset_right = 260
-	_boss_bar.offset_top = 156
-	_boss_bar.offset_bottom = 170
+	_boss_bar.offset_top = 168
+	_boss_bar.offset_bottom = 182
 	_boss_bar.show_percentage = false
 	_boss_bar.max_value = 1.0
 	var fill := StyleBoxFlat.new(); fill.bg_color = Color("8FD65A")
@@ -204,6 +212,8 @@ func _process(delta: float) -> void:
 
 
 func _update_storm() -> void:
+	var spawner := get_parent().get_node_or_null("Enemies")
+	_combat_status.text = spawner.combat_status() if spawner else ""
 	storm_label.text = WeatherManager.storm_name().to_upper()
 	storm_label.modulate = STORM_COLORS[WeatherManager.storm_state]
 	var seconds := ceili(WeatherManager.phase_time_left)
@@ -261,6 +271,7 @@ func _update_vitals(player: Node) -> void:
 	$BottomLeft/SuitText.text = "SUIT INTEGRITY   %03d" % int(suit_bar.value)
 	$BottomLeft/HealthText.text = "VITAL SIGNS   %03d" % int(health_bar.value)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
+	exposed_label.text = "FLARE COVER" if preload("res://weapons/projectile.gd").protects(player.global_position + Vector3.UP, get_tree()) else "EXPOSED"
 	exposed_label.visible = exposed_in_rain
 	if exposed_in_rain:
 		exposed_label.modulate.a = 0.55 + 0.45 * sin(_time * 8.0)

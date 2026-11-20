@@ -297,6 +297,8 @@ func _host_tick(delta: float) -> void:
 	match state:
 		"ok":
 			var drain := WeatherManager.suit_loss_per_second() if exposed else 0.0
+			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
+				drain *= 0.25
 			if holding_leaky:
 				drain = maxf(drain, leaky_drain)
 			if drain > 0.0:

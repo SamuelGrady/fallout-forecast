@@ -6,6 +6,9 @@ var _hurt := 0.0
 var _attack := 0.0
 var _body: Node3D
 var _enemy: EnemyBase
+var _head := Node3D.new()
+var _head_kick := 0.0
+var _anticipation := 0.0
 
 func _ready() -> void:
 	_enemy = get_parent() as EnemyBase
@@ -17,10 +20,12 @@ func _ready() -> void:
 	_body = Node3D.new()
 	add_child(_body)
 	_piece(_body, Vector3(0, 1.05, 0), Vector3(.62, .7, .35), coat)
-	_piece(_body, Vector3(0, 1.63, -.04), Vector3(.43, .45, .4), skin)
-	_piece(_body, Vector3(0, 1.88, .02), Vector3(.5, .12, .46), coat.darkened(.5))
+	_body.add_child(_head)
+	_head.position.y = 1.63
+	_piece(_head, Vector3(0, 0, -.04), Vector3(.43, .45, .4), skin)
+	_piece(_head, Vector3(0, .25, .02), Vector3(.5, .12, .46), coat.darkened(.5))
 	for side in [-1.0, 1.0]:
-		_piece(_body, Vector3(side*.12, 1.68, -.25), Vector3(.09, .07, .05), Color("#ffed8a"), true)
+		_piece(_head, Vector3(side*.12, .05, -.25), Vector3(.09, .07, .05), Color("#ffed8a"), true)
 		var arm := Node3D.new()
 		arm.position = Vector3(side*.43, 1.32, 0)
 		_body.add_child(arm)
@@ -40,10 +45,15 @@ func _ready() -> void:
 	if gutter:
 		scale = Vector3(1.05, .82, 1.0)
 		_body.rotation.x = -.25
+	_enemy.winding_up.connect(func(): _anticipation = 1.0)
+	_enemy.staggered.connect(func(): _hurt = 1.0)
 	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
 	scale *= 0.1
 	create_tween().tween_property(self, "scale", scale * 10.0, .3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_enemy.damaged.connect(func(_amount, _health): _hurt = 1.0)
+	_enemy.damaged.connect(func(_amount, _health):
+		_hurt = 1.0
+		if _enemy._bullet_critical:
+			_head_kick = 1.0)
 
 func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false) -> void:
 	var mesh := MeshInstance3D.new()
@@ -63,10 +73,13 @@ func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := fa
 func _process(delta: float) -> void:
 	_clock += delta * (3.0 + Vector2(_enemy.velocity.x, _enemy.velocity.z).length()*2.0)
 	_hurt = move_toward(_hurt, 0.0, delta*5.0)
+	_head_kick = move_toward(_head_kick, 0.0, delta * 4.0)
+	_anticipation = move_toward(_anticipation, 0.0, delta * 2.0)
+	_head.rotation.x = _head_kick * 0.7
 	_attack = move_toward(_attack, 0.0, delta * 3.0)
 	var speed := Vector2(_enemy.velocity.x, _enemy.velocity.z).length()
 	for i in limbs.size():
 		var swing := sin(_clock + (PI if i > 1 else 0.0)) * .45 * minf(speed, 1.0)
-		limbs[i].rotation.x = swing - (_attack * 1.5 if i % 2 == 0 else 0.0)
+		limbs[i].rotation.x = swing - ((_attack * 1.5 - _anticipation * 0.8) if i % 2 == 0 else 0.0)
 	_body.position.y = absf(sin(_clock))*.045
 	_body.rotation.z = sin(_clock*.5)*.04 + _hurt*.16

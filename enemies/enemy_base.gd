@@ -8,6 +8,8 @@ extends CharacterBody3D
 ## Speed and damage are multiplied by WeatherManager.enemy_buff().
 
 signal damaged(amount: float, health_left: float)
+signal winding_up
+signal staggered
 signal attacked(target: Node3D, amount: float)
 signal died(enemy: EnemyBase)
 
@@ -16,6 +18,14 @@ signal died(enemy: EnemyBase)
 var health := 0.0
 var _bullet_critical := false
 var target: Node3D
+var _stagger_left := 0.0
+var _slow_left := 0.0
+var _weaken_left := 0.0
+var _windup_left := 0.0
+var _recover_left := 0.0
+var _attack_victim: Node3D
+var _attack_amount := 0.0
+var _dead := false
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _retarget_timer := 0.0
@@ -61,21 +71,46 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _dead:
+		return
+	_slow_left = maxf(0.0, _slow_left - delta)
+	_weaken_left = maxf(0.0, _weaken_left - delta)
+	if _stagger_left > 0.0 or _recover_left > 0.0 or _windup_left > 0.0:
+		_stagger_left = maxf(0.0, _stagger_left - delta)
+		_recover_left = maxf(0.0, _recover_left - delta)
+		if _windup_left > 0.0:
+			_windup_left = maxf(0.0, _windup_left - delta)
+			if _windup_left <= 0.0:
+				if is_instance_valid(_attack_victim) and _can_attack(_attack_victim):
+					attack(_attack_victim, _attack_amount)
+				_recover_left = 0.5
+		velocity = Vector3(_push.x, velocity.y - _gravity * delta, _push.z)
+		_push = _push.move_toward(Vector3.ZERO, 25.0 * delta)
+		move_and_slide()
+		return
 	_retarget_timer -= delta
 	_attack_timer -= delta
 	if _retarget_timer <= 0.0 or not is_instance_valid(target):
 		_retarget_timer = data.retarget_interval
 		target = choose_target()
+		var lure := _nearest(get_tree().get_nodes_in_group("enemy_lures"))
+		if lure and global_position.distance_to(lure.global_position) < 12.0:
+			target = lure
 
 	var buff := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	if _slow_left > 0.0:
+		buff *= 0.5
+	if _weaken_left > 0.0:
+		buff *= 0.65
 	var move := Vector3.ZERO
 	if is_instance_valid(target):
 		var to_target := target.global_position - global_position
 		to_target.y = 0.0
-		if to_target.length() <= data.attack_range:
-			if _attack_timer <= 0.0:
+		var stop_range := 1.0 if target.is_in_group("enemy_lures") else data.attack_range
+		if to_target.length() <= stop_range:
+			if _attack_timer <= 0.0 and not target.is_in_group("enemy_lures"):
 				_attack_timer = data.attack_cooldown
-				attack(target, data.damage * buff)
+				_begin_attack(target, data.damage * buff)
 			move = in_range_move(to_target, buff)
 		else:
 			# Re-path when the target has moved, or every REPATH_INTERVAL in case
@@ -113,6 +148,8 @@ func _process(delta: float) -> void:
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
 func knockback(impulse: Vector3) -> void:
 	_push += impulse
+	if impulse.length() >= 0.8:
+		stagger(0.4)
 
 
 ## Local only: brief red flash when a shot lands.
@@ -194,11 +231,20 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func die() -> void:
+	if _dead:
+		return
+	_dead = true
 	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
 		var drop := Node3D.new()
 		drop.set_script(preload("res://weapons/ammo_drop.gd"))
 		get_parent().add_child(drop)
 		drop.global_position = global_position
+	if not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+		var recovery := Node3D.new()
+		recovery.set_script(preload("res://weapons/ammo_drop.gd"))
+		recovery.kind = "health" if randf() < 0.5 else "suit"
+		get_parent().add_child(recovery)
+		recovery.global_position = global_position + Vector3(0.6, 0.0, 0.0)
 	for i in 6:
 		var fragment := MeshInstance3D.new()
 		var cube := BoxMesh.new()
@@ -208,7 +254,7 @@ func die() -> void:
 		material.albedo_color = Color("#b5df68") if i % 2 == 0 else Color("#337c87")
 		fragment.material_override = material
 		get_parent().add_child(fragment)
-		fragment.global_position = global_position + Vector3.UP
+		fragment.global_position = global_position + Vector3.UP * (1.6 if _bullet_critical else 1.0)
 		var tween := fragment.create_tween()
 		tween.tween_property(fragment, "position", fragment.position + Vector3(randf_range(-1.5, 1.5), randf_range(.3, 1.2), randf_range(-1.5, 1.5)), .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(fragment, "scale", Vector3.ZERO, .3)
@@ -270,7 +316,7 @@ func _is_host() -> bool:
 
 
 func take_bullet(amount: float, point: Vector3, source: Node) -> void:
-	if health <= 0.0:
+	if health <= 0.0 or not _is_host():
 		return
 	var height := to_local(point).y
 	var head_height := 1.42
@@ -278,6 +324,10 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		"gutter": head_height = 1.16
 		"mister": head_height = 1.63
 	_bullet_critical = height >= head_height
+	if height < 0.65:
+		_slow_left = 1.8
+	if _bullet_critical:
+		stagger(0.3)
 	var before := health
 	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
 	if is_instance_valid(source) and source.is_in_group("local_player"):
@@ -290,3 +340,33 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		if _bullet_critical:
 			Sound.play("headshot", -10.0)
 	_bullet_critical = false
+
+
+func stagger(duration: float) -> void:
+	_stagger_left = maxf(_stagger_left, duration)
+	_windup_left = 0.0
+	_attack_victim = null
+	staggered.emit()
+
+
+func weaken(duration: float) -> void:
+	_weaken_left = maxf(_weaken_left, duration)
+
+
+func _can_attack(victim: Node3D) -> bool:
+	if victim.get("state") != "ok" or global_position.distance_to(victim.global_position) > data.attack_range + 0.25:
+		return false
+	var direction := victim.global_position - global_position
+	direction.y = 0.0
+	if data.attack_range < 3.0 and direction.length_squared() > 0.01 and (-global_basis.z).dot(direction.normalized()) < 0.3:
+		return false
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP, victim.global_position + Vector3.UP, 1)
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+func _begin_attack(victim: Node3D, amount: float) -> void:
+	_attack_victim = victim
+	_attack_amount = amount
+	_windup_left = 0.45
+	winding_up.emit()
+	reveal(0.45)

@@ -37,6 +37,13 @@ var _lunge_hit := false
 
 
 func _physics_process(delta: float) -> void:
+	if _dead:
+		return
+	if _stagger_left > 0.0:
+		super._physics_process(delta)
+		return
+	_slow_left = maxf(0.0, _slow_left - delta)
+	_weaken_left = maxf(0.0, _weaken_left - delta)
 	_lunge_cooldown_left -= delta
 	if _recovery > 0.0:
 		_recovery -= delta
@@ -59,9 +66,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= _gravity * delta
 		move_and_slide()
 		if not _lunge_hit and is_instance_valid(target) \
-				and global_position.distance_to(target.global_position) < data.attack_range:
+				and _can_attack(target):
 			_lunge_hit = true
-			super.attack(target, data.damage * WeatherManager.enemy_buff())
+			super.attack(target, data.damage * WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0))
 		if _lunge_left <= 0.0:
 			_recovery = 1.0
 		return
@@ -84,4 +91,23 @@ func _start_lunge(direction: Vector3) -> void:
 	_lunge_cooldown_left = lunge_cooldown
 	_lunge_hit = false
 	var speed := lunge_speed * WeatherManager.enemy_buff()
+	if _slow_left > 0.0:
+		speed *= 0.5
+	if _weaken_left > 0.0:
+		speed *= 0.65
 	velocity = direction * speed + Vector3.UP * lunge_up
+
+
+func stagger(duration: float) -> void:
+	super.stagger(duration)
+	_windup = 0.0
+	_lunge_left = 0.0
+	_recovery = 0.7
+	_lunge_cooldown_left = lunge_cooldown
+	if _telegraph:
+		_telegraph.visible = false
+
+
+func _begin_attack(_victim: Node3D, _amount: float) -> void:
+	# Gutters use the committed pounce windup instead of standing melee.
+	pass
