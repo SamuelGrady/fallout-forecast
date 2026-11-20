@@ -351,6 +351,8 @@ func _update_weapon(player: Node) -> void:
 		ammo_label.visible = false
 		return
 	var weapon: WeaponData = holder.loadout[holder.current]
+	# The red dot or bead is the aim point while sighted; hide the crosshair.
+	_hit_marker.modulate.a = move_toward(_hit_marker.modulate.a, 0.0 if holder.sighted() else 1.0, 0.2)
 	if _last_weapon != weapon.resource_path:
 		_last_weapon = weapon.resource_path
 		_weapon_name_left = 3.0

@@ -1,6 +1,5 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/blaster/grenade-a.glb" id="1_p8huw"]
 [ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_uslrf"]
 
 [resource]
@@ -8,7 +7,6 @@ script = ExtResource("2_uslrf")
 shot_sound = "throw_bomb"
 display_name = "Bug Bomb"
 kind = 2
-model = ExtResource("1_p8huw")
 damage = 75.0
 knockback = 12.0
 fire_interval = 0.9
@@ -19,6 +17,7 @@ projectile_speed = 16.0
 effect_time = 2.8
 effect_radius = 6.0
 tracer_color = Color(0.7, 1, 0.3, 1)
-view_position = Vector3(0.22, -0.24, -0.45)
-view_scale = 0.9
+view_position = Vector3(0.18, -0.17, -0.32)
+view_scale = 1.0
 muzzle = Vector3(0, 0.12, 0)
+gun_model = "bug_bomb"

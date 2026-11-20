@@ -1,14 +1,12 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-h.glb" id="1_41ua2"]
 [ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_m6jxt"]
 
 [resource]
 script = ExtResource("2_m6jxt")
-shot_sound = "shot_flare"
+shot_sound = "gun_flare"
 display_name = "Flare Gun"
 kind = 1
-model = ExtResource("1_41ua2")
 damage = 25.0
 fire_interval = 0.6
 mag_size = 1
@@ -19,6 +17,8 @@ projectile_gravity = 0.35
 effect_radius = 10.0
 effect_time = 8.0
 tracer_color = Color(1, 0.3, 0.25, 1)
-view_position = Vector3(0.2, -0.2, -0.42)
-view_scale = 0.6
+view_position = Vector3(0.16, -0.15, -0.3)
+view_scale = 0.8
 muzzle = Vector3(0, 0.05, -0.33)
+gun_model = "flare"
+ads_fov = 60.0

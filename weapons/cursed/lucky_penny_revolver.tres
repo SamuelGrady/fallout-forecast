@@ -1,13 +1,11 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-k.glb" id="1_86k3h"]
 [ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_1c2q0"]
 
 [resource]
 script = ExtResource("2_1c2q0")
-shot_sound = "shot_penny"
+shot_sound = "gun_revolver"
 display_name = "Lucky Penny Revolver"
-model = ExtResource("1_86k3h")
 damage = 28.0
 spread_degrees = 0.5
 max_range = 60.0
@@ -17,7 +15,10 @@ reload_time = 1.6
 lucky_kill_chance = 0.25
 jam_chance = 0.1
 cursed = true
-view_position = Vector3(0.2, -0.2, -0.42)
-view_scale = 0.6
+view_position = Vector3(0.15, -0.15, -0.3)
+view_scale = 1.0
 muzzle = Vector3(0, 0.05, -0.23)
 tracer_color = Color(1, 0.85, 0.2, 1)
+gun_model = "revolver"
+ads_fov = 55.0
+ads_eye_relief = 0.36

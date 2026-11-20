@@ -57,3 +57,26 @@ enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
 ## Muzzle position in the model's own space, for tracers and flashes.
 @export var muzzle := Vector3(0, 0.06, -0.45)
 @export var tracer_color := Color(1.0, 0.85, 0.4)
+
+## Custom model id from GunModels (rifle, shotgun, flare, bug_bomb,
+## revolver, nailgun, boombox). Overrides `model` when set.
+@export var gun_model := ""
+
+
+## The viewmodel / display model for this weapon.
+func make_model() -> Node3D:
+	if gun_model != "":
+		return GunModels.build(gun_model)
+	if model:
+		return model.instantiate() as Node3D
+	return null
+
+
+@export_group("Sights")
+## "red_dot": reflex sight on top. "bead": shotgun rib + front bead.
+## "": no sight, plain centered ADS.
+@export var sight := ""
+## Field of view while aiming down sights.
+@export var ads_fov := 52.0
+## Distance from the eye to the sight while aiming, in meters.
+@export var ads_eye_relief := 0.32

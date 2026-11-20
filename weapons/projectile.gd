@@ -35,7 +35,9 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 		velocity += Vector3.UP * 3.0
 	if from_shooter is CollisionObject3D:
 		_exclude.append(from_shooter.get_rid())
-	if weapon.model:
+	if weapon.gun_model != "":
+		add_child(GunModels.projectile(weapon.gun_model))
+	elif weapon.model:
 		var model := weapon.model.instantiate() as Node3D
 		model.scale = Vector3.ONE * 2.0
 		add_child(model)

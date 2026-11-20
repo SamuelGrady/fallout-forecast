@@ -1,13 +1,11 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-m.glb" id="1_qsm05"]
 [ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_xy4ij"]
 
 [resource]
 script = ExtResource("2_xy4ij")
 shot_sound = "shot_nailgun"
 display_name = "Leaky Nailgun"
-model = ExtResource("1_qsm05")
 damage = 34.0
 spread_degrees = 0.8
 max_range = 70.0
@@ -19,7 +17,8 @@ reserve_ammo = 96
 held_suit_drain = 2.0
 pierce = 3
 cursed = true
-view_position = Vector3(0.2, -0.2, -0.42)
-view_scale = 0.55
+view_position = Vector3(0.17, -0.15, -0.3)
+view_scale = 1.0
 muzzle = Vector3(0, 0.05, -0.31)
 tracer_color = Color(0.55, 1, 0.3, 1)
+gun_model = "nailgun"

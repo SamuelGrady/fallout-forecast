@@ -129,8 +129,10 @@ func leave() -> void:
 	run_active = false
 	roster.clear()
 	# Mode is already OFFLINE, so the disconnects this triggers are ignored.
-	if multiplayer.has_multiplayer_peer():
-		multiplayer.multiplayer_peer = null
+	# Back to Godot's default offline peer, not null: with no peer at all,
+	# every is_multiplayer_authority() and rpc() in solo play errors.
+	if not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	roster_changed.emit()
 
 

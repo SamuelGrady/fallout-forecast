@@ -133,9 +133,9 @@ func _build_reward_mesh(item_id: String, accent: Color) -> void:
 		child.queue_free()
 	if item_id.begins_with("weapon:"):
 		var data := load(item_id.trim_prefix("weapon:")) as WeaponData
-		if data and data.model:
-			var gun := data.model.instantiate() as Node3D
-			gun.scale = Vector3.ONE * 1.45
+		var gun := data.make_model() if data else null
+		if gun:
+			gun.scale = Vector3.ONE * (2.4 if data.gun_model != "" else 1.45)
 			_reward_root.add_child(gun)
 			return
 	match item_id:

@@ -39,6 +39,9 @@ var _hip_fov := 75.0
 ## Time left before a weapon lowered for sprinting can fire.
 var _raise_left := 0.0
 var _reload_total := 1.0
+## Model-space point that should sit dead center on screen while aiming
+## (the red dot or the shotgun bead). Vector3.INF = no sight.
+var _sight_point := Vector3.INF
 const SPRINT_RAISE := 0.15
 var _model: Node3D
 var player: Node3D
@@ -146,6 +149,9 @@ func fire() -> void:
 	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, 0.65, _aim), deg_to_rad(5.0))
 	_heat = minf(1.0, _heat + 0.22)
 	fired.emit(data)
+	if _model and _model.has_node("Pump") and ammo[current] > 0:
+		# Rack sound lines up with the forend animation in _animate.
+		get_tree().create_timer(data.fire_interval * 0.2).timeout.connect(func(): Sound.play("shotgun_pump", -11.0))
 	if ammo[current] == 0 and reserve[current] > 0:
 		get_tree().create_timer(data.fire_interval).timeout.connect(func():
 			if is_instance_valid(player) and player.get("state") == "ok" and loadout[current] == data and ammo[current] == 0:
@@ -156,7 +162,7 @@ func start_reload() -> void:
 	var data := loadout[current]
 	if _reload_left > 0.0 or ammo[current] >= data.mag_size or reserve[current] <= 0:
 		return
-	Sound.play("reel_tick" if data.shell_reload else "reload", -12.0 if data.shell_reload else -10.0)
+	Sound.play("reel_tick" if data.shell_reload else ("rifle_reload" if data.automatic else "reload"), -12.0 if data.shell_reload else -8.0)
 	_reload_total = data.reload_time * GameManager.reload_scale()
 	_reload_left = _reload_total
 
@@ -171,7 +177,7 @@ func _finish_reload() -> void:
 		start_reload()
 	elif data.shell_reload:
 		# Last shell in: rack the pump.
-		Sound.play("reload", -12.0, 1.25)
+		Sound.play("shotgun_pump", -8.0)
 		_kick = 0.6
 
 
@@ -291,7 +297,7 @@ func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int,
 				var center := Vector3.ZERO
 				for p in hit_points:
 					center += p
-				Sound.play_at("hit_enemy", center / hit_points.size(), -18.0 + minf(6.0, 2.0 * (hit_points.size() - 1)))
+				Sound.play_at("hit_flesh", center / hit_points.size(), -18.0 + minf(6.0, 2.0 * (hit_points.size() - 1)))
 
 		_:
 			var projectile := Projectile.new()
@@ -407,11 +413,13 @@ func _equip(index: int) -> void:
 		_model.queue_free()
 		_model = null
 	var data := loadout[index]
-	if data.model:
-		_model = data.model.instantiate() as Node3D
+	_model = data.make_model()
+	_sight_point = Vector3.INF
+	if _model:
 		add_child(_model)
 		for mesh in _model.find_children("*", "MeshInstance3D", true, false):
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_sight_point = _model.get_meta("sight", Vector3.INF)
 	weapon_changed.emit(data)
 
 
@@ -425,7 +433,7 @@ func _animate(delta: float) -> void:
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
-	camera.fov = lerpf(_hip_fov, 52.0, _aim)
+	camera.fov = lerpf(_hip_fov, data.ads_fov, _aim)
 	var speed := 0.0
 	if player is CharacterBody3D:
 		speed = Vector2(player.velocity.x, player.velocity.z).length()
@@ -452,14 +460,38 @@ func _animate(delta: float) -> void:
 			if t > 0.8:
 				reload_push = sin((t - 0.8) / 0.2 * PI) * 0.07
 	var lowered := _raise_left / SPRINT_RAISE
-	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left - 0.06 * lowered, 0.08 * _kick + reload_push)
+	_model.position = data.view_position.lerp(_ads_position(data), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left - 0.06 * lowered, 0.08 * _kick + reload_push)
 	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick + _recoil * 8.0 - 35.0 * reload_dip - 14.0 * lowered, 12.0 * lowered, sin(_bob) * _kick * 1.5 + reload_roll)
 	_model.scale = Vector3.ONE * data.view_scale
+	# Moving parts on the custom models.
+	var pump := _model.get_node_or_null("Pump") as Node3D
+	if pump:
+		# Rack the forend back and forward in the middle of the pump delay.
+		var since := 1.0 - clampf(_cooldown / maxf(data.fire_interval, 0.01), 0.0, 1.0)
+		pump.position.z = 0.055 * sin(clampf((since - 0.15) / 0.6, 0.0, 1.0) * PI)
+	var barrel := _model.get_node_or_null("Barrel") as Node3D
+	if barrel:
+		# Break action: the barrel tips open for the reload.
+		barrel.rotation.x = -deg_to_rad(42.0) * clampf(reload_dip / 1.25, 0.0, 1.0)
+
+
+## Where the model sits while aiming: the sight point lands on the camera's
+## center line at the weapon's eye relief.
+func _ads_position(data: WeaponData) -> Vector3:
+	if _sight_point == Vector3.INF:
+		return Vector3(0.0, -0.12, data.view_position.z - 0.08)
+	var basis := Basis.from_euler(data.view_rotation_degrees * PI / 180.0).scaled(Vector3.ONE * data.view_scale)
+	return Vector3(0.0, 0.0, -data.ads_eye_relief) - basis * _sight_point
+
+
+## True while the sight picture is up (HUD hides the crosshair).
+func sighted() -> bool:
+	return _sight_point != Vector3.INF and _aim > 0.85
 
 
 func _muzzle_position() -> Vector3:
 	if _model:
-		return _model.global_transform * (loadout[current].muzzle)
+		return _model.global_transform * (_model.get_meta("muzzle", loadout[current].muzzle) as Vector3)
 	return camera.global_position
 
 

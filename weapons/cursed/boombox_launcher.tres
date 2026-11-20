@@ -1,6 +1,5 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
-[ext_resource type="PackedScene" path="res://assets/kenney/blaster/blaster-a.glb" id="1_2nc5l"]
 [ext_resource type="Script" path="res://weapons/weapon_data.gd" id="2_adw4l"]
 
 [resource]
@@ -8,7 +7,6 @@ script = ExtResource("2_adw4l")
 shot_sound = "shot_boombox"
 display_name = "Boombox Launcher"
 kind = 3
-model = ExtResource("1_2nc5l")
 damage = 110.0
 knockback = 14.0
 fire_interval = 1.1
@@ -20,7 +18,8 @@ projectile_gravity = 0.05
 effect_radius = 6.5
 pull_radius = 16.0
 cursed = true
-view_position = Vector3(0.22, -0.22, -0.42)
-view_scale = 0.55
+view_position = Vector3(0.16, -0.2, -0.34)
+view_scale = 1.0
 muzzle = Vector3(0, 0.05, -0.37)
 tracer_color = Color(1, 0.3, 0.8, 1)
+gun_model = "boombox"

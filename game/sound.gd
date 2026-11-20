@@ -12,7 +12,7 @@ const THRESHOLDS := [0.0, 0.12, 0.32, 0.58]
 const RAIN_BUS := &"Rain"
 ## Mix buses. Rain sits under Ambience; Music ducks under Weapons fire.
 const BUSES := [&"Music", &"Weapons", &"Threats", &"UI", &"Ambience"]
-const WEAPON_CUES := ["reload", "jam", "reel_tick", "throw_bomb", "hit_enemy", "headshot"]
+const WEAPON_CUES := ["reload", "jam", "reel_tick", "throw_bomb", "hit_enemy", "hit_flesh", "headshot", "shotgun_pump", "rifle_reload"]
 const UI_CUES := ["ui_click", "pickup", "lever", "reel_land", "crate_open", "decon", "revive"]
 const AMBIENCE_CUES := ["downpour", "step_0", "step_1", "step_2", "step_3"]
 var _last_cue_ms := {}
@@ -55,7 +55,7 @@ func _add_bus(bus_name: StringName, send: StringName) -> int:
 
 
 func bus_for(cue: String) -> StringName:
-	if cue.begins_with("shot_") or cue in WEAPON_CUES:
+	if cue.begins_with("shot_") or cue.begins_with("gun_") or cue in WEAPON_CUES:
 		return &"Weapons"
 	if cue in UI_CUES:
 		return &"UI"
@@ -149,7 +149,7 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 			return
 		volume_db -= 6.0
 		pitch *= randf_range(0.92, 1.12)
-	var extension := "wav" if cue in ["player_hurt", "headshot"] else "ogg"
+	var extension := "wav" if ResourceLoader.exists("res://assets/audio/sfx/%s.wav" % cue) else "ogg"
 	_play_stream(load("res://assets/audio/sfx/%s.%s" % [cue, extension]) as AudioStream, volume_db, pitch, bus_for(cue))
 
 
@@ -169,7 +169,8 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 	if not world:
 		return
 	var voice := AudioStreamPlayer3D.new()
-	voice.stream = load("res://assets/audio/sfx/%s.ogg" % cue) as AudioStream
+	var ext := "wav" if ResourceLoader.exists("res://assets/audio/sfx/%s.wav" % cue) else "ogg"
+	voice.stream = load("res://assets/audio/sfx/%s.%s" % [cue, ext]) as AudioStream
 	if cue == "pickup" and _recent(cue, 0.3):
 		voice.free()
 		return
