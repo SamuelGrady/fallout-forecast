@@ -98,7 +98,8 @@ func _ready() -> void:
 	_menu.modulate.a = 0.0
 	add_child(_menu)
 	_button(_menu, "PLAY SOLO", _on_play)
-	_button(_menu, "HOST GAME", _on_host)
+	# Browsers can't listen for connections: web builds only join.
+	_button(_menu, "HOST GAME", _on_host).visible = Net.can_host()
 	_button(_menu, "JOIN GAME", _on_join)
 	_button(_menu, "SETTINGS", _on_settings)
 	_button(_menu, "QUIT", get_tree().quit)
