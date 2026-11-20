@@ -26,6 +26,7 @@ func _ready() -> void:
 		add_child(dev_menu)
 	_setup_decon_showers()
 	_setup_objectives()
+	preload("res://props/building_restyle.gd").apply($Level)
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
 	$Level.add_child(signs)
