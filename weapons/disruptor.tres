@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Weather-Radio Disruptor"
+shot_sound = "gun_disruptor"
+kind = 0
+mechanic = "suppress"
+damage = 38.0
+mag_size = 3
+fire_interval = 0.85
+spread_degrees = 0.25
+max_range = 42.0
+tracer_color = Color(0.976, 0.608, 0.863, 1)
+charge_time = 0.85
+effect_radius = 7.5
+effect_time = 6
+reload_time = 2.6

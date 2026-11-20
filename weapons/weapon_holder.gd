@@ -1,32 +1,39 @@
 class_name WeaponHolder
 extends Node3D
-## The player's guns: inventory, viewmodel, firing, reloading, switching.
-## Sits under the player's Camera3D.
-##
-## Networking follows the design doc's "shooting and damage" row:
-## the shooting client plays its effects at once and sends
-## request_shot(weapon, origin, dir, seed) to the host; the host checks the
-## shot is possible, does the raycast with the same seed and applies damage,
-## then tells the other peers to play the effects. Offline (or on the host
-## itself) the same path runs locally.
-##
-## Controls: fire (LMB / RT), aim (RMB / LT), reload (R / X), weapon_1-4 (1-4),
-## weapon_next / weapon_prev (wheel / RB / LB).
+## Host owns slots, shared reserves, reload, fire cadence and curse rolls.
+## Copies on clients hold the owner's latest snapshot and public equipment.
 
 signal weapon_changed(data: WeaponData)
 signal fired(data: WeaponData)
 
-const HIT_MASK := (1 << 0) | (1 << 2)  # world + enemies
-const Projectile := preload("res://weapons/projectile.gd")
+const HIT_MASK := 1 | 4
+const SLOT_COUNT := 5
+const SPRINT_RAISE := 0.15
 
-@export var loadout: Array[WeaponData] = []
-
+var slots: Array[ItemInstance] = [null, null, null, null, null]
+var reserves: Dictionary = {}
+var _seeded_ammo: Dictionary = {"shell": true}
 var current := 0
-var ammo: Array[int] = []
-var reserve: Array[int] = []
+var scrap := 0
+var revision := 0
+var _public_revision := -1
+var _private_revision := -1
+var equipped_id := ""
+var equipped_tier := 0
+var _model: Node3D
+var _model_serial := -1
+var player: Node3D
+var camera: Camera3D
+var loot: RunLoot
 
 var _cooldown := 0.0
 var _reload_left := 0.0
+var _reload_total := 1.0
+var _reload_serial := 0
+var _jam_left := 0.0
+var _charge_serial := 0
+var _charge_at := 0.0
+var _pending_action := 0.0
 var _kick := 0.0
 var _bob := 0.0
 var _aim := 0.0
@@ -36,489 +43,541 @@ var _recoil := 0.0
 var _camera_kick := 0.0
 var _heat := 0.0
 var _hip_fov := 75.0
-## Time left before a weapon lowered for sprinting can fire.
 var _raise_left := 0.0
-var _reload_total := 1.0
-## Model-space point that should sit dead center on screen while aiming
-## (the red dot or the shotgun bead). Vector3.INF = no sight.
 var _sight_point := Vector3.INF
-const SPRINT_RAISE := 0.15
-var _model: Node3D
-var player: Node3D
-var camera: Camera3D
 var _shot_counter := 0
-
+var _spread_at := 0.0
+var _remote_view: Node3D
 
 func _ready() -> void:
 	camera = get_parent() as Camera3D
 	_hip_fov = camera.fov
-	player = _find_player()
-	loadout = loadout.filter(func(w): return w.resource_path in Settings.unlocked_guns)
-	for w in loadout:
-		ammo.append(w.mag_size)
-		reserve.append(w.reserve_ammo)
-	if not loadout.is_empty():
-		_equip(0)
+	player = camera.get_parent().get_parent() as Node3D
+	loot = RunLoot.find(get_tree())
+	if Net.is_host() and loot:
+		slots[0] = loot.make_item("pump_shotgun")
+		reserves["shell"] = ItemCatalog.CAPS.shell
+		_refresh_equip()
+		if loot.run_id > 0:
+			send_state()
 
+func selected() -> ItemInstance:
+	return slots[current]
+
+func selected_serial() -> int:
+	return selected().serial if selected() else 0
+
+func selected_definition() -> ItemDefinition:
+	return ItemCatalog.definition(selected().id) if selected() else null
+
+func selected_weapon() -> WeaponData:
+	var definition := selected_definition()
+	return definition.weapon if definition else null
+
+func selected_reserve() -> int:
+	var definition := selected_definition()
+	return int(reserves.get(definition.ammo_type, 0)) if definition else 0
+
+func reload_remaining() -> float:
+	return _reload_left
+
+func jammed() -> bool:
+	return _jam_left > 0.0
+
+func can_act() -> bool:
+	return loot != null and loot.run_id > 0 and player.state == "ok" and not GameManager.awaiting_tape_choice \
+			and not GameManager.is_voting() and not get_tree().paused
 
 func _process(delta: float) -> void:
-	_cooldown -= delta
+	_cooldown = maxf(0.0, _cooldown - delta)
+	_jam_left = maxf(0.0, _jam_left - delta)
+	_pending_action = maxf(0.0, _pending_action - delta)
+	if _reload_left > 0.0:
+		_reload_left = maxf(0.0, _reload_left - delta)
+		if _reload_left <= 0.0 and Net.is_host():
+			_finish_reload()
+	if Net.is_host() and not can_act() and (_reload_serial != 0 or _charge_serial != 0):
+		_cancel_actions()
+		send_state(false)
+	if not player.is_multiplayer_authority() or Net.dedicated:
+		if _remote_view:
+			_remote_view.visible = player.state == "ok"
+		return
 	_fire_buffer = maxf(0.0, _fire_buffer - delta)
-	if player and player.get("is_sprinting"):
-		_raise_left = SPRINT_RAISE
-	else:
-		_raise_left = maxf(0.0, _raise_left - delta)
-	_heat = move_toward(_heat, 0.0, delta * 1.6)
+	_raise_left = SPRINT_RAISE if player.is_sprinting else maxf(0.0, _raise_left - delta)
 	_camera_kick = move_toward(_camera_kick, 0.0, delta * deg_to_rad(8.0))
-	if player and player.is_multiplayer_authority():
-		camera.rotation.x = _camera_kick
-		_roll = move_toward(_roll, 0.0, delta * deg_to_rad(20.0))
-		camera.rotation.z = _roll
+	camera.rotation.x = _camera_kick
+	_roll = move_toward(_roll, 0.0, delta * deg_to_rad(20.0))
+	camera.rotation.z = _roll
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
-	if _reload_left > 0.0:
-		_reload_left -= delta
-		if _reload_left <= 0.0:
-			_finish_reload()
-	if player and player.is_multiplayer_authority():
-		_handle_input()
-		_publish()
+	_handle_input()
+	_publish()
 	_animate(delta)
-	_update_throw_preview()
-
+	_update_throw_preview(delta)
 
 func _handle_input() -> void:
-	if loadout.is_empty() or player.get("state") != "ok" or GameManager.awaiting_tape_choice:
+	if not can_act():
 		_fire_buffer = 0.0
-		_reload_left = 0.0
 		return
-	if not GameManager.has_method("is_voting") or not GameManager.is_voting():
-		for i in range(mini(loadout.size(), 5)):
-			if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
-				_equip(i)
-	if loadout.size() > 1:
-		if Input.is_action_just_pressed("weapon_next"):
-			_equip((current + 1) % loadout.size())
-		if Input.is_action_just_pressed("weapon_prev"):
-			_equip((current - 1 + loadout.size()) % loadout.size())
+	for slot in SLOT_COUNT:
+		if Input.is_action_just_pressed("weapon_%d" % (slot + 1)):
+			select_slot(slot)
+			return
+	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
+	if wheel != 0:
+		select_slot(posmod(current + wheel, SLOT_COUNT))
+		return
+	if Input.is_action_just_pressed("drop_item") and selected():
+		_command("drop")
+		return
+	var data := selected_weapon()
+	if data == null or player.tarp_raised:
+		return
 	if Input.is_action_just_pressed("reload"):
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		_fire_buffer = 0.0
 		return
-	if player.get("tarp_raised"):
+	if data.charge_time > 0.0:
+		if Input.is_action_just_pressed("fire"):
+			if selected().count > 0:
+				_command("charge")
+			elif selected_reserve() > 0 and _reload_left <= 0.0:
+				start_reload()
+		if Input.is_action_just_released("fire"):
+			fire()
 		return
-	var data := loadout[current]
 	if Input.is_action_just_pressed("fire"):
 		_fire_buffer = 0.15 + _raise_left
 	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
 	if wants:
-		# Firing drops out of a sprint; the gun takes a beat to come up.
-		player.set("sprint_lock", 0.35)
-	if wants and data.shell_reload and ammo[current] > 0:
-		_reload_left = 0.0
-	if wants and _cooldown <= 0.0 and _reload_left <= 0.0 and _raise_left <= 0.0:
-		if ammo[current] > 0:
+		player.sprint_lock = 0.35
+	if wants and _cooldown <= 0.0 and _pending_action <= 0.0 and _jam_left <= 0.0 and _raise_left <= 0.0:
+		if selected().count > 0 and (_reload_left <= 0.0 or data.shell_reload):
 			fire()
-		elif reserve[current] > 0:
+		elif selected_reserve() > 0 and _reload_left <= 0.0:
 			start_reload()
 
-
 func fire() -> void:
-	if not Net.can_send_run_rpc():
-		return
-	var data := loadout[current]
-	if data.shell_reload and ammo[current] > 0:
-		_reload_left = 0.0
-	if ammo[current] <= 0 or _cooldown > 0.0 or _reload_left > 0.0:
+	if not Net.can_send_run_rpc() or selected() == null:
 		return
 	_fire_buffer = 0.0
-	ammo[current] -= 1
-	var interval := data.fire_interval * GameManager.fire_rate_scale()
-	_cooldown = interval
-	var shot_seed := randi()
-	# Lucky Penny: the same seed decides jams here and lucky kills on the host.
-	if data.jam_chance > 0.0 and _seeded(shot_seed, 1) < data.jam_chance:
-		Sound.play("jam")
-		_cooldown = data.jam_time
-		player.set("weapon_name", data.display_name + " (JAMMED!)")
-		return
-	_kick = 1.0
-	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
-	var origin := camera.global_position
 	var dir := -camera.global_basis.z
-	var is_aiming := _aim > 0.5
-	_play_shot(data, origin, dir, shot_seed, true, is_aiming)
 	if Net.is_host():
-		_resolve_shot(data, origin, dir, shot_seed, 0, is_aiming)
-		_broadcast_fx(data.resource_path, origin, dir, shot_seed, player.get_multiplayer_authority())
+		_host_shot(loot.run_id, selected_serial(), camera.global_position, dir, _aim > 0.5, 0)
 	else:
-		_request_shot.rpc_id(1, data.resource_path, origin, dir, shot_seed, is_aiming)
-	var ads_recoil := 0.5 if GameManager.has_player_mutation("hyper_focus") else 0.65
-	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, ads_recoil, _aim), deg_to_rad(5.0))
-	_heat = minf(1.0, _heat + 0.22)
-	fired.emit(data)
-	_shot_juice(data)
-	if _model and _model.has_node("Pump") and ammo[current] > 0:
-		# Rack sound lines up with the forend animation in _animate.
-		get_tree().create_timer(interval * 0.2).timeout.connect(func(): Sound.play("shotgun_pump", -11.0))
-	if ammo[current] == 0 and reserve[current] > 0:
-		get_tree().create_timer(interval).timeout.connect(func():
-			if is_instance_valid(player) and player.get("state") == "ok" and loadout[current] == data and ammo[current] == 0:
-				start_reload())
-
+		_pending_action = 0.14
+		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, _aim > 0.5)
 
 func start_reload() -> void:
-	var data := loadout[current]
-	if _reload_left > 0.0 or ammo[current] >= data.mag_size or reserve[current] <= 0:
-		return
-	Sound.play("reel_tick" if data.shell_reload else ("rifle_reload" if data.automatic else "reload"), -12.0 if data.shell_reload else -8.0)
-	_reload_total = data.reload_time * GameManager.reload_scale()
-	_reload_left = _reload_total
+	_command("reload")
 
+func select_slot(slot: int) -> void:
+	_command("select", slot)
+
+func _command(action: String, slot := -1) -> void:
+	if not can_act():
+		return
+	if Net.is_host():
+		_host_action(loot.run_id, action, selected_serial(), slot)
+	else:
+		_action.rpc_id(1, loot.run_id, action, selected_serial(), slot)
+
+func _valid_sender() -> bool:
+	var sender := multiplayer.get_remote_sender_id()
+	return Net.is_host() and sender == player.get_multiplayer_authority() and Net.run_peers.has(sender)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _action(run: int, action: String, expected: int, slot: int) -> void:
+	if _valid_sender():
+		_host_action(run, action, expected, slot)
+
+func _host_action(run: int, action: String, expected: int, slot: int) -> void:
+	if not can_act() or run != loot.run_id:
+		return
+	if action == "select" and slot >= 0 and slot < SLOT_COUNT and slot != current:
+		_cancel_actions()
+		current = slot
+		_cooldown = maxf(_cooldown, 0.25)
+		_heat = 0.0
+		send_state()
+		return
+	if expected == 0 or expected != selected_serial():
+		return
+	match action:
+		"reload":
+			_start_reload_host()
+		"drop":
+			var forward := -player.global_basis.z
+			var at := loot.ground_at(player, forward * 1.1)
+			if at == Vector3.INF:
+				at = loot.ground_at(player, Vector3.ZERO)
+			if at != Vector3.INF:
+				var item := selected()
+				slots[current] = null
+				_cancel_actions()
+				loot.spawn_pickup(item, at)
+				send_state()
+		"charge":
+			if selected_weapon().charge_time > 0.0 and _cooldown <= 0.0 and _reload_serial == 0 \
+					and selected().count > 0 and not player.tarp_raised and _charge_serial == 0:
+				_charge_serial = expected
+				_charge_at = loot.clock
+				_play_charge(loot.run_id, expected)
+				if not player.is_multiplayer_authority():
+					_play_charge.rpc_id(player.get_multiplayer_authority(), loot.run_id, expected)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _play_charge(run: int, serial: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if (sender == 1 or (sender == 0 and Net.is_host())) and run == loot.run_id \
+			and selected_serial() == serial and player.is_multiplayer_authority():
+		Sound.play("gun_disruptor_charge", -8.0)
+
+func _cancel_actions() -> void:
+	_reload_left = 0.0
+	_reload_serial = 0
+	_charge_serial = 0
+	_fire_buffer = 0.0
+
+func _start_reload_host() -> void:
+	var definition := selected_definition()
+	if definition == null or definition.kind != ItemDefinition.Kind.GUN or _reload_serial != 0 \
+			or selected().count >= definition.weapon.mag_size or selected_reserve() <= 0 or player.tarp_raised:
+		return
+	_charge_serial = 0
+	_reload_serial = selected_serial()
+	_reload_total = definition.weapon.reload_time * GameManager.reload_scale()
+	_reload_left = _reload_total
+	send_state(false)
+	if player.is_multiplayer_authority():
+		_reload_sound(definition.weapon)
 
 func _finish_reload() -> void:
-	var data := loadout[current]
-	var missing := 1 if data.shell_reload else data.mag_size - ammo[current]
-	var take := mini(missing, reserve[current])
-	ammo[current] += take
-	reserve[current] -= take
-	if data.shell_reload and ammo[current] < data.mag_size and reserve[current] > 0:
-		start_reload()
-	elif data.shell_reload:
-		# Last shell in: rack the pump.
-		Sound.play("shotgun_pump", -8.0)
-		_kick = 0.6
-
-
-# ------------------------------------------------------------------ network
-## A shot travels as its WeaponData path, not a loadout index: every machine
-## unlocks guns independently (Settings.unlocked_guns is local), so index 2
-## is not the same weapon on the host and the client.
-@rpc("any_peer", "call_remote", "reliable")
-func _request_shot(path: String, origin: Vector3, dir: Vector3, shot_seed: int, is_aiming := false) -> void:
-	var sender := multiplayer.get_remote_sender_id()
-	if not Net.is_host() or sender != player.get_multiplayer_authority():
+	var item := selected()
+	if not can_act() or item == null or _reload_serial != item.serial:
+		_cancel_actions()
+		send_state(false)
 		return
-	var data := _weapon_at(path)
-	if data == null:
-		return
-	# The shot must start near where the host thinks this player's head is.
-	# At 20 Hz the host's copy is a few centimetres stale, so this is loose.
-	if origin.distance_to(camera.global_position) > 4.0:
-		return
-	var rewind_ms := Net.get_rewind_ms(sender)
-	_resolve_shot(data, origin, dir.normalized(), shot_seed, rewind_ms, is_aiming)
-	_broadcast_fx(path, origin, dir.normalized(), shot_seed, sender)
-	_play_shot(data, origin, dir, shot_seed, false, is_aiming)
-
-
-## Only the weapons folder, so a client can't ask the host to load anything.
-func _weapon_at(path: String) -> WeaponData:
-	if not (path.begins_with("res://weapons/") and path.ends_with(".tres")):
-		return null
-	return load(path) as WeaponData
-
-
-@rpc("any_peer", "call_remote", "unreliable")
-func _shot_fx(path: String, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
-	if multiplayer.get_remote_sender_id() != 1:
-		return
-	var data := _weapon_at(path)
-	if data:
-		_play_shot(data, origin, dir, shot_seed, false)
-
-
-func _broadcast_fx(path: String, origin: Vector3, dir: Vector3, shot_seed: int, shooter_peer: int) -> void:
-	if not Net.is_online():
-		return
-	for peer in multiplayer.get_peers():
-		if peer != shooter_peer:
-			_shot_fx.rpc_id(peer, path, origin, dir, shot_seed)
-
-
-# ------------------------------------------------------------------ shot logic
-## Host only: damage. Projectiles deal their own damage on the host's copy.
-func _resolve_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, rewind_ms := 0, is_aiming := false) -> void:
-	if data.pull_radius > 0.0:
-		# Boombox: every shot drags nearby enemies toward the shooter.
-		for enemy in get_tree().get_nodes_in_group("enemies"):
-			var to: Vector3 = player.global_position - enemy.global_position
-			to.y = 0.0
-			if to.length() <= data.pull_radius:
-				enemy.knockback(to.normalized() * 9.0)
-	if data.kind != WeaponData.Kind.HITSCAN:
-		return
-	_shot_counter += 1
-	var lucky := data.lucky_kill_chance > 0.0 and _seeded(shot_seed, 2) < data.lucky_kill_chance
-	var max_hits := data.pierce + 1 + GameManager.extra_pierce()
-	var ads_mult := GameManager.ads_damage_scale() if is_aiming else 1.0
-	var voltaic_ready := GameManager.has_player_mutation("voltaic_veins") and (_shot_counter % 4 == 0)
-	var voltaic_fired := false
-	for ray in _pellet_rays(data, origin, dir, shot_seed, is_aiming):
-		if rewind_ms > 0:
-			var hits := LagComp.cast_rewound(get_world_3d(), get_tree(), origin, ray, data.max_range, player, rewind_ms, max_hits)
-			for hit in hits:
-				var collider: Object = hit.collider
-				var pos: Vector3 = hit.position
-				var rewound_pos: Vector3 = hit.rewound_pos
-				var distance: float = hit.distance
-				var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
-				var damage := 9999.0 if lucky else data.damage * falloff * ads_mult
-				if collider.has_method("take_bullet"):
-					collider.take_bullet(damage, pos, player, rewound_pos)
-				else:
-					collider.take_damage(damage, player)
-				if data.knockback > 0.0 and collider.has_method("knockback"):
-					collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
-				if voltaic_ready and not voltaic_fired and collider is EnemyBase:
-					voltaic_fired = true
-					_trigger_voltaic_arc(collider as EnemyBase, pos)
-		else:
-			var start := origin
-			var exclude: Array[RID] = []
-			for pass_i in max_hits:
-				var hit := _cast(start, ray, data.max_range, exclude)
-				if hit.is_empty() or not is_damageable(hit.collider):
-					break
-				var distance := origin.distance_to(hit.position)
-				var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
-				var damage := 9999.0 if lucky else data.damage * falloff * ads_mult
-				if hit.collider.has_method("take_bullet"):
-					hit.collider.take_bullet(damage, hit.position, player)
-				else:
-					hit.collider.take_damage(damage, player)
-				if data.knockback > 0.0 and hit.collider.has_method("knockback"):
-					hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
-				if voltaic_ready and not voltaic_fired and hit.collider is EnemyBase:
-					voltaic_fired = true
-					_trigger_voltaic_arc(hit.collider as EnemyBase, hit.position)
-				exclude.append(hit.rid)
-				start = hit.position
-
-
-## Voltaic Veins player mutation: chain lightning from the struck target to up to 2 nearby enemies.
-func _trigger_voltaic_arc(origin_enemy: EnemyBase, hit_pos: Vector3) -> void:
-	var hit_set: Array = [origin_enemy]
-	var points: Array = [hit_pos]
-	var cur_pos := hit_pos
-	for _hop in 2:
-		var best: EnemyBase = null
-		var best_d := 8.0
-		for node in get_tree().get_nodes_in_group("enemies"):
-			var cand := node as EnemyBase
-			if cand == null or cand.health <= 0.0 or cand in hit_set:
-				continue
-			var d := cand.global_position.distance_to(cur_pos)
-			if d < best_d:
-				best_d = d
-				best = cand
-		if best == null:
-			break
-		hit_set.append(best)
-		var target_pos := best.global_position + Vector3.UP * 1.0
-		points.append(target_pos)
-		best.reveal(2.0)
-		best.stagger(0.25)
-		best.take_damage(18.0, player)
-		cur_pos = target_pos
-	if points.size() >= 2:
-		GameManager.broadcast_arc(points, Color(0.48, 0.94, 1.0))
-
-
-## Every peer: effects. Projectiles are simulated by every peer from here.
-func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, is_local: bool, is_aiming := false) -> void:
-	var world := player.get_parent()
-	var muzzle := _muzzle_position() if is_local else origin + dir * 0.6
-	var ballistic := data.kind == WeaponData.Kind.HITSCAN
-	# Ballistic guns: slightly lower, varied report so they read as gunpowder
-	# rather than identical zaps.
-	var pitch := randf_range(0.86, 0.97) if ballistic else 1.0
-	if not data.shot_sound.is_empty():
-		if is_local:
-			Sound.play(data.shot_sound, -7.0, pitch)
-		else:
-			Sound.play_at(data.shot_sound, muzzle, -6.0, pitch)
-	if ballistic:
-		ShotFX.flash(world, muzzle, Color(1.0, 0.72, 0.38), 3.5)
-		ShotFX.puff(world, muzzle, Color(1.0, 0.86, 0.55, 0.9), 0.07, 0.05)
+	var definition := selected_definition()
+	var data := definition.weapon
+	var take := mini(1 if data.shell_reload else data.mag_size - item.count, selected_reserve())
+	item.count += take
+	reserves[definition.ammo_type] = selected_reserve() - take
+	_reload_serial = 0
+	if data.shell_reload and item.count < data.mag_size and selected_reserve() > 0:
+		_start_reload_host()
 	else:
-		ShotFX.flash(world, muzzle, data.tracer_color.lightened(0.3), 3.0)
-	match data.kind:
-		WeaponData.Kind.HITSCAN:
-			var hit_points: Array[Vector3] = []
-			for ray in _pellet_rays(data, origin, dir, shot_seed, is_aiming):
-				var hit := _cast(origin, ray, data.max_range)
-				var end: Vector3 = hit.position if not hit.is_empty() else origin + ray * data.max_range
-				ShotFX.tracer(world, muzzle, end, data.tracer_color)
-				if not hit.is_empty():
-					var enemy_hit: bool = is_damageable(hit.collider)
-					ShotFX.puff(world, end, Color(0.6, 1.0, 0.4, 0.8) if enemy_hit else Color(0.8, 0.8, 0.75, 0.7), 0.08, 0.2)
-					if enemy_hit:
-						hit_points.append(end)
-						if is_local or randf() < 0.5:
-							_splat_behind(end, ray)
-						if hit.collider.has_method("hit_flash"):
-							hit.collider.hit_flash()
-			# One layered impact per shot, louder for more pellets, instead of
-			# a voice per pellet.
-			if not hit_points.is_empty():
-				var center := Vector3.ZERO
-				for p in hit_points:
-					center += p
-				Sound.play_at("hit_flesh", center / hit_points.size(), -18.0 + minf(6.0, 2.0 * (hit_points.size() - 1)))
+		send_state(false)
+		if data.shell_reload and player.is_multiplayer_authority():
+			Sound.play("shotgun_pump", -8.0)
+			_kick = 0.6
 
-		_:
-			var projectile := Projectile.new()
-			world.add_child(projectile)
-			projectile.launch(muzzle, dir, data, Net.is_host(), player)
+func _reload_sound(data: WeaponData) -> void:
+	var cue := "reel_tick" if data.shell_reload else ("rifle_reload" if data.automatic else "reload")
+	Sound.play(cue, -12.0 if data.shell_reload else -8.0)
 
+@rpc("any_peer", "call_remote", "reliable")
+func _request_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool) -> void:
+	if _valid_sender():
+		_host_shot(run, serial, origin, dir, is_aiming, Net.get_rewind_ms(multiplayer.get_remote_sender_id()))
 
-func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: int, is_aiming := false) -> Array[Vector3]:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = shot_seed
-	var rays: Array[Vector3] = []
-	var side := dir.cross(Vector3.UP).normalized()
-	if side.length_squared() < 0.01:
-		side = Vector3.RIGHT
-	var up := side.cross(dir).normalized()
-	var aim_factor := 1.0 if is_aiming else _aim
-	var ads_spread := 0.25 if GameManager.has_player_mutation("hyper_focus") else 0.45
-	var spread := deg_to_rad((data.spread_degrees + data.burst_spread * _heat) * lerpf(1.0, ads_spread, aim_factor))
-	for i in data.pellets:
-		var angle := rng.randf() * TAU
-		var radius := sqrt(rng.randf()) * spread
-		rays.append((dir + (side * cos(angle) + up * sin(angle)) * tan(radius)).normalized())
-	return rays
-
-
-## Enemies, boss parts and Turned players take bullets; everyone else doesn't.
-static func is_damageable(target: Object) -> bool:
-	if target == null or not target.has_method("take_damage"):
+func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, rewind_ms: int) -> bool:
+	if not Net.is_host() or not can_act() or run != loot.run_id or serial == 0 or selected_serial() != serial \
+			or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
 		return false
-	if target is EnemyBase or (target is Node and target.is_in_group("boss_parts")):
+	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.5 \
+			or origin.distance_to(camera.global_position) > 3.0 \
+			or not WeaponCombat.clear_path(get_world_3d(), camera.global_position, origin):
+		return false
+	var item := selected()
+	var definition := selected_definition()
+	var data := definition.weapon
+	if item.count <= 0 or loot.clock < item.jam_until or (_reload_serial != 0 and not data.shell_reload):
+		return false
+	if data.charge_time > 0.0:
+		var charged := _charge_serial == serial and loot.clock - _charge_at >= data.charge_time
+		_charge_serial = 0
+		if not charged:
+			return false
+	dir = dir.normalized()
+	if not WeaponCombat.can_use(self, item.id, dir):
+		return false
+	_cancel_actions()
+	item.count -= 1
+	_cooldown = data.fire_interval * GameManager.fire_rate_scale()
+	if data.jam_chance > 0.0 and RNG.chance(data.jam_chance):
+		item.jam_until = loot.clock + data.jam_time
+		_apply_jam()
+		if not player.is_multiplayer_authority():
+			_jam.rpc_id(player.get_multiplayer_authority(), loot.run_id)
+		send_state(false)
 		return true
-	return target is Node and target.is_in_group("players") and target.get("state") == "turned"
+	_heat = move_toward(_heat, 0.0, maxf(0.0, loot.clock - _spread_at) * 1.6)
+	_spread_at = loot.clock
+	var ads_scale := 0.25 if GameManager.has_player_mutation("hyper_focus") else 0.45
+	var spread := (data.spread_degrees + data.burst_spread * _heat) * (ads_scale if is_aiming else 1.0)
+	_heat = minf(1.0, _heat + 0.22)
+	var seed := RNG.rng.randi()
+	var lucky := data.lucky_kill_chance > 0.0 and RNG.chance(data.lucky_kill_chance)
+	_shot_counter += 1
+	player.begin_hit_batch()
+	var traces := WeaponCombat.resolve(self, item, origin, dir, seed, spread, is_aiming, lucky, rewind_ms)
+	player.end_hit_batch()
+	_play_shot(item.id, origin, dir, traces, is_aiming)
+	Net.rpc_to_run(_shot_fx, [loot.run_id, item.id, origin, dir, traces, is_aiming])
+	var emptied := item.count == 0 and definition.kind != ItemDefinition.Kind.GUN
+	if emptied:
+		slots[current] = null
+	send_state(emptied)
+	return true
 
+@rpc("any_peer", "call_remote", "reliable")
+func _jam(run: int) -> void:
+	if multiplayer.get_remote_sender_id() == 1 and run == loot.run_id:
+		_apply_jam()
 
-## Owner: an item from a crate.
-func grant(item: String) -> void:
-	if item == "ammo":
-		for i in loadout.size():
-			reserve[i] = loadout[i].reserve_ammo
-	elif item == "flares":
-		for i in loadout.size():
-			if loadout[i].kind == WeaponData.Kind.FLARE:
-				reserve[i] += 4
-	elif item == "base_ammo":
-		var i := randi() % loadout.size()
-		reserve[i] += loadout[i].mag_size * 3
-	elif item.begins_with("weapon:"):
-		add_weapon(load(item.trim_prefix("weapon:")))
-	elif item.begins_with("issue:"):
-		_issue_weapon(load(item.trim_prefix("issue:")))
+func _apply_jam() -> void:
+	if player.is_multiplayer_authority() and not Net.dedicated:
+		Sound.play("jam")
 
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _shot_fx(run: int, id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool) -> void:
+	if multiplayer.get_remote_sender_id() == 1 and run == loot.run_id:
+		_play_shot(id, origin, dir, traces, ads)
 
-## Wave reward: make sure the player carries this gun with a full reserve,
-## without switching to it mid-fight or stacking ammo past the cap.
-func _issue_weapon(data: WeaponData) -> void:
-	if data == null:
+func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool) -> void:
+	if Net.dedicated:
 		return
-	for i in loadout.size():
-		if loadout[i].resource_path == data.resource_path:
-			reserve[i] = maxi(reserve[i], data.reserve_ammo)
-			return
-	if loadout.size() >= 5:
+	var local := player.is_multiplayer_authority()
+	var data := ItemCatalog.definition(id).weapon
+	var muzzle := _muzzle_position() if local and equipped_id == id else origin + dir * 0.55
+	WeaponCombat.play_fx(loot, id, muzzle, traces, local)
+	if not local:
 		return
-	loadout.append(data)
-	ammo.append(data.mag_size)
-	reserve.append(data.reserve_ammo)
-	weapon_changed.emit(loadout[current])
+	_pending_action = 0.0
+	_cooldown = data.fire_interval * GameManager.fire_rate_scale()
+	_kick = 1.0
+	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
+	var recoil_scale := (0.50 if GameManager.has_player_mutation("hyper_focus") else 0.65) if ads else 1.0
+	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * recoil_scale, deg_to_rad(5.0))
+	_shot_juice(data)
+	fired.emit(data)
+	if id == "pump_shotgun":
+		get_tree().create_timer(_cooldown * 0.2).timeout.connect(func():
+			if equipped_id == id:
+				Sound.play("shotgun_pump", -11.0))
 
+func _stack_slot(item: ItemInstance) -> int:
+	var definition := ItemCatalog.definition(item.id)
+	if definition.kind != ItemDefinition.Kind.GUN:
+		for index in SLOT_COUNT:
+			var other := slots[index]
+			if other and other.id == item.id and other.tier == item.tier and other.count + item.count <= definition.stack_cap:
+				return index
+	return -1
 
-## Owner: add a weapon (cursed ones from crates) and switch to it.
-## A fifth slot is replaced if one is already there.
-func add_weapon(data: WeaponData) -> void:
-	if data == null:
+func needs_swap(item: ItemInstance) -> bool:
+	return not slots.has(null) and _stack_slot(item) == -1
+
+## Returns the displaced item, null on placement/stack, or the original on rejection.
+func accept_pickup(item: ItemInstance) -> ItemInstance:
+	var stack := _stack_slot(item)
+	if stack >= 0:
+		slots[stack].count += item.count
+		return null
+	var index := slots.find(null)
+	if index < 0:
+		index = current
+	var replaced := slots[index]
+	slots[index] = item
+	var definition := ItemCatalog.definition(item.id)
+	if definition and definition.kind == ItemDefinition.Kind.GUN and not definition.ammo_type.is_empty() and not _seeded_ammo.has(definition.ammo_type):
+		_seeded_ammo[definition.ammo_type] = true
+		var cap: int = int(ItemCatalog.CAPS[definition.ammo_type])
+		var starter: int = mini(cap, maxi(definition.weapon.mag_size * 2, int(cap * 0.5)))
+		reserves[definition.ammo_type] = mini(cap, maxi(int(reserves.get(definition.ammo_type, 0)), starter))
+	if index == current:
+		_cancel_actions()
+	return replaced
+
+func spill() -> void:
+	if not Net.is_host() or loot == null:
 		return
-	for i in loadout.size():
-		if loadout[i].resource_path == data.resource_path:
-			reserve[i] += data.reserve_ammo
-			_equip(i)
-			return
-	if loadout.size() >= 5:
-		loadout.remove_at(4)
-		ammo.remove_at(4)
-		reserve.remove_at(4)
-	loadout.append(data)
-	ammo.append(data.mag_size)
-	reserve.append(data.reserve_ammo)
-	_equip(loadout.size() - 1)
+	_cancel_actions()
+	for i in SLOT_COUNT:
+		var item := slots[i]
+		if item == null:
+			continue
+		slots[i] = null
+		var at := loot.ground_at(player, Vector3.FORWARD.rotated(Vector3.UP, i * TAU / SLOT_COUNT) * 0.9)
+		if at == Vector3.INF:
+			at = loot.ground_at(player, Vector3.ZERO)
+		if at == Vector3.INF:
+			at = player.global_position
+		loot.spawn_pickup(item, at)
 
+func can_collect_ammo() -> bool:
+	for type: String in _carried_types():
+		if int(reserves.get(type, 0)) < int(ItemCatalog.CAPS[type]):
+			return true
+	return false
 
-func _seeded(shot_seed: int, salt: int) -> float:
-	var r := RandomNumberGenerator.new()
-	r.seed = shot_seed * 31 + salt
-	return r.randf()
+func _carried_types() -> Dictionary:
+	var types: Dictionary = {}
+	for item in slots:
+		if item:
+			var definition := ItemCatalog.definition(item.id)
+			if not definition.ammo_type.is_empty():
+				types[definition.ammo_type] = maxi(int(types.get(definition.ammo_type, 0)), definition.weapon.mag_size)
+	return types
 
+func collect_ammo(full := false) -> bool:
+	if not Net.is_host():
+		return false
+	var collected := false
+	var types := _carried_types()
+	for type: String in types:
+		var old := int(reserves.get(type, 0))
+		var amount := maxi(1, roundi(types[type] * GameManager.ammo_pickup_fraction()))
+		var cap: int = ItemCatalog.CAPS[type]
+		var total := cap if full else mini(old + amount, cap)
+		if total > old:
+			reserves[type] = total
+			collected = true
+	if collected:
+		send_state(false)
+	return collected
 
-func _cast(origin: Vector3, ray: Vector3, max_range: float, extra_exclude: Array[RID] = []) -> Dictionary:
-	var exclude: Array[RID] = extra_exclude.duplicate()
-	if player is CollisionObject3D:
-		exclude.append(player.get_rid())
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + ray * max_range, HIT_MASK, exclude)
-	return get_world_3d().direct_space_state.intersect_ray(query)
-
-
-# ------------------------------------------------------------------ viewmodel
-# ------------------------------------------------------------------ juice
-static var _splat_mesh: QuadMesh
-static var _splat_mat: StandardMaterial3D
-static var _splats: Array[Node3D] = []
-
-
-## Green gore splat on whatever is behind the enemy that was hit.
-func _splat_behind(at: Vector3, ray: Vector3) -> void:
-	var query := PhysicsRayQueryParameters3D.create(at, at + ray * 3.5, 1)
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty():
+func earn_scrap(amount: int) -> void:
+	if not Net.is_host():
 		return
-	if _splat_mesh == null:
-		_splat_mesh = QuadMesh.new()
-		_splat_mesh.size = Vector2.ONE
-		var grad := Gradient.new()
-		grad.set_color(0, Color(0.55, 0.9, 0.25, 0.85))
-		grad.set_color(1, Color(0.35, 0.6, 0.15, 0.0))
-		var tex := GradientTexture2D.new()
-		tex.gradient = grad
-		tex.fill = GradientTexture2D.FILL_RADIAL
-		tex.fill_from = Vector2(0.5, 0.5)
-		tex.fill_to = Vector2(1.0, 0.5)
-		tex.width = 32
-		tex.height = 32
-		_splat_mat = StandardMaterial3D.new()
-		_splat_mat.albedo_texture = tex
-		_splat_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_splat_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_splat_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	var splat := MeshInstance3D.new()
-	splat.mesh = _splat_mesh
-	splat.material_override = _splat_mat
-	splat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	player.get_parent().add_child(splat)
-	var normal: Vector3 = hit.normal
-	var up := Vector3.UP if absf(normal.y) < 0.95 else Vector3.FORWARD
-	splat.global_transform = Transform3D(Basis.looking_at(-normal, up), hit.position + normal * 0.02)
-	splat.scale = Vector3.ONE * randf_range(0.35, 0.8)
-	splat.rotate_object_local(Vector3.FORWARD, randf() * TAU)
-	var tween := splat.create_tween()
-	tween.tween_interval(18.0)
-	tween.tween_property(splat, "scale", Vector3.ZERO, 2.0)
-	tween.tween_callback(splat.queue_free)
-	_splats = _splats.filter(func(n): return is_instance_valid(n))
-	_splats.append(splat)
-	while _splats.size() > (16 if OS.has_feature("web") else 40):
-		_splats.pop_front().queue_free()
+	scrap += amount
+	send_state(false)
+	var peer := player.get_multiplayer_authority()
+	if peer == 1:
+		if not Net.dedicated:
+			_show_scrap(amount)
+	elif Net.run_peers.has(peer):
+		_scrap_feedback.rpc_id(peer, loot.run_id, amount)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _scrap_feedback(run: int, amount: int) -> void:
+	if multiplayer.get_remote_sender_id() == 1 and run == loot.run_id:
+		_show_scrap(amount)
+
+func _show_scrap(amount: int) -> void:
+	Juice.popup("+%d SCRAP" % amount, Color("#ffc365"))
+
+func spend_scrap(amount: int) -> bool:
+	if not Net.is_host() or amount < 0 or scrap < amount:
+		return false
+	scrap -= amount
+	send_state(false)
+	return true
+
+func send_state(update_public := true) -> void:
+	if not Net.is_host() or loot == null:
+		return
+	revision += 1
+	if update_public:
+		_refresh_equip()
+		Net.rpc_to_run(_equip_state, [loot.run_id, revision, equipped_id, equipped_tier])
+	var item := selected()
+	_jam_left = maxf(0.0, item.jam_until - loot.clock) if item else 0.0
+	var peer := player.get_multiplayer_authority()
+	if peer != 1 and Net.run_peers.has(peer):
+		sync_private_to(peer)
+
+func sync_private_to(peer: int) -> void:
+	var rows: Array = []
+	for item in slots:
+		rows.append(item.encode() if item else [])
+	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, scrap, _reload_left, _reload_total, _jam_left, _cooldown)
+
+func sync_equip_to(peer: int) -> void:
+	_equip_state.rpc_id(peer, loot.run_id, revision, equipped_id, equipped_tier)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, new_scrap: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
+	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id or rev <= _private_revision or not player.is_multiplayer_authority():
+		return
+	_private_revision = rev
+	var old_serial := selected_serial()
+	var old_reload := _reload_left
+	for i in SLOT_COUNT:
+		slots[i] = ItemInstance.decode(rows[i])
+	reserves = stash
+	current = slot
+	scrap = new_scrap
+	_reload_left = reload_left
+	_reload_total = reload_total
+	_jam_left = jam_left
+	_cooldown = cooldown
+	_refresh_equip()
+	if reload_left > 0.0 and (old_reload < reload_left or old_serial != selected_serial()):
+		_reload_sound(selected_weapon())
+
+@rpc("any_peer", "call_remote", "reliable")
+func _equip_state(run: int, rev: int, id: String, tier: int) -> void:
+	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id or rev <= _public_revision:
+		return
+	_public_revision = rev
+	if not player.is_multiplayer_authority():
+		_apply_equip(id, tier)
+
+func _refresh_equip() -> void:
+	var item := selected()
+	_apply_equip(item.id if item else "", item.tier if item else 0)
+	if player.is_multiplayer_authority() and _model_serial != selected_serial():
+		_model_serial = selected_serial()
+		_equip_left = 1.0
+		_aim = 0.0
+
+func _apply_equip(id: String, tier: int) -> void:
+	var changed := equipped_id != id or equipped_tier != tier
+	equipped_id = id
+	equipped_tier = tier
+	var definition := ItemCatalog.definition(id)
+	player.holding_leaky = definition != null and definition.weapon.held_suit_drain > 0.0
+	if player.holding_leaky:
+		player.leaky_drain = definition.weapon.held_suit_drain
+	if not changed or Net.dedicated:
+		return
+	if _model:
+		_model.hide()
+		_model.queue_free()
+		_model = null
+	if _remote_view:
+		_remote_view.hide()
+		_remote_view.queue_free()
+		_remote_view = null
+	_sight_point = Vector3.INF
+	if definition != null:
+		if player.is_multiplayer_authority():
+			_model = ItemCatalog.model(id)
+			add_child(_model)
+			_model.set_meta("base_scale", _model.scale)
+			if _model is GeometryInstance3D:
+				_model.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			for mesh: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_sight_point = _model.get_meta("sight", Vector3.INF)
+		else:
+			_remote_view = ItemCatalog.model(id, true)
+			player.add_child.call_deferred(_remote_view)
+			_remote_view.position = Vector3(0.34, 1.12, -0.47)
+	weapon_changed.emit(definition.weapon if definition else null)
+
+func _publish() -> void:
+	var data := selected_weapon()
+	player.weapon_name = data.display_name + (" (JAMMED)" if jammed() else (" (reloading)" if _reload_left > 0.0 else "")) if data else null
+	player.ammo = selected().count if data else null
+	player.max_ammo = selected_reserve() if data else null
+
+func _pad_connected() -> bool:
+	return not Input.get_connected_joypads().is_empty()
 
 var _roll := 0.0
 var _sprint_fov := 0.0
@@ -530,7 +589,7 @@ var _casings: Array[Node3D] = []
 ## Local feel for every shot: ejected brass, muzzle smoke, a camera roll and
 ## shake on heavy guns.
 func _shot_juice(data: WeaponData) -> void:
-	if data.kind != WeaponData.Kind.HITSCAN or _model == null:
+	if data.kind != WeaponData.Kind.HITSCAN or _model == null or OS.has_feature("web") or not data.mechanic in ["", "pin", "hunt", "salt"]:
 		return
 	var heavy := data.pellets > 1
 	_roll += deg_to_rad(randf_range(1.2, 2.2) if heavy else randf_range(0.2, 0.5)) * (1 if randf() < 0.5 else -1)
@@ -552,7 +611,7 @@ func _eject_casing(heavy: bool) -> void:
 	casing.mesh = _casing_mesh
 	casing.material_override = _casing_mat
 	casing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var world := player.get_parent()
+	var world := loot
 	world.add_child(casing)
 	var start := _model.global_transform * Vector3(0.03, 0.03, -0.05)
 	casing.global_position = start
@@ -573,36 +632,15 @@ func _eject_casing(heavy: bool) -> void:
 		_casings.pop_front().queue_free()
 
 
-func _equip(index: int) -> void:
-	if index < 0 or index >= loadout.size():
-		return
-	_equip_left = 1.0
-	_heat = 0.0
-	_fire_buffer = 0.0
-	current = index
-	_reload_left = 0.0
-	_cooldown = maxf(_cooldown, 0.25)
-	if _model:
-		_model.queue_free()
-		_model = null
-	var data := loadout[index]
-	_model = data.make_model()
-	_sight_point = Vector3.INF
-	if _model:
-		add_child(_model)
-		for mesh in _model.find_children("*", "MeshInstance3D", true, false):
-			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_sight_point = _model.get_meta("sight", Vector3.INF)
-	weapon_changed.emit(data)
-
-
 func _animate(delta: float) -> void:
-	if loadout.is_empty() or _model == null:
+	var data := selected_weapon()
+	if _model == null or data == null:
 		return
-	var data := loadout[current]
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
-	var aiming: bool = player.is_multiplayer_authority() and player.get("state") == "ok" and not player.get("tarp_raised") 			and _reload_left <= 0.0 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
+	var aiming: bool = can_act() and not player.get("tarp_raised") \
+			and _reload_left <= 0.0 \
+			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
@@ -637,7 +675,7 @@ func _animate(delta: float) -> void:
 	var lowered := _raise_left / SPRINT_RAISE
 	_model.position = data.view_position.lerp(_ads_position(data), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left - 0.06 * lowered, 0.08 * _kick + reload_push)
 	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick + _recoil * 8.0 - 35.0 * reload_dip - 14.0 * lowered, 12.0 * lowered, sin(_bob) * _kick * 1.5 + reload_roll)
-	_model.scale = Vector3.ONE * data.view_scale
+	_model.scale = (_model.get_meta("base_scale", Vector3.ONE) as Vector3) * data.view_scale
 	# Moving parts on the custom models.
 	var pump := _model.get_node_or_null("Pump") as Node3D
 	if pump:
@@ -648,68 +686,6 @@ func _animate(delta: float) -> void:
 	if barrel:
 		# Break action: the barrel tips open for the reload.
 		barrel.rotation.x = -deg_to_rad(42.0) * clampf(reload_dip / 1.25, 0.0, 1.0)
-
-
-# ------------------------------------------------------------------ throw preview
-const PREVIEW_DOTS := 40
-var _arc: MultiMeshInstance3D
-var _arc_ring: MeshInstance3D
-var _arc_material: StandardMaterial3D
-
-
-## Grenades (frag, Shield Dome): a dotted arc along the real throw physics and
-## a ring where it lands, sized to its blast/dome radius. Brighter while aiming.
-func _update_throw_preview() -> void:
-	var data: WeaponData = loadout[current] if not loadout.is_empty() else null
-	var wanted: bool = data != null and player != null and player.is_multiplayer_authority() 			and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE] 			and player.get("state") == "ok" and _reload_left <= 0.0 and ammo[current] > 0
-	if not wanted:
-		if _arc:
-			_arc.visible = false
-			_arc_ring.visible = false
-		return
-	if _arc == null:
-		_build_preview()
-	var color: Color = data.tracer_color
-	_arc_material.albedo_color = Color(color.r, color.g, color.b, lerpf(0.35, 0.9, _aim))
-	var pos := _muzzle_position()
-	var vel := -camera.global_basis.z * data.projectile_speed + Vector3.UP * 3.0
-	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity") * data.projectile_gravity
-	var space := get_world_3d().direct_space_state
-	var exclude: Array[RID] = []
-	if player is CollisionObject3D:
-		exclude.append(player.get_rid())
-	var dt := 1.0 / 30.0
-	var dots := 0
-	var landed := false
-	var land := Vector3.ZERO
-	var land_normal := Vector3.UP
-	var travelled := 0.0
-	var total := 0.0
-	for i in 120:
-		vel.y -= gravity * dt
-		var next := pos + vel * dt
-		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(pos, next, HIT_MASK, exclude))
-		if not hit.is_empty():
-			land = hit.position
-			land_normal = hit.normal
-			landed = true
-			break
-		travelled += pos.distance_to(next)
-		total += pos.distance_to(next)
-		# Start the dots a little out from the hand so they don't fill the screen.
-		if total >= 1.6 and travelled >= 0.45 and dots < PREVIEW_DOTS:
-			travelled = 0.0
-			_arc.multimesh.set_instance_transform(dots, Transform3D(Basis(), next))
-			dots += 1
-		pos = next
-	_arc.multimesh.visible_instance_count = dots
-	_arc.visible = true
-	_arc_ring.visible = landed
-	if landed:
-		var preview_r := data.effect_radius * (GameManager.explosive_radius_scale() if data.kind == WeaponData.Kind.GRENADE else 1.0)
-		_arc_ring.global_position = land + land_normal * 0.05
-		_arc_ring.scale = Vector3(preview_r, 1.0, preview_r)
-		_arc_ring.material_override = _arc_material
 
 
 func _build_preview() -> void:
@@ -759,44 +735,90 @@ func sighted() -> bool:
 	return _sight_point != Vector3.INF and _aim > 0.85
 
 
+
+
+
+const PREVIEW_DOTS := 40
+var _arc: MultiMeshInstance3D
+var _arc_ring: MeshInstance3D
+var _arc_material: StandardMaterial3D
+var _preview_check := 0.0
+var _preview_age := 0.0
+var _previous_origin := Vector3.INF
+var _previous_direction := Vector3.ZERO
+var _previous_id := ""
+
+func _update_throw_preview(delta: float) -> void:
+	var data := selected_weapon()
+	var wanted: bool = data != null and can_act() and not player.tarp_raised and selected().count > 0 \
+		and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE]
+	if not wanted:
+		if _arc:
+			_arc.hide()
+			_arc_ring.hide()
+		_previous_id = ""
+		return
+	_preview_check -= delta
+	_preview_age += delta
+	if _preview_check > 0.0:
+		return
+	_preview_check = 0.075
+	var dir := -camera.global_basis.z
+	var origin := WeaponCombat.throw_origin(get_world_3d(), camera.global_position, dir)
+	if _previous_id == equipped_id and _preview_age < 0.3 and _previous_origin.distance_squared_to(origin) < 0.0144 \
+			and _previous_direction.dot(dir) > 0.9995:
+		return
+	_preview_age = 0.0
+	_previous_id = equipped_id
+	_previous_origin = origin
+	_previous_direction = dir
+	if _arc == null:
+		_build_preview()
+	var color := data.tracer_color
+	_arc_material.albedo_color = Color(color, lerpf(0.4, 0.9, _aim))
+	var pos := origin
+	var vel := WeaponProjectile.launch_velocity(data, dir)
+	var exclude: Array[RID] = [player.get_rid()]
+	var dt := 0.10
+	var dots := 0
+	var elapsed := 0.0
+	var travelled := 0.0
+	var total := 0.0
+	var touched := false
+	var life := WeaponProjectile.flight_time(data)
+	var acceleration := WeaponProjectile.gravity(data)
+	while elapsed < life and dots < PREVIEW_DOTS:
+		var step := minf(dt, life - elapsed)
+		elapsed += step
+		vel.y -= acceleration * step
+		var next := pos + vel * step
+		var hit := WeaponProjectile.motion_hit(get_world_3d(), pos, next, exclude)
+		if not hit.is_empty():
+			touched = true
+			var normal: Vector3 = hit.normal
+			next = (hit.position as Vector3) + normal * 0.07
+			vel = WeaponProjectile.bounce(data, hit, vel, elapsed)
+		travelled += pos.distance_to(next)
+		total += pos.distance_to(next)
+		if total >= 1.1 and travelled >= 0.45:
+			travelled = 0.0
+			_arc.multimesh.set_instance_transform(dots, Transform3D(Basis(), next))
+			dots += 1
+		pos = next
+		if touched and vel == Vector3.ZERO:
+			break
+	_arc.multimesh.visible_instance_count = dots
+	_arc.show()
+	_arc_ring.visible = touched or data.kind == WeaponData.Kind.GRENADE
+	_arc_ring.global_position = pos + Vector3.UP * 0.045
+	var radius := data.effect_radius * (GameManager.explosive_radius_scale() if equipped_id == "frag" else 1.0)
+	_arc_ring.scale = Vector3(radius, 1.0, radius)
+	_arc_ring.material_override = _arc_material
+
 func _muzzle_position() -> Vector3:
 	if _model:
-		return _model.global_transform * (_model.get_meta("muzzle", loadout[current].muzzle) as Vector3)
+		return _model.global_transform * (_model.get_meta("muzzle", selected_weapon().muzzle) as Vector3)
 	return camera.global_position
 
-
-func _publish() -> void:
-	if loadout.is_empty():
-		return
-	var data := loadout[current]
-	player.set("weapon_name", data.display_name + (" (reloading)" if _reload_left > 0.0 else ""))
-	player.set("holding_leaky", data.held_suit_drain > 0.0)
-	player.set("ammo", ammo[current])
-	player.set("max_ammo", reserve[current])
-
-
-func _find_player() -> Node3D:
-	var node := get_parent()
-	while node and not node.is_in_group("players") and not (node is CharacterBody3D):
-		node = node.get_parent()
-	return node as Node3D
-
-
-func _pad_connected() -> bool:
-	return not Input.get_connected_joypads().is_empty()
-
-
-## Kill drops refill ballistic guns only; supply packs also restock flares and
-## Bug Bombs so those stay tactical.
-func collect_ammo(include_special := false) -> bool:
-	var collected := false
-	for i in loadout.size():
-		var data := loadout[i]
-		if not include_special and data.kind in [WeaponData.Kind.FLARE, WeaponData.Kind.GRENADE]:
-			continue
-		var cap := data.reserve_ammo
-		if reserve[i] < cap:
-			var amount := maxi(1, roundi(data.mag_size * GameManager.ammo_pickup_fraction()))
-			reserve[i] = mini(cap, reserve[i] + amount)
-			collected = true
-	return collected
+static func is_damageable(target: Object) -> bool:
+	return WeaponCombat.is_damageable(target)

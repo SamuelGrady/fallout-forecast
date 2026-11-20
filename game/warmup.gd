@@ -382,7 +382,6 @@ func _warm_combat_fx(base: Vector3, right: Vector3, up: Vector3) -> void:
 		var drop := Node3D.new()
 		drop.set_script(preload("res://weapons/ammo_drop.gd"))
 		drop.set("kind", kind)
-		drop.set("expires_after", 1.0)
 		_holder.add_child(drop)
 		drop.global_position = base + right * (randf() - 0.5) * 2.0 - up * 0.5
 	# Turned player overlay swatch (metallic/lit base + unshaded alpha overlay).

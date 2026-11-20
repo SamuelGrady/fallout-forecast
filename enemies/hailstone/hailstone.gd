@@ -90,14 +90,17 @@ func is_critical_hit(height: float, source: Node) -> bool:
 	return height >= .94 and height <= 1.94 and source is Node3D and _facing_source(source) < -.35
 
 
-func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:
 	_taking_bullet = true
-	super.take_bullet(amount, point, source, rewound_pos)
+	super.take_bullet(amount, point, source, rewound_pos, critical_bonus)
 	_taking_bullet = false
 
 
 func take_damage(amount: float, source: Node = null) -> void:
-	if _taking_bullet and Net.is_host() and health > 0.0 and source is Node3D and _facing_source(source) > .30:
+	var origin := _blast_origin
+	if origin == Vector3.INF and _taking_bullet and is_instance_valid(source) and source is Node3D:
+		origin = source.global_position
+	if Net.is_host() and health > 0.0 and origin != Vector3.INF and blocks_impact(origin):
 		amount *= .36
 		var at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.4
 		ShotFX.sparks(get_parent(), at, -global_basis.z, 5)
@@ -107,3 +110,7 @@ func take_damage(amount: float, source: Node = null) -> void:
 
 func _facing_source(source: Node3D) -> float:
 	return (-global_basis.z.normalized()).dot(flat_direction(source.global_position))
+
+
+func blocks_impact(origin: Vector3) -> bool:
+	return (-global_basis.z.normalized()).dot(flat_direction(origin)) > 0.30

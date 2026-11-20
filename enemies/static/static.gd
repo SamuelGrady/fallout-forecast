@@ -111,3 +111,10 @@ func _process(delta: float) -> void:
 
 func is_critical_hit(height: float, _source: Node) -> bool:
 	return height >= 1.58
+
+
+func salt_stun() -> void:
+	stagger(1.8)
+	_blink_left = maxf(_blink_left, 2.1)
+	_charged_left = 0.0
+	reveal(1.8)

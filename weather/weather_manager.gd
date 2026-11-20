@@ -179,7 +179,10 @@ func strike_lightning(at: Variant = null) -> void:
 	if not Net.is_host():
 		return
 	var position: Vector3
-	if at is Vector3:
+	var rods := get_tree().get_nodes_in_group("lightning_rods")
+	if not rods.is_empty():
+		position = rods[0].global_position
+	elif at is Vector3:
 		position = at
 	else:
 		var sites := get_tree().get_nodes_in_group("enemy_spawn")
@@ -213,6 +216,11 @@ func sync_to_peer(peer_id: int) -> void:
 		_receive_phase.rpc_id(peer_id, phase, wave, phase_time_left)
 		_receive_intensity.rpc_id(peer_id, storm_intensity)
 		_override.rpc_id(peer_id, intensity_override)
+
+
+func replicate_puddle_growth(values: Dictionary) -> void:
+	if Net.is_host() and not values.is_empty():
+		Net.rpc_to_run(_sync_puddles, [values])
 
 
 ## The run scene is loaded on this peer, so existing water and lurking
