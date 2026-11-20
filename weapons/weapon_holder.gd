@@ -536,7 +536,9 @@ func _shot_juice(data: WeaponData) -> void:
 	_roll += deg_to_rad(randf_range(1.2, 2.2) if heavy else randf_range(0.2, 0.5)) * (1 if randf() < 0.5 else -1)
 	Juice.shake(0.28 if heavy else 0.05)
 	var muzzle := _muzzle_position()
-	ShotFX.puff(player.get_parent(), muzzle + (-camera.global_basis.z) * 0.1, Color(0.75, 0.75, 0.72, 0.35), 0.06 if not heavy else 0.11, 0.5)
+	# The view-model muzzle is ~0.5 m from the eye: keep the wisp small, faint
+	# and a little ahead of it or it fills a third of the screen.
+	ShotFX.puff(player.get_parent(), muzzle + (-camera.global_basis.z) * 0.35 + Vector3.UP * 0.03, Color(0.75, 0.75, 0.72, 0.16), 0.022 if not heavy else 0.04, 0.45)
 	_eject_casing(heavy)
 
 
