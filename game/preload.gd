@@ -19,8 +19,6 @@ const SCENES := [
 	"res://enemies/gutter/gutter.tscn",
 	"res://enemies/mister/mister.tscn",
 	"res://enemies/boss/boss_cumulus.tscn",
-	"res://crates/crate.tscn",
-	"res://crates/double_crate.tscn",
 	"res://ui/results.tscn",
 	"res://ui/lobby.tscn",
 	"res://ui/teammate_card.tscn",

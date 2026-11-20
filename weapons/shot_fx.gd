@@ -18,6 +18,8 @@ static func _unshaded(color: Color) -> StandardMaterial3D:
 		var material := StandardMaterial3D.new()
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.albedo_color = color
+		if color.a < 1.0:
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.disable_fog = true
 		_materials[key] = material
 	return _materials[key]
@@ -72,12 +74,9 @@ static func puff(parent: Node, at: Vector3, color: Color, size := 0.18, life := 
 		_puff_mesh.radial_segments = 8
 		_puff_mesh.rings = 4
 	var mesh := MeshInstance3D.new()
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = color
 	mesh.mesh = _puff_mesh
-	mesh.material_override = material
+	# Cached per color; the fade tweens the instance transparency instead.
+	mesh.material_override = _unshaded(Color(color, minf(color.a, 0.99)))
 	mesh.scale = Vector3.ONE * size
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mesh)
@@ -85,7 +84,7 @@ static func puff(parent: Node, at: Vector3, color: Color, size := 0.18, life := 
 	var tween := mesh.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(mesh, "scale", Vector3.ONE * (size * 2.5), life)
-	tween.tween_property(material, "albedo_color:a", 0.0, life)
+	tween.tween_property(mesh, "transparency", 1.0, life)
 	tween.chain().tween_callback(mesh.queue_free)
 
 
@@ -100,7 +99,7 @@ static func sparks(parent: Node, at: Vector3, outward := Vector3.UP, count := 6)
 			m.albedo_color = c
 			_spark_mats.append(m)
 	var dir := outward.normalized() if outward.length_squared() > 0.001 else Vector3.UP
-	for i in count:
+	for i in mini(count, 4) if OS.has_feature("web") else count:
 		var spark := MeshInstance3D.new()
 		spark.mesh = _spark_mesh
 		spark.material_override = _spark_mats[i % 2]
@@ -113,3 +112,24 @@ static func sparks(parent: Node, at: Vector3, outward := Vector3.UP, count := 6)
 		tween.tween_property(spark, "global_position", at + spread * randf_range(0.45, 0.95), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(spark, "scale", Vector3.ZERO, 0.18)
 		tween.chain().tween_callback(spark.queue_free)
+
+
+static func beam(parent: Node, from: Vector3, to: Vector3, color: Color, width: float) -> void:
+	var length := from.distance_to(to)
+	if length <= 0.05:
+		return
+	if _streak_mesh == null:
+		_streak_mesh = BoxMesh.new()
+		_streak_mesh.size = Vector3(0.018, 0.018, 1.0)
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = _streak_mesh
+	mesh.material_override = _unshaded(Color(color, 0.72))
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mesh)
+	var direction := (to - from) / length
+	var up := Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT
+	mesh.look_at_from_position((from + to) / 2.0, to, up)
+	mesh.scale = Vector3(width / 0.018, width / 0.018, length)
+	var tween := mesh.create_tween()
+	tween.tween_property(mesh, "transparency", 1.0, 0.11)
+	tween.tween_callback(mesh.queue_free)

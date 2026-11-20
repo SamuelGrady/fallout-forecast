@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Car-Battery Zapper"
+shot_sound = "gun_battery_zapper"
+kind = 0
+mechanic = "zap"
+damage = 23.0
+mag_size = 12
+fire_interval = 0.39
+spread_degrees = 0.35
+max_range = 22.0
+tracer_color = Color(1.000, 0.949, 0.404, 1)
+automatic = true
+reload_time = 2.1

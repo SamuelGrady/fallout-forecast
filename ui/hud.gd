@@ -30,7 +30,7 @@ var _armory: PanelContainer
 var _weapon := Label.new()
 var _ammo := Label.new()
 var _pips := preload("res://ui/ammo_pips.gd").new()
-var _slots := HBoxContainer.new()
+var _slots := ItemHotbar.new()
 var _unlock := Label.new()
 var _unlock_left := 0.0
 var _reticle := preload("res://ui/reticle.gd").new()
@@ -216,8 +216,18 @@ func _build_armory() -> void:
 	BroadcastUI.text(_ammo, 38)
 	_pips.custom_minimum_size.y = 20
 	box.add_child(_pips)
-	_row(box, _slots)
-	_slots.alignment = BoxContainer.ALIGNMENT_END
+	# The 5-slot hotbar sits bottom center, between the vitals and the armory
+	# panels; its scrap counter is drawn just above the cells.
+	_slots.name = "Hotbar"
+	_slots.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_slots.offset_left = -ItemHotbar.SIZE.x * 0.5
+	_slots.offset_right = ItemHotbar.SIZE.x * 0.5
+	_slots.offset_top = -24 - ItemHotbar.SIZE.y
+	_slots.offset_bottom = -24
+	_slots.pivot_offset = Vector2(ItemHotbar.SIZE.x * 0.5, ItemHotbar.SIZE.y)
+	_slots.scale = Vector2.ONE * minf(Settings.hud_scale, 1.0)
+	_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layout.add_child(_slots)
 
 
 func _build_messages() -> void:
@@ -225,14 +235,16 @@ func _build_messages() -> void:
 	_notice(_banner, Control.PRESET_CENTER_TOP, 480, 158, 28, BroadcastUI.PAPER)
 	_notice(_lightning, Control.PRESET_TOP_RIGHT, 224, 100, 19, BroadcastUI.CYAN)
 	_notice(_downed, Control.PRESET_CENTER, 408, 48, 34, BroadcastUI.PINK)
-	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 360, -112, 22, BroadcastUI.PAPER)
+	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 408, -124, 22, BroadcastUI.PAPER)
+	# Grows upward from just above the hotbar's scrap line, so a two-line
+	# prompt never drops onto the hotbar or the side panels.
 	_prompt.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_revive_progress.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_revive_progress.offset_left = -100
 	_revive_progress.offset_right = 100
-	_revive_progress.offset_top = -102
-	_revive_progress.offset_bottom = -94
-	_bar(_layout, _revive_progress, 8, BroadcastUI.CYAN)
+	_revive_progress.offset_top = -112
+	_revive_progress.offset_bottom = -106
+	_bar(_layout, _revive_progress, 6, BroadcastUI.CYAN)
 	_revive_progress.hide()
 
 
@@ -453,32 +465,27 @@ func _update_damage(player: Player, delta: float) -> void:
 
 func _update_weapon(player: Player) -> void:
 	var holder := player.get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
-	_armory.visible = player.state == "ok" and holder != null and not holder.loadout.is_empty()
 	_reticle.visible = player.state in ["ok", "turned"]
 	_reticle.modulate.a = move_toward(_reticle.modulate.a, 0.0 if holder and holder.sighted() else 1.0, 0.2)
+	_slots.visible = holder != null and player.state == "ok"
+	if holder:
+		_slots.refresh(holder)
+	var definition: ItemDefinition = holder.selected_definition() if holder else null
+	_armory.visible = player.state == "ok" and definition != null
 	if not _armory.visible:
 		return
-	var weapon: WeaponData = holder.loadout[holder.current]
-	_weapon.text = weapon.display_name.to_upper()
-	var weapon_color := BroadcastUI.PINK if weapon.cursed else BroadcastUI.PAPER
+	var item: ItemInstance = holder.selected()
+	var is_gun := definition.kind == ItemDefinition.Kind.GUN
+	var status := "  /  JAMMED" if holder.jammed() else ("  /  RELOAD" if holder.reload_remaining() > 0.0 else "")
+	_weapon.text = definition.display_name.to_upper() + status
+	var weapon_color := ItemCatalog.tier_color(definition.id, item.tier)
 	if _weapon.get_theme_color("font_color") != weapon_color:
 		_weapon.add_theme_color_override("font_color", weapon_color)
-	_ammo.text = "%d / %d" % [holder.ammo[holder.current], holder.reserve[holder.current]]
-	_pips.rounds = holder.ammo[holder.current]
-	_pips.capacity = weapon.mag_size
-	_pips.reload_progress = 1.0 - holder._reload_left / maxf(holder._reload_total, 0.01) if holder._reload_left > 0 else 0.0
-	if _slots.get_child_count() != holder.loadout.size():
-		for child in _slots.get_children():
-			_slots.remove_child(child)
-			child.queue_free()
-		for i in holder.loadout.size():
-			var slot := Label.new()
-			slot.text = str(i + 1)
-			BroadcastUI.text(slot, 20)
-			_slots.add_child(slot)
-	for i in _slots.get_child_count():
-		var slot := _slots.get_child(i) as Label
-		slot.modulate = (BroadcastUI.AMBER if _unlock_left > 0.0 else BroadcastUI.CYAN) if i == holder.current else BroadcastUI.MUTED
+	_ammo.text = "%d / %d" % [item.count, holder.selected_reserve()] if is_gun else "x%d" % item.count
+	_pips.visible = is_gun
+	_pips.rounds = item.count
+	_pips.capacity = definition.weapon.mag_size
+	_pips.reload_progress = 1.0 - holder.reload_remaining() / maxf(holder._reload_total, 0.01) if holder.reload_remaining() > 0.0 else 0.0
 
 
 func _update_teammates(local: Player) -> void:

@@ -3,13 +3,8 @@
 [ext_resource type="Script" path="res://player/player.gd" id="1_oul6g"]
 [ext_resource type="Script" path="res://weapons/weapon_holder.gd" id="2_8t03j"]
 [ext_resource type="PackedScene" path="res://assets/kenney/characters/character-worker.glb" id="2_rkbax"]
-[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="3_2ieo8"]
 [ext_resource type="Script" path="res://props/model_style.gd" id="3_yw30f"]
-[ext_resource type="Resource" path="res://weapons/pump_shotgun.tres" id="4_ebec5"]
 [ext_resource type="Texture2D" path="res://assets/kenney/characters/Textures/colormap.png" id="4_qjkh3"]
-[ext_resource type="Resource" path="res://weapons/spray_rifle.tres" id="5_yllr7"]
-[ext_resource type="Resource" path="res://weapons/flare_gun.tres" id="6_kb6p2"]
-[ext_resource type="Resource" path="res://weapons/bug_bomb.tres" id="7_wodsf"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rkbax"]
 radius = 0.4
@@ -47,7 +42,6 @@ cull_mask = 1048573
 
 [node name="WeaponHolder" type="Node3D" parent="Head/Camera3D" unique_id=1632525860]
 script = ExtResource("2_8t03j")
-loadout = Array[ExtResource("3_2ieo8")]([ExtResource("4_ebec5"), ExtResource("5_yllr7"), ExtResource("6_kb6p2"), ExtResource("7_wodsf")])
 
 [node name="RoofCheck" type="RayCast3D" parent="." unique_id=105555753]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)

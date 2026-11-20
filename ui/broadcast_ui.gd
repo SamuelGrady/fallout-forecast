@@ -231,8 +231,8 @@ static func button_accent(button: Button, accent: Color, quiet := false) -> void
 
 static func input_hint(action: String) -> String:
 	if Settings.using_gamepad:
-		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
-	return {"interact":"E", "use_item":"T", "ready_up":"G", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
+		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
+	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
 
 
 static func reveal(control: Control) -> void:

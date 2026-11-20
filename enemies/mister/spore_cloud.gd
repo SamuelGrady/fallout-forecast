@@ -18,6 +18,7 @@ var radius := 2.5
 var lifetime := 4.0
 var source: Node = null
 var acid := false
+var hazard_id := 0
 
 var _age := 0.0
 var _damage_time := 0.0
@@ -34,7 +35,7 @@ static var _hit_frame := {}
 ## the spot, or null if a Shield Dome kept it out. Runs the same way on every
 ## peer, so all copies merge alike.
 static func spawn(parent: Node, at: Vector3, is_acid: bool, cloud_radius: float, cloud_lifetime: float,
-		dps: float, cloud_source: Variant = null) -> Node:
+		dps: float, cloud_source: Variant = null, cloud_hazard_id := 0) -> Node:
 	var tree := parent.get_tree()
 	if _in_dome(at, tree, cloud_radius * 0.35):
 		if not Net.dedicated:
@@ -49,6 +50,8 @@ static func spawn(parent: Node, at: Vector3, is_acid: bool, cloud_radius: float,
 		var other_radius := float(other.get("radius"))
 		if offset.length() < other_radius + cloud_radius * 0.6:
 			other.call("_absorb", at, cloud_radius, cloud_lifetime, dps)
+			if cloud_hazard_id > 0 and int(other.get("hazard_id")) == 0:
+				other.set("hazard_id", cloud_hazard_id)
 			return other
 	var cloud := (load("res://enemies/mister/spore_cloud.gd") as GDScript).new() as Area3D
 	cloud.set("acid", is_acid)
@@ -56,6 +59,7 @@ static func spawn(parent: Node, at: Vector3, is_acid: bool, cloud_radius: float,
 	cloud.set("lifetime", cloud_lifetime)
 	cloud.set("damage_per_second", dps)
 	cloud.set("source", cloud_source if is_instance_valid(cloud_source) else null)
+	cloud.set("hazard_id", cloud_hazard_id)
 	parent.add_child(cloud, true)
 	cloud.global_position = at
 	return cloud
@@ -63,7 +67,7 @@ static func spawn(parent: Node, at: Vector3, is_acid: bool, cloud_radius: float,
 
 static func _in_dome(point: Vector3, tree: SceneTree, margin := 0.0) -> bool:
 	for dome in tree.get_nodes_in_group("active_flares"):
-		if dome.is_queued_for_deletion():
+		if dome.is_queued_for_deletion() or str(dome.get("id")) != "shield_dome":
 			continue
 		var offset: Vector3 = point - dome.global_position
 		offset.y = 0.0
