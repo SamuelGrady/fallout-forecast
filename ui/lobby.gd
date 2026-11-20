@@ -92,6 +92,9 @@ func _refresh() -> void:
 
 func _host_line() -> String:
 	if not Net.is_host():
+		# A dedicated server is never in its own roster.
+		if not Net.roster.is_empty() and not Net.roster.has(1):
+			return "CONNECTED TO THE CLOUD SERVER   ·   THE RUN STARTS WHEN EVERYONE IS READY"
 		return "CONNECTED TO HOST"
 	# Shown so the other player can type it in when discovery is blocked.
 	var lan := "no LAN address"

@@ -126,6 +126,10 @@ func _exit_tree() -> void:
 
 
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:
+	# The dedicated server has no results screen; game/dedicated_server.gd
+	# unloads the run itself.
+	if Net.dedicated:
+		return
 	get_tree().create_timer(4.5).timeout.connect(func():
 		_end()
 		get_tree().change_scene_to_file("res://ui/results.tscn"))
