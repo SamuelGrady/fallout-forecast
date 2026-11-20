@@ -298,6 +298,19 @@ Remote players and infected interpolate host-relayed movement (15 Hz for infecte
 | Title and sound | Cassette transport and VCR playback menu, gated Downpour drums, storm bulletins, shelter-responsive wind and spatial hazard cues. | `ui/title.gd`, `ui/vcr_deck.gd`, `game/sound.gd` |
 | Fixes | Decon repair hold no longer resets near the shower; HUD vitals readable; lightning reveal is announced; solo play no longer errors after leaving a session; host skips closing WebSockets during disconnect broadcasts; `AmmoDrop` caches shared materials; Dev Menu labels match Shield Dome and Frag Grenade. | `player/player.gd`, `ui/hud.gd`, `game/net.gd`, `weapons/ammo_drop.gd`, `ui/dev_menu.gd` |
 
+**November 20 night update.** The mutation roll became a draft, the UI moved to a VHS font, and the web build got a round of hitch fixes plus a built-in profiler.
+
+| Area | What was built | Where |
+| --- | --- | --- |
+| Mutation draft | The wave's enemy mutation is rolled and shown on a slim banner; players pick one of three player-mutation cards with 1/2/3 (D-pad) from a strip above the HUD. Solo resolves at once; sessions vote, one per peer. Active mutations are listed with descriptions on the pause screen. | `game/mutation_roll.gd`, `ui/slot_reel.gd`, `ui/pause_menu.gd` |
+| Teammates | Nameplates with distance and health over teammates, drawn through walls; off-screen and behind-you pointers; REVIVE and TURNED states called out. | `ui/teammate_markers.gd` |
+| Lobby and join | Force start for any player (the cloud server honours it). JOIN GAME goes straight to the cloud server; Settings has a SERVER (WSS) field and a LAN browser button. Protocol v6. | `ui/lobby.gd`, `game/net.gd`, `ui/title.gd` |
+| Ending | Boss victory clears the remaining infected, broadcasts the lifted quarantine and bursts sparks over the street; defeat fades to SIGNAL LOST. Results add an epilogue, time on tape, squad mutations, an MVP and an end-of-tape sign-off. | `game/game_manager.gd`, `main.gd`, `ui/results.gd` |
+| UI | VT323 (OFL) VHS font everywhere; default size 20. Loading-tape screen when entering a run. | `assets/fonts/`, `game/scene_loader.gd` |
+| Audio | Soundtrack about 6 dB louder, rain about 5 dB quieter; thunder is a pre-rendered WAV. | `game/sound.gd`, `weather/lightning_fx.gd` |
+| Web performance | Fog stays enabled so the first rain no longer recompiles every shader; no dynamic gunshot lights on web; infected merged to one mesh per bone; low-poly torus/sphere defaults; lighter web neon; web-only static prop batching; a still title backdrop on web; small-asset preloading on menus; a shader warm-up behind a TUNING IN card. | `weather/weather_fx.gd`, `props/mesh_merge.gd`, `props/static_batcher.gd`, `game/warmup.gd`, `game/preload.gd` |
+| Telemetry | Perf overlay (Settings) and an exportable report (Settings or pause menu) listing frame percentiles and every frame over 100 ms with what happened before it. On web it downloads a file and copies to the clipboard. | `game/perf.gd` |
+
 ## Team, milestones and risks
 
 Sam and Drew build the game in three weeks.
