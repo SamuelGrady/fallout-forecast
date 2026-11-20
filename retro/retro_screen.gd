@@ -10,6 +10,7 @@ extends CanvasLayer
 ## F8 toggles the whole effect.
 
 const PS1 := preload("res://retro/ps1.gdshader")
+const WEB_VHS := preload("res://retro/retro_web.gdshader")
 const MONTH := "OCT"
 const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
 
@@ -40,8 +41,15 @@ func _ready() -> void:
 	$VHS.reparent(recording_layer, false)
 	rec.add_theme_font_override("font", BroadcastUI.FONT)
 	stamp.add_theme_font_override("font", BroadcastUI.FONT)
-	# Keep the REC/timestamp overlay without the WebGL screen copies or material swaps.
+	WeatherManager.lightning_struck.connect(_on_lightning_struck)
+	# Web uses a zero-screen-copy VHS overlay + lowered 3D render scale for
+	# crisp retro pixels and high WebGL2 framerates.
 	if _web:
+		layer = 5
+		var mat := ShaderMaterial.new()
+		mat.shader = WEB_VHS
+		mat.set_shader_parameter("interface_only", 1.0 if interface_only else 0.0)
+		screen.material = mat
 		_apply_enabled()
 		return
 	screen.material = screen.material.duplicate()
@@ -60,13 +68,14 @@ func _ready() -> void:
 		(overlay.material as ShaderMaterial).set_shader_parameter("interface_pass", true)
 		_interface_layer.add_child(overlay)
 
-	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
 	_apply_enabled()
 
 
 func _exit_tree() -> void:
+	if _web and get_viewport():
+		get_viewport().scaling_3d_scale = 1.0
 	if Settings.video_changed.is_connected(_on_video_changed):
 		Settings.video_changed.disconnect(_on_video_changed)
 	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
@@ -101,7 +110,7 @@ func _process(delta: float) -> void:
 	if player and player.get("state") == "downed":
 		target = downed_glitch * Settings.flash_scale()
 	_glitch = maxf(move_toward(_glitch, 0.0, delta * 1.6), target)
-	if not _web:
+	if screen.material is ShaderMaterial:
 		(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
 
 	var recording := fmod(_clock, 1.0) < 0.6
@@ -141,7 +150,9 @@ func _prune_cache() -> void:
 
 
 func _apply_enabled() -> void:
-	screen.visible = enabled and not _web
+	screen.visible = enabled
+	if _web and not interface_only and get_viewport():
+		get_viewport().scaling_3d_scale = 0.55 if enabled else 0.75
 	if _interface_layer:
 		_interface_layer.visible = enabled
 	rec.visible = enabled

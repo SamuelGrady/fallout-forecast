@@ -8,7 +8,7 @@ script = ExtResource("1_dsyws")
 id = "spores"
 display_name = "Spores"
 description = "Enemies burst into a damage cloud on death"
-weight = 25.0
+weight = 22.0
 color = Color(0.56078434, 0.8392157, 0.3529412, 1)
 
 [sub_resource type="Resource" id="Resource_elgil"]
@@ -16,6 +16,7 @@ script = ExtResource("1_dsyws")
 id = "armor"
 display_name = "Armor"
 description = "Enemies take half damage from the front"
+weight = 18.0
 color = Color(0.54901963, 0.7058824, 0.8784314, 1)
 
 [sub_resource type="Resource" id="Resource_s1f7w"]
@@ -23,6 +24,7 @@ script = ExtResource("1_dsyws")
 id = "swarm"
 display_name = "Swarm"
 description = "Twice as many enemies at half health"
+weight = 18.0
 color = Color(1, 0.8784314, 0.2901961, 1)
 
 [sub_resource type="Resource" id="Resource_7e61l"]
@@ -30,6 +32,7 @@ script = ExtResource("1_dsyws")
 id = "runners"
 display_name = "Runners"
 description = "Enemies move 40% faster"
+weight = 18.0
 color = Color(0.8509804, 0.4117647, 0.16862746, 1)
 
 [sub_resource type="Resource" id="Resource_nbr3q"]
@@ -40,6 +43,54 @@ description = "Enemies split into two small ones on death"
 weight = 15.0
 color = Color(1, 0.24313726, 0.64705884, 1)
 
+[sub_resource type="Resource" id="Resource_cond1"]
+script = ExtResource("1_dsyws")
+id = "conductors"
+display_name = "Conductors"
+description = "Lightning jumps between nearby enemies"
+weight = 16.0
+color = Color(0.4, 0.91, 1.0, 1)
+
+[sub_resource type="Resource" id="Resource_molt1"]
+script = ExtResource("1_dsyws")
+id = "molting"
+display_name = "Molting"
+description = "First hit sheds armor and triggers a speed burst"
+weight = 16.0
+color = Color(0.91, 0.66, 0.29, 1)
+
+[sub_resource type="Resource" id="Resource_utow1"]
+script = ExtResource("1_dsyws")
+id = "undertow"
+display_name = "Undertow"
+description = "Puddles tug exposed players toward their centers"
+weight = 15.0
+color = Color(0.22, 0.72, 0.65, 1)
+
+[sub_resource type="Resource" id="Resource_stat1"]
+script = ExtResource("1_dsyws")
+id = "static_charge"
+display_name = "Static Charge"
+description = "Sprinting builds charge that shocks melee attackers"
+weight = 16.0
+color = Color(1.0, 0.88, 0.28, 1)
+
+[sub_resource type="Resource" id="Resource_pres1"]
+script = ExtResource("1_dsyws")
+id = "pressure_front"
+display_name = "Pressure Front"
+description = "Infected resist bullets but take extra explosive blast"
+weight = 16.0
+color = Color(0.48, 0.55, 1.0, 1)
+
+[sub_resource type="Resource" id="Resource_fals1"]
+script = ExtResource("1_dsyws")
+id = "false_clearing"
+display_name = "False Clearing"
+description = "Rain pauses mid-wave while a marked elite arrives"
+weight = 14.0
+color = Color(1.0, 0.43, 0.57, 1)
+
 [resource]
 script = ExtResource("2_kebm5")
-entries = Array[ExtResource("1_dsyws")]([SubResource("Resource_po6ps"), SubResource("Resource_elgil"), SubResource("Resource_s1f7w"), SubResource("Resource_7e61l"), SubResource("Resource_nbr3q")])
+entries = Array[ExtResource("1_dsyws")]([SubResource("Resource_po6ps"), SubResource("Resource_elgil"), SubResource("Resource_s1f7w"), SubResource("Resource_7e61l"), SubResource("Resource_nbr3q"), SubResource("Resource_cond1"), SubResource("Resource_molt1"), SubResource("Resource_utow1"), SubResource("Resource_stat1"), SubResource("Resource_pres1"), SubResource("Resource_fals1")])

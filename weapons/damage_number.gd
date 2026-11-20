@@ -44,8 +44,8 @@ func _animate() -> void:
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	modulate.a = 1.0
+	scale = Vector3.ONE * (1.28 if critical else 1.15)
 	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(self, "position", position + Vector3(randf_range(-.22, .22), .72, 0), .7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(self, "scale", Vector3.ONE, .14)
-	_tween.tween_property(self, "modulate:a", 0.0, .25).set_delay(.45)
+	_tween.tween_property(self, "scale", Vector3.ONE, 0.14)
+	_tween.tween_property(self, "modulate:a", 0.0, 0.25).set_delay(0.45)
 	_tween.chain().tween_callback(queue_free)

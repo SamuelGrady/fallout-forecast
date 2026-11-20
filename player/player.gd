@@ -76,6 +76,8 @@ var exposed := true
 # Host-owned (synced to clients).
 var health := 100.0
 var suit_integrity := 100.0
+## Static Charge mutation: 0..1 charge built by sprinting, discharged on melee hit.
+var static_charge := 0.0
 ## "ok", "downed", "turned" or "out".
 var _step_distance := 0.0
 var state := "ok"
@@ -97,9 +99,12 @@ var aiming := false
 var sprint_lock := 0.0
 ## Host: post-revive grace. No damage or suit drain until it runs out.
 var _grace_left := 0.0
+var _acid_blood_cooldown := 0.0
 var _last_headshot_ms := 0
 const REVIVE_GRACE := 1.0
 const SELF_REVIVE_SUIT := 30.0
+const POS_HISTORY_LIMIT := 24
+var _pos_history: Array[Dictionary] = []
 
 # Local UI.
 var weapon_name = null
@@ -138,6 +143,9 @@ func _ready() -> void:
 	collider.shape = collider.shape.duplicate()
 	_height = stand_height
 	_apply_height()
+	if GameManager.bonus_max_health() > 0.0:
+		max_health = 100.0 + GameManager.bonus_max_health()
+		health = max_health
 
 	_shelter_query.collide_with_areas = true
 	_shelter_query.collide_with_bodies = false
@@ -204,7 +212,7 @@ func _build_children() -> void:
 	_turned_model.set_script(ModelStyle)
 	_turned_model.set("tint", Color(0.6, 1.0, 0.5))
 	_turned_model.set("texture", load("res://assets/kenney/characters/Textures/colormap.png"))
-	_turned_model.set("render_layers", 1 << 1)
+	_turned_model.set("render_layers", (1 << 1) if is_multiplayer_authority() else 1)
 	_turned_model.transform = Transform3D(Basis(Vector3.UP, PI).scaled(Vector3.ONE * 2.4), Vector3.ZERO)
 	_turned_model.visible = false
 	add_child(_turned_model)
@@ -270,7 +278,7 @@ func _physics_process(delta: float) -> void:
 		_apply_height()
 
 	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0 and not is_crouching and state != "downed":
-		velocity.y = jump_velocity
+		velocity.y = jump_velocity * GameManager.jump_scale()
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 
@@ -296,6 +304,19 @@ func _physics_process(delta: float) -> void:
 	var accel := ground_accel if is_on_floor() else air_accel
 	var horizontal := Vector2(velocity.x, velocity.z).move_toward(
 		Vector2(direction.x, direction.z) * speed, accel * delta)
+	# Undertow mutation: active puddles tug nearby players inward (Hydro-Skin resists 70%).
+	if state == "ok" and GameManager.has_mutation("undertow"):
+		var pull_scale := 0.3 if GameManager.has_player_mutation("hydro_skin") else 1.0
+		for puddle in get_tree().get_nodes_in_group("puddles"):
+			var r: float = puddle.radius()
+			if r <= 0.25:
+				continue
+			var to_puddle: Vector3 = (puddle as Node3D).global_position - global_position
+			to_puddle.y = 0.0
+			var d := to_puddle.length()
+			if d > 0.25 and d < r + 1.8:
+				var falloff := 1.0 - clampf(d / (r + 1.8), 0.0, 1.0)
+				horizontal += Vector2(to_puddle.x, to_puddle.z).normalized() * (22.0 * falloff * pull_scale * delta)
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
 	move_and_slide()
@@ -325,10 +346,23 @@ func _physics_process(delta: float) -> void:
 # ------------------------------------------------------------------ host rules
 func _host_tick(delta: float) -> void:
 	_grace_left = maxf(0.0, _grace_left - delta)
+	_acid_blood_cooldown = maxf(0.0, _acid_blood_cooldown - delta)
+	if state == "turned":
+		_record_position()
+	if GameManager.has_mutation("static_charge") and state == "ok":
+		var hspeed := Vector2(velocity.x, velocity.z).length()
+		if hspeed > 5.8:
+			static_charge = minf(1.0, static_charge + delta * 0.26)
+		else:
+			static_charge = maxf(0.0, static_charge - delta * 0.14)
+	else:
+		static_charge = 0.0
 	match state:
 		"ok":
 			if _grace_left > 0.0:
 				return
+			if GameManager.has_player_mutation("hydro_skin") and exposed and WeatherManager.is_raining() and suit_integrity > 0.0:
+				heal(2.5 * delta)
 			var drain := WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale() if exposed else 0.0
 			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
 				drain = 0.0  # Shield Dome: full shelter
@@ -346,6 +380,41 @@ func _host_tick(delta: float) -> void:
 				_bleed_out()
 
 
+## Host: raise max_health when a bio-mutation (Chitin Suit) is granted mid-run.
+func apply_max_health_bonus(bonus: float) -> void:
+	if not Net.is_host() or bonus <= 0.0:
+		return
+	max_health += bonus
+	if state == "ok":
+		health = minf(max_health, health + bonus)
+
+
+func _record_position() -> void:
+	_pos_history.append({"ms": Time.get_ticks_msec(), "pos": global_position})
+	if _pos_history.size() > POS_HISTORY_LIMIT:
+		_pos_history.remove_at(0)
+
+
+## Host lag compensation for shooting Turned players.
+func sample_position(target_ms: int) -> Vector3:
+	if _pos_history.is_empty():
+		return global_position
+	var last := _pos_history[_pos_history.size() - 1]
+	if target_ms >= int(last.ms):
+		return last.pos
+	var first := _pos_history[0]
+	if target_ms <= int(first.ms):
+		return first.pos
+	for i in range(_pos_history.size() - 1, 0, -1):
+		var a := _pos_history[i - 1]
+		var b := _pos_history[i]
+		if target_ms >= int(a.ms) and target_ms <= int(b.ms):
+			var span := float(int(b.ms) - int(a.ms))
+			var frac := (float(target_ms - int(a.ms)) / span) if span > 0.0 else 0.0
+			return (a.pos as Vector3).lerp(b.pos as Vector3, clampf(frac, 0.0, 1.0))
+	return global_position
+
+
 ## Enemies, spore clouds, suit drain and (for Turned players) teammates' guns.
 func take_damage(amount: float, _source: Node = null) -> void:
 	if not Net.is_host():
@@ -356,6 +425,32 @@ func take_damage(amount: float, _source: Node = null) -> void:
 				return
 			health = maxf(health - amount, 0.0)
 			damaged.emit(amount)
+			# Static Charge mutation: sprinting builds shock that retaliates on melee hit.
+			if GameManager.has_mutation("static_charge") and static_charge >= 0.25 and _source is EnemyBase:
+				var attacker := _source as EnemyBase
+				var shock := lerpf(15.0, 45.0, static_charge)
+				static_charge = 0.0
+				attacker.stagger(0.6)
+				attacker.take_damage(shock, self)
+				var shove := attacker.global_position - global_position
+				shove.y = 0.0
+				if shove.length_squared() > 0.001:
+					attacker.knockback(shove.normalized() * 7.5)
+				GameManager.broadcast_arc([global_position + Vector3.UP * 1.1, attacker.global_position + Vector3.UP * 1.0], Color(1.0, 0.92, 0.35))
+			# Acid Blood player mutation: splash nearby infected on real health hits.
+			if GameManager.has_player_mutation("acid_blood") and amount >= 2.0 and _acid_blood_cooldown <= 0.0:
+				_acid_blood_cooldown = 1.5
+				for node in get_tree().get_nodes_in_group("enemies"):
+					var enemy := node as EnemyBase
+					if enemy == null or enemy.health <= 0.0:
+						continue
+					if enemy.global_position.distance_to(global_position) <= 4.0:
+						enemy.take_damage(28.0, self)
+						var push := enemy.global_position - global_position
+						push.y = 0.0
+						if push.length_squared() > 0.001:
+							enemy.knockback(push.normalized() * 5.0)
+				GameManager.broadcast_blast(global_position + Vector3.UP * 0.9, 1.4, Color(0.62, 1.0, 0.25, 0.85))
 			if health <= 0.0:
 				_go_down()
 		"turned":
@@ -666,7 +761,7 @@ func _net_step(delta: float) -> void:
 	_vitals_left -= delta
 	if _vitals_left <= 0.0:
 		_vitals_left = VITALS_RATE
-		Net.rpc_to_run(_apply_vitals, [health, suit_integrity, state, bleed_left, tarp_raised])
+		Net.rpc_to_run(_apply_vitals, [health, suit_integrity, state, bleed_left, tarp_raised, max_health, static_charge])
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -724,11 +819,13 @@ func _smooth_remote(delta: float) -> void:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool) -> void:
+func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool, max_hp := 100.0, charge := 0.0) -> void:
 	if Net.is_host() or multiplayer.get_remote_sender_id() != 1:
 		return
+	max_health = max_hp
 	health = hp
 	suit_integrity = suit
+	static_charge = charge
 	bleed_left = bleed
 	tarp_raised = tarp and new_state == "ok"
 	# Assigned, not _set_state(): a remote player's change must not replay the
@@ -794,21 +891,26 @@ func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_
 ## stack into one number, which is why the enemy's net id comes along: the
 ## stacking has to happen on the shooter's machine, whichever peer that is.
 func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
-	var parent := get_parent()
+	var parent := get_tree().current_scene
+	if parent == null:
+		parent = get_parent()
 	if parent == null:
 		return
+	var at := point + Vector3.UP * 0.35
 	if enemy_id > 0:
 		var existing = _numbers.get(enemy_id)
 		if is_instance_valid(existing) and float(existing.get("age")) < 0.12:
+			existing.global_position = at
 			existing.add_hit(amount, critical)
 			return
 	var number := Label3D.new()
 	number.set_script(preload("res://weapons/damage_number.gd"))
-	# Set before add_child: damage_number's _ready() reads both.
+	# Set position, amount and critical before add_child so _ready() spawns in place.
+	number.position = at
 	number.set("amount", amount)
 	number.set("critical", critical)
 	parent.add_child(number)
-	number.global_position = point + Vector3.UP * 0.25
+	number.global_position = at
 	if enemy_id > 0:
 		if _numbers.size() > 64:
 			_numbers.clear()

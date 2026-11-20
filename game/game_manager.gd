@@ -41,6 +41,7 @@ var crates: Node
 
 func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
+	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	Net.peer_joined.connect(_on_peer_joined)
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
@@ -69,7 +70,10 @@ func start_run() -> void:
 	_run_id += 1
 	run_active = true
 	stats.clear()
+	if mutations:
+		mutations.reset_run()
 	for p in players():
+		p.set("max_health", 100.0)
 		_stat(p)
 	var n := player_count()
 	decon_max = DECON_CHARGES[n]
@@ -121,49 +125,135 @@ func has_mutation(id: String) -> bool:
 	return mutations != null and mutations.has(id)
 
 
-# ------------------------------------------------------------------ perks
-## Every enemy mutation hands the players a matching perk for the same waves,
-## so a roll changes both sides of the fight.
-const PERKS := {
-	"spores": ["FILTER MASK", "Suit drains 30% slower"],
-	"armor": ["HOLLOW POINTS", "Headshots deal 2.5x"],
-	"swarm": ["QUICK HANDS", "Reload 30% faster"],
-	"runners": ["SECOND WIND", "Move 12% faster"],
-	"splitters": ["SCAVENGER", "Kill drops refill more ammo"],
+# ------------------------------------------------------------------ player mutations
+## Players mutate right alongside the infected: every Mutation Roll grants the
+## squad a persistent bio-mutation (2 on a Jackpot) that stacks across the run.
+const PLAYER_MUTATIONS := {
+	"acid_blood": {
+		"name": "ACID BLOOD",
+		"desc": "Taking health damage splashes burning acid around you",
+		"color": Color(0.62, 1.0, 0.25),
+	},
+	"chitin_suit": {
+		"name": "CHITIN SUIT",
+		"desc": "+25 max health and suit drains 35% slower in rain",
+		"color": Color(0.45, 0.92, 0.88),
+	},
+	"adrenaline_glands": {
+		"name": "ADRENALINE",
+		"desc": "Move 18% faster and jump 20% higher",
+		"color": Color(1.0, 0.72, 0.25),
+	},
+	"bone_piercer": {
+		"name": "BONE PIERCER",
+		"desc": "Headshots deal 2.6x damage and shots pierce +1 enemy",
+		"color": Color(1.0, 0.42, 0.56),
+	},
+	"reflex_tendons": {
+		"name": "REFLEX TENDONS",
+		"desc": "Reload 35% faster and fire 20% faster",
+		"color": Color(1.0, 0.88, 0.35),
+	},
+	"magnet_hands": {
+		"name": "MAGNET HANDS",
+		"desc": "Pull pickups from 3x range and refill 60% ammo per drop",
+		"color": Color(0.45, 0.82, 1.0),
+	},
+	"voltaic_veins": {
+		"name": "VOLTAIC VEINS",
+		"desc": "Every 4th shot arcs lightning to 2 nearby enemies",
+		"color": Color(0.48, 0.94, 1.0),
+	},
+	"vampiric_siphon": {
+		"name": "BIO-SIPHON",
+		"desc": "Every kill restores +5 health and +6% suit integrity",
+		"color": Color(0.96, 0.32, 0.62),
+	},
+	"blast_glands": {
+		"name": "VOLATILE ROUNDS",
+		"desc": "+30% blast radius & damage; kills can pop a shockwave",
+		"color": Color(1.0, 0.54, 0.22),
+	},
+	"hydro_skin": {
+		"name": "HYDRO-SKIN",
+		"desc": "Rain heals +2.5 HP/s while your suit holds; resists Undertow",
+		"color": Color(0.32, 0.88, 0.74),
+	},
+	"hyper_focus": {
+		"name": "PREDATOR EYES",
+		"desc": "ADS cuts spread & recoil sharply and deals +25% damage",
+		"color": Color(0.76, 0.58, 1.0),
+	},
 }
 
 
-func has_perk(mutation_id: String) -> bool:
-	return has_mutation(mutation_id)
+func has_player_mutation(id: String) -> bool:
+	return mutations != null and mutations.has_player(id)
 
 
-func active_perks() -> Array:
+func active_player_mutations() -> Array:
 	var out := []
 	if mutations:
-		for id in mutations.active:
-			if PERKS.has(id):
-				out.append(PERKS[id])
+		for id in mutations.player_mutations:
+			if PLAYER_MUTATIONS.has(id):
+				out.append(PLAYER_MUTATIONS[id])
 	return out
 
 
 func headshot_multiplier() -> float:
-	return 2.5 if has_perk("armor") else 2.0
+	return 2.6 if has_player_mutation("bone_piercer") else 2.0
+
+
+func extra_pierce() -> int:
+	return 1 if has_player_mutation("bone_piercer") else 0
 
 
 func reload_scale() -> float:
-	return 0.7 if has_perk("swarm") else 1.0
+	return 0.65 if has_player_mutation("reflex_tendons") else 1.0
+
+
+func fire_rate_scale() -> float:
+	return 0.8 if has_player_mutation("reflex_tendons") else 1.0
 
 
 func player_speed_scale() -> float:
-	return 1.12 if has_perk("runners") else 1.0
+	return 1.18 if has_player_mutation("adrenaline_glands") else 1.0
+
+
+func jump_scale() -> float:
+	return 1.2 if has_player_mutation("adrenaline_glands") else 1.0
 
 
 func ammo_pickup_fraction() -> float:
-	return 0.6 if has_perk("splitters") else 0.4
+	return 0.6 if has_player_mutation("magnet_hands") else 0.4
+
+
+func pickup_reach() -> float:
+	return 5.0 if has_player_mutation("magnet_hands") else 1.8
 
 
 func suit_drain_scale() -> float:
-	return 0.7 if has_perk("spores") else 1.0
+	return 0.65 if has_player_mutation("chitin_suit") else 1.0
+
+
+func bonus_max_health() -> float:
+	return 25.0 if has_player_mutation("chitin_suit") else 0.0
+
+
+func ads_damage_scale() -> float:
+	return 1.25 if has_player_mutation("hyper_focus") else 1.0
+
+
+func explosive_damage_scale() -> float:
+	return (1.35 if has_mutation("pressure_front") else 1.0) * (1.3 if has_player_mutation("blast_glands") else 1.0)
+
+
+func explosive_knockback_scale() -> float:
+	return 2.0 if has_mutation("pressure_front") else 1.0
+
+
+func explosive_radius_scale() -> float:
+	return 1.3 if has_player_mutation("blast_glands") else 1.0
 
 
 func lever_prompt(player: Node) -> String:
@@ -413,9 +503,122 @@ func _stat(player: Node) -> Dictionary:
 	return stats[peer]
 
 
-func record_kill(source: Node) -> void:
-	if is_host() and source and source.is_in_group("players"):
-		_stat(source).kills += 1
+var _volatile_popping := false
+
+
+func record_kill(source: Node, at := Vector3.INF) -> void:
+	if not is_host() or not source or not source.is_in_group("players"):
+		return
+	_stat(source).kills += 1
+	# Bio-Siphon: each kill restores health and suit integrity.
+	if has_player_mutation("vampiric_siphon"):
+		if source.has_method("heal"):
+			source.heal(5.0)
+		var suit := float(source.get("suit_integrity"))
+		source.set("suit_integrity", minf(100.0, suit + 6.0))
+	# Volatile Rounds: kills have a 25% chance to pop a 3.8 m shockwave.
+	if has_player_mutation("blast_glands") and at != Vector3.INF and not _volatile_popping and randf() < 0.25:
+		_volatile_popping = true
+		var pop_radius := 3.8 * explosive_radius_scale()
+		var pop_dmg := 35.0 * explosive_damage_scale()
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var enemy := node as EnemyBase
+			if enemy == null or enemy.health <= 0.0:
+				continue
+			if enemy.global_position.distance_to(at) <= pop_radius:
+				enemy.take_damage(pop_dmg, source)
+				var push := enemy.global_position - at
+				push.y = 0.0
+				if push.length_squared() > 0.001:
+					enemy.knockback(push.normalized() * 6.0 * explosive_knockback_scale())
+		broadcast_blast(at + Vector3.UP * 0.6, pop_radius * 0.35, Color(1.0, 0.54, 0.22, 0.85))
+		_volatile_popping = false
+
+
+## Conductors mutation: lightning snaps to an infected within 20 m and chains
+## across up to 4 targets within 11 m of each hop.
+func _on_lightning_struck(position: Vector3, _seed: int) -> void:
+	if not is_host() or not run_active or finished or not has_mutation("conductors"):
+		return
+	var first: EnemyBase = null
+	var best_d := 20.0
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as EnemyBase
+		if enemy == null or enemy.health <= 0.0:
+			continue
+		var d := Vector2(enemy.global_position.x - position.x, enemy.global_position.z - position.z).length()
+		if d < best_d:
+			best_d = d
+			first = enemy
+	if first == null:
+		return
+	var hit: Array[EnemyBase] = []
+	var points: Array = [position + Vector3.UP * 10.0]
+	var cur: EnemyBase = first
+	for _hop in 4:
+		if cur == null or cur.health <= 0.0:
+			break
+		hit.append(cur)
+		var center := cur.global_position + Vector3.UP * 1.0
+		points.append(center)
+		cur.reveal(3.0)
+		cur.stagger(0.45)
+		cur.take_damage(35.0, null)
+		var next: EnemyBase = null
+		var next_d := 11.0
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var cand := node as EnemyBase
+			if cand == null or cand.health <= 0.0 or cand in hit:
+				continue
+			var d := cand.global_position.distance_to(center)
+			if d < next_d:
+				next_d = d
+				next = cand
+		cur = next
+	broadcast_arc(points, Color(0.45, 0.95, 1.0))
+
+
+func broadcast_arc(points: Array, color: Color) -> void:
+	if points.size() < 2:
+		return
+	if _online():
+		Net.rpc_to_all(_draw_arc, [points, color])
+	_draw_arc(points, color)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _draw_arc(points: Array, color: Color) -> void:
+	if Net.dedicated or points.size() < 2:
+		return
+	var world := _world()
+	if world == null:
+		return
+	for i in range(points.size() - 1):
+		var a: Vector3 = points[i]
+		var b: Vector3 = points[i + 1]
+		ShotFX.tracer(world, a, b, color)
+		ShotFX.sparks(world, b, Vector3.UP, 4)
+	ShotFX.flash(world, points[points.size() - 1], color, 5.0, 0.08)
+	Sound.play_at("dome_deploy", points[0], -14.0, 1.8)
+
+
+func broadcast_blast(at: Vector3, size: float, color: Color) -> void:
+	if _online():
+		Net.rpc_to_all(_draw_blast, [at, size, color])
+	_draw_blast(at, size, color)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _draw_blast(at: Vector3, size: float, color: Color) -> void:
+	if Net.dedicated:
+		return
+	var world := _world()
+	if world == null:
+		return
+	ShotFX.puff(world, at, color, size, 0.35)
+	ShotFX.sparks(world, at, Vector3.UP, 8)
+	ShotFX.flash(world, at, color, 6.0, 0.1)
+	Sound.play_at("explosion", at, -12.0, 1.35)
 
 
 func record_revive(reviver: Node) -> void:

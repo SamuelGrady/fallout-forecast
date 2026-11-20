@@ -33,6 +33,12 @@ func _ready() -> void:
 			var spawner := get_parent().get_node("Enemies")
 			spawner.spawn(load("res://enemies/%s/%s.tscn" % [selected, selected])))
 	_button(box, "SPAWN CUMULUS", func(): GameManager.spawn_boss())
+	_section(box, "MUTATIONS")
+	_button(box, "TRIGGER MUTATION ROLL", func(): GameManager.mutations.begin())
+	_button(box, "GRANT PLAYER MUTATION", func(): GameManager.mutations.grant_random_player_mutation())
+	for mid in ["conductors", "molting", "undertow", "static_charge", "pressure_front", "false_clearing"]:
+		var selected_m: String = mid
+		_button(box, "FORCE " + mid.replace("_", " ").to_upper(), func(): GameManager.mutations.force_enemy_mutation(selected_m))
 	_section(box, "WEAPONS")
 	for gun in ["pump_shotgun", "spray_rifle", "flare_gun", "bug_bomb"]:
 		var selected: String = gun

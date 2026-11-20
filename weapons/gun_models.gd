@@ -82,16 +82,21 @@ static func _rifle(root: Node3D) -> void:
 	_cylinder(root, 0.013, 0.11, Vector3(0, -0.006, 0.135), GUNMETAL, 0.5)
 	_box(root, Vector3(0.036, 0.06, 0.09), Vector3(0, -0.02, 0.2), POLYMER)
 	_box(root, Vector3(0.04, 0.075, 0.012), Vector3(0, -0.022, 0.248), Color("#121418"))
-	# Reflex sight: mount, hooded window, tinted glass, the dot.
-	_box(root, Vector3(0.03, 0.012, 0.05), Vector3(0, 0.039, -0.005), GUNMETAL, 0.6)
+	# Reflex sight: low-profile mount, open wide hood, ultra-clear lens, crisp dot.
+	_box(root, Vector3(0.03, 0.008, 0.044), Vector3(0, 0.037, -0.005), GUNMETAL, 0.6)
 	for side in [-1.0, 1.0]:
-		_box(root, Vector3(0.005, 0.036, 0.034), Vector3(side * 0.018, 0.062, -0.005), GUNMETAL, 0.6)
-	_box(root, Vector3(0.041, 0.006, 0.034), Vector3(0, 0.082, -0.005), GUNMETAL, 0.6)
-	_box(root, Vector3(0.012, 0.012, 0.012), Vector3(0.022, 0.05, 0.004), GUNMETAL, 0.6)  # brightness knob
-	var glass := _box(root, Vector3(0.031, 0.031, 0.002), Vector3(0, 0.063, -0.018), Color(0.55, 0.85, 1.0, 0.18))
+		_box(root, Vector3(0.003, 0.036, 0.022), Vector3(side * 0.021, 0.060, -0.008), GUNMETAL, 0.6)
+	_box(root, Vector3(0.045, 0.0035, 0.022), Vector3(0, 0.079, -0.008), GUNMETAL, 0.6)
+	_box(root, Vector3(0.009, 0.009, 0.009), Vector3(0.025, 0.047, 0.002), GUNMETAL, 0.6)  # brightness knob
+	var glass := MeshInstance3D.new()
+	var lens := QuadMesh.new()
+	lens.size = Vector2(0.039, 0.036)
+	glass.mesh = lens
+	glass.position = Vector3(0, 0.060, -0.015)
 	glass.material_override = _glass()
-	var dot_at := Vector3(0, 0.063, -0.019)
-	_dot(root, dot_at, Color(1.0, 0.12, 0.1), 0.0017)
+	root.add_child(glass)
+	var dot_at := Vector3(0, 0.060, -0.016)
+	_dot(root, dot_at, Color(1.0, 0.14, 0.12), 0.0013)
 	root.set_meta("sight", dot_at)
 	root.set_meta("muzzle", Vector3(0, 0.0, -0.455))
 
@@ -344,9 +349,10 @@ static func _glow(color: Color, energy: float) -> StandardMaterial3D:
 static func _glass() -> StandardMaterial3D:
 	if not _materials.has("glass"):
 		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.55, 0.85, 1.0, 0.16)
+		material.albedo_color = Color(0.65, 0.9, 1.0, 0.04)
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.disable_fog = true
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_materials["glass"] = material
 	return _materials["glass"]

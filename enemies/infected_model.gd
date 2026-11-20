@@ -11,6 +11,7 @@ var _head_kick := 0.0
 var _anticipation := 0.0
 var _mutation_root := Node3D.new()
 var _spore_sacs: Array[MeshInstance3D] = []
+var _molt_plates: Array[Node3D] = []
 
 ## Outfits a Drip can spawn in: [shirt, pants, accent]. Picked per instance
 ## so a horde isn't a row of clones.
@@ -138,6 +139,7 @@ func _ready() -> void:
 		GameManager.mutations.mutations_changed.connect(_on_mutations_changed)
 	_enemy.winding_up.connect(func(): _anticipation = 1.0)
 	_enemy.staggered.connect(func(): _hurt = 1.0)
+	_enemy.molted.connect(_on_molted)
 	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
 	scale *= 0.1
 	create_tween().tween_property(self, "scale", scale * 10.0, .3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -156,10 +158,18 @@ func _on_mutations_changed(_active: Array) -> void:
 	_apply_mutations()
 
 
+func _on_molted() -> void:
+	for plate in _molt_plates:
+		if is_instance_valid(plate):
+			plate.visible = false
+	_molt_plates.clear()
+
+
 func _apply_mutations() -> void:
 	for child in _mutation_root.get_children():
 		child.queue_free()
 	_spore_sacs.clear()
+	_molt_plates.clear()
 	if GameManager.has_mutation("armor"):
 		# Front metallic chest plate, visor brow and shoulder pauldrons matching the Armor shield card.
 		var plate := Color("#7b90a3")
@@ -200,6 +210,26 @@ func _apply_mutations() -> void:
 		_piece(_mutation_root, Vector3(0, 1.63, -0.04), Vector3(0.08, 0.5, 0.46), Color("#ff5689"), true)
 		for side in [-1.0, 1.0]:
 			_piece(_mutation_root, Vector3(side * 0.38, 1.52, 0.05), Vector3(0.22, 0.24, 0.22), Color("#ff8f5c"), true)
+	if GameManager.has_mutation("conductors"):
+		# Twin glowing cyan lightning prongs rising off the shoulders.
+		for side in [-1.0, 1.0]:
+			_piece(_mutation_root, Vector3(side * 0.36, 1.72, 0.08), Vector3(0.06, 0.52, 0.06), Color("#5ce8ff"), true, 0.6)
+			_piece(_mutation_root, Vector3(side * 0.36, 1.98, 0.08), Vector3(0.12, 0.08, 0.12), Color("#c6f8ff"), true)
+	if GameManager.has_mutation("molting") and not _enemy._molted:
+		# Amber chitin carapace plates that pop off on the first hit.
+		var shell := Node3D.new()
+		_mutation_root.add_child(shell)
+		_piece(shell, Vector3(0, 1.24, 0.22), Vector3(0.64, 0.54, 0.14), Color("#e8a238"), false, 0.3)
+		for side in [-1.0, 1.0]:
+			_piece(shell, Vector3(side * 0.42, 1.42, 0.06), Vector3(0.24, 0.24, 0.28), Color("#d48628"), false, 0.3)
+		_molt_plates.append(shell)
+	if GameManager.has_mutation("pressure_front"):
+		# Dense indigo pressure bands strapped around the torso.
+		for y in [0.95, 1.15, 1.35]:
+			_piece(_mutation_root, Vector3(0, y, 0.0), Vector3(0.66, 0.07, 0.4), Color("#6a73d9"), false, 0.7)
+	if _enemy.is_elite:
+		# Glowing elite crest above the head (False Clearing).
+		_piece(_mutation_root, Vector3(0, 2.02, -0.02), Vector3(0.32, 0.1, 0.28), Color("#8ce8ff"), true)
 
 
 ## One material per color/glow/metal combo, shared by every infected, so the
@@ -222,12 +252,17 @@ static func _shared_material(color: Color, glow: bool, metallic: float) -> Stand
 	return _materials[key]
 
 
+static var _unit_box: BoxMesh
+
+
 func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> void:
+	if _unit_box == null:
+		_unit_box = BoxMesh.new()
+		_unit_box.size = Vector3.ONE
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh.mesh = box
+	mesh.mesh = _unit_box
 	mesh.position = at
+	mesh.scale = size
 	mesh.material_override = _shared_material(color, glow, metallic)
 	parent.add_child(mesh)
 

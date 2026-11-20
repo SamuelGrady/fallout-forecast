@@ -22,7 +22,7 @@ extends Node3D
 @export var mister_first_wave := 2
 
 ## Position broadcasts per second when the host is relaying to clients.
-const NET_HZ := 10.0
+const NET_HZ := 20.0
 
 var _timer := 0.0
 var _next_net_id := 1
@@ -35,6 +35,9 @@ var _reveal_timer := 0.0
 var _supplies_pending := false
 ## One authored beat per wave (from wave 2), fired halfway through Downpour.
 var _beat_done := false
+## False Clearing mutation: mid-Downpour lull + elite spawn.
+var _false_clearing_done := false
+var _false_clearing_left := 0.0
 
 
 func _ready() -> void:
@@ -42,12 +45,17 @@ func _ready() -> void:
 
 
 func _on_phase(phase: int, wave: int) -> void:
+	if _false_clearing_left > 0.0:
+		_false_clearing_left = 0.0
+		if Net.is_host() and get_tree().get_nodes_in_group("boss").is_empty():
+			WeatherManager.set_intensity_override(-1.0)
 	if wave != _wave or phase == WeatherManager.Phase.CALM:
 		_wave = wave
 		_budget = roundi((18 + wave * 8) * GameManager.enemy_spawn_scale())
 		_spawned = 0
 		_supplies_pending = true
 		_beat_done = false
+		_false_clearing_done = false
 	_timer = 1.5
 	_burst_left = 0
 
@@ -55,6 +63,11 @@ func _on_phase(phase: int, wave: int) -> void:
 func _physics_process(delta: float) -> void:
 	if not Net.is_host() or not GameManager.run_active or GameManager.finished:
 		return
+	if _false_clearing_left > 0.0:
+		_false_clearing_left -= delta
+		if _false_clearing_left <= 0.0 and get_tree().get_nodes_in_group("boss").is_empty():
+			WeatherManager.set_intensity_override(-1.0)
+			GameManager.show_banner("STORM SURGING", Color("b8e56d"), 2.0)
 	if Net.is_online():
 		_net_sync -= delta
 		if _net_sync <= 0.0:
@@ -80,6 +93,9 @@ func _physics_process(delta: float) -> void:
 			_timer = drizzle_breather if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else downpour_breather
 		else:
 			_timer = 0.5
+	if not _false_clearing_done and GameManager.has_mutation("false_clearing") and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.35):
+		_false_clearing_done = true
+		_trigger_false_clearing()
 	if not _beat_done and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.5):
 		_beat_done = true
 		_run_beat(_wave)
@@ -88,6 +104,26 @@ func _physics_process(delta: float) -> void:
 		_reveal_timer = 1.0
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			enemy.reveal(1.2)
+
+
+## False Clearing mutation: rain briefly pauses while a heavy revealed elite enters.
+func _trigger_false_clearing() -> void:
+	if get_tree().get_nodes_in_group("boss").is_empty():
+		WeatherManager.set_intensity_override(0.05)
+		_false_clearing_left = 6.5
+	GameManager.show_banner("FALSE CLEARING  -  ELITE INCOMING", Color("8ce8ff"), 2.8)
+	var elite_scene := mister_scene if WeatherManager.wave >= mister_first_wave and randf() < 0.5 else gutter_scene
+	var at: Variant = _marker_position("enemy_spawn")
+	if at == null:
+		return
+	var point: Vector3 = at
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) > 0:
+		point = NavigationServer3D.map_get_closest_point(map, point)
+	var where := point + Vector3(0, 0.15, 0)
+	var enemy := _make(elite_scene, where, false, 0, true)
+	if enemy and Net.is_online():
+		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(elite_scene), where, false, true])
 
 
 ## Memorable mid-wave encounters on top of the count-based horde. Beat
@@ -143,7 +179,7 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBas
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(scene, where, false)
 	if enemy and Net.is_online():
-		_spawn_enemy.rpc(enemy.net_id, _kind_of(scene), where, false)
+		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false])
 	return enemy
 
 
@@ -207,7 +243,7 @@ func spawn(scene: PackedScene) -> EnemyBase:
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(scene, where, false)
 	if enemy and Net.is_online():
-		_spawn_enemy.rpc(enemy.net_id, _kind_of(scene), where, false)
+		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false])
 	return enemy
 
 
@@ -224,15 +260,15 @@ func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
 	add_child.call_deferred(copy, true)
 	copy.set_deferred("global_position", at)
 	if Net.is_online():
-		_spawn_enemy.rpc(copy.net_id, _kind_of(scene), at, small)
+		Net.rpc_to_all(_spawn_enemy, [copy.net_id, _kind_of(scene), at, small, false])
 
 
-## Build one enemy on this peer. `is_small` and net_id are set before add_child
-## because EnemyBase._ready() reads them. Clients pass the host's id in; only
-## the host hands out new ones.
-func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0) -> EnemyBase:
+## Build one enemy on this peer. `is_small`, `is_elite` and net_id are set before
+## add_child because EnemyBase._ready() reads them. Clients pass the host's id in.
+func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite := false) -> EnemyBase:
 	var enemy := scene.instantiate() as EnemyBase
 	enemy.is_small = small
+	enemy.is_elite = elite
 	if forced_id > 0:
 		enemy.net_id = forced_id
 	else:
@@ -240,6 +276,8 @@ func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0) -> Enem
 		_next_net_id += 1
 	add_child(enemy, true)
 	enemy.global_position = at
+	if elite:
+		enemy.reveal(10.0)
 	return enemy
 
 
@@ -345,10 +383,10 @@ func _clear_supplies() -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool) -> void:
+func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool, elite := false) -> void:
 	if _find_net(net_id) != null:
 		return
-	_make(_scene_of(kind), at, small, net_id)
+	_make(_scene_of(kind), at, small, net_id, elite)
 
 
 func notify_tell(net_id: int, cue: String, duration: float, volume: float) -> void:
@@ -362,17 +400,30 @@ func _play_enemy_tell(net_id: int, cue: String, duration: float, volume: float) 
 		enemy.play_tell(cue, duration, volume)
 
 
-## Host: one enemy died. Tell the clients which one, and what it dropped.
-func notify_despawn(enemy: EnemyBase, drops: Array) -> void:
-	if Net.is_host() and Net.is_online():
-		_despawn_enemy.rpc(enemy.net_id, drops)
+func notify_molt(net_id: int) -> void:
+	Net.rpc_to_run(_play_enemy_molt, [net_id])
 
 
 @rpc("authority", "call_remote", "reliable")
-func _despawn_enemy(net_id: int, drops: Array) -> void:
+func _play_enemy_molt(net_id: int) -> void:
 	var enemy := _find_net(net_id)
 	if enemy:
-		Sound.play_at("enemy_death", enemy.global_position)
+		enemy.play_molt()
+
+
+## Host: one enemy died. Tell clients which one, its drops, and death fragment launch.
+func notify_despawn(enemy: EnemyBase, drops: Array, throw_vec := Vector3.ZERO, critical := false) -> void:
+	if Net.is_host() and Net.is_online():
+		Net.rpc_to_all(_despawn_enemy, [enemy.net_id, drops, enemy.global_position, throw_vec, critical])
+
+
+@rpc("authority", "call_remote", "reliable")
+func _despawn_enemy(net_id: int, drops: Array, at: Vector3, throw_vec: Vector3, critical: bool) -> void:
+	var enemy := _find_net(net_id)
+	var pos := enemy.global_position if enemy else at
+	EnemyBase.spawn_death_fragments(self, pos, throw_vec, critical)
+	Sound.play_at("enemy_death", pos)
+	if enemy:
 		enemy.remove_from_group("enemies")
 		enemy.queue_free()
 	for entry in drops:
@@ -394,7 +445,7 @@ func _push_enemies() -> void:
 		yaws.append(enemy.rotation.y)
 	if ids.is_empty():
 		return
-	_sync_enemies.rpc(ids, places, yaws)
+	Net.rpc_to_run(_sync_enemies, [ids, places, yaws])
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")
@@ -402,8 +453,7 @@ func _sync_enemies(ids: PackedInt32Array, places: PackedVector3Array, yaws: Pack
 	for i in ids.size():
 		var enemy := _find_net(ids[i])
 		if enemy:
-			enemy.global_position = places[i]
-			enemy.rotation.y = yaws[i]
+			enemy.set_net_state(places[i], yaws[i])
 
 
 func _find_net(net_id: int) -> EnemyBase:

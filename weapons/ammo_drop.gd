@@ -158,12 +158,18 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 	if _taken or _age < .35:
 		return
+	var reach := GameManager.pickup_reach()
 	for player in get_tree().get_nodes_in_group("local_player"):
-		if player.state != "ok" or global_position.distance_to(player.global_position) > 1.8:
+		var dist := global_position.distance_to(player.global_position)
+		if player.state != "ok" or dist > reach:
 			continue
 		var origin: Vector3 = player.global_position + Vector3.UP
 		var query := PhysicsRayQueryParameters3D.create(origin, global_position + Vector3.UP * .3, 1)
 		if not get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			continue
+		if dist > 1.8 and GameManager.has_player_mutation("magnet_hands"):
+			var target: Vector3 = player.global_position + Vector3.UP * 0.2
+			global_position = global_position.move_toward(target, 10.0 * delta)
 			continue
 		var holder := player.get_node("Head/Camera3D/WeaponHolder")
 		if _collect(player, holder):

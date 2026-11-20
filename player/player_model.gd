@@ -106,8 +106,12 @@ func _build() -> void:
 	_gun.scale = Vector3.ONE * 1.25
 	_gun.position = Vector3(0.12, 0.2, -0.32)
 	_torso.add_child(_gun)
+	# Only the local owner's own body sits on Layer 2 (culled by the local
+	# first-person camera). Remote players and lobby previews sit on Layer 1
+	# so every teammate is visible.
+	var render_layer := LAYER if (player and player.is_multiplayer_authority()) else 1
 	for mesh in _hips.find_children("*", "MeshInstance3D", true, false):
-		mesh.layers = LAYER
+		mesh.layers = render_layer
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 

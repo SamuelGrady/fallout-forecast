@@ -55,7 +55,11 @@ func _physics_process(delta: float) -> void:
 		growth = minf(growth + intensity * delta / grow_time, 1.0)
 	else:
 		growth = maxf(growth - delta / dry_time, 0.0)
-	_material.albedo_color = color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
+	var base := color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
+	if GameManager.has_mutation("undertow"):
+		var pulse := 0.55 + 0.25 * sin(Time.get_ticks_msec() * 0.006)
+		base = base.lerp(Color(0.22, 0.82, 0.9, 0.88), pulse)
+	_material.albedo_color = base
 	_apply()
 
 

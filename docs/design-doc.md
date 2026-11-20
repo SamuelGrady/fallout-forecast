@@ -278,7 +278,7 @@ The title screen has **PLAY SOLO**, **HOST GAME** and **JOIN GAME**.
 
 What still crosses the network only as visuals: rain, fog, puddles, the retro shader, music and the HUD all run locally.
 
-Remote players interpolate host-relayed movement. Infected windup and death audio and decon spray play on clients. Enemy death fragments are local to the host. Lag compensation remains open.
+Remote players and infected interpolate host-relayed movement (15 Hz for infected, 20 Hz for players). Infected windup, molt, death audio, death fragments, and decon spray play on every peer. Host-side lag compensation rewinds enemy and Turned-player capsules analytically against static world cover using per-peer smoothed RTT (`PROTOCOL = 4`).
 
 **November 20 update.** The build now has custom art throughout, a dedicated cloud server, a browser build, and fixes for every finding from the November 19 playtest and whole-game review.
 
@@ -287,12 +287,12 @@ Remote players interpolate host-relayed movement. Infected windup and death audi
 | Guns | Code-built firearms replace the Kenney blasters: carbine with a reflex red dot, pump shotgun with a brass bead and animated forend, custom cursed weapons. ADS aligns the sight to screen centre and hides the crosshair. | `weapons/gun_models.gd`, `weapons/weapon_holder.gd` |
 | Gun audio | Synthesized gunshots (crack, body, thump, slapback echo), flesh impacts, pump and mag-swap sounds. Buses with a limiter and music ducking. | `tools/audio/gen_gun_sfx.py`, `game/sound.gd` |
 | Grenades | Flare Gun became the Shield Dome (thrown, full shelter inside, pushes infected out). Bug Bomb became a Frag Grenade. Both show a throw-arc preview with a landing ring. | `weapons/projectile.gd`, `weapons/*.tres` |
-| Infected | Jointed limbs, reaching arms, hanging jaws, varied outfits, archetype gaits, hit reactions, growls and windup tells. | `enemies/infected_model.gd`, `enemies/enemy_base.gd` |
+| Infected | Jointed limbs, reaching arms, hanging jaws, varied outfits, archetype gaits, hit reactions, growls, windup tells, and client-replicated directional death fragments. | `enemies/infected_model.gd`, `enemies/enemy_base.gd`, `enemies/enemy_spawner.gd` |
 | Players | Animated hazmat model (walk, sprint, aim, downed, Turned), with a synced color and skin picker and a saved solo preference. Remote players are interpolated. | `player/player_model.gd`, `ui/suit_picker.gd` |
 | Map | All 17 buildings individually modelled. Signs are modelled neon tubes mounted on facades or posts; none float. | `props/building_kit.gd`, `props/pinecrest_*.gd`, `props/neon_lettering.gd` |
 | Pacing | Ready-up (G) skips Calm and Clearing, a 12 s first Calm with a storm countdown, a crate near each player at Calm, authored wave beats, rotating district objectives. | `game/game_manager.gd`, `enemies/enemy_spawner.gd` |
-| Mutations | The roll explains itself, auto-pulls in solo, and every mutation grants a matching player perk. | `ui/slot_reel.gd`, `game/game_manager.gd` |
-| Multiplayer | All transport is WebSocket. LAN discovery uses broadcast, per-interface broadcast and multicast. Global pause. Dedicated headless server at `wss://fallout.drew.place`. | `game/net.gd`, `game/dedicated_server.gd`, `server/` |
+| Mutations | 11 enemy mutations (original 5 + Conductors, Molting, Undertow, Static Charge, Pressure Front, False Clearing) with 3D model tells, plus 11 persistent stacking **Player Bio-Mutations** rolled every wave (2 on a Jackpot) and shown on the HUD and SlotReelUI. | `game/mutation_table.tres`, `game/mutation_roll.gd`, `game/game_manager.gd`, `ui/slot_reel.gd`, `ui/hud.gd` |
+| Multiplayer & lag comp | All transport is WebSocket (`PROTOCOL = 4`). Host measures per-peer RTT at 1 Hz and rewinds enemy/Turned-player hitboxes analytically (`LagComp`, capped at 250 ms and clipped by static world cover) for client hitscan shots. LAN discovery uses broadcast, per-interface broadcast and multicast. Global pause. Dedicated headless server at `wss://fallout.drew.place`. | `game/net.gd`, `game/lag_comp.gd`, `game/dedicated_server.gd`, `weapons/weapon_holder.gd`, `server/` |
 | Web and deployment | Godot Web export runs in Compatibility mode at `https://drewdettmer.com/fallout/`. GitHub Actions verifies both images, and Coolify on `ballista` auto-deploys both **Fallout Forecast Web** and **Fallout Forecast Server** (`wss://fallout.drew.place/`) from `master`. | `web/`, `server/`, `.github/workflows/` |
 | Team pings | Contextual tap and six-command wheel, with host-checked relay, suit-colored markers, distance and radio cues. Infected and revive markers follow their targets. | `game/ping_system.gd`, `ui/ping_hud.gd` |
 | Title and sound | Cassette transport and VCR playback menu, gated Downpour drums, storm bulletins, shelter-responsive wind and spatial hazard cues. | `ui/title.gd`, `ui/vcr_deck.gd`, `game/sound.gd` |

@@ -120,7 +120,7 @@ func _reset() -> void:
 	Net.end_run()
 	GameManager.run_active = false
 	GameManager.finished = true
-	GameManager.mutations.clear()
+	GameManager.mutations.reset_run()
 	WeatherManager.stop()
 	if get_tree().current_scene:
 		get_tree().unload_current_scene()

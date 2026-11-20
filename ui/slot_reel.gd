@@ -128,7 +128,7 @@ func _on_started() -> void:
 	_panel.visible = true
 	BroadcastUI.reveal(_panel)
 	_title.text = "MUTATION ROLL"
-	_info.text = "Enemies mutate this wave. Two matching reels decide it; three of a kind is a JACKPOT (two mutations, vote one off). You get a matching perk."
+	_info.text = "Enemies mutate this wave — and YOUR SQUAD mutates permanently! Match 3 for a JACKPOT (2 player mutations, vote off 1 enemy mutation)."
 	_pull_wait = 0.0
 	_targets.clear()
 	_options.clear()
@@ -165,7 +165,7 @@ func _on_vote(options: Array) -> void:
 	_spinning = [false,false,false]
 	_options = options.duplicate()
 	_title.text = "CANCEL ONE"
-	_info.text = "JACKPOT: two mutations landed. Vote which one to cancel."
+	_info.text = "JACKPOT: two enemy mutations landed. Vote which one to cancel (you keep 2 player mutations!)."
 	_cards[2].visible = false
 	for i in 2:
 		_cards[i].show_entry(_table.get_entry(options[i]),true,BroadcastUI.input_hint("vote_%d" % (i+1)))
@@ -200,11 +200,13 @@ func _on_final(active: Array) -> void:
 	var lines := []
 	for id in active:
 		var entry := _table.get_entry(id)
-		var perk: Array = GameManager.PERKS.get(id, ["", ""])
-		lines.append("ENEMIES: %s. %s
-YOUR PERK: %s. %s" % [entry.display_name.to_upper(), entry.description, perk[0], perk[1]])
-	_info.text = "
-".join(PackedStringArray(lines))
-	_hide_at = _clock + 4.0
+		if entry:
+			lines.append("ENEMIES: %s — %s" % [entry.display_name.to_upper(), entry.description])
+	for pid in GameManager.mutations.last_player_mutations:
+		if GameManager.PLAYER_MUTATIONS.has(pid):
+			var info: Dictionary = GameManager.PLAYER_MUTATIONS[pid]
+			lines.append("YOUR MUTATION: %s — %s" % [str(info.name), str(info.desc)])
+	_info.text = "\n".join(PackedStringArray(lines))
+	_hide_at = _clock + 4.5
 	if MenuState.stack.is_empty():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

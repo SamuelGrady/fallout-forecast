@@ -26,6 +26,12 @@ GameManager="*res://game/game_manager.gd"
 Playtest="*res://game/playtest.gd"
 MenuState="*res://ui/menu_state.gd"
 
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
+general/default_playback_type.web=0
+driver/output_latency.web=50
+
 [display]
 
 window/size/viewport_width=960
@@ -171,9 +177,9 @@ ready_up={
 }
 ping={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"device":-1,"physical_keycode":90)
-, Object(InputEventMouseButton,"device":-1,"button_index":3)
-, Object(InputEventJoypadButton,"device":-1,"button_index":12)
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":90,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":3,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":12,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
 use_item={
@@ -202,5 +208,4 @@ weapon_5={
 
 [rendering]
 
-renderer/rendering_method.web="gl_compatibility"
 rendering_device/driver.windows="d3d12"

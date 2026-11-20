@@ -118,8 +118,9 @@ static func build(text: String, height: float, color: Color, lit := true, racewa
 				post.position = Vector3(sx * w, y, radius * 1.5)
 				post.material_override = _metal()
 				root.add_child(post)
-	if lit:
-		# Colored wash on the wall behind the sign.
+	if lit and not OS.has_feature("web"):
+		# Colored wash on the wall behind the sign (skipped on Web to keep
+		# WebGL2 forward lighting fast; the emissive neon tubes remain bright).
 		var glow := OmniLight3D.new()
 		glow.light_color = color
 		glow.light_energy = 0.9

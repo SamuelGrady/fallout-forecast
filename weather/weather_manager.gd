@@ -176,17 +176,25 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 func strike_lightning(at: Variant = null) -> void:
 	if not Net.is_host():
 		return
-	var position: Vector3 = at if at is Vector3 else Vector3(
-		randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
+	var position: Vector3
+	if at is Vector3:
+		position = at
+	else:
+		position = Vector3(randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
+		# Conductors mutation: pull most strikes near an infected so the chain jump matters.
+		if GameManager.has_mutation("conductors") and randf() < 0.65:
+			var enemies := get_tree().get_nodes_in_group("enemies")
+			if not enemies.is_empty():
+				var chosen: Node3D = enemies.pick_random()
+				position = chosen.global_position + Vector3(randf_range(-3.5, 3.5), 0.0, randf_range(-3.5, 3.5))
 	var strike_seed := randi()
 	# rpc() needs a live peer, so solo strikes come straight off the signal.
 	if Net.is_online():
-		_strike.rpc(position, strike_seed)
-	else:
-		lightning_struck.emit(position, strike_seed)
+		Net.rpc_to_all(_strike, [position, strike_seed])
+	lightning_struck.emit(position, strike_seed)
 
 
-@rpc("authority", "call_local", "reliable")
+@rpc("authority", "call_remote", "reliable")
 func _strike(position: Vector3, strike_seed: int) -> void:
 	lightning_struck.emit(position, strike_seed)
 

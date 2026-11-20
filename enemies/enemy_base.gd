@@ -12,6 +12,7 @@ extends CharacterBody3D
 signal damaged(amount: float, health_left: float)
 signal winding_up
 signal staggered
+signal molted
 signal attacked(target: Node3D, amount: float)
 signal died(enemy: EnemyBase)
 
@@ -25,6 +26,8 @@ var target: Node3D
 var _stagger_left := 0.0
 var _slow_left := 0.0
 var _weaken_left := 0.0
+var _molt_boost_left := 0.0
+var _molted := false
 var _windup_left := 0.0
 var _recover_left := 0.0
 var _attack_victim: Node3D
@@ -34,6 +37,7 @@ var _status_frame := -1
 var _last_hit_dir := Vector3.ZERO
 var _last_hit_force := 0.0
 static var _fragment_materials: Array[StandardMaterial3D] = []
+static var _fragment_mesh: BoxMesh
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _retarget_timer := 0.0
@@ -44,8 +48,15 @@ var _path_index := 0
 
 const WAYPOINT_REACHED := 0.4
 const REPATH_INTERVAL := 1.5
+const POS_HISTORY_LIMIT := 24
 
 var _repath_timer := 0.0
+## Host-recorded recent positions for hitscan lag compensation.
+var _pos_history: Array[Dictionary] = []
+## Client-side interpolation target from _sync_enemies.
+var _net_target_pos := Vector3.ZERO
+var _net_target_yaw := 0.0
+var _net_has_target := false
 
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -62,6 +73,8 @@ var _push := Vector3.ZERO
 var _last_hit_by: Node = null
 ## Splitters mutation: the small copies don't split again.
 var is_small := false
+## False Clearing mutation: heavy elite spawn.
+var is_elite := false
 
 
 func _ready() -> void:
@@ -75,10 +88,15 @@ func _ready() -> void:
 		_visibility_material = ShaderMaterial.new()
 		_visibility_material.shader = preload("res://enemies/visibility.gdshader")
 	_set_overlay.call_deferred(_visibility_material)
-	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
+	var mult := 0.3 if is_small else (2.2 if is_elite else 1.0)
+	health = data.max_health * GameManager.enemy_health_scale() * mult
 	if is_small:
 		scale = Vector3.ONE * 0.6
-	if not Net.is_host():
+	elif is_elite:
+		scale = Vector3.ONE * 1.35
+	if Net.is_host():
+		_record_position()
+	else:
 		set_physics_process(false)
 
 
@@ -99,6 +117,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3(_push.x, velocity.y - _gravity * delta, _push.z)
 		_push = _push.move_toward(Vector3.ZERO, 25.0 * delta)
 		move_and_slide()
+		_record_position()
 		return
 	_retarget_timer -= delta
 	if _retarget_timer <= 0.0 or not is_instance_valid(target):
@@ -143,11 +162,14 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	move_and_slide()
+	_record_position()
 
 
-## Movement multiplier: storm, Runners mutation, leg-shot slow, flare weaken.
+## Movement multiplier: storm, Runners mutation, Molting burst, leg-shot slow, flare weaken.
 func speed_multiplier() -> float:
 	var m := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	if _molt_boost_left > 0.0:
+		m *= 1.45
 	if _slow_left > 0.0:
 		m *= 0.5
 	if _weaken_left > 0.0:
@@ -169,6 +191,61 @@ func _tick_status(delta: float) -> void:
 	_status_frame = frame
 	_slow_left = maxf(0.0, _slow_left - delta)
 	_weaken_left = maxf(0.0, _weaken_left - delta)
+	_molt_boost_left = maxf(0.0, _molt_boost_left - delta)
+
+
+func _record_position() -> void:
+	_pos_history.append({"ms": Time.get_ticks_msec(), "pos": global_position})
+	if _pos_history.size() > POS_HISTORY_LIMIT:
+		_pos_history.remove_at(0)
+
+
+## Host lag compensation: interpolated position at `target_ms` (ticks_msec).
+func sample_position(target_ms: int) -> Vector3:
+	if _pos_history.is_empty():
+		return global_position
+	var last := _pos_history[_pos_history.size() - 1]
+	if target_ms >= int(last.ms):
+		return last.pos
+	var first := _pos_history[0]
+	if target_ms <= int(first.ms):
+		return first.pos
+	for i in range(_pos_history.size() - 1, 0, -1):
+		var a := _pos_history[i - 1]
+		var b := _pos_history[i]
+		if target_ms >= int(a.ms) and target_ms <= int(b.ms):
+			var span := float(int(b.ms) - int(a.ms))
+			var frac := (float(target_ms - int(a.ms)) / span) if span > 0.0 else 0.0
+			return (a.pos as Vector3).lerp(b.pos as Vector3, clampf(frac, 0.0, 1.0))
+	return global_position
+
+
+var _net_vel := Vector3.ZERO
+var _net_age := 0.0
+var _net_last_ms := 0
+
+
+## Client: receive a host position/yaw snapshot and glide smoothly toward it.
+func set_net_state(pos: Vector3, yaw: float) -> void:
+	var now := Time.get_ticks_msec()
+	if _net_has_target and _net_last_ms > 0:
+		var dt := clampf(float(now - _net_last_ms) * 0.001, 0.02, 0.25)
+		var step_v := (pos - _net_target_pos) / dt
+		# Ignore teleports/respawns when estimating travel velocity.
+		if step_v.length() < 16.0:
+			_net_vel = _net_vel.lerp(step_v, 0.55)
+		else:
+			_net_vel = Vector3.ZERO
+	else:
+		_net_vel = Vector3.ZERO
+	_net_last_ms = now
+	_net_target_pos = pos
+	_net_target_yaw = yaw
+	_net_age = 0.0
+	if not _net_has_target or global_position.distance_to(pos) > 4.0:
+		global_position = pos
+		rotation.y = yaw
+	_net_has_target = true
 
 
 func _has_attack_los(victim: Node3D) -> bool:
@@ -206,6 +283,13 @@ func _growl(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if not Net.is_host() and _net_has_target:
+		_net_age += delta
+		var predicted := _net_target_pos + _net_vel * minf(_net_age, 0.12)
+		var blend := 1.0 - exp(-14.0 * delta)
+		global_position = global_position.lerp(predicted, blend)
+		rotation.y = lerp_angle(rotation.y, _net_target_yaw, blend)
+		velocity = velocity.lerp(_net_vel, 1.0 - exp(-10.0 * delta))
 	_growl(delta)
 	var changed := false
 	if _hit_left > 0.0:
@@ -284,6 +368,41 @@ func play_tell(cue: String, duration: float, volume: float) -> void:
 	Sound.play_at(cue, global_position + Vector3.UP * height, volume, randf_range(0.93, 1.07))
 
 
+## Molting carapace burst (plays on host and via RPC on every client).
+func play_molt() -> void:
+	_molted = true
+	molted.emit()
+	if not Net.dedicated and get_parent():
+		ShotFX.sparks(get_parent(), global_position + Vector3.UP * 1.1, Vector3.UP, 8)
+		Sound.play_at("hit_flesh", global_position + Vector3.UP, -12.0, 1.4)
+
+
+## Shared death fragments: runs on the host and on every client from _despawn_enemy.
+static func spawn_death_fragments(parent: Node, at: Vector3, throw_vec: Vector3, critical: bool) -> void:
+	if Net.dedicated or parent == null:
+		return
+	if _fragment_materials.is_empty():
+		for c in [Color("#b5df68"), Color("#337c87")]:
+			var material := StandardMaterial3D.new()
+			material.albedo_color = c
+			_fragment_materials.append(material)
+	if _fragment_mesh == null:
+		_fragment_mesh = BoxMesh.new()
+		_fragment_mesh.size = Vector3.ONE
+	for i in 6:
+		var fragment := MeshInstance3D.new()
+		fragment.mesh = _fragment_mesh
+		fragment.scale = Vector3.ONE * randf_range(0.1, 0.22)
+		fragment.material_override = _fragment_materials[i % 2]
+		parent.add_child(fragment)
+		fragment.global_position = at + Vector3.UP * (1.6 if critical else 1.0)
+		var scatter := Vector3(randf_range(-1.0, 1.0), randf_range(0.3, 1.2), randf_range(-1.0, 1.0)) + throw_vec * randf_range(0.7, 1.3)
+		var tween := fragment.create_tween()
+		tween.tween_property(fragment, "position", fragment.position + scatter, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(fragment, "scale", Vector3.ZERO, 0.3)
+		tween.tween_callback(fragment.queue_free)
+
+
 ## Local only: explicit through-wall reveal outline (lightning strikes, Flare Gun).
 func reveal(duration: float) -> void:
 	if _reveal_material == null:
@@ -334,6 +453,14 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
+	# Molting mutation: first hit sheds carapace for half damage + speed burst.
+	if GameManager.has_mutation("molting") and not _molted and amount > 0.0:
+		_molted = true
+		_molt_boost_left = 3.5
+		amount *= 0.5
+		play_molt()
+		if Net.is_online() and get_parent() and get_parent().has_method("notify_molt"):
+			get_parent().notify_molt(net_id)
 	# Armor mutation: half damage from the front with visible deflection sparks.
 	if GameManager.has_mutation("armor") and _source is Node3D:
 		var to_source: Vector3 = (_source as Node3D).global_position - global_position
@@ -367,36 +494,19 @@ func die() -> void:
 	if get_parent() and get_parent().has_method("spawn_drop"):
 		for entry in drops:
 			get_parent().spawn_drop(entry[0], str(entry[1]))
-	if _fragment_materials.is_empty():
-		for c in [Color("#b5df68"), Color("#337c87")]:
-			var material := StandardMaterial3D.new()
-			material.albedo_color = c
-			_fragment_materials.append(material)
 	# Debris carries the killing hit: shotgun blasts and headshots throw it
-	# further along the shot direction.
-	var throw := _last_hit_dir * clampf(0.6 + _last_hit_force * 0.12, 0.6, 2.6)
-	for i in 6:
-		var fragment := MeshInstance3D.new()
-		var cube := BoxMesh.new()
-		cube.size = Vector3.ONE * randf_range(0.1, 0.22)
-		fragment.mesh = cube
-		fragment.material_override = _fragment_materials[i % 2]
-		get_parent().add_child(fragment)
-		fragment.global_position = global_position + Vector3.UP * (1.6 if _bullet_critical else 1.0)
-		var scatter := Vector3(randf_range(-1.0, 1.0), randf_range(.3, 1.2), randf_range(-1.0, 1.0)) + throw * randf_range(0.7, 1.3)
-		var tween := fragment.create_tween()
-		tween.tween_property(fragment, "position", fragment.position + scatter, .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tween.tween_property(fragment, "scale", Vector3.ZERO, .3)
-		tween.tween_callback(fragment.queue_free)
+	# further along the shot direction, replicated to every client.
+	var throw_vec := _last_hit_dir * clampf(0.6 + _last_hit_force * 0.12, 0.6, 2.6)
+	spawn_death_fragments(get_parent(), global_position, throw_vec, _bullet_critical)
 	Sound.play_at("enemy_death", global_position)
-	GameManager.record_kill(_last_hit_by)
+	GameManager.record_kill(_last_hit_by, global_position)
 	if GameManager.has_mutation("spores"):
 		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)
 	if GameManager.has_mutation("splitters") and not is_small and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	if get_parent() and get_parent().has_method("notify_despawn"):
-		get_parent().notify_despawn(self, drops)
+		get_parent().notify_despawn(self, drops, throw_vec, _bullet_critical)
 	died.emit(self)
 	queue_free()
 
@@ -442,10 +552,10 @@ func _face(direction: Vector3) -> void:
 		rotation.y = atan2(-direction.x, -direction.z)
 
 
-func take_bullet(amount: float, point: Vector3, source: Node) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF) -> void:
 	if health <= 0.0 or not Net.is_host():
 		return
-	var height := to_local(point).y
+	var height := (point.y - rewound_pos.y) / maxf(absf(scale.y), 0.01) if rewound_pos != Vector3.INF else to_local(point).y
 	var head_height := 1.42
 	match data.display_name.to_lower():
 		"gutter": head_height = 1.16
@@ -461,6 +571,8 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		_slow_left = 1.8
 	if _bullet_critical:
 		stagger(0.3)
+	if GameManager.has_mutation("pressure_front"):
+		amount *= 0.72
 	_last_bullet_point = point
 	take_damage(amount * (GameManager.headshot_multiplier() if _bullet_critical else 1.0), source)
 	_last_bullet_point = Vector3.ZERO

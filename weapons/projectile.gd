@@ -186,36 +186,39 @@ func _explode() -> void:
 		remove_from_group("enemy_lures")
 	var center := global_position
 	var blast_eye := center + Vector3.UP * 0.35
+	var blast_radius := data.effect_radius * GameManager.explosive_radius_scale()
+	var dmg_scale := GameManager.explosive_damage_scale()
+	var kb_scale := GameManager.explosive_knockback_scale()
 	if authoritative:
 		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
 		for target in targets:
 			if not WeaponHolder.is_damageable(target):
 				continue
 			var d: float = target.global_position.distance_to(center)
-			if d <= data.effect_radius:
+			if d <= blast_radius:
 				var aim_point: Vector3 = target.global_position + (Vector3.ZERO if target.is_in_group("boss_parts") else Vector3.UP * 0.9)
 				if not _has_los(blast_eye, aim_point):
 					continue
-				var falloff := 1.0 - 0.6 * d / data.effect_radius
-				target.take_damage(data.damage * falloff, shooter)
+				var falloff := 1.0 - 0.6 * d / blast_radius
+				target.take_damage(data.damage * falloff * dmg_scale, shooter)
 				if target.has_method("knockback"):
 					var push: Vector3 = (target.global_position - center)
 					push.y = 0.0
-					target.knockback(push.normalized() * data.knockback * falloff)
+					target.knockback(push.normalized() * data.knockback * falloff * kb_scale)
 	for puddle in get_tree().get_nodes_in_group("puddles"):
-		if puddle.global_position.distance_to(center) <= data.effect_radius + puddle.radius() \
+		if puddle.global_position.distance_to(center) <= blast_radius + puddle.radius() \
 				and _has_los(blast_eye, puddle.global_position + Vector3.UP * 0.2):
 			puddle.clear()
 	var parent := get_parent()
 	if data.kind == WeaponData.Kind.ROCKET:
-		ShotFX.puff(parent, center, Color(1.0, 0.5, 0.8, 0.7), data.effect_radius * 0.4, 0.6)
+		ShotFX.puff(parent, center, Color(1.0, 0.5, 0.8, 0.7), blast_radius * 0.4, 0.6)
 		ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.4, 0.8), 8.0, 0.12)
 		queue_free()
 		return
 	# Frag: white-hot core, orange fireball, dark smoke, flying debris.
-	ShotFX.puff(parent, center + Vector3.UP * 0.4, Color(1.0, 0.95, 0.75, 0.95), data.effect_radius * 0.15, 0.18)
-	ShotFX.puff(parent, center + Vector3.UP * 0.5, Color(1.0, 0.55, 0.15, 0.85), data.effect_radius * 0.3, 0.45)
-	ShotFX.puff(parent, center + Vector3.UP * 1.0, Color(0.18, 0.17, 0.16, 0.6), data.effect_radius * 0.38, 1.1)
+	ShotFX.puff(parent, center + Vector3.UP * 0.4, Color(1.0, 0.95, 0.75, 0.95), blast_radius * 0.15, 0.18)
+	ShotFX.puff(parent, center + Vector3.UP * 0.5, Color(1.0, 0.55, 0.15, 0.85), blast_radius * 0.3, 0.45)
+	ShotFX.puff(parent, center + Vector3.UP * 1.0, Color(0.18, 0.17, 0.16, 0.6), blast_radius * 0.38, 1.1)
 	ShotFX.sparks(parent, center + Vector3.UP * 0.3, Vector3.UP, 14)
 	ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.6, 0.25), 10.0, 0.15)
 	queue_free()

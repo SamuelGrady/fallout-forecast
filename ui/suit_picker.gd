@@ -148,7 +148,7 @@ func _build_preview(preview_size: Vector2i) -> void:
 	_viewport.size = preview_size
 	_viewport.own_world_3d = true
 	_viewport.transparent_bg = true
-	_viewport.msaa_3d = Viewport.MSAA_2X
+	_viewport.msaa_3d = Viewport.MSAA_DISABLED if OS.has_feature("web") else Viewport.MSAA_2X
 	container.add_child(_viewport)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_CLEAR_COLOR

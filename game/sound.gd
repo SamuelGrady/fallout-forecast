@@ -36,13 +36,14 @@ func _ready() -> void:
 	# Master limiter keeps shotgun + explosion stacks from clipping.
 	AudioServer.add_bus_effect(0, AudioEffectHardLimiter.new())
 	# Music ducks a few dB while guns are firing.
-	var duck := AudioEffectCompressor.new()
-	duck.sidechain = &"Weapons"
-	duck.threshold = -26.0
-	duck.ratio = 4.0
-	duck.attack_us = 2000.0
-	duck.release_ms = 350.0
-	AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
+	if not OS.has_feature("web"):
+		var duck := AudioEffectCompressor.new()
+		duck.sidechain = &"Weapons"
+		duck.threshold = -26.0
+		duck.ratio = 4.0
+		duck.attack_us = 2000.0
+		duck.release_ms = 350.0
+		AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
 	WeatherManager.phase_changed.connect(_phase_changed)
 
 
@@ -116,6 +117,8 @@ func _loop(stream: AudioStream, bus := &"Master") -> AudioStreamPlayer:
 	var voice := AudioStreamPlayer.new()
 	voice.stream = stream
 	voice.bus = bus
+	if OS.has_feature("web"):
+		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	voice.volume_linear = 0.0
 	add_child(voice)
 	voice.play()
@@ -186,6 +189,8 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 	voice.volume_db = volume_db
 	voice.pitch_scale = pitch
 	voice.bus = bus
+	if OS.has_feature("web"):
+		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(voice)
 	voice.finished.connect(voice.queue_free)
 	voice.play()
@@ -206,6 +211,8 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 	voice.volume_db = volume_db
 	voice.pitch_scale = pitch
 	voice.bus = bus_for(cue)
+	if OS.has_feature("web"):
+		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	voice.max_distance = 45.0
 	world.add_child(voice)
 	voice.global_position = position

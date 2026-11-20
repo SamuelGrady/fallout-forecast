@@ -2,16 +2,25 @@ class_name GameIcon
 extends Control
 ## Small geometric pictograms shared by cards, HUD and world signage.
 
-@export var kind := "health"
-@export var color := Color("#e8e9d5")
-var value := 1.0
+@export var kind := "health":
+	set(v):
+		if kind != v:
+			kind = v
+			queue_redraw()
+@export var color := Color("#e8e9d5"):
+	set(v):
+		if color != v:
+			color = v
+			queue_redraw()
+var value := 1.0:
+	set(v):
+		if not is_equal_approx(value, v):
+			value = v
+			queue_redraw()
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-
-func _process(_delta: float) -> void:
 	queue_redraw()
 
 
@@ -112,6 +121,97 @@ func _draw() -> void:
 			var diamond := PackedVector2Array([Vector2(0,-26),Vector2(26,0),Vector2(0,26),Vector2(-26,0),Vector2(0,-26)])
 			draw_polyline(diamond, color, 5, true)
 			draw_circle(Vector2.ZERO, 7, color)
+		# Extra enemy mutations.
+		"conductors":
+			_line([Vector2(6,-26), Vector2(-10,-2), Vector2(4,-2), Vector2(-8,26)], 6)
+			draw_circle(Vector2(6,-26), 4, color)
+			draw_circle(Vector2(-8,26), 4, color)
+		"molting":
+			_line([Vector2(-22,12), Vector2(0,-22), Vector2(22,12)], 5)
+			_line([Vector2(-14,22), Vector2(0,-4), Vector2(14,22)], 4)
+			draw_line(Vector2(0,-22), Vector2(0,22), color * Color(1,1,1,0.5), 3, true)
+		"undertow":
+			draw_arc(Vector2.ZERO, 22, 0.2, PI * 1.4, 20, color, 5, true)
+			draw_arc(Vector2.ZERO, 12, PI, TAU + 0.6, 16, color, 4, true)
+			draw_circle(Vector2.ZERO, 4, color)
+		"static_charge":
+			draw_circle(Vector2.ZERO, 16, color, false, 4, true)
+			_line([Vector2(3,-12), Vector2(-5,0), Vector2(3,0), Vector2(-3,12)], 4)
+			for i in 6:
+				var d := Vector2.from_angle(i * TAU / 6.0)
+				draw_line(d * 20, d * 27, color, 3, true)
+		"pressure_front":
+			_line([Vector2(-26,0), Vector2(-9,0)], 5)
+			_line([Vector2(-15,-8), Vector2(-8,0), Vector2(-15,8)], 4)
+			_line([Vector2(26,0), Vector2(9,0)], 5)
+			_line([Vector2(15,-8), Vector2(8,0), Vector2(15,8)], 4)
+			draw_rect(Rect2(-5, -20, 10, 40), color)
+		"false_clearing":
+			draw_arc(Vector2(-8,-8), 11, 0, TAU, 18, color, 4, true)
+			draw_circle(Vector2(6,4), 10, color)
+			draw_circle(Vector2(-6,8), 9, color)
+			draw_circle(Vector2(14,10), 8, color)
+			draw_line(Vector2(-20,24), Vector2(22,-18), Color("#ff5689"), 4, true)
+		# Player bio-mutations.
+		"acid_blood":
+			var drop := PackedVector2Array([Vector2(0,-25), Vector2(16,4), Vector2(10,20), Vector2(-10,20), Vector2(-16,4)])
+			draw_colored_polygon(drop, color * Color(1,1,1,0.3))
+			drop.append(drop[0])
+			draw_polyline(drop, color, 4, true)
+			draw_circle(Vector2(-22,-6), 4, color)
+			draw_circle(Vector2(22,-4), 3.5, color)
+		"chitin_suit":
+			var hex := PackedVector2Array([Vector2(0,-25), Vector2(22,-12), Vector2(22,12), Vector2(0,25), Vector2(-22,12), Vector2(-22,-12)])
+			draw_colored_polygon(hex, color * Color(1,1,1,0.22))
+			hex.append(hex[0])
+			draw_polyline(hex, color, 4, true)
+			draw_line(Vector2(-14,0), Vector2(14,0), color, 4, true)
+			draw_line(Vector2(0,-14), Vector2(0,14), color, 4, true)
+		"adrenaline_glands":
+			_line([Vector2(-20,16), Vector2(0,-4), Vector2(20,16)], 6)
+			_line([Vector2(-20,-2), Vector2(0,-22), Vector2(20,-2)], 6)
+		"bone_piercer":
+			draw_circle(Vector2.ZERO, 15, color, false, 4, true)
+			draw_line(Vector2(-26,18), Vector2(24,-18), color, 5, true)
+			_line([Vector2(12,-20), Vector2(25,-19), Vector2(21,-6)], 4)
+		"reflex_tendons":
+			_line([Vector2(-22,-16), Vector2(-4,0), Vector2(-22,16)], 6)
+			_line([Vector2(0,-16), Vector2(18,0), Vector2(0,16)], 6)
+		"magnet_hands":
+			draw_arc(Vector2(0,-2), 18, PI, TAU, 20, color, 6, true)
+			draw_line(Vector2(-18,-2), Vector2(-18,18), color, 6, true)
+			draw_line(Vector2(18,-2), Vector2(18,18), color, 6, true)
+			draw_rect(Rect2(-22, 14, 8, 8), Color("#ff5689"))
+			draw_rect(Rect2(14, 14, 8, 8), Color("#5ce8ff"))
+		"voltaic_veins":
+			_line([Vector2(-22,-16), Vector2(-4,-4), Vector2(-10,8), Vector2(22,18)], 5)
+			_line([Vector2(-4,-4), Vector2(18,-18)], 4)
+			draw_circle(Vector2(-22,-16), 5, color)
+			draw_circle(Vector2(18,-18), 5, color)
+			draw_circle(Vector2(22,18), 5, color)
+		"vampiric_siphon":
+			var siphon := PackedVector2Array([Vector2(0,-24), Vector2(18,4), Vector2(0,24), Vector2(-18,4)])
+			draw_colored_polygon(siphon, color * Color(1,1,1,0.28))
+			siphon.append(siphon[0])
+			draw_polyline(siphon, color, 4, true)
+			draw_line(Vector2(-8,2), Vector2(8,2), color, 4, true)
+			draw_line(Vector2(0,-6), Vector2(0,10), color, 4, true)
+		"blast_glands":
+			for i in 8:
+				var d := Vector2.from_angle(i * TAU / 8.0)
+				draw_line(d * 6, d * (26 if i % 2 == 0 else 17), color, 4, true)
+			draw_circle(Vector2.ZERO, 7, color)
+		"hydro_skin":
+			draw_arc(Vector2.ZERO, 22, 0, TAU, 24, color, 4, true)
+			var droplet := PackedVector2Array([Vector2(0,-14), Vector2(10,4), Vector2(0,13), Vector2(-10,4)])
+			draw_colored_polygon(droplet, color)
+		"hyper_focus":
+			draw_circle(Vector2.ZERO, 17, color, false, 4, true)
+			draw_circle(Vector2.ZERO, 4, color)
+			draw_line(Vector2(0,-26), Vector2(0,-11), color, 4, true)
+			draw_line(Vector2(0,11), Vector2(0,26), color, 4, true)
+			draw_line(Vector2(-26,0), Vector2(-11,0), color, 4, true)
+			draw_line(Vector2(11,0), Vector2(26,0), color, 4, true)
 		_:
 			draw_circle(Vector2.ZERO, 20, color, false, 4, true)
 

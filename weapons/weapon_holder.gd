@@ -1,4 +1,4 @@
-﻿class_name WeaponHolder
+class_name WeaponHolder
 extends Node3D
 ## The player's guns: inventory, viewmodel, firing, reloading, switching.
 ## Sits under the player's Camera3D.
@@ -46,6 +46,7 @@ const SPRINT_RAISE := 0.15
 var _model: Node3D
 var player: Node3D
 var camera: Camera3D
+var _shot_counter := 0
 
 
 func _ready() -> void:
@@ -129,7 +130,8 @@ func fire() -> void:
 		return
 	_fire_buffer = 0.0
 	ammo[current] -= 1
-	_cooldown = data.fire_interval
+	var interval := data.fire_interval * GameManager.fire_rate_scale()
+	_cooldown = interval
 	var shot_seed := randi()
 	# Lucky Penny: the same seed decides jams here and lucky kills on the host.
 	if data.jam_chance > 0.0 and _seeded(shot_seed, 1) < data.jam_chance:
@@ -141,20 +143,22 @@ func fire() -> void:
 	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
-	_play_shot(data, origin, dir, shot_seed, true)
+	var is_aiming := _aim > 0.5
+	_play_shot(data, origin, dir, shot_seed, true, is_aiming)
 	if Net.is_host():
-		_resolve_shot(data, origin, dir, shot_seed)
+		_resolve_shot(data, origin, dir, shot_seed, 0, is_aiming)
 		_broadcast_fx(data.resource_path, origin, dir, shot_seed, player.get_multiplayer_authority())
 	else:
-		_request_shot.rpc_id(1, data.resource_path, origin, dir, shot_seed)
-	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, 0.65, _aim), deg_to_rad(5.0))
+		_request_shot.rpc_id(1, data.resource_path, origin, dir, shot_seed, is_aiming)
+	var ads_recoil := 0.5 if GameManager.has_player_mutation("hyper_focus") else 0.65
+	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, ads_recoil, _aim), deg_to_rad(5.0))
 	_heat = minf(1.0, _heat + 0.22)
 	fired.emit(data)
 	if _model and _model.has_node("Pump") and ammo[current] > 0:
 		# Rack sound lines up with the forend animation in _animate.
-		get_tree().create_timer(data.fire_interval * 0.2).timeout.connect(func(): Sound.play("shotgun_pump", -11.0))
+		get_tree().create_timer(interval * 0.2).timeout.connect(func(): Sound.play("shotgun_pump", -11.0))
 	if ammo[current] == 0 and reserve[current] > 0:
-		get_tree().create_timer(data.fire_interval).timeout.connect(func():
+		get_tree().create_timer(interval).timeout.connect(func():
 			if is_instance_valid(player) and player.get("state") == "ok" and loadout[current] == data and ammo[current] == 0:
 				start_reload())
 
@@ -187,7 +191,7 @@ func _finish_reload() -> void:
 ## unlocks guns independently (Settings.unlocked_guns is local), so index 2
 ## is not the same weapon on the host and the client.
 @rpc("any_peer", "call_remote", "reliable")
-func _request_shot(path: String, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
+func _request_shot(path: String, origin: Vector3, dir: Vector3, shot_seed: int, is_aiming := false) -> void:
 	var sender := multiplayer.get_remote_sender_id()
 	if not Net.is_host() or sender != player.get_multiplayer_authority():
 		return
@@ -198,9 +202,10 @@ func _request_shot(path: String, origin: Vector3, dir: Vector3, shot_seed: int) 
 	# At 20 Hz the host's copy is a few centimetres stale, so this is loose.
 	if origin.distance_to(camera.global_position) > 4.0:
 		return
-	_resolve_shot(data, origin, dir.normalized(), shot_seed)
+	var rewind_ms := Net.get_rewind_ms(sender)
+	_resolve_shot(data, origin, dir.normalized(), shot_seed, rewind_ms, is_aiming)
 	_broadcast_fx(path, origin, dir.normalized(), shot_seed, sender)
-	_play_shot(data, origin, dir, shot_seed, false)
+	_play_shot(data, origin, dir, shot_seed, false, is_aiming)
 
 
 ## Only the weapons folder, so a client can't ask the host to load anything.
@@ -229,7 +234,7 @@ func _broadcast_fx(path: String, origin: Vector3, dir: Vector3, shot_seed: int, 
 
 # ------------------------------------------------------------------ shot logic
 ## Host only: damage. Projectiles deal their own damage on the host's copy.
-func _resolve_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
+func _resolve_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, rewind_ms := 0, is_aiming := false) -> void:
 	if data.pull_radius > 0.0:
 		# Boombox: every shot drags nearby enemies toward the shooter.
 		for enemy in get_tree().get_nodes_in_group("enemies"):
@@ -239,29 +244,85 @@ func _resolve_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: i
 				enemy.knockback(to.normalized() * 9.0)
 	if data.kind != WeaponData.Kind.HITSCAN:
 		return
+	_shot_counter += 1
 	var lucky := data.lucky_kill_chance > 0.0 and _seeded(shot_seed, 2) < data.lucky_kill_chance
-	for ray in _pellet_rays(data, origin, dir, shot_seed):
-		var start := origin
-		var exclude: Array[RID] = []
-		for pass_i in data.pierce + 1:
-			var hit := _cast(start, ray, data.max_range, exclude)
-			if hit.is_empty() or not is_damageable(hit.collider):
-				break
-			var distance := origin.distance_to(hit.position)
-			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
-			var damage := 9999.0 if lucky else data.damage * falloff
-			if hit.collider.has_method("take_bullet"):
-				hit.collider.take_bullet(damage, hit.position, player)
-			else:
-				hit.collider.take_damage(damage, player)
-			if data.knockback > 0.0 and hit.collider.has_method("knockback"):
-				hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
-			exclude.append(hit.rid)
-			start = hit.position
+	var max_hits := data.pierce + 1 + GameManager.extra_pierce()
+	var ads_mult := GameManager.ads_damage_scale() if is_aiming else 1.0
+	var voltaic_ready := GameManager.has_player_mutation("voltaic_veins") and (_shot_counter % 4 == 0)
+	var voltaic_fired := false
+	for ray in _pellet_rays(data, origin, dir, shot_seed, is_aiming):
+		if rewind_ms > 0:
+			var hits := LagComp.cast_rewound(get_world_3d(), get_tree(), origin, ray, data.max_range, player, rewind_ms, max_hits)
+			for hit in hits:
+				var collider: Object = hit.collider
+				var pos: Vector3 = hit.position
+				var rewound_pos: Vector3 = hit.rewound_pos
+				var distance: float = hit.distance
+				var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
+				var damage := 9999.0 if lucky else data.damage * falloff * ads_mult
+				if collider.has_method("take_bullet"):
+					collider.take_bullet(damage, pos, player, rewound_pos)
+				else:
+					collider.take_damage(damage, player)
+				if data.knockback > 0.0 and collider.has_method("knockback"):
+					collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
+				if voltaic_ready and not voltaic_fired and collider is EnemyBase:
+					voltaic_fired = true
+					_trigger_voltaic_arc(collider as EnemyBase, pos)
+		else:
+			var start := origin
+			var exclude: Array[RID] = []
+			for pass_i in max_hits:
+				var hit := _cast(start, ray, data.max_range, exclude)
+				if hit.is_empty() or not is_damageable(hit.collider):
+					break
+				var distance := origin.distance_to(hit.position)
+				var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
+				var damage := 9999.0 if lucky else data.damage * falloff * ads_mult
+				if hit.collider.has_method("take_bullet"):
+					hit.collider.take_bullet(damage, hit.position, player)
+				else:
+					hit.collider.take_damage(damage, player)
+				if data.knockback > 0.0 and hit.collider.has_method("knockback"):
+					hit.collider.knockback(Vector3(ray.x, 0, ray.z).normalized() * data.knockback / data.pellets * falloff)
+				if voltaic_ready and not voltaic_fired and hit.collider is EnemyBase:
+					voltaic_fired = true
+					_trigger_voltaic_arc(hit.collider as EnemyBase, hit.position)
+				exclude.append(hit.rid)
+				start = hit.position
+
+
+## Voltaic Veins player mutation: chain lightning from the struck target to up to 2 nearby enemies.
+func _trigger_voltaic_arc(origin_enemy: EnemyBase, hit_pos: Vector3) -> void:
+	var hit_set: Array = [origin_enemy]
+	var points: Array = [hit_pos]
+	var cur_pos := hit_pos
+	for _hop in 2:
+		var best: EnemyBase = null
+		var best_d := 8.0
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var cand := node as EnemyBase
+			if cand == null or cand.health <= 0.0 or cand in hit_set:
+				continue
+			var d := cand.global_position.distance_to(cur_pos)
+			if d < best_d:
+				best_d = d
+				best = cand
+		if best == null:
+			break
+		hit_set.append(best)
+		var target_pos := best.global_position + Vector3.UP * 1.0
+		points.append(target_pos)
+		best.reveal(2.0)
+		best.stagger(0.25)
+		best.take_damage(18.0, player)
+		cur_pos = target_pos
+	if points.size() >= 2:
+		GameManager.broadcast_arc(points, Color(0.48, 0.94, 1.0))
 
 
 ## Every peer: effects. Projectiles are simulated by every peer from here.
-func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, is_local: bool) -> void:
+func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, is_local: bool, is_aiming := false) -> void:
 	var world := player.get_parent()
 	var muzzle := _muzzle_position() if is_local else origin + dir * 0.6
 	var ballistic := data.kind == WeaponData.Kind.HITSCAN
@@ -281,7 +342,7 @@ func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int,
 	match data.kind:
 		WeaponData.Kind.HITSCAN:
 			var hit_points: Array[Vector3] = []
-			for ray in _pellet_rays(data, origin, dir, shot_seed):
+			for ray in _pellet_rays(data, origin, dir, shot_seed, is_aiming):
 				var hit := _cast(origin, ray, data.max_range)
 				var end: Vector3 = hit.position if not hit.is_empty() else origin + ray * data.max_range
 				ShotFX.tracer(world, muzzle, end, data.tracer_color)
@@ -306,7 +367,7 @@ func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int,
 			projectile.launch(muzzle, dir, data, Net.is_host(), player)
 
 
-func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: int) -> Array[Vector3]:
+func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: int, is_aiming := false) -> Array[Vector3]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = shot_seed
 	var rays: Array[Vector3] = []
@@ -314,7 +375,9 @@ func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: i
 	if side.length_squared() < 0.01:
 		side = Vector3.RIGHT
 	var up := side.cross(dir).normalized()
-	var spread := deg_to_rad((data.spread_degrees + data.burst_spread * _heat) * lerpf(1.0, 0.45, _aim))
+	var aim_factor := 1.0 if is_aiming else _aim
+	var ads_spread := 0.25 if GameManager.has_player_mutation("hyper_focus") else 0.45
+	var spread := deg_to_rad((data.spread_degrees + data.burst_spread * _heat) * lerpf(1.0, ads_spread, aim_factor))
 	for i in data.pellets:
 		var angle := rng.randf() * TAU
 		var radius := sqrt(rng.randf()) * spread
@@ -532,8 +595,9 @@ func _update_throw_preview() -> void:
 	_arc.visible = true
 	_arc_ring.visible = landed
 	if landed:
+		var preview_r := data.effect_radius * (GameManager.explosive_radius_scale() if data.kind == WeaponData.Kind.GRENADE else 1.0)
 		_arc_ring.global_position = land + land_normal * 0.05
-		_arc_ring.scale = Vector3(data.effect_radius, 1.0, data.effect_radius)
+		_arc_ring.scale = Vector3(preview_r, 1.0, preview_r)
 		_arc_ring.material_override = _arc_material
 
 

@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 3
+const PROTOCOL := 4
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -44,6 +44,7 @@ const PROBE := "acidrain:probe"
 const SCAN_INTERVAL := 1.0
 ## A server not seen for this long drops off the list.
 const SERVER_TIMEOUT := 3.0
+const PING_INTERVAL := 1.0
 
 enum Mode { OFFLINE, HOST, CLIENT }
 
@@ -61,9 +62,16 @@ var run_active := false
 var dedicated := false
 ## Why the last join failed, for the join screen ("" = no answer).
 var last_error := ""
+## Host-measured smoothed RTT in milliseconds per connected client peer id.
+var peer_rtt_ms := {}
+## Client: most recent RTT reported back from the host (ms).
+var local_rtt_ms := 0.0
 
 var _connect_left := 0.0
 var _host_port := PORT
+var _ping_timer := 0.0
+var _ping_seq := 0
+var _ping_sent_ms := {}  # peer_id -> {"seq": int, "ms": int}
 
 var _beacon: PacketPeerUDP
 var _scout: PacketPeerUDP
@@ -91,6 +99,11 @@ func _process(delta: float) -> void:
 		if _connect_left <= 0.0 and mode == Mode.CLIENT:
 			last_error = "NO ANSWER FROM THE SERVER."
 			_on_connection_failed()
+	if mode == Mode.HOST and is_online():
+		_ping_timer -= delta
+		if _ping_timer <= 0.0:
+			_ping_timer = PING_INTERVAL
+			_send_rtt_pings()
 	if _beacon:
 		_pump_beacon()
 	if _scanning:
@@ -196,6 +209,9 @@ func leave() -> void:
 	run_active = false
 	_connect_left = 0.0
 	roster.clear()
+	peer_rtt_ms.clear()
+	_ping_sent_ms.clear()
+	local_rtt_ms = 0.0
 	# Mode is already OFFLINE, so the disconnects this triggers are ignored.
 	# Back to Godot's default offline peer, not null: with no peer at all,
 	# every is_multiplayer_authority() and rpc() in solo play errors.
@@ -335,11 +351,59 @@ func rpc_to_run(method: Callable, args: Array) -> void:
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	run_peers.erase(peer_id)
+	peer_rtt_ms.erase(peer_id)
+	_ping_sent_ms.erase(peer_id)
 	if not is_host():
 		return
 	roster.erase(peer_id)
 	_broadcast_roster(peer_id)
 	roster_changed.emit()
+
+
+## Host: measure smoothed RTT to each connected client for lag compensation.
+func _send_rtt_pings() -> void:
+	_ping_seq += 1
+	var now := Time.get_ticks_msec()
+	for peer in _open_peers():
+		_ping_sent_ms[peer] = {"seq": _ping_seq, "ms": now}
+		_rtt_ping.rpc_id(peer, _ping_seq, float(peer_rtt_ms.get(peer, 0.0)))
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _rtt_ping(seq: int, measured_rtt: float) -> void:
+	local_rtt_ms = measured_rtt
+	if mode == Mode.CLIENT and is_online():
+		_rtt_pong.rpc_id(1, seq)
+
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _rtt_pong(seq: int) -> void:
+	if not is_host():
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	var sent: Variant = _ping_sent_ms.get(peer)
+	if not sent is Dictionary or int(sent.seq) != seq:
+		return
+	var sample := clampf(float(Time.get_ticks_msec() - int(sent.ms)), 0.0, 1000.0)
+	if peer_rtt_ms.has(peer):
+		peer_rtt_ms[peer] = lerpf(float(peer_rtt_ms[peer]), sample, 0.3)
+	else:
+		peer_rtt_ms[peer] = sample
+
+
+func get_peer_rtt_ms(peer_id: int) -> float:
+	return float(peer_rtt_ms.get(peer_id, 0.0))
+
+
+## Authoritative rewind window (ms) for a remote client's hitscan shot:
+## half RTT plus ~33 ms (half of one 15 Hz enemy-sync interval), capped at 250 ms.
+func get_rewind_ms(peer_id: int) -> int:
+	if peer_id <= 1:
+		return 0
+	var rtt := get_peer_rtt_ms(peer_id)
+	if rtt <= 0.0:
+		return 50
+	return clampi(roundi(rtt * 0.5 + 33.0), 0, LagComp.MAX_REWIND_MS)
 
 
 func _on_connection_failed() -> void:

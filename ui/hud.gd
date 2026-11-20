@@ -34,6 +34,9 @@ var _tarp_icon := GameIcon.new()
 var _regen := GameIcon.new()
 var _active_icons := HBoxContainer.new()
 var _active_ids: Array = []
+var _player_mut_icons := HBoxContainer.new()
+var _player_mut_ids: Array = []
+var _static_label := Label.new()
 var _breather := ProgressBar.new()
 var _pips := Control.new()
 var _slots := HBoxContainer.new()
@@ -323,6 +326,26 @@ func _update_storm() -> void:
 			icon.color = GameManager.mutations.table.get_entry(id).color
 			icon.tooltip_text = GameManager.mutations.table.get_entry(id).description
 			_active_icons.add_child(icon)
+	var pmuts: Array = GameManager.mutations.player_mutations
+	if pmuts != _player_mut_ids:
+		_player_mut_ids = pmuts.duplicate()
+		for old in _player_mut_icons.get_children():
+			old.queue_free()
+		if not pmuts.is_empty():
+			var tag := Label.new()
+			tag.text = "BIO"
+			_style(tag, 14, Color("#98ffbb"))
+			_player_mut_icons.add_child(tag)
+		for pid in pmuts:
+			if not GameManager.PLAYER_MUTATIONS.has(pid):
+				continue
+			var info: Dictionary = GameManager.PLAYER_MUTATIONS[pid]
+			var icon := GameIcon.new()
+			icon.kind = pid
+			icon.custom_minimum_size = Vector2(30, 30)
+			icon.color = info.color
+			icon.tooltip_text = "%s: %s" % [str(info.name), str(info.desc)]
+			_player_mut_icons.add_child(icon)
 	_mutation.visible = false
 	var boss := get_tree().get_first_node_in_group("boss")
 	_boss_label.visible = boss != null
@@ -390,6 +413,11 @@ func _update_vitals(player: Node) -> void:
 	_exposure.color = BroadcastUI.CYAN if protected else Color("#b8e56d")
 	_exposure.value = 1.0
 	_exposure.modulate.a = 1.0 if protected else .65 + .35*sin(_time*6)
+	var charge := _num(player, "static_charge", 0.0)
+	_static_label.visible = GameManager.has_mutation("static_charge") and charge > 0.01
+	if _static_label.visible:
+		_static_label.text = "STATIC  %d%%%s" % [roundi(charge * 100.0), "  READY" if charge >= 0.25 else ""]
+		_static_label.modulate = Color("#fff480") if charge >= 0.25 else Color("#9fe8ff")
 
 
 
@@ -493,6 +521,21 @@ func _build_visual_status() -> void:
 	add_child(_breather)
 	_active_icons.position = Vector2(28,82)
 	add_child(_active_icons)
+	_player_mut_icons.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_player_mut_icons.offset_left = 28
+	_player_mut_icons.offset_right = 460
+	_player_mut_icons.offset_top = -246
+	_player_mut_icons.offset_bottom = -212
+	_player_mut_icons.add_theme_constant_override("separation", 6)
+	add_child(_player_mut_icons)
+	_static_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_static_label.offset_left = 172
+	_static_label.offset_right = 370
+	_static_label.offset_top = -174
+	_static_label.offset_bottom = -148
+	_style(_static_label, 18, Color("#fff480"))
+	_static_label.visible = false
+	add_child(_static_label)
 	_exposure.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_exposure.offset_left = 356
 	_exposure.offset_top = -94

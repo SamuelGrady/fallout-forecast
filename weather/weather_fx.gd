@@ -29,14 +29,19 @@ var flash := 0.0
 var _rain: GPUParticles3D
 var _web_rain: CPUParticles3D
 var _rain_material: StandardMaterial3D
+var _web_rain_material: ShaderMaterial
 var _collision: GPUParticlesCollisionHeightField3D
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _base_sky_energy := 1.0
 var _base_sun_energy := 1.0
+var _shelter_query := PhysicsPointQueryParameters3D.new()
 
 
 func _ready() -> void:
+	_shelter_query.collide_with_areas = true
+	_shelter_query.collide_with_bodies = false
+	_shelter_query.collision_mask = 1 << 3
 	_build_rain()
 	_find_scene_lighting.call_deferred()
 
@@ -62,13 +67,17 @@ func _process(delta: float) -> void:
 	var rain_intensity := intensity * (0.25 if flare_cover else 1.0)
 	var color := rain_color.lerp(acid_color, acid)
 	if _web_rain:
+		# Keep rain pouring visibly outside while cutting a dry hole over the
+		# shelter the local player stands under.
 		var player := get_tree().get_first_node_in_group("local_player") as Player
-		color.a *= rain_intensity if not player or not player.sheltered else 0.0
-		_web_rain.emitting = color.a > 0.0
+		color.a *= rain_intensity
+		_web_rain.emitting = intensity > 0.01
+		_web_rain_material.set_shader_parameter("rain_color", color)
+		_update_web_shelter_hole(player)
 	else:
 		_rain.amount_ratio = rain_intensity
 		_rain.emitting = intensity > 0.01
-	_rain_material.albedo_color = color
+		_rain_material.albedo_color = color
 
 	if _environment:
 		_environment.fog_enabled = intensity > 0.01
@@ -80,7 +89,45 @@ func _process(delta: float) -> void:
 		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) + flash * 2.5
 
 
+func _update_web_shelter_hole(player: Player) -> void:
+	if player == null or not player.sheltered:
+		_web_rain_material.set_shader_parameter("hole_active", 0.0)
+		return
+	var hole_min := player.global_position + Vector3(-3.4, -2.0, -3.4)
+	var hole_max := player.global_position + Vector3(3.4, 4.5, 3.4)
+	var space := get_world_3d().direct_space_state
+	_shelter_query.position = player.head.global_position
+	var hits := space.intersect_point(_shelter_query, 1)
+	if not hits.is_empty():
+		var area := hits[0].collider as Area3D
+		if area:
+			for child in area.get_children():
+				if child is CollisionShape3D and child.shape:
+					var ext := Vector3(3.4, 2.5, 3.4)
+					if child.shape is BoxShape3D:
+						ext = (child.shape as BoxShape3D).size * 0.5
+					elif child.shape is CylinderShape3D:
+						var cyl := child.shape as CylinderShape3D
+						ext = Vector3(cyl.radius, cyl.height * 0.5, cyl.radius)
+					var c: Vector3 = (child as Node3D).global_position
+					# Transform box corners to world AABB so rotated shelters match too.
+					var b: Basis = (child as Node3D).global_basis
+					var wx := absf(b.x.x) * ext.x + absf(b.y.x) * ext.y + absf(b.z.x) * ext.z
+					var wy := absf(b.x.y) * ext.x + absf(b.y.y) * ext.y + absf(b.z.y) * ext.z
+					var wz := absf(b.x.z) * ext.x + absf(b.y.z) * ext.y + absf(b.z.z) * ext.z
+					hole_min = Vector3(c.x - wx, c.y - wy - 1.5, c.z - wz)
+					hole_max = Vector3(c.x + wx, c.y + wy + 0.5, c.z + wz)
+					break
+	_web_rain_material.set_shader_parameter("hole_active", 1.0)
+	_web_rain_material.set_shader_parameter("hole_min", hole_min)
+	_web_rain_material.set_shader_parameter("hole_max", hole_max)
+
+
 func _build_rain() -> void:
+	if OS.has_feature("web"):
+		_build_web_rain()
+		return
+
 	var mesh := QuadMesh.new()
 	mesh.size = Vector2(0.025, 0.6)
 	_rain_material = StandardMaterial3D.new()
@@ -91,10 +138,6 @@ func _build_rain() -> void:
 	_rain_material.albedo_color = rain_color
 	_rain_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh.material = _rain_material
-
-	if OS.has_feature("web"):
-		_build_web_rain(mesh)
-		return
 
 	_rain = GPUParticles3D.new()
 	_rain.name = "Rain"
@@ -129,15 +172,55 @@ func _build_rain() -> void:
 	add_child(_collision)
 
 
-func _build_web_rain(mesh: QuadMesh) -> void:
+func _build_web_rain() -> void:
+	var shader := Shader.new()
+	shader.code = """shader_type spatial;
+render_mode unshaded, cull_disabled, blend_mix, depth_draw_never;
+
+uniform vec4 rain_color : source_color = vec4(0.75, 0.82, 0.9, 0.35);
+uniform float hole_active = 0.0;
+uniform vec3 hole_min = vec3(0.0);
+uniform vec3 hole_max = vec3(0.0);
+
+varying vec3 world_pos;
+
+void vertex() {
+	// Fixed-Y billboard so streaks stay vertical while facing the camera.
+	vec3 center = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+	vec3 to_cam = normalize(vec3(INV_VIEW_MATRIX[3].x - center.x, 0.0, INV_VIEW_MATRIX[3].z - center.z));
+	vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), to_cam));
+	vec3 pos = center + right * VERTEX.x + vec3(0.0, VERTEX.y, 0.0);
+	world_pos = pos;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(pos, 1.0);
+}
+
+void fragment() {
+	if (hole_active > 0.5) {
+		if (world_pos.x > hole_min.x && world_pos.x < hole_max.x &&
+			world_pos.z > hole_min.z && world_pos.z < hole_max.z &&
+			world_pos.y < hole_max.y) {
+			discard;
+		}
+	}
+	ALBEDO = rain_color.rgb;
+	ALPHA = rain_color.a;
+}"""
+	_web_rain_material = ShaderMaterial.new()
+	_web_rain_material.shader = shader
+	_web_rain_material.set_shader_parameter("rain_color", rain_color)
+
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.032, 0.72)
+	mesh.material = _web_rain_material
+
 	_web_rain = CPUParticles3D.new()
 	_web_rain.name = "Rain"
-	_web_rain.amount = mini(max_drops, 900)
+	_web_rain.amount = mini(max_drops, 380)
 	_web_rain.lifetime = (spawn_height + 10.0) / fall_speed
 	_web_rain.fixed_fps = 30
 	_web_rain.emitting = false
 	_web_rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_web_rain.emission_box_extents = Vector3(area_size * 0.3, 1.0, area_size * 0.3)
+	_web_rain.emission_box_extents = Vector3(area_size * 0.32, 1.0, area_size * 0.32)
 	_web_rain.direction = Vector3(0.05, -1.0, 0.0)
 	_web_rain.spread = 2.0
 	_web_rain.initial_velocity_min = fall_speed * 0.9
@@ -162,8 +245,19 @@ func _find_scene_lighting() -> void:
 	if _sun:
 		_base_sun_energy = _sun.light_energy
 		if _web_rain:
-			# Keep bright facades readable with the Compatibility lighting response.
+			# Keep bright facades readable and cut WebGL2 shadow pass cost.
 			_base_sun_energy *= 0.75
+			_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+			_sun.directional_shadow_max_distance = 40.0
+			RenderingServer.directional_shadow_atlas_set_size(1024, false)
+	if _web_rain:
+		# Cull distant OmniLight3Ds so WebGL2 forward lighting stays fast.
+		for light in get_tree().root.find_children("*", "OmniLight3D", true, false):
+			var omni := light as OmniLight3D
+			if omni and not omni.distance_fade_enabled:
+				omni.distance_fade_enabled = true
+				omni.distance_fade_begin = 26.0
+				omni.distance_fade_length = 8.0
 
 
 func _sample_fog(intensity: float) -> float:

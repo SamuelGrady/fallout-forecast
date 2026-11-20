@@ -29,6 +29,33 @@
     <p id="status" role="status"></p>
   </main>
   <button id="fullscreen" type="button" hidden>Fullscreen</button>
+  <script>
+    // Track every AudioContext Godot creates and resume on any user gesture so
+    // async WASM downloads never leave WebAudio stuck in "suspended".
+    (function () {
+      const contexts = [];
+      const NativeAC = window.AudioContext || window.webkitAudioContext;
+      if (NativeAC) {
+        const WrappedAC = function (...args) {
+          const ctx = new NativeAC(...args);
+          contexts.push(ctx);
+          return ctx;
+        };
+        WrappedAC.prototype = NativeAC.prototype;
+        Object.setPrototypeOf(WrappedAC, NativeAC);
+        if (window.AudioContext) window.AudioContext = WrappedAC;
+        if (window.webkitAudioContext) window.webkitAudioContext = WrappedAC;
+        const unlock = () => {
+          for (const ctx of contexts) {
+            if (ctx.state === "suspended") ctx.resume().catch(() => {});
+          }
+        };
+        window.addEventListener("pointerdown", unlock, { capture: true, passive: true });
+        window.addEventListener("keydown", unlock, { capture: true, passive: true });
+        window.addEventListener("touchstart", unlock, { capture: true, passive: true });
+      }
+    })();
+  </script>
   <script src="$GODOT_URL"></script>
   <script>
     const canvas = document.getElementById("canvas");

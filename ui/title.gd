@@ -10,10 +10,10 @@ const WHIRR := preload("res://assets/audio/sfx/vcr_whirr.wav")
 const EJECT := preload("res://assets/audio/sfx/vcr_eject.wav")
 const FAST_FORWARD := preload("res://assets/audio/sfx/vcr_ff.wav")
 const TRACKING := preload("res://assets/audio/sfx/vhs_glitch.ogg")
-const ENGAGE := 0.58
-const THREAD := 0.84
-const TRACK := 1.86
-const PLAY := 2.32
+const ENGAGE := 0.22
+const THREAD := 0.36
+const TRACK := 0.72
+const PLAY := 0.96
 const OSD_COLOR := Color("CCEADB")
 
 var _playback := Control.new()
@@ -26,6 +26,7 @@ var _snow := ColorRect.new()
 var _snow_material := ShaderMaterial.new()
 var _transport := AudioStreamPlayer.new()
 var _tracking := AudioStreamPlayer.new()
+var _backdrop_viewport: SubViewport
 var _counter: Label
 var _settings_button: Button
 var _suit_button: Button
@@ -48,9 +49,13 @@ func _ready() -> void:
 
 	_transport.bus = &"UI"
 	_transport.volume_db = -11.0
+	if OS.has_feature("web"):
+		_transport.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(_transport)
 	_tracking.bus = &"UI"
 	_tracking.volume_db = -19.0
+	if OS.has_feature("web"):
+		_tracking.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(_tracking)
 
 	var retro := RETRO_SCREEN.instantiate() as CanvasLayer
@@ -173,9 +178,9 @@ func _process(delta: float) -> void:
 		_finish_intro()
 		return
 	var approach := smoothstep(0.0, ENGAGE, _t)
-	var feed := smoothstep(ENGAGE, 1.45, _t)
+	var feed := smoothstep(ENGAGE, 0.62, _t)
 	_deck.tape_depth = lerpf(-84.0, 0.0, approach) + VcrDeck.CASSETTE.y * feed
-	_deck.reel_angle = maxf(0.0, _t - THREAD) * 16.0
+	_deck.reel_angle = maxf(0.0, _t - THREAD) * 18.0
 	_deck.shake = 3.0 * sin(TAU * 8.0 * (_t - ENGAGE)) * exp(-11.0 * (_t - ENGAGE)) if _t >= ENGAGE and not Settings.reduced_flash else 0.0
 	_deck.display = "--:--" if _t < ENGAGE else ("LOAD" if _t < TRACK else "00:00")
 	_deck.play_lit = _t >= TRACK
@@ -183,6 +188,8 @@ func _process(delta: float) -> void:
 		var switch := smoothstep(TRACK, PLAY, _t)
 		_intro.modulate.a = 1.0 - switch
 		_playback.show()
+		if _backdrop_viewport:
+			_backdrop_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 		_set_tracking(sin(PI * switch) * (0.22 if Settings.reduced_flash else 0.58))
 
 
@@ -206,6 +213,8 @@ func _finish_intro() -> void:
 	_intro.hide()
 	_snow.hide()
 	_playback.show()
+	if _backdrop_viewport:
+		_backdrop_viewport.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 	for button in _menu.get_children():
 		button.disabled = false
 	_menu.get_child(0).grab_focus()
@@ -412,11 +421,16 @@ func _build_street_backdrop() -> void:
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_playback.add_child(container)
 	var viewport := SubViewport.new()
-	viewport.size = Vector2i(960, 720)
+	viewport.size = Vector2i(480, 360) if OS.has_feature("web") else Vector2i(960, 720)
 	viewport.own_world_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	container.add_child(viewport)
+	_backdrop_viewport = viewport
 	var level := (load("res://levels/pinecrest/level_pinecrest.tscn") as PackedScene).instantiate() as Node3D
 	viewport.add_child(level)
+	if OS.has_feature("web"):
+		for light in level.find_children("*", "DirectionalLight3D", true, false):
+			(light as DirectionalLight3D).shadow_enabled = false
 	preload("res://props/building_restyle.gd").apply(level)
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
