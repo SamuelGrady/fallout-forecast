@@ -169,7 +169,13 @@ func host(port := PORT, as_player := true) -> Error:
 
 ## Join the public cloud server (CLOUD_URL). Same path on desktop and web.
 func join_cloud() -> Error:
-	return join(CLOUD_URL)
+	return join(cloud_url())
+
+
+## The server JOIN GAME uses: Settings' custom address, or the public one.
+func cloud_url() -> String:
+	var custom := Settings.server_url.strip_edges()
+	return to_url(custom) if custom != "" else CLOUD_URL
 
 
 ## "192.168.1.20", "host:9000", "ws://..." or "wss://..." -> a WebSocket URL.

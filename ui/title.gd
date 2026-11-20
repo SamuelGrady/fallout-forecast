@@ -140,6 +140,20 @@ func _build_playback_menu() -> void:
 	calm.toggled.connect(Settings.set_reduced_flash)
 	_style_button(calm)
 	_settings.add_child(calm)
+	# Where JOIN GAME connects. Blank = the public cloud server.
+	var server_caption := Label.new()
+	server_caption.text = "SERVER (WSS)"
+	server_caption.add_theme_font_size_override("font_size", 16)
+	_settings.add_child(server_caption)
+	var server_edit := LineEdit.new()
+	server_edit.text = Settings.server_url
+	server_edit.placeholder_text = Net.CLOUD_URL
+	server_edit.custom_minimum_size.y = 38
+	server_edit.text_changed.connect(func(t): Settings.server_url = t.strip_edges())
+	server_edit.text_submitted.connect(func(_t): Settings.save())
+	_settings.add_child(server_edit)
+	if Net.can_host():
+		_button(_settings, "BROWSE LAN GAMES", _on_browse_lan)
 	_button(_settings, "BACK", _on_back)
 
 	_suit.position = Vector2(510, 110)
@@ -313,10 +327,60 @@ func _on_host() -> void:
 	get_tree().change_scene_to_file(LOBBY_SCENE)
 
 
+## JOIN GAME goes straight to the cloud server (or the address in Settings).
 func _on_join() -> void:
+	Settings.save()
+	var err := Net.join_cloud()
+	if err != OK:
+		_show_error("Could not reach %s (error %d)." % [Net.cloud_url(), err])
+		return
+	_set_menu_enabled(false)
+	_join_status("CONNECTING TO %s ..." % Net.cloud_url().trim_prefix("wss://").trim_prefix("ws://").trim_suffix("/").to_upper())
+	if not Net.joined_server.is_connected(_on_joined):
+		Net.joined_server.connect(_on_joined, CONNECT_ONE_SHOT)
+	if not Net.connection_failed.is_connected(_on_join_failed):
+		Net.connection_failed.connect(_on_join_failed, CONNECT_ONE_SHOT)
+
+
+func _on_joined() -> void:
+	if Net.connection_failed.is_connected(_on_join_failed):
+		Net.connection_failed.disconnect(_on_join_failed)
+	get_tree().change_scene_to_file(LOBBY_SCENE)
+
+
+func _on_join_failed() -> void:
+	if Net.joined_server.is_connected(_on_joined):
+		Net.joined_server.disconnect(_on_joined)
+	_join_status("")
+	_set_menu_enabled(true)
+	var why: String = Net.last_error if Net.last_error != "" else "No answer from the server."
+	_show_error("Could not join %s. %s" % [Net.cloud_url(), why])
+
+
+func _on_browse_lan() -> void:
 	Settings.save()
 	Net.leave()
 	get_tree().change_scene_to_file(BROWSER_SCENE)
+
+
+var _status_label: Label
+
+
+func _join_status(text: String) -> void:
+	if _status_label == null:
+		_status_label = Label.new()
+		_status_label.add_theme_font_size_override("font_size", 20)
+		_status_label.add_theme_color_override("font_color", BroadcastUI.CYAN)
+		_status_label.position = _menu.position + Vector2(0, -34)
+		_playback.add_child(_status_label)
+	_status_label.text = text
+	_status_label.visible = text != ""
+
+
+func _set_menu_enabled(enabled: bool) -> void:
+	for button in _menu.get_children():
+		if button is Button:
+			button.disabled = not enabled
 
 
 func _on_quit() -> void:
@@ -414,23 +478,9 @@ void fragment() {
 	return shader
 
 
-func _build_street_backdrop() -> void:
-	var container := SubViewportContainer.new()
-	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	container.stretch = true
-	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_playback.add_child(container)
-	var viewport := SubViewport.new()
-	viewport.size = Vector2i(480, 360) if OS.has_feature("web") else Vector2i(960, 720)
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	container.add_child(viewport)
-	_backdrop_viewport = viewport
+func _build_street_3d(viewport: SubViewport) -> void:
 	var level := (load("res://levels/pinecrest/level_pinecrest.tscn") as PackedScene).instantiate() as Node3D
 	viewport.add_child(level)
-	if OS.has_feature("web"):
-		for light in level.find_children("*", "DirectionalLight3D", true, false):
-			(light as DirectionalLight3D).shadow_enabled = false
 	preload("res://props/building_restyle.gd").apply(level)
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
@@ -439,6 +489,34 @@ func _build_street_backdrop() -> void:
 	viewport.add_child(camera)
 	camera.position = Vector3(-28, 2.2, -2)
 	camera.look_at(Vector3(-5, 1.5, 1))
+
+
+func _build_street_backdrop() -> void:
+	if OS.has_feature("web"):
+		# Building the whole map just for a backdrop froze the browser on the
+		# VHS screen; web shows a pre-rendered still of the same view instead
+		# (assets/ui/title_street.png, re-bake if the street changes).
+		var still := TextureRect.new()
+		still.texture = preload("res://assets/ui/title_street.png")
+		still.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		still.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		still.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		still.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_playback.add_child(still)
+	else:
+		var container := SubViewportContainer.new()
+		container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		container.stretch = true
+		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_playback.add_child(container)
+		var viewport := SubViewport.new()
+		viewport.size = Vector2i(960, 720)
+		viewport.own_world_3d = true
+		viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		container.add_child(viewport)
+		_backdrop_viewport = viewport
+		# Build the 3D street after the first frame so the screen shows at once.
+		_build_street_3d.call_deferred(viewport)
 	var shade := ColorRect.new()
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var shade_material := ShaderMaterial.new()

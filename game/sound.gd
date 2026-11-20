@@ -9,6 +9,11 @@ const MUSIC := [
 	"res://assets/audio/music/music_boss.ogg",
 ]
 const THRESHOLDS := [0.0, 0.12, 0.32, 0.58]
+## Overall soundtrack level (linear). 2.0 is about +6 dB; playtests found the
+## score too quiet. The Master limiter keeps peaks in check.
+const MUSIC_GAIN := 2.0
+## Rain bed level (linear). 0.55 is about -5 dB.
+const RAIN_GAIN := 0.55
 const RAIN_BUS := &"Rain"
 ## Mix buses. Rain sits under Ambience; Music ducks under Weapons fire.
 const BUSES := [&"Music", &"Weapons", &"Threats", &"UI", &"Ambience"]
@@ -175,7 +180,7 @@ func _process(delta: float) -> void:
 		# single-threaded Vorbis decoding smooth without crackles.
 		if _web and (i == 1 or i == 3):
 			gain = 0.0
-		var v := lerpf(_layers[i].volume_linear, gain, blend)
+		var v := lerpf(_layers[i].volume_linear, gain * MUSIC_GAIN, blend)
 		_layers[i].volume_linear = v
 		if _web:
 			var want_paused := v < 0.005
@@ -187,7 +192,7 @@ func _process(delta: float) -> void:
 			boss_track.stream_paused = false
 		boss_track.seek(0.0)
 	_boss_active = boss
-	var boss_vol := lerpf(boss_track.volume_linear, 0.32 if boss else 0.0, blend)
+	var boss_vol := lerpf(boss_track.volume_linear, (0.32 * MUSIC_GAIN) if boss else 0.0, blend)
 	boss_track.volume_linear = boss_vol
 	if _web:
 		var pause_boss := boss_vol < 0.005
@@ -201,7 +206,7 @@ func _process(delta: float) -> void:
 	if not _web:
 		_rain_filter.cutoff_hz = lerpf(16000.0, 1500.0, _shelter_mix)
 	if _rain:
-		var rvol := _rain_gain * lerpf(0.4, 0.22 if _web else 0.32, _shelter_mix)
+		var rvol := _rain_gain * lerpf(0.4, 0.22 if _web else 0.32, _shelter_mix) * RAIN_GAIN
 		_rain.volume_linear = rvol
 		if _web:
 			var pause_rain := rvol < 0.005

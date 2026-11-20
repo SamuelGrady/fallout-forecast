@@ -17,6 +17,8 @@ var suit_color := 0
 var suit_skin := 0
 ## Custom callsign shown in lobbies, teammate cards, and end-of-run results.
 var player_name := ""
+## Server JOIN GAME connects to. Empty = Net.CLOUD_URL (wss://fallout.drew.place/).
+var server_url := ""
 
 func unlock_gun(path: String) -> void:
 	if path not in unlocked_guns:
@@ -36,6 +38,7 @@ func _ready() -> void:
 		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
 		player_name = str(cfg.get_value("profile", "name", player_name)).strip_edges().left(18)
+		server_url = str(cfg.get_value("network", "server_url", server_url)).strip_edges()
 	apply()
 
 
@@ -54,6 +57,7 @@ func save() -> void:
 	cfg.set_value("cosmetic", "color", suit_color)
 	cfg.set_value("cosmetic", "skin", suit_skin)
 	cfg.set_value("profile", "name", player_name.strip_edges().left(18))
+	cfg.set_value("network", "server_url", server_url.strip_edges())
 	cfg.save(PATH)
 	apply()
 

@@ -22,6 +22,13 @@ func _ready() -> void:
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
+	# Compile shaders for enemies, guns and FX behind a brief card so the
+	# first fight doesn't hitch (most noticeable on web).
+	if not Net.dedicated:
+		var warm := Node3D.new()
+		warm.name = "WarmUp"
+		warm.set_script(preload("res://game/warmup.gd"))
+		add_child.call_deferred(warm)
 	# Teammate nameplates and off-screen pointers, visible through walls.
 	var markers := CanvasLayer.new()
 	markers.name = "TeammateMarkers"
