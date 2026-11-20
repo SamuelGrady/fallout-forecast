@@ -12,6 +12,7 @@ var _roster: VBoxContainer
 var _status: Label
 var _name_edit: LineEdit
 var _ready_button: Button
+var _force_button: Button
 var _start_button: Button
 var _picker: SuitPicker
 var _leaving := false
@@ -85,6 +86,7 @@ func _ready() -> void:
 
 	_start_button = _button(side, "START RUN", _on_start)
 	_ready_button = _button(side, "READY", _on_ready)
+	_force_button = _button(side, "FORCE START", _on_force)
 	_button(side, "LEAVE", _on_leave)
 
 	Net.roster_changed.connect(_refresh)
@@ -111,6 +113,13 @@ func _refresh() -> void:
 	var hosting := Net.is_host()
 	_start_button.visible = hosting
 	_ready_button.visible = not hosting
+	var all_ready := true
+	for peer_id in Net.roster:
+		if not _is_ready(peer_id):
+			all_ready = false
+	_start_button.text = "START RUN" if all_ready else "FORCE START"
+	# Clients can force the start too (the cloud server has no host player).
+	_force_button.visible = not hosting and Net.is_online() and not all_ready
 	_ready_button.text = "READY" if _is_ready(Net.local_id()) else "NOT READY"
 	if Net.is_offline():
 		_status.text = "No session. Go back and pick HOST GAME or JOIN GAME."
@@ -224,6 +233,10 @@ func _on_ready() -> void:
 
 func _on_start() -> void:
 	Net.request_start()
+
+
+func _on_force() -> void:
+	Net.force_start()
 
 
 func _on_leave() -> void:

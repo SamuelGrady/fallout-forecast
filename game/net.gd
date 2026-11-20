@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 5
+const PROTOCOL := 6
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -219,6 +219,36 @@ func leave() -> void:
 	if not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
 		multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	roster_changed.emit()
+
+
+## Anyone can start the run without waiting for everyone to ready up. A player
+## host starts it directly; a client asks the host, which starts it (the
+## dedicated server listens for force_start_requested).
+signal force_start_requested(by: String)
+
+
+func force_start() -> void:
+	if is_host():
+		if dedicated:
+			force_start_requested.emit(local_name)
+		else:
+			request_start()
+	elif is_online():
+		_request_force_start.rpc_id(1)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_force_start() -> void:
+	if not is_host() or run_active:
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	if not roster.has(peer):
+		return
+	var who := str(roster[peer].get("name", "PLAYER"))
+	if dedicated:
+		force_start_requested.emit(who)
+	else:
+		request_start()
 
 
 func set_ready(value: bool) -> void:

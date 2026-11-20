@@ -50,6 +50,7 @@ func _start() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_left)
 	Net.peer_joined.connect(_on_peer_joined)
 	Net.roster_changed.connect(_on_roster_changed)
+	Net.force_start_requested.connect(_on_force_start)
 	GameManager.run_finished.connect(_on_run_finished)
 	_log("listening for WebSocket (ws://) on TCP %d (protocol v%d, max %d players)" % [_port, Net.PROTOCOL, Net.MAX_PLAYERS])
 	_beat()
@@ -85,6 +86,13 @@ func _on_roster_changed() -> void:
 	for info in Net.roster.values():
 		if not bool(info.get("ready", false)):
 			return
+	_start_run.call_deferred()
+
+
+func _on_force_start(by: String) -> void:
+	if _in_run or Net.roster.is_empty():
+		return
+	_log("%s forced the start" % by)
 	_start_run.call_deferred()
 
 

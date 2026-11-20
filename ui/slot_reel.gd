@@ -183,7 +183,7 @@ func _on_votes(counts: Array) -> void:
 
 
 func _refresh_highlight() -> void:
-	var pick := GameManager.mutations.local_pick
+	var pick: int = GameManager.mutations.local_pick
 	for i in _cards.size():
 		_cards[i].add_theme_stylebox_override("panel", _card_style(i == pick))
 
