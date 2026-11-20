@@ -77,66 +77,68 @@ rings = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.95, 0)
 shape = SubResource("CylinderShape3D_7rt6n")
 
-[node name="Finish" type="MeshInstance3D" parent="." unique_id=902091465]
+[node name="WindVisuals" type="Node3D" parent="." groups=["wind_sway"]]
+
+[node name="Finish" type="MeshInstance3D" parent="WindVisuals" unique_id=902091465]
 transform = Transform3D(0.88, 0, 0, 0, 3.9, 0, 0, 0, 0.88, 0, 1.95, 0)
 material_override = SubResource("StandardMaterial3D_8i06k")
 mesh = SubResource("CylinderMesh_efkly")
 
-[node name="Finish2" type="MeshInstance3D" parent="." unique_id=1722973871]
+[node name="Finish2" type="MeshInstance3D" parent="WindVisuals" unique_id=1722973871]
 material_override = SubResource("StandardMaterial3D_8i06k")
 mesh = SubResource("ArrayMesh_mlher")
 
-[node name="Finish3" type="MeshInstance3D" parent="." unique_id=913992669]
+[node name="Finish3" type="MeshInstance3D" parent="WindVisuals" unique_id=913992669]
 transform = Transform3D(1.94, 0, 0, 0, 1.6, 0, 0, 0, 1.94, 1.9342281, 4.59, 0.8177785)
 material_override = SubResource("StandardMaterial3D_1a2r3")
 mesh = SubResource("CylinderMesh_sb4w5")
 
-[node name="Finish4" type="MeshInstance3D" parent="." unique_id=1781103884]
+[node name="Finish4" type="MeshInstance3D" parent="WindVisuals" unique_id=1781103884]
 transform = Transform3D(4.12, 0, 0, 0, 1.65, 0, 0, 0, 4.12, 1.9342281, 6.2, 0.8177785)
 material_override = SubResource("StandardMaterial3D_1a2r3")
 mesh = SubResource("CylinderMesh_6fdst")
 
-[node name="Finish5" type="MeshInstance3D" parent="." unique_id=1472644946]
+[node name="Finish5" type="MeshInstance3D" parent="WindVisuals" unique_id=1472644946]
 transform = Transform3D(1.94, 0, 0, 0, 1.6, 0, 0, 0, 1.94, -0.18004423, 5.07, 2.0922678)
 material_override = SubResource("StandardMaterial3D_sl7fp")
 mesh = SubResource("CylinderMesh_sb4w5")
 
-[node name="Finish6" type="MeshInstance3D" parent="." unique_id=1958255883]
+[node name="Finish6" type="MeshInstance3D" parent="WindVisuals" unique_id=1958255883]
 transform = Transform3D(4.12, 0, 0, 0, 1.65, 0, 0, 0, 4.12, -0.18004423, 6.6800003, 2.0922678)
 material_override = SubResource("StandardMaterial3D_sl7fp")
 mesh = SubResource("CylinderMesh_6fdst")
 
-[node name="Finish7" type="MeshInstance3D" parent="." unique_id=89576722]
+[node name="Finish7" type="MeshInstance3D" parent="WindVisuals" unique_id=89576722]
 transform = Transform3D(1.94, 0, 0, 0, 1.6, 0, 0, 0, 1.94, -2.0455015, 5.55, 0.47531402)
 material_override = SubResource("StandardMaterial3D_5e2a8")
 mesh = SubResource("CylinderMesh_sb4w5")
 
-[node name="Finish8" type="MeshInstance3D" parent="." unique_id=1297276539]
+[node name="Finish8" type="MeshInstance3D" parent="WindVisuals" unique_id=1297276539]
 transform = Transform3D(4.12, 0, 0, 0, 1.65, 0, 0, 0, 4.12, -2.0455015, 7.16, 0.47531402)
 material_override = SubResource("StandardMaterial3D_5e2a8")
 mesh = SubResource("CylinderMesh_6fdst")
 
-[node name="Finish9" type="MeshInstance3D" parent="." unique_id=45844427]
+[node name="Finish9" type="MeshInstance3D" parent="WindVisuals" unique_id=45844427]
 transform = Transform3D(1.94, 0, 0, 0, 1.6, 0, 0, 0, 1.94, -1.0841452, 4.59, -1.7985075)
 material_override = SubResource("StandardMaterial3D_dgk2o")
 mesh = SubResource("CylinderMesh_sb4w5")
 
-[node name="Finish10" type="MeshInstance3D" parent="." unique_id=827254796]
+[node name="Finish10" type="MeshInstance3D" parent="WindVisuals" unique_id=827254796]
 transform = Transform3D(4.12, 0, 0, 0, 1.65, 0, 0, 0, 4.12, -1.0841452, 6.2, -1.7985075)
 material_override = SubResource("StandardMaterial3D_dgk2o")
 mesh = SubResource("CylinderMesh_6fdst")
 
-[node name="Finish11" type="MeshInstance3D" parent="." unique_id=1700627129]
+[node name="Finish11" type="MeshInstance3D" parent="WindVisuals" unique_id=1700627129]
 transform = Transform3D(1.94, 0, 0, 0, 1.6, 0, 0, 0, 1.94, 1.3754629, 5.07, -1.5868528)
 material_override = SubResource("StandardMaterial3D_ncoi8")
 mesh = SubResource("CylinderMesh_sb4w5")
 
-[node name="Finish12" type="MeshInstance3D" parent="." unique_id=516945656]
+[node name="Finish12" type="MeshInstance3D" parent="WindVisuals" unique_id=516945656]
 transform = Transform3D(4.12, 0, 0, 0, 1.65, 0, 0, 0, 4.12, 1.3754629, 6.6800003, -1.5868528)
 material_override = SubResource("StandardMaterial3D_ncoi8")
 mesh = SubResource("CylinderMesh_6fdst")
 
-[node name="Finish13" type="MeshInstance3D" parent="." unique_id=1470636333]
+[node name="Finish13" type="MeshInstance3D" parent="WindVisuals" unique_id=1470636333]
 transform = Transform3D(4.2, 0, 0, 0, 2.3, 0, 0, 0, 4.2, 0, 5.8, 0)
 material_override = SubResource("StandardMaterial3D_l38wt")
 mesh = SubResource("CylinderMesh_0wirw")

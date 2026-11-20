@@ -37,19 +37,41 @@ var _base_sky_energy := 1.0
 var _base_ambient_energy := 1.0
 var _base_sun_energy := 1.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
+var _wet_materials: Dictionary[Material, Vector3] = {}
+var _wet_colors: Dictionary[Material, Color] = {}
+var _wetness := -1.0
+var _wind_props: Array[Node3D] = []
+var _wind_rest: Array[Basis] = []
+var _wind_clock := 0.0
+var _wind_was_active := false
+var _sun_rest := Basis.IDENTITY
+var _sun_color := Color.WHITE
+var _sun_blur := 0.0
+var _strike_frames := 0
+var _warming_rain := false
+
+const WET_TEXTURES := [
+	"asphalt.png", "sidewalk.png", "pavers.png", "shingles_teal.png",
+	"canopy.png", "awning_cyan.png", "awning_pink.png", "quay_steel.png", "diamond_plate.png",
+]
+const WET_SURFACE := &"storm_wet_surface"
 
 
 func _ready() -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless":
+		set_process(false)
+		return
 	_shelter_query.collide_with_areas = true
 	_shelter_query.collide_with_bodies = false
 	_shelter_query.collision_mask = 1 << 3
 	_build_rain()
-	_find_scene_lighting.call_deferred()
 
 
 func _process(delta: float) -> void:
 	flash = maxf(flash - flash_fade * delta, 0.0)
 	var intensity := WeatherManager.storm_intensity
+	_update_wet_surfaces(intensity)
+	_update_wind(intensity, delta)
 	# 0 at Downpour and below, 1 at the full Acid Storm.
 	var acid := clampf((intensity - 0.7) / 0.3, 0.0, 1.0)
 
@@ -58,6 +80,8 @@ func _process(delta: float) -> void:
 		var p := camera.global_position
 		var rain_position := p + Vector3.UP * spawn_height
 		if _web_rain:
+			if _warming_rain:
+				rain_position = p - camera.global_basis.z * 6.0 + Vector3.UP
 			_web_rain.global_position = rain_position
 		else:
 			_rain.global_position = rain_position
@@ -72,21 +96,18 @@ func _process(delta: float) -> void:
 		# shelter the local player stands under.
 		var player := get_tree().get_first_node_in_group("local_player") as Player
 		color.a *= rain_intensity
-		_web_rain.emitting = intensity > 0.01
+		_web_rain.emitting = intensity > 0.01 or _warming_rain
 		_web_rain_material.set_shader_parameter("rain_color", color)
 		_update_web_shelter_hole(player)
 	else:
-		_rain.amount_ratio = rain_intensity
-		_rain.emitting = intensity > 0.01
+		_rain.amount_ratio = maxf(rain_intensity, 0.02 if _warming_rain else 0.0)
+		_rain.emitting = intensity > 0.01 or _warming_rain
 		_rain_material.albedo_color = color
 
 	var blackout := WeatherManager.wave_modifier() == WeatherManager.WavePlan.BLACKOUT and WeatherManager.is_storm_active()
-	var darken := .5 if blackout else 1.0
+	var darken := .62 if blackout else 1.0
 	if _environment:
-		# Fog stays enabled (density 0 when clear): flipping fog_enabled changes
-		# the shader variant of every material, so the first rain recompiled
-		# the whole scene (a 1 s hitch on desktop, far worse on WebGL).
-		_environment.fog_enabled = true
+		# The fog variant is set before Level enters the tree.
 		var fog := _sample_fog(intensity)
 		if blackout:
 			fog = fog * 1.4 + minf(intensity, .3) * .036
@@ -94,9 +115,112 @@ func _process(delta: float) -> void:
 		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
 		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 3.0
 		_environment.ambient_light_energy = _base_ambient_energy * lerpf(1.0, darken, minf(intensity / .3, 1.0))
+		if _strike_frames > 0:
+			_environment.ambient_light_energy *= 1.0 - 0.28 * Settings.flash_scale()
 		_environment.fog_density *= 1.0 - flash * 0.6
 	if _sun:
-		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 2.5
+		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 1.65
+		if _strike_frames > 0:
+			_sun.light_energy += 2.7 * Settings.flash_scale()
+			_strike_frames -= 1
+		elif _sun.basis != _sun_rest:
+			_sun.basis = _sun_rest
+			_sun.light_color = _sun_color
+			_sun.shadow_blur = _sun_blur
+
+
+## Use the existing shadow-casting sun for two rendered frames. Its shadow
+## variant stays resident, while the light swings around to the strike.
+func light_strike(at: Vector3) -> void:
+	if OS.has_feature("web") or _sun == null:
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var direction := at - camera.global_position
+	direction.y = 0.0
+	if direction.length_squared() < 1.0:
+		direction = Vector3.BACK
+	direction = direction.normalized() + Vector3.UP * 0.7
+	_sun.look_at(_sun.global_position - direction)
+	_sun.light_color = Color("#dfeaff")
+	_sun.shadow_blur = 0.15
+	_strike_frames = 2
+
+
+func warm_rain(value: bool) -> void:
+	_warming_rain = value
+
+
+static func is_wet_surface(material: StandardMaterial3D) -> bool:
+	return material.has_meta(WET_SURFACE) or material.resource_name == "roof" or (
+		material.albedo_texture != null and material.albedo_texture.resource_path.get_file() in WET_TEXTURES)
+
+
+func _collect_surface(material: Material) -> void:
+	if material == null or _wet_materials.has(material):
+		return
+	if material is StandardMaterial3D and is_wet_surface(material):
+		_wet_materials[material] = Vector3(material.roughness, material.metallic_specular, 0.0)
+		_wet_colors[material] = material.albedo_color
+	elif material is ShaderMaterial and material.has_meta(WET_SURFACE):
+		_wet_materials[material] = Vector3.ZERO
+
+
+func refresh_wet_surfaces(level: Node3D) -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless" or level == null:
+		return
+	_update_wet_surfaces(0.0)
+	_wet_materials.clear()
+	_wet_colors.clear()
+	_collect_surface_finish(level)
+
+
+func _collect_surface_finish(level: Node3D) -> void:
+	for node in level.find_children("*", "GeometryInstance3D", true, false):
+		if node is MeshInstance3D and node.mesh:
+			for i in node.mesh.get_surface_count():
+				_collect_surface(node.get_active_material(i))
+		elif node is CSGPrimitive3D:
+			_collect_surface(node.material)
+	_wetness = -1.0
+
+
+func _update_wet_surfaces(intensity: float) -> void:
+	# Quantize while ramping. At a steady intensity neither renderer has to
+	# resend material data, even when the map has hundreds of wet surfaces.
+	var wet := snappedf(intensity, 0.025)
+	if is_equal_approx(wet, _wetness):
+		return
+	_wetness = wet
+	for material in _wet_materials:
+		if material is ShaderMaterial:
+			material.set_shader_parameter("wetness", wet)
+		else:
+			var dry: Vector3 = _wet_materials[material]
+			var tint: Color = _wet_colors[material]
+			material.albedo_color = tint.darkened(wet * 0.24)
+			material.roughness = lerpf(dry.x, 0.25, wet)
+			material.metallic_specular = lerpf(dry.y, 0.54, wet)
+
+
+func _exit_tree() -> void:
+	_update_wet_surfaces(0.0)
+
+
+func _update_wind(intensity: float, delta: float) -> void:
+	if _wind_props.is_empty() or (intensity <= 0.0 and not _wind_was_active):
+		return
+	_wind_clock += delta
+	_wind_was_active = intensity > 0.0
+	# Only authored visual roots move. Their trunks/posts, world collision and
+	# navigation stay in place. A common gust with phase offsets avoids lockstep.
+	var gust := intensity * (0.6 + 0.4 * sin(_wind_clock * 1.35))
+	for i in _wind_props.size():
+		var phase := _wind_clock * 2.8 + i * 1.73
+		var node := _wind_props[i]
+		node.basis = Basis.from_euler(Vector3(sin(phase) * gust * 0.026, 0.0,
+			(sin(phase * 0.8) + 0.45) * gust * 0.045)) * _wind_rest[i]
 
 
 func _update_web_shelter_hole(player: Player) -> void:
@@ -240,10 +364,18 @@ void fragment() {
 	add_child(_web_rain)
 
 
-func _find_scene_lighting() -> void:
-	var level := get_parent().get_node_or_null("Level")
-	if level == null:
+func configure_level(level: Node3D, map_id: String) -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless":
 		return
+	match map_id:
+		"harbor":
+			fog_color = Color(0.37, 0.45, 0.53)
+			fog_density_curve = PackedFloat32Array([0.0, 0.011, 0.029, 0.04])
+			min_sun_energy = 0.24
+		"maple_hollow":
+			fog_color = Color(0.43, 0.40, 0.49)
+			fog_density_curve = PackedFloat32Array([0.0, 0.012, 0.031, 0.04])
+			min_sun_energy = 0.22
 	for node in level.find_children("*", "WorldEnvironment", true, false):
 		var world_env := node as WorldEnvironment
 		if world_env.environment:
@@ -257,6 +389,8 @@ func _find_scene_lighting() -> void:
 		_base_sky_energy = _environment.background_energy_multiplier
 		_base_ambient_energy = _environment.ambient_light_energy
 		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+		_environment.fog_enabled = true
+		_environment.fog_density = 0.0
 		if _web_rain:
 			_environment.glow_enabled = false
 			_environment.ssao_enabled = false
@@ -264,6 +398,9 @@ func _find_scene_lighting() -> void:
 			_environment.sdfgi_enabled = false
 	if _sun:
 		_base_sun_energy = _sun.light_energy
+		_sun_rest = _sun.basis
+		_sun_color = _sun.light_color
+		_sun_blur = _sun.shadow_blur
 		if _web_rain:
 			# Disable real-time sun shadow map on WebGL2: cuts full-scene geometry
 			# draw calls in half while keeping directional lighting and fog intact.
@@ -279,6 +416,13 @@ func _find_scene_lighting() -> void:
 				omni.distance_fade_enabled = true
 				omni.distance_fade_begin = 14.0
 				omni.distance_fade_length = 6.0
+	elif DisplayServer.get_name() != "headless":
+		for node in level.find_children("*", "Node3D", true, false):
+			if node.is_in_group("wind_sway"):
+				_wind_props.append(node)
+				_wind_rest.append(node.basis)
+	# Run after RetroScreen converts the already attached map geometry.
+	_collect_surface_finish.call_deferred(level)
 
 
 func _sample_fog(intensity: float) -> float:

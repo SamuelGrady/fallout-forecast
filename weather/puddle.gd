@@ -22,6 +22,8 @@ var _shape := CylinderShape3D.new()
 var _collision := CollisionShape3D.new()
 var _mesh := MeshInstance3D.new()
 var _material := StandardMaterial3D.new()
+var _draw_water := false
+static var _marked_first_wet := false
 
 
 func _ready() -> void:
@@ -33,6 +35,11 @@ func _ready() -> void:
 	_collision.shape = _shape
 	add_child(_collision)
 
+	_draw_water = not Net.dedicated and DisplayServer.get_name() != "headless"
+	if not _draw_water:
+		_mesh.free()
+		_apply()
+		return
 	var disc := CylinderMesh.new()
 	disc.top_radius = 1.0
 	disc.bottom_radius = 1.0
@@ -49,15 +56,15 @@ func _ready() -> void:
 	_apply()
 
 
-var _tick_left := 0.0
+var _tick_elapsed := 0.0
 
 
 func _physics_process(delta: float) -> void:
-	_tick_left -= delta
-	if _tick_left > 0.0:
+	_tick_elapsed += delta
+	if _tick_elapsed < 0.1:
 		return
-	var dt := 0.1
-	_tick_left = dt
+	var dt := _tick_elapsed
+	_tick_elapsed = 0.0
 	var raining := WeatherManager.is_raining()
 	if not raining and growth <= 0.0:
 		return
@@ -67,12 +74,14 @@ func _physics_process(delta: float) -> void:
 		growth = minf(growth + intensity * growth_rate * dt / grow_time, 1.0)
 	else:
 		growth = maxf(growth - dt / dry_time, 0.0)
+	_apply()
+	if not _draw_water:
+		return
 	var base := color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
 	if GameManager.has_mutation("undertow"):
 		var pulse := 0.55 + 0.25 * sin(Time.get_ticks_msec() * 0.006)
 		base = base.lerp(Color(0.22, 0.82, 0.9, 0.88), pulse)
 	_material.albedo_color = base
-	_apply()
 	if raining and growth > 0.3 and randf() < intensity * (0.35 if OS.has_feature("web") else 0.8):
 		_ripple()
 
@@ -134,8 +143,13 @@ func set_growth(value: float) -> void:
 func _apply() -> void:
 	var r := radius()
 	var wet := r > 0.25
-	_mesh.visible = wet
 	_collision.disabled = not wet
 	if wet:
 		_shape.radius = r
-		_mesh.scale = Vector3(r, 1.0, r)
+	if _draw_water:
+		if wet and not _marked_first_wet:
+			_marked_first_wet = true
+			Perf.mark("first puddle visible")
+		_mesh.visible = wet
+		if wet:
+			_mesh.scale = Vector3(r, 1.0, r)
