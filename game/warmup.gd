@@ -7,6 +7,11 @@ extends Node3D
 ## materials compile in a single frame. This spreads the warm-up across small
 ## per-stage batches, freeing each stage before drawing the next and reporting
 ## progress on the loading card.
+##
+## On web (see WebMaterials) main.gd hides the world from the camera until
+## the first stage has drawn one small swatch per distinct shader key in the
+## run (plus a copy inside a temporary omni light for the lit variant), a few
+## per frame. Then "district" shows the real level for two frames.
 
 signal finished
 
@@ -16,8 +21,12 @@ const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
 const BossScene := preload("res://enemies/boss/boss_cumulus.tscn")
 const WeatherEnemy := preload("res://enemies/weather_enemy.gd")
 
+## Render layer the swatches use while the world is hidden from the camera.
+const WARM_LAYER := 1 << 19
+
 const STAGES: Array[String] = [
 	"surfaces",
+	"district",
 	"classic_infected",
 	"weather_infected_a",
 	"weather_infected_b",
@@ -38,6 +47,10 @@ var _started_us := 0
 var _stage_us := 0
 var _web := OS.has_feature("web")
 var _done := false
+var _surface_queue: Array[Dictionary] = []
+var _surface_total := 0
+var _swatch_box: BoxMesh
+var _keys_drawn := {}
 
 
 func _ready() -> void:
@@ -81,14 +94,18 @@ func _process(_delta: float) -> void:
 	if _done:
 		return
 	_hold -= 1
-	if _stage == 2 and _hold == 1 and is_instance_valid(_undertow):
+	if _stage == 3 and _hold == 1 and is_instance_valid(_undertow):
 		_undertow.play_tell("undertow_emerge", 0.6, -80.0)
 	if _hold > 0:
+		return
+	if _stage == 0 and not _surface_queue.is_empty():
+		_clear_holder()
+		_draw_surface_batch()
 		return
 	var stage_ms := (Time.get_ticks_usec() - _stage_us) / 1000.0
 	if _stage >= 0 and _stage < STAGES.size() and stage_ms >= 100.0:
 		Perf.mark("warm-up %s %.0f ms" % [STAGES[_stage], stage_ms])
-	if _stage == 0:
+	if _stage == 1:
 		_end_screen_warm()
 	_clear_holder()
 	_advance_stage()
@@ -122,10 +139,15 @@ func _advance_stage() -> void:
 	var spawner := get_parent().get_node_or_null("Enemies") as Spawner
 	match STAGES[_stage]:
 		"surfaces":
-			_warm_level_surfaces(base, right, up)
 			_warm_puddle_and_bolt(base, right, up)
 			_begin_screen_warm()
-			_hold = 2 if _web else 1
+			_queue_surfaces()
+		"district":
+			# Everything the world uses has compiled: let it draw.
+			var main := get_parent()
+			if main.has_method("reveal_world"):
+				main.reveal_world()
+			_hold = 2
 		"classic_infected":
 			if spawner:
 				_spawn_enemies([spawner.drip_scene, spawner.gutter_scene, spawner.mister_scene], base, forward, right, up, 0)
@@ -382,35 +404,154 @@ func _warm_combat_fx(base: Vector3, right: Vector3, up: Vector3) -> void:
 	_holder.add_child(sample)
 
 
-func _warm_level_surfaces(base: Vector3, right: Vector3, up: Vector3) -> void:
-	var level := get_parent().get_node_or_null("Level")
-	if level == null:
-		return
-	var seen := {}
-	# Draw a small swatch for each unique material variant in the district,
-	# including props outside the starting view, while keeping draws low.
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE * 0.22
-	for node in level.find_children("*", "MeshInstance3D", true, false):
-		var mesh := node as MeshInstance3D
-		if mesh == null or not mesh.is_visible_in_tree() or mesh.mesh == null:
+## One entry per distinct shader key the run can draw so far (level,
+## players, held guns, HUD 3D bits), including hidden nodes that switch on
+## later (objective beacons, flicker states). Hidden CSG is collision only.
+func _queue_surfaces() -> void:
+	_surface_queue.clear()
+	_keys_drawn.clear()
+	var main := get_parent()
+	for node in main.find_children("*", "GeometryInstance3D", true, false):
+		if is_ancestor_of(node) or (node is CSGShape3D and not (node as Node3D).is_visible_in_tree()):
 			continue
-		for i in mesh.mesh.get_surface_count():
-			var material := mesh.get_active_material(i) as StandardMaterial3D
-			if material == null:
-				continue
-			var signature := [material.shading_mode, material.transparency, material.cull_mode,
-				material.albedo_texture != null, material.uv1_triplanar, material.emission_enabled,
-				material.vertex_color_use_as_albedo, material.disable_fog]
-			if seen.has(signature):
-				continue
-			var slot := seen.size()
-			seen[signature] = true
-			var sample := MeshInstance3D.new()
-			sample.mesh = box
-			sample.material_override = material
-			sample.position = base + right * (slot % 12 - 5.5) * 0.29 + up * (2.2 - floorf(slot / 12.0) * 0.3)
-			_holder.add_child(sample)
+		if node is GPUParticles3D or node is CPUParticles3D:
+			continue  # Rain: WeatherFX.warm_rain draws it.
+		var gi := node as GeometryInstance3D
+		if node is Label3D:
+			var label := node as Label3D
+			if label.material_override:
+				_queue_material(label.material_override, "mesh", null)
+			else:
+				_queue_entry("label:%s|%s|%s|%s|%s|%s|%s" % [label.shaded, label.double_sided,
+					label.no_depth_test, label.fixed_size, label.alpha_cut, label.billboard, label.texture_filter],
+					{"kind": "label", "source": label, "lit": label.shaded})
+			continue
+		var source: MultiMesh = (node as MultiMeshInstance3D).multimesh if node is MultiMeshInstance3D else null
+		var kind := "instanced" if node is MultiMeshInstance3D else "mesh"
+		if gi.material_overlay:
+			_queue_material(gi.material_overlay, kind, source)
+		if gi.material_override:
+			_queue_material(gi.material_override, kind, source)
+			continue
+		if node is MeshInstance3D:
+			var mi := node as MeshInstance3D
+			if mi.mesh:
+				for i in mi.mesh.get_surface_count():
+					_queue_material(mi.get_active_material(i), kind, source)
+			continue
+		var mesh: Mesh = null
+		if source:
+			mesh = source.mesh
+		elif node is CSGShape3D and (node as CSGShape3D).is_root_shape():
+			var meshes := (node as CSGShape3D).get_meshes()
+			mesh = meshes[1] if meshes.size() > 1 else null
+		if mesh:
+			for i in mesh.get_surface_count():
+				_queue_material(mesh.surface_get_material(i), kind, source)
+	_surface_total = _surface_queue.size()
+	Perf.mark("warm-up %d surface keys" % _surface_total)
+	_draw_surface_batch()
+
+
+func _queue_material(material: Material, kind: String, source: MultiMesh) -> void:
+	var guard := 0
+	while material and guard < 4:
+		var lit := true
+		if material is BaseMaterial3D:
+			lit = (material as BaseMaterial3D).shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED
+		_queue_entry(kind + ":" + WebMaterials.shader_key(material), {"kind": kind, "material": material, "source": source, "lit": lit})
+		material = material.next_pass
+		guard += 1
+
+
+func _queue_entry(key: String, entry: Dictionary) -> void:
+	if _keys_drawn.has(key):
+		return
+	_keys_drawn[key] = true
+	entry["key"] = key
+	_surface_queue.append(entry)
+
+
+## A few swatches per frame so no single frame compiles everything. Each lit
+## key also draws once inside a small temporary omni light: street lamps give
+## the level's lit shaders an omni-light variant.
+func _draw_surface_batch() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		_surface_queue.clear()
+		return
+	var per_frame := 2 if _web else 8
+	var forward := -camera.global_basis.z
+	var right := camera.global_basis.x
+	var up := camera.global_basis.y
+	var base := camera.global_position + forward * 4.0
+	var count := mini(per_frame, _surface_queue.size())
+	var light := OmniLight3D.new()
+	light.omni_range = 0.9
+	light.light_energy = 1.0
+	light.shadow_enabled = false
+	_holder.add_child(light)
+	light.global_position = base + up * -0.7 - forward * 0.3
+	for i in count:
+		var entry: Dictionary = _surface_queue.pop_front()
+		var x := (float(i) - (count - 1) * 0.5) * 0.45
+		_add_swatch(entry, base + right * x + up * 1.0)
+		if entry.get("lit", true):
+			_add_swatch(entry, base + right * x * 0.4 + up * -0.7)
+	_set_holder_layers()
+	var done := _surface_total - _surface_queue.size()
+	SceneLoader.set_stage("TUNING IN...", 0.60 + 0.38 * (float(done) / maxf(1.0, _surface_total)) / STAGES.size(), "SURFACES %d / %d" % [done, _surface_total])
+	if _label:
+		_label.text = "TUNING IN...  SURFACES %d / %d" % [done, _surface_total]
+	_hold = 2 if _web else 1
+
+
+func _add_swatch(entry: Dictionary, at: Vector3) -> void:
+	if _swatch_box == null:
+		_swatch_box = BoxMesh.new()
+		_swatch_box.size = Vector3.ONE * 0.2
+	var node: GeometryInstance3D
+	match str(entry.kind):
+		"label":
+			var src := entry.source as Label3D
+			if not is_instance_valid(src):
+				return
+			var label := Label3D.new()
+			label.text = "A"
+			label.font = src.font
+			label.font_size = 24
+			label.pixel_size = 0.01
+			for p in ["shaded", "double_sided", "no_depth_test", "fixed_size", "alpha_cut", "billboard", "texture_filter", "alpha_antialiasing_mode"]:
+				label.set(p, src.get(p))
+			node = label
+		"instanced":
+			var mm := MultiMesh.new()
+			var src_mm := entry.source as MultiMesh
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			if src_mm:
+				mm.use_colors = src_mm.use_colors
+				mm.use_custom_data = src_mm.use_custom_data
+			mm.mesh = _swatch_box
+			mm.instance_count = 1
+			mm.set_instance_transform(0, Transform3D.IDENTITY)
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.material_override = entry.material
+			node = mmi
+		_:
+			var mi := MeshInstance3D.new()
+			mi.mesh = _swatch_box
+			mi.material_override = entry.material
+			node = mi
+	_holder.add_child(node)
+	node.global_position = at
+
+
+## While the world is hidden the camera only renders WARM_LAYER.
+func _set_holder_layers() -> void:
+	for node in _holder.find_children("*", "VisualInstance3D", true, false):
+		if not (node is Light3D):
+			(node as VisualInstance3D).layers = WARM_LAYER
 
 
 func _complete() -> void:
@@ -419,6 +560,8 @@ func _complete() -> void:
 	_done = true
 	set_process(false)
 	_end_screen_warm()
+	if get_parent() and get_parent().has_method("reveal_world"):
+		get_parent().reveal_world()
 	_clear_holder()
 	SceneLoader.set_stage("TUNING IN...", 1.0, "READY")
 	if _started_us > 0:

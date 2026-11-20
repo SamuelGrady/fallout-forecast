@@ -15,6 +15,10 @@ var map_id := ""
 var map_scene: PackedScene
 var loading_map := true
 var _level: Node3D
+## Web: the camera only sees the warm-up swatches until they have compiled
+## every shader the level needs (see reveal_world and game/warmup.gd).
+var _hidden_camera: Camera3D
+var _hidden_mask := 0
 
 
 func _ready() -> void:
@@ -38,14 +42,26 @@ func _ready() -> void:
 			_leave_to_title.call_deferred()
 		return
 	_level.name = "Level"
+	# Web: fold the level's materials into a few shared shader programs
+	# before anything draws, then keep folding whatever spawns later.
+	var web_materials := WebMaterials.enabled() and not Net.dedicated
+	if web_materials:
+		WebMaterials.reset_level()
+		WebMaterials.apply_tree(_level)
 	$WeatherFX.configure_level(_level, map_id)
 	add_child(_level)
+	if web_materials:
+		WebMaterials.install(get_tree())
 	Perf.mark("map %s inst %.1f ms" % [map_id, (Time.get_ticks_usec() - inst_started) / 1000.0])
 	GameManager.map_id = map_id
 	Telemetry.run_started(map_id)
 	_setup_decon_showers()
 	_setup_objectives()
 	_setup_players()
+	if web_materials:
+		WebMaterials.apply_tree(self)
+		if DisplayServer.get_name() != "headless":
+			_hide_world()
 
 	if OS.has_feature("web"):
 		Engine.max_physics_steps_per_frame = 2
@@ -175,6 +191,22 @@ func _prepare_navigation() -> void:
 			Net.accept_run_peers()
 	else:
 		Net.report_in_run(true)
+
+
+func _hide_world() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	_hidden_camera = camera
+	_hidden_mask = camera.cull_mask
+	camera.cull_mask = preload("res://game/warmup.gd").WARM_LAYER
+
+
+## Called by the warm-up once every surface key has compiled.
+func reveal_world() -> void:
+	if is_instance_valid(_hidden_camera) and _hidden_camera.cull_mask == preload("res://game/warmup.gd").WARM_LAYER:
+		_hidden_camera.cull_mask = _hidden_mask
+	_hidden_camera = null
 
 
 func _setup_players() -> void:

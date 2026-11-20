@@ -18,7 +18,7 @@ const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
 @export var enabled := true
 @export var interface_only := false
 var _interface_layer: CanvasLayer
-var _web := OS.has_feature("web")
+var _web := WebMaterials.emulate_web_look()
 @export var vertex_snap := 120.0
 @export var lightning_glitch := 1.0
 @export var downed_glitch := 0.45
