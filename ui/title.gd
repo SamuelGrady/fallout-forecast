@@ -102,12 +102,7 @@ func _ready() -> void:
 	_button(_menu, "HOST GAME", _on_host).visible = Net.can_host()
 	_button(_menu, "JOIN GAME", _on_join)
 	_button(_menu, "SETTINGS", _on_settings)
-	_button(_menu, "QUIT", get_tree().quit)
-	if OS.has_feature("web"):
-		# Browsers can join the WebSocket backend but cannot host a socket server.
-		_menu.get_child(1).hide()
-		_menu.get_child(2).visible = Net.has_method("join_cloud")
-		_menu.get_child(4).hide()
+	_button(_menu, "QUIT", get_tree().quit).visible = not OS.has_feature("web")
 
 	_settings.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_settings.grow_horizontal = Control.GROW_DIRECTION_BOTH

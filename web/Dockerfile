@@ -6,9 +6,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eu; \
-    case "$TARGETARCH" in \
-        amd64) arch=x86_64; digest=cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4 ;; \
-        arm64) arch=arm64; digest=5dd0d86405cf7e8adf79fb6377b38ba682a2846cb378ffe5364f38c01ad29b9d ;; \
+    case "${TARGETARCH:-$(uname -m)}" in \
+        amd64|x86_64) arch=x86_64; digest=cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4 ;; \
+        arm64|aarch64) arch=arm64; digest=5dd0d86405cf7e8adf79fb6377b38ba682a2846cb378ffe5364f38c01ad29b9d ;; \
         *) echo "Unsupported build architecture: $TARGETARCH" >&2; exit 1 ;; \
     esac; \
     release=https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable; \
@@ -20,6 +20,7 @@ RUN set -eu; \
     curl --fail --silent --show-error --location --retry 3 \
         "$release/Godot_v4.7.2-stable_export_templates.tpz" -o /tmp/templates.tpz; \
     echo "f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011  /tmp/templates.tpz" | sha256sum --check; \
+    mkdir -p /root/.local/share/godot/export_templates/4.7.2.stable; \
     unzip -j /tmp/templates.tpz templates/web_nothreads_release.zip templates/version.txt \
         -d /root/.local/share/godot/export_templates/4.7.2.stable; \
     rm /tmp/godot.zip /tmp/templates.tpz "/tmp/Godot_v4.7.2-stable_linux.$arch"

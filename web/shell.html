@@ -52,7 +52,7 @@
       if (event.key === "Escape" && document.fullscreenElement) {
         document.exitFullscreen().catch(console.warn);
       }
-    });
+    }, { capture: true });
 
     start.addEventListener("click", async () => {
       start.disabled = true;
