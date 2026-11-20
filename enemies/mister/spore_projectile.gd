@@ -67,6 +67,13 @@ func _physics_process(delta: float) -> void:
 	if not hit.is_empty() or _age > 5.0:
 		_burst(hit.get("position", global_position))
 		return
+	# A Shield Dome stops globs at its shell: they splash off it harmlessly.
+	if SporeCloud._in_dome(global_position + step, get_tree()) and not SporeCloud._in_dome(global_position, get_tree()):
+		if not Net.dedicated:
+			ShotFX.puff(get_parent(), global_position, Color(0.55, 0.95, 1.0, 0.8), 0.35, 0.45)
+		Sound.play_at("spore_burst", global_position, -8.0)
+		queue_free()
+		return
 	global_position += step
 	_trail_left -= delta
 	if _trail_left <= 0.0 and not Net.dedicated:
@@ -86,13 +93,5 @@ func _burst(at: Vector3) -> void:
 		var floor_hit := get_world_3d().direct_space_state.intersect_ray(query)
 		at = floor_hit.get("position", at)
 	Sound.play_at("smog_splash" if acid else "spore_burst", at)
-	var cloud := SporeCloud.new()
-	cloud.damage_per_second = damage_per_second
-	cloud.source = source if is_instance_valid(source) else null
-	if acid:
-		cloud.acid = true
-		cloud.lifetime = 8.0
-		cloud.radius = 3.0
-	get_parent().add_child(cloud, true)
-	cloud.global_position = at
+	SporeCloud.spawn(get_parent(), at, acid, 3.0 if acid else 2.5, 8.0 if acid else 4.0, damage_per_second, source)
 	queue_free()

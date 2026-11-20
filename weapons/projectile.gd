@@ -77,6 +77,8 @@ func _flare_process(delta: float) -> void:
 				_deploy_dome()
 		return
 	var left := data.effect_time - (_age - _deployed_at)
+	if authoritative and left > 0.0:
+		_hold_out_enemies()
 	if _dome:
 		# Shimmer, then flicker out in the last second.
 		var fade := clampf(left, 0.0, 1.0)
@@ -223,6 +225,28 @@ func _explode() -> void:
 	ShotFX.sparks(parent, center + Vector3.UP * 0.3, Vector3.UP, 14)
 	ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.6, 0.25), 10.0, 0.15)
 	queue_free()
+
+
+## Host: the dome is a wall for infected. Anything inside (except the boss)
+## is put back just outside the shell, so they can't walk in or be spawned in.
+func _hold_out_enemies() -> void:
+	var wall: float = data.effect_radius + 0.35
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or enemy.is_in_group("boss") or enemy.is_queued_for_deletion():
+			continue
+		var offset := enemy.global_position - global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance >= wall:
+			continue
+		var out := offset / distance if distance > 0.01 else Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU)
+		enemy.global_position += out * (wall - distance)
+		if enemy is CharacterBody3D:
+			var body := enemy as CharacterBody3D
+			var inward := body.velocity.dot(-out)
+			if inward > 0.0:
+				body.velocity += out * inward
 
 
 ## True if `point` is under an active Shield Dome.

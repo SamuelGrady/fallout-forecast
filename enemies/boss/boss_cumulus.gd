@@ -21,6 +21,14 @@ const STORM_STEPS := [0.7, 0.3, 0.0]
 @export var spore_interval := 2.6
 @export var summon_interval := 14.0
 @export var drift_radius := 10.0
+## Cumulus hunts: it drifts to hang roughly above a player (offset by
+## HOVER_OFFSET so it isn't straight overhead), switching focus every
+## FOCUS_TIME s in co-op. It moves at FOLLOW_SPEED and never strays more than
+## LEASH m from the map's boss_anchor.
+@export var follow_speed := 6.5
+@export var hover_offset := 5.0
+@export var leash := 150.0
+const FOCUS_TIME := 10.0
 @export var drop_per_sac := 4.0
 
 var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
@@ -44,11 +52,15 @@ var _sac_material := StandardMaterial3D.new()
 var _core_material := StandardMaterial3D.new()
 var _core_rings: Node3D
 var _entrance_left := 1.8
+var _center := Vector3.ZERO
+var _focus: Node3D
+var _focus_left := 0.0
 
 
 func _ready() -> void:
 	add_to_group("boss")
 	_anchor = global_position
+	_center = Vector3(_anchor.x, 0.0, _anchor.z)
 	_height = _anchor.y + 16.0
 	var scale_hp := GameManager.enemy_health_scale() if GameManager.has_method("enemy_health_scale") else 1.0
 	for i in 3:
@@ -200,12 +212,13 @@ func _process(delta: float) -> void:
 		return
 	if _entrance_left > 0.0:
 		_entrance_left = maxf(0.0, _entrance_left - delta)
-	# Drift around the map's anchor and sink as sacs pop.
+	# Drift over to hang near a player, and sink as sacs pop.
 	var goal_height := _anchor.y - drop_per_sac * (3 - sacs_left)
 	var descend_rate := 10.0 if _entrance_left > 0.0 else 2.2
 	_height = move_toward(_height, goal_height, delta * descend_rate)
-	var drift := Vector3(cos(_t * 0.12), 0, sin(_t * 0.12)) * drift_radius
-	global_position = _anchor + drift + Vector3(0, _height - _anchor.y + sin(_t * 0.8) * 0.6, 0)
+	_follow_focus(delta)
+	var drift := Vector3(cos(_t * 0.35), 0, sin(_t * 0.35)) * hover_offset
+	global_position = _center + drift + Vector3(0, _height + sin(_t * 0.8) * 0.6, 0)
 	# Rain heals it, unless a flare is burning nearby.
 	_burn_left -= delta
 	if _burn_left <= 0.0:
@@ -336,6 +349,27 @@ func _die() -> void:
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
 	t.tween_callback(queue_free)
+
+
+## Host: pick a player to hang over (rotating in co-op) and glide the hover
+## center toward them, leashed to the boss anchor.
+func _follow_focus(delta: float) -> void:
+	_focus_left -= delta
+	if _focus == null or not is_instance_valid(_focus) or str(_focus.get("state")) != "ok" or _focus_left <= 0.0:
+		_focus_left = FOCUS_TIME
+		var alive: Array = GameManager.players().filter(func(p): return p is Node3D and str(p.get("state")) == "ok")
+		if alive.is_empty():
+			_focus = null
+		else:
+			var index := (alive.find(_focus) + 1) % alive.size() if _focus in alive else randi() % alive.size()
+			_focus = alive[index] as Node3D
+	if _focus == null or _entrance_left > 0.0:
+		return
+	var want := Vector3(_focus.global_position.x, 0.0, _focus.global_position.z)
+	var home := Vector3(_anchor.x, 0.0, _anchor.z)
+	if want.distance_to(home) > leash:
+		want = home + (want - home).normalized() * leash
+	_center = _center.move_toward(want, follow_speed * delta)
 
 
 @rpc("authority", "call_remote", "reliable")

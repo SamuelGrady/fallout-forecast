@@ -899,11 +899,7 @@ func _spawn_cloud(at: Vector3, damage_per_second: float, radius: float) -> void:
 	var world := _world()
 	if world == null:
 		return
-	var cloud := SporeCloud.new()
-	cloud.damage_per_second = damage_per_second
-	cloud.radius = radius
-	world.add_child(cloud)
-	cloud.global_position = at
+	SporeCloud.spawn(world, at, false, radius, 4.0, damage_per_second)
 
 
 func show_banner(text: String, color: Color, seconds := 3.0) -> void:

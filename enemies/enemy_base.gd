@@ -19,6 +19,9 @@ signal died(enemy: EnemyBase)
 @export var data: EnemyData
 
 var health := 0.0
+## Max turn speed in radians per second while chasing. 0 = turn instantly.
+## Heavy infected (Hailstone) turn slowly, so flanking their plates works.
+var turn_rate := 0.0
 ## Host-assigned, used by the spawner to match this enemy across peers.
 var net_id := 0
 var _bullet_critical := false
@@ -659,9 +662,15 @@ func _nearest(candidates: Array) -> Node3D:
 	return best
 
 
-func _face(direction: Vector3) -> void:
-	if direction.length_squared() > 0.01:
-		rotation.y = atan2(-direction.x, -direction.z)
+func _face(direction: Vector3, instant := false) -> void:
+	if direction.length_squared() <= 0.01:
+		return
+	var want := atan2(-direction.x, -direction.z)
+	if instant or turn_rate <= 0.0:
+		rotation.y = want
+		return
+	var step := turn_rate * get_physics_process_delta_time()
+	rotation.y += clampf(wrapf(want - rotation.y, -PI, PI), -step, step)
 
 
 func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF) -> void:
