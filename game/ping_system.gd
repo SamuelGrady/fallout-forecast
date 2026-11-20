@@ -84,6 +84,8 @@ func _follow(ping: Dictionary) -> void:
 # ------------------------------------------------------------------ sending
 ## Owner: ping `kind` at `pos` (enemy_id = the enemy's net_id, or 0).
 func send(kind: String, pos: Vector3, enemy_id := 0) -> void:
+	if not Net.can_send_run_rpc():
+		return
 	if Net.is_host():
 		_accept(multiplayer.get_unique_id(), kind, pos, enemy_id)
 	elif Net.is_online():

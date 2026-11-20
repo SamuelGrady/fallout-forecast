@@ -125,6 +125,8 @@ func _handle_input() -> void:
 
 
 func fire() -> void:
+	if not Net.can_send_run_rpc():
+		return
 	var data := loadout[current]
 	if data.shell_reload and ammo[current] > 0:
 		_reload_left = 0.0

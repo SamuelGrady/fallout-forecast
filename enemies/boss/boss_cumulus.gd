@@ -27,6 +27,7 @@ var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
 var part_max: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var sacs_left := 3
 var dead := false
+var preview_only := false
 
 var _anchor := Vector3.ZERO
 var _height := 0.0
@@ -44,9 +45,20 @@ var _sac_material := StandardMaterial3D.new()
 var _core_material := StandardMaterial3D.new()
 var _core_rings: Node3D
 var _entrance_left := 1.8
+static var _cloud_mesh: ArrayMesh
+static var _part_meshes: Dictionary[float, SphereMesh] = {}
+static var _rings: Dictionary[float, TorusMesh] = {}
 
 
 func _ready() -> void:
+	if preview_only:
+		_build()
+		if _core_rings:
+			_core_rings.visible = true
+		for part: StaticBody3D in _parts:
+			part.remove_from_group("boss_parts")
+			part.collision_layer = 0
+		return
 	add_to_group("boss")
 	_anchor = global_position
 	_height = _anchor.y + 16.0
@@ -71,20 +83,12 @@ func _build() -> void:
 	_cloud_material.disable_fog = true
 	_cloud_material.emission_enabled = true
 	_cloud_material.emission = Color(0.12, 0.2, 0.08)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 5
-	for i in 9:
-		var m := MeshInstance3D.new()
-		var s := SphereMesh.new()
-		var r := rng.randf_range(2.6, 4.2)
-		s.radius = r
-		s.height = r * 1.6
-		s.radial_segments = 10
-		s.rings = 6
-		s.material = _cloud_material
-		m.mesh = s
-		m.position = Vector3(rng.randf_range(-4, 4), rng.randf_range(0.5, 2.5), rng.randf_range(-4, 4))
-		_body.add_child(m)
+	if _cloud_mesh == null:
+		_cloud_mesh = _build_cloud_mesh()
+	var cloud := MeshInstance3D.new()
+	cloud.mesh = _cloud_mesh
+	cloud.material_override = _cloud_material
+	_body.add_child(cloud)
 
 	_sac_material.albedo_color = Color(0.85, 1.0, 0.3)
 	_sac_material.emission_enabled = true
@@ -98,12 +102,7 @@ func _build() -> void:
 		var a := TAU * i / 3.0
 		var sac := _make_part("Sac%d" % i, i, 1.7, Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0), _sac_material)
 		var halo := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.rings = 24
-		torus.ring_segments = 6
-		torus.inner_radius = 2.05
-		torus.outer_radius = 2.32
-		halo.mesh = torus
+		halo.mesh = _ring_mesh(2.05, 2.32)
 		halo.material_override = halo_mat
 		sac.add_child(halo)
 		_sac_halos.append(halo)
@@ -123,27 +122,17 @@ func _build() -> void:
 	ring_mat.albedo_color = Color("#ff5689")
 	for tilt in [Vector3(0.4, 0, 0.2), Vector3(-0.5, 0.3, 0.7)]:
 		var rmesh := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.rings = 24
-		torus.ring_segments = 6
-		torus.inner_radius = 2.75
-		torus.outer_radius = 3.0
-		rmesh.mesh = torus
+		rmesh.mesh = _ring_mesh(2.75, 3.0)
 		rmesh.rotation = tilt
 		rmesh.material_override = ring_mat
 		_core_rings.add_child(rmesh)
 
 	_shell = MeshInstance3D.new()
-	var shell_mesh := SphereMesh.new()
-	shell_mesh.radial_segments = 12
-	shell_mesh.rings = 6
-	shell_mesh.radius = 2.85
-	shell_mesh.height = 5.7
 	var shell_mat := StandardMaterial3D.new()
 	shell_mat.albedo_color = Color(0.5, 0.7, 0.4, 0.58)
 	shell_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shell_mesh.material = shell_mat
-	_shell.mesh = shell_mesh
+	_shell.mesh = _part_mesh(2.85)
+	_shell.material_override = shell_mat
 	_shell.position = Vector3(0, -1.8, 0)
 	add_child(_shell)
 
@@ -159,18 +148,51 @@ func _make_part(part_name: String, i: int, radius: float, pos: Vector3, material
 	cs.shape = sphere
 	body.add_child(cs)
 	var m := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radial_segments = 12
-	sm.rings = 6
-	sm.radius = radius
-	sm.height = radius * 2.0
-	sm.material = material
-	m.mesh = sm
+	m.mesh = _part_mesh(radius)
+	m.material_override = material
 	body.add_child(m)
 	add_child(body)
 	body.boss = self
 	body.index = i
 	return body
+
+
+static func _build_cloud_mesh() -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var geometry := SurfaceTool.new()
+	for i in 9:
+		var sphere := SphereMesh.new()
+		var radius := rng.randf_range(2.6, 4.2)
+		sphere.radius = radius
+		sphere.height = radius * 1.6
+		sphere.radial_segments = 10
+		sphere.rings = 6
+		var point := Vector3(rng.randf_range(-4, 4), rng.randf_range(0.5, 2.5), rng.randf_range(-4, 4))
+		geometry.append_from(sphere, 0, Transform3D(Basis.IDENTITY, point))
+	return geometry.commit()
+
+
+static func _part_mesh(radius: float) -> SphereMesh:
+	if not _part_meshes.has(radius):
+		var sphere := SphereMesh.new()
+		sphere.radial_segments = 12
+		sphere.rings = 6
+		sphere.radius = radius
+		sphere.height = radius * 2.0
+		_part_meshes[radius] = sphere
+	return _part_meshes[radius]
+
+
+static func _ring_mesh(inner: float, outer: float) -> TorusMesh:
+	if not _rings.has(outer):
+		var ring := TorusMesh.new()
+		ring.rings = 24
+		ring.ring_segments = 6
+		ring.inner_radius = inner
+		ring.outer_radius = outer
+		_rings[outer] = ring
+	return _rings[outer]
 
 
 func _process(delta: float) -> void:
@@ -287,6 +309,7 @@ func _pop_sac(i: int) -> void:
 	Sound.play("reel_land", -8.0, 0.9 + 0.15 * (3 - sacs_left))
 	ShotFX.flash(get_parent(), part.global_position, Color(0.8, 1.0, 0.3), 8.0, 0.18)
 	GameManager.spawn_cloud(part.global_position, 10.0, 4.0)
+	Perf.mark("boss sac broken (%d left)" % sacs_left)
 	part.visible = false
 	part.collision_layer = 0
 	WeatherManager.set_intensity_override(STORM_STEPS[2 - sacs_left])
@@ -295,6 +318,7 @@ func _pop_sac(i: int) -> void:
 
 
 func _shatter_shell() -> void:
+	Perf.mark("boss core exposed")
 	Sound.play_at("explosion_big", _shell.global_position)
 	ShotFX.flash(get_parent(), _shell.global_position, Color("#ff5689"), 10.0, 0.25)
 	_shell.visible = false
@@ -319,6 +343,7 @@ func _shatter_shell() -> void:
 
 
 func _die() -> void:
+	Perf.mark("boss defeated")
 	Juice.shake(1.0)
 	Juice.duck_music(-12.0, 2.5)
 	Juice.hit_stop(120.0)

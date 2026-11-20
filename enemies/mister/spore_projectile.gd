@@ -91,7 +91,7 @@ func _burst(at: Vector3) -> void:
 	cloud.source = source if is_instance_valid(source) else null
 	if acid:
 		cloud.acid = true
-		cloud.lifetime = 8.0
+		cloud.lifetime = 6.0
 		cloud.radius = 3.0
 	get_parent().add_child(cloud, true)
 	cloud.global_position = at

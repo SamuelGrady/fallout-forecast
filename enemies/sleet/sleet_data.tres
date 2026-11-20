@@ -6,7 +6,7 @@
 script = ExtResource("1")
 display_name = "Sleet"
 max_health = 24.0
-move_speed = 5.9
-damage = 10.0
+move_speed = 5.2
+damage = 8.0
 attack_range = 3.7
 attack_cooldown = 2.15

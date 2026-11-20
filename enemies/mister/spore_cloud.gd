@@ -9,6 +9,7 @@ var source: Node = null
 var acid := false
 
 var _age := 0.0
+var _damage_time := 0.0
 var _mesh_material := StandardMaterial3D.new()
 
 
@@ -77,13 +78,18 @@ func _physics_process(delta: float) -> void:
 	if _age >= lifetime or GameManager.victory_locked or GameManager.finished:
 		queue_free()
 		return
-	if not Net.is_host():
+	if not Net.is_host() or damage_per_second <= 0.0:
 		return
+	_damage_time += delta
+	if _damage_time < 0.2:
+		return
+	var amount := damage_per_second * _damage_time
+	_damage_time = 0.0
 	for body in get_overlapping_bodies():
-		if body.has_method("take_damage"):
+		if body is Player:
 			if acid:
 				var ray := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * .35, body.global_position + Vector3.UP * .35, 1)
 				if not get_world_3d().direct_space_state.intersect_ray(ray).is_empty():
 					continue
 			# The cloud outlives the enemy that spat it out.
-			body.take_damage(damage_per_second * delta, source if is_instance_valid(source) else null)
+			body.take_damage(amount, source if is_instance_valid(source) else null, true)
