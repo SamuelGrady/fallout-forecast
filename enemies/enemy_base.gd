@@ -80,6 +80,7 @@ var miniboss_wave := 0
 var miniboss_name := ""
 var max_health := 1.0
 var _miniboss_ability_timer := 4.0
+var _model: Node3D
 static var _web := OS.has_feature("web")
 
 const MINIBOSS_NAMES := {
@@ -96,14 +97,15 @@ func _ready() -> void:
 	add_to_group("enemies")
 	if has_node("Model"):
 		$Model.queue_free()
-	var model := Node3D.new()
-	model.set_script(preload("res://enemies/infected_model.gd"))
-	add_child(model)
-	if not _web:
+	if not Net.dedicated:
+		_model = Node3D.new()
+		_model.set_script(model_script())
+		add_child(_model)
+	if _model and not _web:
 		if _visibility_material == null:
 			_visibility_material = ShaderMaterial.new()
 			_visibility_material.shader = preload("res://enemies/visibility.gdshader")
-		_set_overlay.call_deferred(_visibility_material)
+		_refresh_overlay.call_deferred()
 	var mult := 0.3 if is_small else (float(MINIBOSS_HP_MULT.get(miniboss_wave, 4.5)) if miniboss_wave > 0 else (2.2 if is_elite else 1.0))
 	max_health = data.max_health * GameManager.enemy_health_scale() * mult
 	health = max_health
@@ -120,6 +122,10 @@ func _ready() -> void:
 		_record_position()
 	else:
 		set_physics_process(false)
+
+
+func model_script() -> Script:
+	return preload("res://enemies/infected_model.gd")
 
 
 func _physics_process(delta: float) -> void:
@@ -174,7 +180,7 @@ func _physics_process(delta: float) -> void:
 				_repath_timer = REPATH_INTERVAL
 				_last_target_position = target.global_position
 				_repath(_last_target_position)
-			move = _path_direction(target.global_position) * data.move_speed * buff
+			move = chase_direction(target.global_position) * data.move_speed * buff
 		_face(to_target)
 
 	move += _push
@@ -192,6 +198,8 @@ func _physics_process(delta: float) -> void:
 ## Movement multiplier: storm, Runners mutation, Molting burst, leg-shot slow, flare weaken.
 func speed_multiplier() -> float:
 	var m := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	if is_elite:
+		m *= 1.12
 	if _molt_boost_left > 0.0:
 		m *= 1.45
 	if _slow_left > 0.0:
@@ -203,7 +211,7 @@ func speed_multiplier() -> float:
 
 ## Attack damage multiplier: storm and flare weaken only.
 func damage_multiplier() -> float:
-	return WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0)
+	return WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0) * (1.2 if is_elite else 1.0)
 
 
 ## Status timers decay once per physics frame, even when a subclass and the
@@ -450,6 +458,7 @@ func announce_tell(cue: String, duration: float, volume: float) -> void:
 func play_tell(cue: String, duration: float, volume: float) -> void:
 	if duration > 0.0:
 		attack_flash(duration)
+		winding_up.emit()
 	var height := 0.2 if str(data.display_name) == "Gutter" else 1.0
 	Sound.play_at(cue, global_position + Vector3.UP * height, volume, randf_range(0.93, 1.07))
 
@@ -505,7 +514,9 @@ func reveal(duration: float) -> void:
 
 
 func _set_overlay(material: Material) -> void:
-	for mesh in find_children("*", "MeshInstance3D", true, false):
+	if not is_instance_valid(_model):
+		return
+	for mesh in _model.find_children("*", "MeshInstance3D", true, false):
 		if mesh.visible:
 			mesh.material_overlay = material
 
@@ -595,10 +606,11 @@ func die() -> void:
 	if miniboss_wave > 0:
 		spawn_death_fragments(get_parent(), global_position + Vector3.UP * 1.1, throw_vec * 1.3, true)
 	Sound.play_at("enemy_death", global_position)
-	GameManager.record_kill(_last_hit_by, global_position)
-	if GameManager.has_mutation("spores"):
+	if not GameManager.victory_locked:
+		GameManager.record_kill(_last_hit_by, global_position, is_elite)
+	if not GameManager.victory_locked and GameManager.has_mutation("spores"):
 		GameManager.spawn_cloud(global_position + Vector3.UP * 0.5, 6.0, 2.5)
-	if GameManager.has_mutation("splitters") and not is_small and miniboss_wave == 0 and get_parent().has_method("spawn_copy"):
+	if not GameManager.victory_locked and GameManager.has_mutation("splitters") and not is_small and miniboss_wave == 0 and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	if get_parent() and get_parent().has_method("notify_despawn"):
@@ -627,6 +639,10 @@ func _path_direction(fallback: Vector3) -> Vector3:
 	return step.normalized() if step.length_squared() > 0.0001 else Vector3.ZERO
 
 
+func chase_direction(destination: Vector3) -> Vector3:
+	return _path_direction(destination)
+
+
 func _flat_distance(point: Vector3) -> float:
 	return Vector2(point.x - global_position.x, point.z - global_position.z).length()
 
@@ -652,11 +668,7 @@ func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vec
 	if health <= 0.0 or not Net.is_host():
 		return
 	var height := (point.y - rewound_pos.y) / maxf(absf(scale.y), 0.01) if rewound_pos != Vector3.INF else to_local(point).y
-	var head_height := 1.42
-	match data.display_name.to_lower():
-		"gutter": head_height = 1.16
-		"mister": head_height = 1.63
-	_bullet_critical = height >= head_height
+	_bullet_critical = is_critical_hit(height, source)
 	if source is Node3D:
 		var shot_dir := point - (source as Node3D).global_position
 		shot_dir.y = 0.0
@@ -678,14 +690,18 @@ func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vec
 	_bullet_critical = false
 
 
+func is_critical_hit(height: float, _source: Node) -> bool:
+	match data.display_name.to_lower():
+		"gutter": return height >= 1.16
+		"mister": return height >= 1.63
+	return height >= 1.42
+
+
 ## Every peer: leave a body that topples along the killing hit, lies a moment
 ## and sinks away, instead of the model just vanishing. Heavy hits (shotgun
 ## blasts) also tear an arm loose.
 func make_corpse(throw_vec: Vector3) -> void:
-	var model: Node3D = null
-	for child in get_children():
-		if child.get_script() and (child.get_script() as Script).resource_path.ends_with("infected_model.gd"):
-			model = child
+	var model := _model
 	var world := get_parent()
 	if model == null or world == null or OS.has_feature("web") and get_tree().get_nodes_in_group("corpses").size() > 6:
 		return
@@ -752,7 +768,6 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 	_attack_victim = victim
 	_attack_amount = amount
 	_windup_left = 0.45
-	winding_up.emit()
 	# Audible windup tell so attacks from behind can still be dodged.
 	var cue := "mister_windup" if data.display_name == "Mister" else "drip_windup"
 	announce_tell(cue, _windup_left, -12.0)

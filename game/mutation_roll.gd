@@ -52,8 +52,11 @@ func begin() -> void:
 	if not Net.is_host():
 		return
 	WeatherManager.hold = true
-	var weights: Array = table.entries.map(func(e): return e.weight)
-	var enemy: String = table.entries[RNG.weighted_index(weights)].id
+	var choices := table.entries.filter(func(entry): return not GameManager.endless or entry.id not in active)
+	if choices.is_empty():
+		choices = table.entries
+	var weights := choices.map(func(entry): return entry.weight)
+	var enemy: String = choices[RNG.weighted_index(weights)].id
 	var dealt: Array = []
 	for id in _pick_player_mutations(3):
 		dealt.append(id)
@@ -170,7 +173,9 @@ func _resolve() -> void:
 		elif c == best:
 			top.append(i)
 	var pick: int = top[RNG.rng.randi_range(0, top.size() - 1)] if not top.is_empty() else -1
-	var enemy_list: Array = [enemy_pick]
+	var enemy_list: Array = active.duplicate() if GameManager.endless else []
+	if enemy_pick not in enemy_list:
+		enemy_list.append(enemy_pick)
 	var granted: Array = []
 	var updated_player: Array = player_mutations.duplicate()
 	if pick >= 0 and pick < cards.size() and not updated_player.has(cards[pick]):
@@ -191,7 +196,7 @@ func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Ar
 	mutations_changed.emit(active)
 	player_mutations_changed.emit(player_mutations)
 	if announce and not active.is_empty():
-		var entry := table.get_entry(active[0])
+		var entry := table.get_entry(enemy_pick)
 		var text := "ENEMIES: " + entry.display_name.to_upper()
 		if not granted.is_empty():
 			text += "  |  SQUAD: " + str(GameManager.PLAYER_MUTATIONS[granted[0]].name)

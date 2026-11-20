@@ -26,6 +26,8 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 var _cards := {}
 var _time := 0.0
 var _combat_status := Label.new()
+var _wave_progress := ProgressBar.new()
+var _tape_counter := Label.new()
 var _hit_marker := Control.new()
 var _weather := GameIcon.new()
 var _enemy_icon := GameIcon.new()
@@ -123,6 +125,24 @@ func _ready() -> void:
 	_combat_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_style(_combat_status, 18, BroadcastUI.CYAN)
 	add_child(_combat_status)
+	_wave_progress.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_wave_progress.offset_left = 76
+	_wave_progress.offset_right = 161
+	_wave_progress.offset_top = 54
+	_wave_progress.offset_bottom = 58
+	_wave_progress.show_percentage = false
+	_wave_progress.max_value = 1.0
+	_wave_progress.step = .001
+	_wave_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	BroadcastUI.bar(_wave_progress, BroadcastUI.CYAN)
+	add_child(_wave_progress)
+	_tape_counter.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_tape_counter.offset_left = -240
+	_tape_counter.offset_right = -28
+	_tape_counter.offset_top = 67
+	_tape_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_style(_tape_counter, 26, Color("#ffbf68"))
+	add_child(_tape_counter)
 	_hit_marker.set_script(preload("res://ui/reticle.gd"))
 	_hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_hit_marker)
@@ -295,13 +315,22 @@ func _process(delta: float) -> void:
 
 
 func _update_storm() -> void:
-	var spawner := get_parent().get_node_or_null("Enemies")
-	var combat := WeatherManager.phase in [WeatherManager.Phase.DRIZZLE,WeatherManager.Phase.DOWNPOUR]
-	_enemy_icon.visible = spawner != null and combat
-	_combat_status.text = str(spawner.remaining()) if spawner and combat else ""
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	var combat := WeatherManager.phase in [WeatherManager.Phase.DRIZZLE, WeatherManager.Phase.DOWNPOUR] and not GameManager.victory_locked
+	var total: int = spawner.wave_total() if spawner and combat else 0
+	var left: int = spawner.remaining() if total > 0 else 0
+	_enemy_icon.visible = total > 0
+	_combat_status.text = str(left) if total > 0 else ""
+	_wave_progress.visible = total > 0
+	if total > 0:
+		_wave_progress.value = clampf(1.0 - float(left) / total, 0.0, 1.0)
 	storm_label.visible = false
 	var seconds := maxi(0,ceili(WeatherManager.phase_time_left))
 	wave_label.text = "WAVE %d / %d    %d:%02d" % [WeatherManager.wave,WeatherManager.FINAL_WAVE,seconds/60,seconds%60]
+	_tape_counter.visible = GameManager.endless
+	if GameManager.endless:
+		wave_label.text = "ENDLESS %d    %d:%02d" % [WeatherManager.wave - WeatherManager.FINAL_WAVE, seconds / 60, seconds % 60]
+		_tape_counter.text = "CNT %08d" % GameManager.endless_score
 	_update_storm_countdown(seconds)
 	if GameManager.can_ready_up():
 		var hint := "[%s] READY" % BroadcastUI.input_hint("ready_up")
@@ -310,10 +339,11 @@ func _update_storm() -> void:
 		wave_label.text += "    " + hint
 	_weather.value = WeatherManager.storm_intensity
 	_weather.color = STORM_COLORS[WeatherManager.storm_state]
-	_breather.visible = spawner != null and combat and spawner._timer > 1.0
+	var recovery: float = spawner.recovery_time() if spawner and combat else 0.0
+	_breather.visible = recovery > 1.0
 	if _breather.visible:
 		var breather_max: float = spawner.drizzle_breather if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else spawner.downpour_breather
-		_breather.value = clampf(spawner._timer / maxf(breather_max, 0.1), 0.0, 1.0)
+		_breather.value = clampf(recovery / maxf(breather_max, 0.1), 0.0, 1.0)
 	var active: Array = GameManager.mutations.active
 	if active != _active_ids:
 		_active_ids = active.duplicate()

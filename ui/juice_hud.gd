@@ -26,6 +26,13 @@ func _ready() -> void:
 	layer = 2
 	_build_screen_layers()
 	_build_card()
+	var incoming := preload("res://ui/incoming_warning.gd").new()
+	incoming.theme = BroadcastUI.theme()
+	add_child(incoming)
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner:
+		spawner.group_incoming.connect(incoming.warn)
+	add_child(preload("res://ui/tape_choice.gd").new())
 	_ticker.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
 	_ticker.offset_left = -260
 	_ticker.offset_right = -24
@@ -130,7 +137,10 @@ func _on_phase(phase: int, wave: int) -> void:
 	if phase != WeatherManager.Phase.DRIZZLE:
 		return
 	var subtitle: String = "THE ACID STORM" if wave == WeatherManager.FINAL_WAVE else ["", "FIRST RAIN", "DOWNPOUR WARNING", "FLOOD WATCH", "SEVERE STORM"][clampi(wave, 0, 4)]
-	_card.text = "WAVE %d" % wave
+	var modifier := WeatherManager.wave_modifier()
+	if not modifier.is_empty():
+		subtitle = "%s  /  %s" % [modifier, WeatherManager.WavePlan.FORECAST[modifier]]
+	_card.text = "ENDLESS %d" % (wave - WeatherManager.FINAL_WAVE) if GameManager.endless else "WAVE %d" % wave
 	_card_sub.text = subtitle
 	var tween := create_tween().set_parallel(true)
 	for label in [_card, _card_sub]:

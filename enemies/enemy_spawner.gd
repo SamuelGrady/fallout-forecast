@@ -7,19 +7,26 @@ extends Node3D
 ## packet per tick carrying every enemy's position. Clients never run the AI,
 ## they only draw.
 ##
-## Debug (debug builds, host only): F3 spawns a Drip, F4 a Gutter, F5 a Mister.
+## F3-F5 spawn the original roster. Shift+F3-F8 spawn weather infected.
+signal group_incoming(at: Vector3)
+
+const WavePlan := preload("res://enemies/wave_plan.gd")
+const Kind := WavePlan.Kind
+const WEATHER_SCENES := [
+	preload("res://enemies/sleet/sleet.tscn"),
+	preload("res://enemies/hailstone/hailstone.tscn"),
+	preload("res://enemies/undertow/undertow.tscn"),
+	preload("res://enemies/static/static.tscn"),
+	preload("res://enemies/smog/smog.tscn"),
+	preload("res://enemies/thunderhead/thunderhead.tscn"),
+]
 
 @export var drip_scene: PackedScene = preload("res://enemies/drip/drip.tscn")
 @export var gutter_scene: PackedScene = preload("res://enemies/gutter/gutter.tscn")
 @export var mister_scene: PackedScene = preload("res://enemies/mister/mister.tscn")
-@export var drizzle_breather := 8.0
-@export var downpour_breather := 6.0
-@export var max_alive := 30
-@export_group("Weights")
-@export var drip_weight := 10.0
-@export var gutter_weight := 1.5
-@export var mister_weight := 1.2
-@export var mister_first_wave := 2
+@export var drizzle_breather := 7.5
+@export var downpour_breather := 5.0
+@export var max_alive := 26
 
 ## Position broadcasts per second when the host is relaying to clients.
 const NET_HZ := 20.0
@@ -30,7 +37,19 @@ var _net_sync := 0.0
 var _wave := 0
 var _budget := 0
 var _spawned := 0
-var _burst_left := 0
+var _group: Array = []
+var _group_origin := Vector3.ZERO
+var _group_warned := false
+var _opening_group := true
+var _phase := -1
+var _lightning_site := Vector3.INF
+var _lightning_left := 0.0
+var _extras := 0
+var _progress_tick := 0.0
+var _remote_wave := 0
+var _remote_remaining := 0
+var _remote_total := 0
+var _remote_recovery := 0.0
 var _reveal_timer := 0.0
 var _supplies_pending := false
 ## One authored beat per wave (from wave 2), fired halfway through Downpour.
@@ -43,24 +62,38 @@ var _miniboss_spawned := false
 
 
 func _ready() -> void:
+	add_to_group("enemy_spawner")
 	WeatherManager.phase_changed.connect(_on_phase)
+	if Net.is_host():
+		WeatherManager.lightning_struck.connect(_on_lightning)
 
 
 func _on_phase(phase: int, wave: int) -> void:
+	if wave == _wave and phase == _phase:
+		return
+	_phase = phase
+	var fresh_wave := wave != _wave or phase == WeatherManager.Phase.CALM
+	_wave = wave
+	if not Net.is_host():
+		return
 	if _false_clearing_left > 0.0:
 		_false_clearing_left = 0.0
-		if Net.is_host() and get_tree().get_nodes_in_group("boss").is_empty():
+		if get_tree().get_nodes_in_group("boss").is_empty() and not GameManager.victory_locked:
 			WeatherManager.set_intensity_override(-1.0)
-	if wave != _wave or phase == WeatherManager.Phase.CALM:
-		_wave = wave
-		_budget = roundi((18 + wave * 8) * GameManager.enemy_spawn_scale())
+	if fresh_wave:
 		_spawned = 0
+		_extras = 0
 		_supplies_pending = true
 		_beat_done = false
 		_false_clearing_done = false
 		_miniboss_spawned = false
-	_timer = 1.5
-	_burst_left = 0
+	if phase == WeatherManager.Phase.DRIZZLE or fresh_wave:
+		_budget = roundi((18 + wave * 8) * GameManager.enemy_spawn_scale())
+	_group.clear()
+	_opening_group = true
+	_lightning_left = 0.0
+	_timer = 1.25 if phase == WeatherManager.Phase.DRIZZLE else 2.1
+	_progress_tick = 0.0
 
 
 func _physics_process(delta: float) -> void:
@@ -76,40 +109,123 @@ func _physics_process(delta: float) -> void:
 		if _net_sync <= 0.0:
 			_net_sync = 1.0 / NET_HZ
 			_push_enemies()
+		_progress_tick -= delta
+		if _progress_tick <= 0.0:
+			_progress_tick = .28
+			Net.rpc_to_run(_sync_progress, [_wave, remaining(), wave_total(), recovery_time(), GameManager.endless_score])
 	if _supplies_pending:
 		_spawn_street_supplies()
 		_supplies_pending = false
-	if WeatherManager.phase not in [WeatherManager.Phase.DRIZZLE, WeatherManager.Phase.DOWNPOUR]:
+	if GameManager.victory_locked or _phase not in [WeatherManager.Phase.DRIZZLE, WeatherManager.Phase.DOWNPOUR]:
 		return
-	# Mutation rolls resolve after Calm, so include their population effect here.
-	_budget = roundi((18 + _wave * 8) * GameManager.enemy_spawn_scale())
-	var limit := ceili(_budget * 0.35) if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else _budget
+	var spawn_scale := GameManager.enemy_spawn_scale()
+	# Preserve the current group's composition when the roster changes.
+	if _group.is_empty():
+		_budget = maxi(_spawned, roundi((18 + _wave * 8) * spawn_scale))
+	var downpour := _phase == WeatherManager.Phase.DOWNPOUR
+	var limit := _budget if downpour else ceili(_budget * .35)
+	_lightning_left -= delta
 	_timer -= delta
-	if _timer <= 0.0 and _spawned < limit and alive_count() < mini(60, roundi(max_alive * GameManager.enemy_spawn_scale())):
-		if _burst_left <= 0:
-			_burst_left = 4 + _wave
-		var enemy := spawn(_pick_scene())
-		if enemy:
-			_spawned += 1
-			_burst_left -= 1
-		if _burst_left <= 0:
-			_timer = drizzle_breather if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else downpour_breather
-		else:
-			_timer = 0.5
+	var cap := mini(60, roundi(max_alive * spawn_scale))
+	if _timer <= 0.0 and _spawned < limit and alive_count() < cap:
+		_spawn_group_member(limit, downpour)
 	if not _false_clearing_done and GameManager.has_mutation("false_clearing") and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.35):
 		_false_clearing_done = true
 		_trigger_false_clearing()
 	if not _beat_done and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.5):
 		_beat_done = true
 		_run_beat(_wave)
-	if not _miniboss_spawned and _wave < WeatherManager.FINAL_WAVE and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= _budget and alive_count() <= 3:
-		_miniboss_spawned = true
-		spawn_miniboss(_wave)
+	if not _miniboss_spawned and _wave < WeatherManager.FINAL_WAVE and downpour and _spawned >= _budget and alive_count() <= 3:
+		_miniboss_spawned = spawn_miniboss(_wave) != null
 	_reveal_timer -= delta
 	if _spawned >= _budget and alive_count() <= 5 and _reveal_timer <= 0.0:
 		_reveal_timer = 1.0
 		for enemy in get_tree().get_nodes_in_group("enemies"):
+			if enemy.has_method("expose_for_cleanup"):
+				enemy.expose_for_cleanup()
 			enemy.reveal(1.2)
+
+
+func _spawn_group_member(limit: int, downpour: bool) -> void:
+	if _group.is_empty() and not _plan_group(limit - _spawned, downpour):
+		_timer = 1.0
+		return
+	var kind: int = _group.pop_front()
+	var puddle := _wet_puddle() if kind == Kind.UNDERTOW else null
+	var point := _group_origin
+	if puddle:
+		point = puddle.global_position
+	elif kind == Kind.GUTTER and _group_warned == false:
+		var drain: Variant = _gutter_spawn_point()
+		if drain is Vector3:
+			point = drain
+			_group_origin = drain
+	var is_elite_roll := kind >= Kind.SLEET and _wave >= 3 and RNG.rng.randf() < minf(.34, .065 + (_wave - 3) * .025)
+	var enemy := _spawn_near(_scene_of(kind), point, .25 if puddle else 2.6, is_elite_roll)
+	if enemy:
+		_spawned += 1
+		if not _group_warned:
+			_group_warned = true
+			_warn_group(enemy.global_position)
+		if puddle:
+			enemy.bind_puddle(puddle)
+	if not _group.is_empty():
+		_timer = .28
+	else:
+		_timer = maxf(2.7, downpour_breather - (_wave - 1) * .25) if downpour else drizzle_breather
+		if alive_count() > 7:
+			_timer += 1.6
+
+
+func _plan_group(slots: int, downpour: bool) -> bool:
+	var marker: Variant = _marker_position("enemy_spawn")
+	if marker == null:
+		return false
+	_group_origin = marker
+	_group_warned = false
+	if _opening_group:
+		_group = WavePlan.opener(_wave, downpour)
+		_group.resize(mini(slots, _group.size()))
+		_opening_group = false
+		return true
+	var size := mini(slots, clampi(4 + _wave, 5, 12))
+	var mix := WavePlan.weights(_wave, downpour)
+	if _lightning_left > 0.0:
+		var map := get_world_3d().navigation_map
+		var site := NavigationServer3D.map_get_closest_point(map, _lightning_site)
+		if site.distance_to(_lightning_site) < 12.0 and _safe_spawn(site, 9.0):
+			_group_origin = site
+			_group.append(Kind.THUNDERHEAD)
+			if size > 1:
+				_group.append(Kind.THUNDERHEAD)
+		_lightning_left = 0.0
+	while _group.size() < size:
+		mix[Kind.SLEET] = 0 if size - _group.size() < 3 else mix[Kind.SLEET]
+		var kind := RNG.weighted_index(mix)
+		if kind == Kind.SLEET:
+			var count := mini(RNG.rng.randi_range(3, 5), size - _group.size())
+			for i in count:
+				_group.append(kind)
+		else:
+			_group.append(kind)
+	return true
+
+
+func _on_lightning(at: Vector3, _seed: int) -> void:
+	if _phase == WeatherManager.Phase.DOWNPOUR and WavePlan.modifier(_wave) == WavePlan.HEAVY_WEATHER:
+		_lightning_site = at
+		_lightning_left = 14.0
+
+
+func _warn_group(at: Vector3) -> void:
+	group_incoming.emit(at)
+	if Net.is_online():
+		Net.rpc_to_run(_receive_group_warning, [at])
+
+
+@rpc("authority", "call_remote", "reliable")
+func _receive_group_warning(at: Vector3) -> void:
+	group_incoming.emit(at)
 
 
 ## False Clearing mutation: rain briefly pauses while a heavy revealed elite enters.
@@ -118,7 +234,8 @@ func _trigger_false_clearing() -> void:
 		WeatherManager.set_intensity_override(0.05)
 		_false_clearing_left = 6.5
 	GameManager.show_banner("FALSE CLEARING  -  ELITE INCOMING", Color("8ce8ff"), 2.8)
-	var elite_scene := mister_scene if WeatherManager.wave >= mister_first_wave and randf() < 0.5 else gutter_scene
+	var elite_kind: int = [Kind.SLEET, Kind.HAILSTONE, Kind.UNDERTOW, Kind.STATIC, Kind.SMOG, Kind.THUNDERHEAD][clampi(_wave - 1, 0, 5)]
+	var elite_scene := _scene_of(elite_kind)
 	var at: Variant = _marker_position("enemy_spawn")
 	if at == null:
 		return
@@ -128,8 +245,11 @@ func _trigger_false_clearing() -> void:
 		point = NavigationServer3D.map_get_closest_point(map, point)
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(elite_scene, where, false, 0, true)
-	if enemy and Net.is_online():
-		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(elite_scene.resource_path), where, false, true])
+	if enemy:
+		_extras += 1
+		if Net.is_online():
+			Net.rpc_to_run(_spawn_enemy, [enemy.net_id, elite_kind, where, false, true])
+		_warn_group(where)
 
 
 ## Memorable mid-wave encounters on top of the count-based horde. Beat
@@ -151,31 +271,44 @@ func _run_beat(wave: int) -> void:
 					best = d
 					at = pack.global_position
 			GameManager.show_banner("SUPPLY AMBUSH", Color("ff8a4c"), 2.0)
+			_warn_group(at)
 			for i in 3 + GameManager.player_count():
-				_spawn_near(gutter_scene, at, 6.0)
+				_spawn_extra(gutter_scene, at, 6.0)
 		3:
 			# Street push: a wall of Drips from one direction at once.
 			var origin: Variant = _marker_position("enemy_spawn")
 			if origin == null:
 				return
 			GameManager.show_banner("STREET PUSH", Color("ff5a6e"), 2.0)
-			for i in 8 + 3 * GameManager.player_count():
-				_spawn_near(drip_scene, origin, 4.0)
+			_warn_group(origin)
+			for i in 6 + 2 * GameManager.player_count():
+				_spawn_extra(drip_scene, origin, 4.0)
 		4:
 			# Elite squad: Misters with a Gutter escort, briefly revealed.
 			var origin: Variant = _marker_position("enemy_spawn")
 			if origin == null:
 				return
 			GameManager.show_banner("ELITE SQUAD", Color("b48cff"), 2.0)
+			_warn_group(origin)
+			_spawn_extra(_scene_of(Kind.STATIC), origin, 3.0, true)
+			_spawn_extra(_scene_of(Kind.SMOG), origin, 3.0, true)
 			for i in 2 + GameManager.player_count():
-				var mister := _spawn_near(mister_scene, origin, 3.0)
-				if mister:
-					mister.reveal(3.0)
-			for i in 2:
-				_spawn_near(gutter_scene, origin, 3.0)
+				_spawn_extra(gutter_scene, origin, 3.0)
+		_:
+			if wave > WeatherManager.FINAL_WAVE:
+				var origin: Variant = _marker_position("enemy_spawn")
+				if origin is Vector3:
+					_warn_group(origin)
+					_spawn_extra(_scene_of(Kind.THUNDERHEAD), origin, 2.0, true)
+					_spawn_extra(_scene_of(Kind.HAILSTONE), origin, 2.0, true)
 
 
-func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBase:
+func _spawn_extra(scene: PackedScene, center: Vector3, spread: float, elite := false) -> void:
+	if _spawn_near(scene, center, spread, elite):
+		_extras += 1
+
+
+func _spawn_near(scene: PackedScene, center: Vector3, spread: float, elite := false) -> EnemyBase:
 	if not Net.is_host() or alive_count() >= 60:
 		return null
 	var point := center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
@@ -183,9 +316,10 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBas
 	if NavigationServer3D.map_get_iteration_id(map) > 0:
 		point = NavigationServer3D.map_get_closest_point(map, point)
 	var where := point + Vector3(0, 0.15, 0)
-	var enemy := _make(scene, where, false)
-	if enemy and Net.is_online():
-		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false])
+	Perf.mark("spawn " + scene.resource_path.get_file().get_basename())
+	var enemy := _make(scene, where, false, 0, elite)
+	if Net.is_online():
+		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, elite])
 	return enemy
 
 
@@ -214,9 +348,10 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(scene, where, false, 0, false, wave)
 	if enemy:
-		enemy.reveal(8.0)
+		_extras += 1
 		if Net.is_online():
-			Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false, wave])
+			Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false, wave])
+		_warn_group(where)
 		Sound.play("storm_arrival", -6.0, 0.72)
 		GameManager.show_banner("MINI-BOSS: %s" % enemy.miniboss_name, Color("ff5689"), 3.2)
 	return enemy
@@ -224,22 +359,38 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 
 func can_finish_wave() -> bool:
 	var need_miniboss := _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned
-	return _spawned >= _budget and not need_miniboss and alive_count() == 0
+	return _spawned >= _budget and not need_miniboss and alive_count() + _pending_copies == 0
 
 
 func remaining() -> int:
-	return maxi(0, _budget - _spawned) + alive_count()
+	if not Net.is_host():
+		return _remote_remaining if _remote_wave == _wave else 0
+	if GameManager.victory_locked:
+		return 0
+	return maxi(0, _budget - _spawned) + alive_count() + int(_wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned)
 
 
-func combat_status() -> String:
-	if WeatherManager.phase not in [WeatherManager.Phase.DRIZZLE, WeatherManager.Phase.DOWNPOUR]:
-		return ""
-	var mb := get_tree().get_first_node_in_group("miniboss")
-	if mb:
-		return "DEFEAT %s" % str(mb.get("miniboss_name"))
-	if _spawned >= _budget:
-		return "CLEAR THE LAST %d" % alive_count() if alive_count() > 0 else "AREA CLEAR"
-	return "%d REMAINING  /  %s" % [remaining(), "RELOAD + RESUPPLY" if _timer > 1.0 else "HORDE INCOMING"]
+func wave_total() -> int:
+	if not Net.is_host():
+		return _remote_total if _remote_wave == _wave else 0
+	return _budget + _extras + int(_wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned)
+
+
+func recovery_time() -> float:
+	if not Net.is_host():
+		return _remote_recovery if _remote_wave == _wave else 0.0
+	var downpour := _phase == WeatherManager.Phase.DOWNPOUR
+	var limit := _budget if downpour else ceili(_budget * .35)
+	return maxf(0.0, _timer) if _spawned < limit and _group.is_empty() else 0.0
+
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _sync_progress(wave: int, left: int, total: int, recovery: float, score: int) -> void:
+	_remote_wave = wave
+	_remote_remaining = left
+	_remote_total = total
+	_remote_recovery = recovery
+	GameManager.endless_score = score
 
 
 func _spawn_street_supplies() -> void:
@@ -247,26 +398,26 @@ func _spawn_street_supplies() -> void:
 		old.queue_free()
 	if Net.is_online():
 		Net.rpc_to_run(_clear_supplies, [])
-	for point in _supply_points():
+	var sites := get_tree().get_nodes_in_group("street_supply_spawn")
+	if sites.is_empty():
+		sites = get_tree().get_nodes_in_group("drain_spawn")
+	if sites.is_empty():
+		sites = get_tree().get_nodes_in_group("crate_spawn")
+	var count := mini(4, sites.size())
+	for i in count:
+		var site := sites[floori(float(i * sites.size()) / count)] as Node3D
+		var point := site.global_position + Vector3.UP * .12
 		spawn_drop(point, "supply", 600.0)
 		if Net.is_online():
 			Net.rpc_to_run(_spawn_supply, [point])
 
 
-func _supply_points() -> Array[Vector3]:
-	if GameManager.map_id == Maps.DEFAULT_ID:
-		# Pinecrest's authored approaches on Main Street, the lot and the park.
-		return [Vector3(-30, 0.12, 2.5), Vector3(28, 0.12, -2.5), Vector3(4, 0.12, 42), Vector3(46, 0.12, 34)]
-	var points: Array[Vector3] = []
-	var markers := get_tree().get_nodes_in_group("enemy_spawn")
-	for i in mini(4, markers.size()):
-		var marker := markers[i] as Node3D
-		points.append(marker.global_position + Vector3.UP * 0.12)
-	return points
-
-
 func _unhandled_input(event: InputEvent) -> void:
 	if not (OS.is_debug_build() and Net.is_host() and event is InputEventKey and event.pressed and not event.echo):
+		return
+	if event.shift_pressed and event.keycode >= KEY_F3 and event.keycode <= KEY_F8:
+		spawn(WEATHER_SCENES[event.keycode - KEY_F3])
+		get_viewport().set_input_as_handled()
 		return
 	match event.keycode:
 		KEY_F3:
@@ -282,40 +433,49 @@ func alive_count() -> int:
 
 
 func spawn(scene: PackedScene) -> EnemyBase:
-	Perf.mark("spawn " + scene.resource_path.get_file().get_basename())
-	# The host owns spawns; a client asking would make an enemy that never
-	# thinks and never replicates.
-	if not Net.is_host():
+	if not Net.is_host() or GameManager.victory_locked:
 		return null
-	var at: Variant = _gutter_spawn_point() if scene == gutter_scene else _marker_position("enemy_spawn")
+	var kind := _kind_of(scene)
+	var puddle := _wet_puddle() if kind == Kind.UNDERTOW else null
+	var at: Variant = _gutter_spawn_point() if kind == Kind.GUTTER else _marker_position("enemy_spawn")
+	if puddle:
+		at = puddle.global_position
+	if at == null:
+		at = _marker_position("enemy_spawn")
 	if at == null:
 		push_warning("No spawn point for %s" % scene.resource_path)
 		return null
-	var point: Vector3 = at
-	var map := get_world_3d().navigation_map
-	if NavigationServer3D.map_get_iteration_id(map) > 0:
-		point = NavigationServer3D.map_get_closest_point(map, point)
-	var where := point + Vector3(0, 0.15, 0)
-	var enemy := _make(scene, where, false)
-	if enemy and Net.is_online():
-		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false])
+	if kind == Kind.SLEET:
+		for i in 2:
+			_spawn_near(scene, at, 2.4)
+	var enemy := _spawn_near(scene, at, 0.0)
+	if enemy and puddle:
+		enemy.bind_puddle(puddle)
 	return enemy
 
 
 ## Splitters: a small copy of `enemy` at `at`.
+var _pending_copies := 0
+
+
 func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
+	if not Net.is_host() or alive_count() + _pending_copies >= 60:
+		return
 	var scene := load(enemy.scene_file_path) as PackedScene
 	if scene == null:
 		return
-	# Deferred: this runs from inside the parent's death.
-	var copy := scene.instantiate() as EnemyBase
-	copy.is_small = small
-	copy.net_id = _next_net_id
-	_next_net_id += 1
-	add_child.call_deferred(copy, true)
-	copy.set_deferred("global_position", at)
+	_pending_copies += 1
+	_add_copy.call_deferred(scene, at, small)
+
+
+func _add_copy(scene: PackedScene, at: Vector3, small: bool) -> void:
+	_pending_copies -= 1
+	if GameManager.victory_locked or GameManager.finished:
+		return
+	var copy := _make(scene, at, small)
+	_extras += 1
 	if Net.is_online():
-		Net.rpc_to_run(_spawn_enemy, [copy.net_id, _kind_of(scene.resource_path), at, small, false])
+		Net.rpc_to_run(_spawn_enemy, [copy.net_id, _kind_of(scene), at, small, false])
 
 
 ## Build one enemy on this peer. `is_small`, `is_elite`, `miniboss_wave` and net_id
@@ -339,39 +499,39 @@ func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite :
 
 ## Which kind of enemy this is, for the wire. Compares resource paths rather
 ## than instances, because splitters reload the scene by path.
-func _kind_of(path: String) -> int:
-	if path == gutter_scene.resource_path:
-		return 1
-	if path == mister_scene.resource_path:
-		return 2
-	return 0
+func _kind_of(scene: PackedScene) -> int:
+	if scene.resource_path == gutter_scene.resource_path:
+		return Kind.GUTTER
+	if scene.resource_path == mister_scene.resource_path:
+		return Kind.MISTER
+	for i in WEATHER_SCENES.size():
+		if scene.resource_path == WEATHER_SCENES[i].resource_path:
+			return i + Kind.SLEET
+	return Kind.DRIP
 
 
 func _scene_of(kind: int) -> PackedScene:
 	match kind:
-		1:
-			return gutter_scene
-		2:
-			return mister_scene
-	return drip_scene
+		Kind.DRIP: return drip_scene
+		Kind.GUTTER: return gutter_scene
+		Kind.MISTER: return mister_scene
+	return WEATHER_SCENES[kind - Kind.SLEET]
 
 
-func _pick_scene() -> PackedScene:
-	var specials := get_tree().get_nodes_in_group("enemies").filter(func(enemy): return enemy.data.display_name != "Drip")
-	if specials.size() >= 3:
-		return drip_scene
-	var options := [[drip_scene, drip_weight], [gutter_scene, gutter_weight]]
-	if WeatherManager.wave >= mister_first_wave:
-		options.append([mister_scene, mister_weight])
-	var total := 0.0
-	for o in options:
-		total += o[1]
-	var roll := randf() * total
-	for o in options:
-		roll -= o[1]
-		if roll <= 0.0:
-			return o[0]
-	return drip_scene
+func _wet_puddle() -> Node3D:
+	var candidates: Array[Node3D] = []
+	for node in get_tree().get_nodes_in_group("puddles"):
+		var puddle := node as Node3D
+		if puddle and puddle.has_method("radius") and float(puddle.call("radius")) > .25 and _safe_spawn(puddle.global_position, 5.0):
+			candidates.append(puddle)
+	return candidates.pick_random() if not candidates.is_empty() else null
+
+
+func _safe_spawn(point: Vector3, distance: float) -> bool:
+	for player in GameManager.players():
+		if player.state == "ok" and player.global_position.distance_to(point) < distance:
+			return false
+	return true
 
 
 ## Gutters crawl out of storm drains, or out of any puddle big enough.
@@ -403,26 +563,34 @@ func _near_players(points: Array) -> Variant:
 			distance = minf(distance, player.global_position.distance_to(point))
 		if distance >= 12.0 and distance <= 45.0:
 			candidates.append(point)
-	# Never spawn on top of a player, even if every marker is crowded.
-	if candidates.is_empty():
-		for point in points:
-			if players.all(func(player): return player.global_position.distance_to(point) >= 12.0):
-				candidates.append(point)
-	return candidates.pick_random() if not candidates.is_empty() else null
+	if not candidates.is_empty():
+		return candidates.pick_random()
+	# Small maps may have every marker close to a player. Use the furthest
+	# open one before moving out along the navigation mesh around those markers.
+	var furthest := 7.0
+	var fallback: Variant = null
+	for point in points:
+		var distance := INF
+		for player in players:
+			distance = minf(distance, player.global_position.distance_to(point))
+		if distance > furthest:
+			furthest = distance
+			fallback = point
+	if fallback != null:
+		return fallback
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) == 0:
+		return null
+	for origin: Vector3 in points:
+		for i in 8:
+			var probe := origin + Vector3.FORWARD.rotated(Vector3.UP, TAU * i / 8.0) * 10.0
+			var point := NavigationServer3D.map_get_closest_point(map, probe)
+			if probe.distance_to(point) < 2.0 and _safe_spawn(point, 7.5):
+				return point
+	return null
 
 
 # ------------------------------------------------------------------ network
-func sync_to_peer(peer_id: int) -> void:
-	for drop in get_tree().get_nodes_in_group("street_supplies"):
-		if not drop.is_queued_for_deletion():
-			_spawn_supply.rpc_id(peer_id, drop.global_position)
-	for child in get_children():
-		var enemy := child as EnemyBase
-		if enemy and enemy.is_in_group("enemies") and not enemy.is_queued_for_deletion():
-			_spawn_enemy.rpc_id(peer_id, enemy.net_id, _kind_of(enemy.scene_file_path),
-				enemy.global_position, enemy.is_small, enemy.is_elite, enemy.miniboss_wave)
-
-
 ## A drop every peer will see: it is collected locally by whoever walks over
 ## it, so the node has to exist on every machine.
 func spawn_drop(at: Vector3, kind := "ammo", expires := 35.0) -> void:
@@ -455,6 +623,22 @@ func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool, elite := fal
 	_make(_scene_of(kind), at, small, net_id, elite, miniboss_wave)
 
 
+func sync_to_peer(peer: int) -> void:
+	if not Net.is_host():
+		return
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as EnemyBase
+		if enemy == null or enemy.is_queued_for_deletion():
+			continue
+		var scene := load(enemy.scene_file_path) as PackedScene
+		_spawn_enemy.rpc_id(peer, enemy.net_id, _kind_of(scene), enemy.global_position, enemy.is_small, enemy.is_elite, enemy.miniboss_wave)
+		if enemy.has_method("sync_tells"):
+			enemy.sync_tells(peer)
+	for node in get_tree().get_nodes_in_group("street_supplies"):
+		_spawn_supply.rpc_id(peer, (node as Node3D).global_position)
+	_sync_progress.rpc_id(peer, _wave, remaining(), wave_total(), recovery_time(), GameManager.endless_score)
+
+
 func notify_miniboss_hp(net_id: int, hp: float, max_hp: float) -> void:
 	Net.rpc_to_run(_sync_miniboss_hp, [net_id, hp, max_hp])
 
@@ -471,7 +655,7 @@ func notify_tell(net_id: int, cue: String, duration: float, volume: float) -> vo
 	Net.rpc_to_run(_play_enemy_tell, [net_id, cue, duration, volume])
 
 
-@rpc("authority", "call_remote", "unreliable")
+@rpc("authority", "call_remote", "reliable")
 func _play_enemy_tell(net_id: int, cue: String, duration: float, volume: float) -> void:
 	var enemy := _find_net(net_id)
 	if enemy:

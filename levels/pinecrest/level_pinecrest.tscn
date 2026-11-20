@@ -4309,6 +4309,20 @@ gizmo_extents = 0.75
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 3)
 gizmo_extents = 0.75
 
+[node name="StreetSupplySpawns" type="Node3D" parent="."]
+
+[node name="WestStreet" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(-30, 0, 2.5)
+
+[node name="EastStreet" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(28, 0, -2.5)
+
+[node name="SouthLot" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(4, 0, 42)
+
+[node name="EastLot" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(46, 0, 34)
+
 [node name="CrateSpawns" type="Node3D" parent="." unique_id=1057258533]
 
 [node name="Crate0" type="Marker3D" parent="CrateSpawns" unique_id=1799612136 groups=["crate_spawn"]]

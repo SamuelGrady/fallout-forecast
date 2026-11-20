@@ -94,7 +94,7 @@ func _on_video_changed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+	if event is InputEventKey and event.pressed and not event.echo and not event.shift_pressed and event.keycode == KEY_F8:
 		enabled = not enabled
 		_apply_enabled()
 
