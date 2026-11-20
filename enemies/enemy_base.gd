@@ -56,7 +56,7 @@ func _ready() -> void:
 	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
 	if is_small:
 		scale = Vector3.ONE * 0.6
-	if not _is_host():
+	if not Net.is_host():
 		set_physics_process(false)
 
 
@@ -175,7 +175,7 @@ func attack(victim: Node3D, amount: float) -> void:
 
 ## Host only. Shooting calls this after the host's raycast hits.
 func take_damage(amount: float, _source: Node = null) -> void:
-	if not _is_host() or health <= 0.0:
+	if not Net.is_host() or health <= 0.0:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
@@ -263,10 +263,6 @@ func _nearest(candidates: Array) -> Node3D:
 func _face(direction: Vector3) -> void:
 	if direction.length_squared() > 0.01:
 		rotation.y = atan2(-direction.x, -direction.z)
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
 
 
 func take_bullet(amount: float, point: Vector3, source: Node) -> void:

@@ -111,7 +111,7 @@ func fire() -> void:
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
 	_play_shot(current, origin, dir, shot_seed, true)
-	if _is_host():
+	if Net.is_host():
 		_resolve_shot(current, origin, dir, shot_seed)
 		_broadcast_fx(current, origin, dir, shot_seed, player.get_multiplayer_authority())
 	else:
@@ -140,7 +140,7 @@ func _finish_reload() -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func _request_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
 	var sender := multiplayer.get_remote_sender_id()
-	if not multiplayer.is_server() or sender != player.get_multiplayer_authority():
+	if not Net.is_host() or sender != player.get_multiplayer_authority():
 		return
 	# The shot must start near where the host thinks this player's head is.
 	if index < 0 or index >= loadout.size() or origin.distance_to(camera.global_position) > 4.0:
@@ -158,7 +158,7 @@ func _shot_fx(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void
 
 
 func _broadcast_fx(index: int, origin: Vector3, dir: Vector3, shot_seed: int, shooter_peer: int) -> void:
-	if not multiplayer.has_multiplayer_peer():
+	if not Net.is_online():
 		return
 	for peer in multiplayer.get_peers():
 		if peer != shooter_peer:
@@ -227,7 +227,7 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 		_:
 			var projectile := Projectile.new()
 			world.add_child(projectile)
-			projectile.launch(muzzle, dir, data, _is_host(), player)
+			projectile.launch(muzzle, dir, data, Net.is_host(), player)
 
 
 func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: int) -> Array[Vector3]:
@@ -372,10 +372,6 @@ func _find_player() -> Node3D:
 
 func _pad_connected() -> bool:
 	return not Input.get_connected_joypads().is_empty()
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
 
 
 func collect_ammo() -> bool:

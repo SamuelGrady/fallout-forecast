@@ -42,7 +42,7 @@ func _physics_process(delta: float) -> void:
 	if _age >= lifetime:
 		queue_free()
 		return
-	if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+	if not Net.is_host():
 		return
 	for body in get_overlapping_bodies():
 		if body.has_method("take_damage"):

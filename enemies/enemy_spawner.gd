@@ -25,7 +25,7 @@ var _timer := 0.0
 
 
 func _physics_process(delta: float) -> void:
-	if not _is_host():
+	if not Net.is_host():
 		return
 	var interval := 0.0
 	match WeatherManager.phase:
@@ -44,7 +44,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (OS.is_debug_build() and _is_host() and event is InputEventKey and event.pressed and not event.echo):
+	if not (OS.is_debug_build() and Net.is_host() and event is InputEventKey and event.pressed and not event.echo):
 		return
 	match event.keycode:
 		KEY_F3:
@@ -110,7 +110,3 @@ func _gutter_spawn_point() -> Variant:
 func _marker_position(group: String) -> Variant:
 	var markers := get_tree().get_nodes_in_group(group)
 	return (markers.pick_random() as Node3D).global_position if not markers.is_empty() else null
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()

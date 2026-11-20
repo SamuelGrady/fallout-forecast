@@ -131,7 +131,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	_body.rotation.y += delta * 0.15
 	_sac_material.emission_energy_multiplier = 1.5 + sin(_t * 4.0) * 0.8
-	if not _is_host() or dead:
+	if not Net.is_host() or dead:
 		return
 	# Drift in a slow circle over Main Street and sink as sacs pop.
 	var goal_height := start_height - drop_per_sac * (3 - sacs_left)
@@ -169,7 +169,7 @@ func core_exposed() -> bool:
 
 
 func damage_part(i: int, amount: float, _source: Node) -> void:
-	if not _is_host() or dead or part_health[i] <= 0.0:
+	if not Net.is_host() or dead or part_health[i] <= 0.0:
 		return
 	if i == 3 and not core_exposed():
 		return
@@ -233,7 +233,3 @@ func _summon() -> void:
 	for k in 2:
 		var scene: PackedScene = spawner.mister_scene if k == 0 else spawner.drip_scene
 		spawner.spawn(scene)
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()

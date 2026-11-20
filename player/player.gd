@@ -198,7 +198,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if _is_host():
+	if Net.is_host():
 		_host_tick(delta)
 	if state != _shown_state:
 		_apply_state_visuals()
@@ -284,7 +284,7 @@ func _physics_process(delta: float) -> void:
 		_melee_left -= delta
 		if Input.is_action_just_pressed("fire") and _melee_left <= 0.0:
 			_melee_left = melee_cooldown
-			if _is_host():
+			if Net.is_host():
 				_melee()
 			else:
 				_request_melee.rpc_id(1)
@@ -313,7 +313,7 @@ func _host_tick(delta: float) -> void:
 
 ## Enemies, spore clouds, suit drain and (for Turned players) teammates' guns.
 func take_damage(amount: float, _source: Node = null) -> void:
-	if not _is_host():
+	if not Net.is_host():
 		return
 	match state:
 		"ok":
@@ -329,7 +329,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func heal(amount: float) -> void:
-	if _is_host() and state == "ok":
+	if Net.is_host() and state == "ok":
 		health = minf(health + amount, max_health)
 
 
@@ -395,7 +395,7 @@ func _melee() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _request_melee() -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority() and state == "turned":
+	if Net.is_host() and multiplayer.get_remote_sender_id() == get_multiplayer_authority() and state == "turned":
 		_melee()
 
 
@@ -554,14 +554,15 @@ func _update_shelter() -> void:
 	var now_sheltered := roof_check.is_colliding() or in_shelter_area
 	if now_sheltered != sheltered or now_in_puddle != in_puddle:
 		_set_exposure(now_sheltered, now_in_puddle)
-		if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		# Clients tell the host; the host is the only one who acts on it.
+		if not Net.is_host():
 			_report_exposure.rpc_id(1, sheltered, in_puddle)
 
 
 ## Client -> host: this player's shelter and puddle state changed.
 @rpc("any_peer", "call_remote", "reliable")
 func _report_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+	if Net.is_host() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
 		_set_exposure(is_sheltered, is_in_puddle)
 
 
@@ -574,7 +575,3 @@ func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
 	if now_exposed != exposed:
 		exposed = now_exposed
 		exposed_changed.emit(exposed)
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()

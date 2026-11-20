@@ -354,9 +354,8 @@ func _world() -> Node:
 
 
 func _online() -> bool:
-	return multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer) \
-		and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+	return Net.is_online()
 
 
 func is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+	return Net.is_host()
