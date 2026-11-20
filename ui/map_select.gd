@@ -34,18 +34,25 @@ var _starting := false
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	theme = BroadcastUI.theme()
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	BroadcastUI.backdrop(self)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var box := VBoxContainer.new()
 	box.custom_minimum_size.x = 880
-	box.add_theme_constant_override("separation", 24)
+	box.add_theme_constant_override("separation", 18)
 	center.add_child(box)
 	BroadcastUI.reveal(box)
 
-	var heading := _label(box, "VOTE FOR A DISTRICT" if mode == Mode.VOTE else "SELECT A DISTRICT", 54, BroadcastUI.PAPER)
+	var header := VBoxContainer.new()
+	header.add_theme_constant_override("separation", 4)
+	box.add_child(header)
+	var heading := _label(header, "VOTE FOR A DISTRICT" if mode == Mode.VOTE else "SELECT A DISTRICT", 52, BroadcastUI.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var sub := _label(header, "SELECT A CHANNEL TO CAST YOUR LIVE VOTE" if mode == Mode.VOTE else "CHOOSE A QUARANTINE ZONE FOR THIS TAPE", 20, BroadcastUI.CYAN)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 	var cards := HBoxContainer.new()
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
 	cards.add_theme_constant_override("separation", 14)
@@ -63,6 +70,8 @@ func _ready() -> void:
 	if mode != Mode.VOTE:
 		_deploy = _action(actions, "PLAY" if mode == Mode.SOLO else "SET DISTRICT", _confirm)
 		BroadcastUI.button_role(_deploy, true)
+	else:
+		BroadcastUI.button_role(_back, true)
 	if mode == Mode.SOLO:
 		_error = _label(box, "", 20, BroadcastUI.PINK)
 		_error.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -83,7 +92,7 @@ func _ready() -> void:
 
 func _build_card(parent: Control, map: Dictionary) -> void:
 	var card := Button.new()
-	card.custom_minimum_size = Vector2(205, 248)
+	card.custom_minimum_size = Vector2(205, 268)
 	card.pressed.connect(_pick.bind(map.id))
 	BroadcastUI.animate_button(card)
 	parent.add_child(card)
@@ -91,7 +100,7 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 
 	var inset := MarginContainer.new()
 	inset.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
+	for side: String in ["left", "right", "top", "bottom"]:
 		inset.add_theme_constant_override("margin_" + side, 12)
 	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(inset)
@@ -103,7 +112,7 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 	_label(content, "CHANNEL " + str(map.channel), 19, map.accent)
 	var monitor := ColorRect.new()
 	monitor.clip_contents = true
-	monitor.custom_minimum_size.y = 94
+	monitor.custom_minimum_size.y = 96
 	monitor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(monitor)
 	if map.preview != "" and ResourceLoader.exists(map.preview, "Texture2D"):
@@ -119,8 +128,10 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 		material.shader = _shared_monitor_shader()
 		material.set_shader_parameter("tint", map.accent)
 		monitor.material = material
-	_label(content, map.name, 28, BroadcastUI.PAPER)
-	var blurb := _label(content, map.blurb, 20, BroadcastUI.MUTED)
+	var name_lbl := _label(content, str(map.name), 26, BroadcastUI.PAPER)
+	name_lbl.clip_text = true
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var blurb := _label(content, str(map.blurb), 20, BroadcastUI.MUTED)
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_states.append(_label(content, "", 19, map.accent))
@@ -220,9 +231,7 @@ func _border(background: Color, accent: Color, width: int) -> StyleBoxFlat:
 func _label(parent: Control, value: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = value
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
+	BroadcastUI.text(label, font_size, color)
 	parent.add_child(label)
 	return label
 
@@ -230,7 +239,7 @@ func _label(parent: Control, value: String, font_size: int, color: Color) -> Lab
 func _action(parent: Control, value: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = value
-	button.custom_minimum_size = Vector2(188, 52)
+	button.custom_minimum_size = Vector2(196, 48)
 	BroadcastUI.button_role(button)
 	BroadcastUI.animate_button(button)
 	button.pressed.connect(action)
