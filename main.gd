@@ -15,6 +15,8 @@ const PlayerScene := preload("res://player/player.tscn")
 
 func _ready() -> void:
 	Sound.start_run()
+	# Tell the host this client can now take per-frame player relays.
+	Net.report_in_run.call_deferred(true)
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
@@ -123,6 +125,7 @@ func _setup_objectives() -> void:
 
 func _exit_tree() -> void:
 	Sound.stop_run()
+	Net.report_in_run(false)
 
 
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:

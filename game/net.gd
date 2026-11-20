@@ -237,7 +237,41 @@ func _on_connected() -> void:
 	joined_server.emit()
 
 
+# ------------------------------------------------------------------ run scene readiness
+## Host: peers whose run scene (main.tscn) is loaded. High-rate relays go only
+## to these, so a client still loading or leaving the run doesn't get RPCs
+## for nodes it doesn't have yet ("Node not found" spam).
+var run_peers := {}
+
+
+## Every peer: call when the run scene is ready (true) or being left (false).
+func report_in_run(value: bool) -> void:
+	if not is_online():
+		return
+	if is_host():
+		return
+	_report_in_run.rpc_id(1, value)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _report_in_run(value: bool) -> void:
+	if not is_host():
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	if value:
+		run_peers[peer] = true
+	else:
+		run_peers.erase(peer)
+
+
+## Host: send `method` to every peer whose run scene is loaded.
+func rpc_to_run(method: Callable, args: Array) -> void:
+	for peer in run_peers:
+		Callable.create(method, "rpc_id").callv([peer] + args)
+
+
 func _on_peer_disconnected(peer_id: int) -> void:
+	run_peers.erase(peer_id)
 	if not is_host():
 		return
 	roster.erase(peer_id)

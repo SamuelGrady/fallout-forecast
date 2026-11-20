@@ -650,7 +650,7 @@ func _net_step(delta: float) -> void:
 		_net_left = 1.0 / NET_RATE
 		if is_multiplayer_authority():
 			if Net.is_host():
-				_relay_transform.rpc(global_position, rotation.y, head.rotation.x, velocity)
+				Net.rpc_to_run(_relay_transform, [global_position, rotation.y, head.rotation.x, velocity])
 			else:
 				_push_transform.rpc_id(1, global_position, rotation.y, head.rotation.x, velocity)
 	if not Net.is_host():
@@ -658,7 +658,7 @@ func _net_step(delta: float) -> void:
 	_vitals_left -= delta
 	if _vitals_left <= 0.0:
 		_vitals_left = VITALS_RATE
-		_apply_vitals.rpc(health, suit_integrity, state, bleed_left, tarp_raised)
+		Net.rpc_to_run(_apply_vitals, [health, suit_integrity, state, bleed_left, tarp_raised])
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -666,7 +666,7 @@ func _push_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> vo
 	if not Net.is_host() or multiplayer.get_remote_sender_id() != get_multiplayer_authority():
 		return
 	_apply_transform(pos, yaw, pitch, vel)
-	_relay_transform.rpc(pos, yaw, pitch, vel)
+	Net.rpc_to_run(_relay_transform, [pos, yaw, pitch, vel])
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
