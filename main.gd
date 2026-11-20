@@ -183,6 +183,7 @@ func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 	if Net.dedicated or _finishing:
 		return
 	_finishing = true
+	_play_ending(_won)
 	get_tree().create_timer(4.5, true).timeout.connect(func():
 		if not is_inside_tree():
 			return
@@ -190,6 +191,50 @@ func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 		MenuState.reset()
 		_end()
 		tree.change_scene_to_file.call_deferred("res://ui/results.tscn"))
+
+
+## Local, cosmetic ending beat while the run winds down (every peer):
+## victory = sparks bursting over the street; defeat = the tape loses signal.
+func _play_ending(won: bool) -> void:
+	var me := get_tree().get_first_node_in_group("local_player") as Node3D
+	if won:
+		Sound.play("reel_land", -4.0, 1.4)
+		if me:
+			for i in 9:
+				get_tree().create_timer(0.35 * i).timeout.connect(func():
+					if not is_inside_tree():
+						return
+					var at := me.global_position + Vector3(randf_range(-14, 14), randf_range(12, 20), randf_range(-14, 14))
+					var color: Color = [Color("#ff5689"), Color("#66dfda"), Color("#ffd56a")][i % 3]
+					ShotFX.sparks(self, at, Vector3.UP, 12)
+					ShotFX.puff(self, at, Color(color, 0.85), 0.9, 0.6)
+					Sound.play_at("explosion", at, -18.0, 1.6))
+		return
+	# Defeat: tracking collapses, then a card.
+	Sound.play("vhs_glitch", -6.0)
+	var layer := CanvasLayer.new()
+	layer.layer = 60
+	add_child(layer)
+	var shade := ColorRect.new()
+	shade.color = Color(0.02, 0.02, 0.05, 0.0)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(shade)
+	var label := Label.new()
+	label.text = "SIGNAL LOST
+TRACKING..."
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 54)
+	label.add_theme_color_override("font_color", BroadcastUI.PINK)
+	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	label.offset_left = -300
+	label.offset_right = 300
+	label.offset_top = -60
+	label.modulate.a = 0.0
+	layer.add_child(label)
+	var tween := create_tween()
+	tween.tween_interval(1.2)
+	tween.tween_property(shade, "color:a", 0.85, 1.4)
+	tween.parallel().tween_property(label, "modulate:a", 1.0, 0.6)
 
 
 ## The host left (or dropped us): there is no run to be in any more.

@@ -30,6 +30,7 @@ func _ready() -> void:
 	center.add_child(box)
 
 	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 52, BroadcastUI.CYAN if won else BroadcastUI.PINK)
+	_label(box, _epilogue(won, int(result.get("wave_reached", result.get("waves", 0)))), 20, Color(0.85, 0.86, 0.8))
 	var waves := HBoxContainer.new()
 	waves.alignment = BoxContainer.ALIGNMENT_CENTER
 	waves.add_theme_constant_override("separation", 12)
@@ -41,15 +42,33 @@ func _ready() -> void:
 		waves.add_child(segment)
 		_label(segment, str(i + 1), 24, BroadcastUI.PAPER)
 
+	# Run summary: time on tape, total eliminations, the squad's mutations.
+	var total_kills := 0
+	var pdata: Variant = result.get("players", {})
+	if pdata is Dictionary:
+		for st in (pdata as Dictionary).values():
+			if st is Dictionary:
+				total_kills += int(st.get("kills", 0))
+	var secs := int(result.get("seconds", 0))
+	var summary := HBoxContainer.new()
+	summary.alignment = BoxContainer.ALIGNMENT_CENTER
+	summary.add_theme_constant_override("separation", 40)
+	box.add_child(summary)
+	for pair in [["TIME ON TAPE", "%d:%02d" % [secs / 60, secs % 60]], ["WAVES", "%d / 5" % int(result.get("waves", 0))], ["ELIMINATIONS", str(total_kills)]]:
+		var col := VBoxContainer.new()
+		summary.add_child(col)
+		_label(col, pair[1], 34, BroadcastUI.PAPER)
+		_label(col, pair[0], 15, BroadcastUI.CYAN)
+	var squad: Array = result.get("squad_mutations", [])
+	if not squad.is_empty():
+		_label(box, "SQUAD MUTATIONS:  " + ", ".join(PackedStringArray(squad)), 18, Color("#8fe36a"))
 	var players_data: Variant = result.get("players", {})
 	var players: Dictionary = players_data if players_data is Dictionary else {}
 	if players.size() <= 1:
 		var stats: Dictionary = players.values()[0] if not players.is_empty() and players.values()[0] is Dictionary else {}
-		_label(box, str(stats.get("kills", 0)), 80, BroadcastUI.PAPER)
-		_label(box, "ELIMINATIONS", 18, BroadcastUI.CYAN)
 		var weapon := str(stats.get("weapon", stats.get("cursed", "")))
 		if not weapon.is_empty():
-			_label(box, weapon.to_upper(), 24, BroadcastUI.PAPER)
+			_label(box, "FINISHED WITH THE " + weapon.to_upper(), 22, BroadcastUI.PAPER)
 	else:
 		var grid := GridContainer.new()
 		grid.columns = 4
@@ -58,6 +77,17 @@ func _ready() -> void:
 		box.add_child(grid)
 		for heading in ["PLAYER", "KILLS", "REVIVES", "TURNED"]:
 			_label(grid, heading, 18, BroadcastUI.CYAN)
+		# MVP: most kills, revives count double.
+		var mvp := ""
+		var best := -1
+		for st in players.values():
+			if st is Dictionary:
+				var score := int(st.get("kills", 0)) + 2 * int(st.get("revives", 0))
+				if score > best:
+					best = score
+					mvp = str(st.get("name", "PLAYER"))
+		if mvp != "":
+			_label(box, "MVP: " + mvp.to_upper(), 24, Color("#ffd56a"))
 		for stats in players.values():
 			if not stats is Dictionary:
 				continue
@@ -78,6 +108,38 @@ func _ready() -> void:
 	BroadcastUI.button_role(play, true)
 	_button(actions, "MAIN MENU", _on_menu)
 	play.grab_focus()
+	# VHS sign-off.
+	var corner := Label.new()
+	corner.text = "STOP  []   END OF TAPE"
+	corner.add_theme_font_size_override("font_size", 22)
+	corner.position = Vector2(40, 28)
+	add_child(corner)
+	var credits := Label.new()
+	credits.text = "FALLOUT FORECAST  -  A SAM & DREW PRODUCTION  -  OCT 31 1987"
+	credits.add_theme_font_size_override("font_size", 16)
+	credits.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
+	credits.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	credits.offset_left = -330
+	credits.offset_right = 330
+	credits.offset_top = -40
+	credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(credits)
+
+
+## One line of epilogue, by how the run went.
+func _epilogue(won: bool, wave: int) -> String:
+	if won:
+		return "The acid storm broke over Pinecrest at dawn. Cumulus is gone, and the sirens finally stopped."
+	match wave:
+		0, 1:
+			return "The first rain was enough. Nobody made it past the drizzle."
+		2, 3:
+			return "The squad held Main Street for a while. Then the downpour took the rest."
+		4:
+			return "So close. One more storm and the quarantine would have lifted."
+		_:
+			return "Cumulus swallowed the last of the signal. The tape runs out here."
+
 
 
 func _on_menu() -> void:

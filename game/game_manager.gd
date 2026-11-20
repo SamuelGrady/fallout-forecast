@@ -68,6 +68,7 @@ func start_run() -> void:
 	finished = false
 	victory_locked = false
 	_run_id += 1
+	_run_started_ms = Time.get_ticks_msec()
 	run_active = true
 	stats.clear()
 	if mutations:
@@ -672,6 +673,9 @@ func _spawn_boss(at: Vector3) -> void:
 
 
 ## Host: the core popped. Clear skies, then the win.
+var _run_started_ms := 0
+
+
 func boss_defeated() -> void:
 	if victory_locked or finished:
 		return
@@ -679,6 +683,14 @@ func boss_defeated() -> void:
 	WeatherManager.set_intensity_override(0.0)
 	WeatherManager.hold = false
 	show_banner("STORM CLEARED", Color(0.4, 1, 0.6), 2.5)
+	# With Cumulus gone the infected lose their storm: the stragglers drop.
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e.has_method("take_damage"):
+			e.take_damage(99999.0, null)
+	var announce_run := _run_id
+	get_tree().create_timer(2.6).timeout.connect(func():
+		if announce_run == _run_id and run_active:
+			show_banner("EMERGENCY BROADCAST: QUARANTINE LIFTED", Color("#ffd56a"), 2.4))
 	var run := _run_id
 	get_tree().create_timer(5.0).timeout.connect(func():
 		# Ignore the timer if the run ended or a new one started meanwhile.
@@ -711,9 +723,17 @@ func finish(won: bool) -> void:
 		var holder: Node = p.get_node_or_null("Head/Camera3D/WeaponHolder")
 		if holder and not holder.loadout.is_empty():
 			s["weapon"] = holder.loadout[holder.current].display_name
+	var squad: Array = []
+	if mutations:
+		for id in mutations.player_mutations:
+			if PLAYER_MUTATIONS.has(id):
+				squad.append(str(PLAYER_MUTATIONS[id].name))
 	var results := {
 		"won": won,
 		"waves": WeatherManager.wave if won else WeatherManager.wave - 1,
+		"wave_reached": WeatherManager.wave,
+		"seconds": int((Time.get_ticks_msec() - _run_started_ms) / 1000.0) if _run_started_ms > 0 else 0,
+		"squad_mutations": squad,
 		"players": stats.duplicate(true),
 	}
 	if _online():
