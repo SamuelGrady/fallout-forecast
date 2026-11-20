@@ -103,6 +103,7 @@ var _jump_buffer_timer := 0.0
 var _pitch := 0.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
 var _puddle_query := PhysicsPointQueryParameters3D.new()
+var _hold_target: Interactable
 var _hold := 0.0
 var _hold_done := false
 var _melee_left := 0.0
@@ -450,42 +451,49 @@ func _apply_grant(item: String) -> void:
 func _handle_interact(delta: float) -> void:
 	var best: Interactable = null
 	var best_score := INF
-	if state != "turned":
+	if state != "turned" and GameManager.mutations.stage == "":
 		var forward := -camera.global_basis.z
 		for node in get_tree().get_nodes_in_group("interactables"):
 			var it := node as Interactable
-			if it == null or not it.is_visible_in_tree():
+			if it == null or not it.is_visible_in_tree() or not it.can_interact(self):
 				continue
-			var to := it.global_position - global_position
-			var d := to.length()
-			if d > it.radius or not it.can_interact(self):
+			var self_revive := it.get_parent() == self and state == "downed"
+			var direction := it.global_position - camera.global_position
+			var distance := global_position.distance_to(it.global_position)
+			if distance > it.radius:
 				continue
-			var score := d - forward.dot(to.normalized() if d > 0.01 else forward)
+			if not self_revive:
+				if forward.dot(direction.normalized()) < 0.65:
+					continue
+				var query := PhysicsRayQueryParameters3D.create(camera.global_position,it.global_position, WORLD_LAYER,[get_rid()])
+				var hit := get_world_3d().direct_space_state.intersect_ray(query)
+				if not hit.is_empty() and hit.collider != it.get_parent():
+					continue
+			var score := distance - forward.dot(direction.normalized())
 			if score < best_score:
-				best_score = score
 				best = it
-	if best == null and GameManager.has_method("lever_prompt"):
-		var lever: String = GameManager.lever_prompt(self)
-		if lever != "":
-			interact_prompt = "[E] " + lever
-			interact_progress = 0.0
-			if Input.is_action_just_pressed("interact"):
-				GameManager.pull_lever()
-			return
+				best_score = score
+	if best != _hold_target:
+		if is_instance_valid(_hold_target):
+			_hold_target.set_targeted(false)
+		_hold_target = best
+		_hold = 0.0
+		_hold_done = false
+		interact_progress = 0.0
+		if best:
+			best.set_targeted(true)
 	if best == null:
 		interact_prompt = ""
 		interact_progress = 0.0
-		_hold = 0.0
-		_hold_done = false
 		return
-	interact_prompt = "[E] " + best.get_prompt(self)
+	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), best.get_prompt(self)]
 	var need := best.get_hold_time(self)
 	if Input.is_action_pressed("interact"):
 		_hold += delta
-		interact_progress = clampf(_hold / maxf(need, 0.001), 0.0, 1.0)
+		interact_progress = clampf(_hold / maxf(need,0.001),0,1)
 		if _hold >= need and not _hold_done:
 			_hold_done = true
-			GameManager.interact(best, self)
+			GameManager.interact(best,self)
 	else:
 		_hold = 0.0
 		_hold_done = false

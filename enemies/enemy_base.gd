@@ -44,8 +44,12 @@ var _repath_timer := 0.0
 static var _visibility_material: ShaderMaterial
 static var _reveal_material: StandardMaterial3D
 static var _hit_material: StandardMaterial3D
+static var _attack_material: StandardMaterial3D
 var _reveal_left := 0.0
 var _hit_left := 0.0
+var _attack_flash_left := 0.0
+var _damage_number: Label3D
+var _last_bullet_point := Vector3.ZERO
 var _push := Vector3.ZERO
 var _last_hit_by: Node = null
 ## Splitters mutation: the small copies don't split again.
@@ -135,14 +139,32 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	var changed := false
 	if _hit_left > 0.0:
-		_hit_left -= delta
+		_hit_left = maxf(0.0, _hit_left - delta)
 		if _hit_left <= 0.0:
-			_set_overlay(_reveal_material if _reveal_left > 0.0 else _visibility_material)
+			changed = true
+	if _attack_flash_left > 0.0:
+		_attack_flash_left = maxf(0.0, _attack_flash_left - delta)
+		if _attack_flash_left <= 0.0:
+			changed = true
 	if _reveal_left > 0.0:
-		_reveal_left -= delta
-		if _reveal_left <= 0.0 and _hit_left <= 0.0:
-			_set_overlay.call_deferred(_visibility_material)
+		_reveal_left = maxf(0.0, _reveal_left - delta)
+		if _reveal_left <= 0.0:
+			changed = true
+	if changed:
+		_refresh_overlay()
+
+
+func _refresh_overlay() -> void:
+	if _hit_left > 0.0 and _hit_material:
+		_set_overlay(_hit_material)
+	elif _attack_flash_left > 0.0 and _attack_material:
+		_set_overlay(_attack_material)
+	elif _reveal_left > 0.0 and _reveal_material:
+		_set_overlay(_reveal_material)
+	else:
+		_set_overlay(_visibility_material)
 
 
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
@@ -152,33 +174,45 @@ func knockback(impulse: Vector3) -> void:
 		stagger(0.4)
 
 
-## Local only: brief red flash when a shot lands.
+## Local only: brief white-red hit confirmation flash when a shot lands.
 func hit_flash() -> void:
 	if _hit_material == null:
 		_hit_material = StandardMaterial3D.new()
 		_hit_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_hit_material.albedo_color = Color(1, 0.2, 0.15, 0.6)
+		_hit_material.albedo_color = Color(1.0, 0.25, 0.2, 0.55)
 		_hit_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_hit_material.grow = true
-		_hit_material.grow_amount = 0.02
+		_hit_material.grow_amount = 0.015
 	_hit_left = 0.08
-	_set_overlay(_hit_material)
+	_refresh_overlay()
 
 
-## Local only: outline this enemy through walls and fog for `duration` seconds
-## (lightning strikes, the Flare Gun).
+## Local only: distinct warm front-lit attack windup pulse (does not draw through walls).
+func attack_flash(duration: float) -> void:
+	if _attack_material == null:
+		_attack_material = StandardMaterial3D.new()
+		_attack_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_attack_material.albedo_color = Color(1.0, 0.32, 0.12, 0.42)
+		_attack_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_attack_material.grow = true
+		_attack_material.grow_amount = 0.025
+	_attack_flash_left = maxf(_attack_flash_left, duration)
+	_refresh_overlay()
+
+
+## Local only: explicit through-wall reveal outline (lightning strikes, Flare Gun).
 func reveal(duration: float) -> void:
 	if _reveal_material == null:
 		_reveal_material = StandardMaterial3D.new()
 		_reveal_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_reveal_material.albedo_color = Color(1.0, 0.95, 0.6)
+		_reveal_material.albedo_color = Color(0.55, 0.96, 1.0)
 		_reveal_material.grow = true
-		_reveal_material.grow_amount = 0.05
+		_reveal_material.grow_amount = 0.055
 		_reveal_material.cull_mode = BaseMaterial3D.CULL_FRONT
 		_reveal_material.no_depth_test = true
 		_reveal_material.disable_fog = true
 	_reveal_left = maxf(_reveal_left, duration)
-	_set_overlay(_reveal_material)
+	_refresh_overlay()
 
 
 func _set_overlay(material: Material) -> void:
@@ -216,12 +250,14 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
-	# Armor mutation: half damage from the front.
+	# Armor mutation: half damage from the front with visible deflection sparks.
 	if GameManager.has_mutation("armor") and _source is Node3D:
 		var to_source: Vector3 = (_source as Node3D).global_position - global_position
 		to_source.y = 0.0
-		if (-global_basis.z).dot(to_source.normalized()) > 0.3:
+		if to_source.length_squared() > 0.001 and (-global_basis.z).dot(to_source.normalized()) > 0.3:
 			amount *= 0.5
+			var hit_at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.1
+			ShotFX.sparks(get_parent(), hit_at, to_source.normalized(), 4)
 	health -= amount
 	if is_instance_valid(_source) and _source.is_in_group("local_player"):
 		GameManager.combat_hit.emit(health <= 0.0, _bullet_critical)
@@ -328,15 +364,22 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		_slow_left = 1.8
 	if _bullet_critical:
 		stagger(0.3)
+	_last_bullet_point = point
 	var before := health
 	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
+	_last_bullet_point = Vector3.ZERO
 	if is_instance_valid(source) and source.is_in_group("local_player"):
-		var number := Label3D.new()
-		number.set_script(preload("res://weapons/damage_number.gd"))
-		number.amount = ceili(minf(before, before - health))
-		number.critical = _bullet_critical
-		get_parent().add_child(number)
-		number.global_position = point + Vector3.UP * .25
+		var dealt := ceili(minf(before, before - health))
+		if is_instance_valid(_damage_number) and _damage_number.age < 0.12:
+			_damage_number.add_hit(dealt, _bullet_critical)
+		else:
+			var number := Label3D.new()
+			number.set_script(preload("res://weapons/damage_number.gd"))
+			number.amount = dealt
+			number.critical = _bullet_critical
+			get_parent().add_child(number)
+			number.global_position = point + Vector3.UP * .25
+			_damage_number = number
 		if _bullet_critical:
 			Sound.play("headshot", -10.0)
 	_bullet_critical = false
@@ -369,4 +412,4 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 	_attack_amount = amount
 	_windup_left = 0.45
 	winding_up.emit()
-	reveal(0.45)
+	attack_flash(0.45)

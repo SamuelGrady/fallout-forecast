@@ -1,6 +1,9 @@
 extends Node
 ## Autoload "Settings": player options saved to user://settings.cfg.
 
+signal video_changed
+var using_gamepad := false
+
 const PATH := "user://settings.cfg"
 
 var mouse_sensitivity := 0.0025
@@ -15,6 +18,7 @@ func unlock_gun(path: String) -> void:
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) == OK:
 		mouse_sensitivity = cfg.get_value("input", "mouse_sensitivity", mouse_sensitivity)
@@ -29,6 +33,7 @@ func apply() -> void:
 
 
 func save() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var cfg := ConfigFile.new()
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value("audio", "master_volume", master_volume)
@@ -36,3 +41,15 @@ func save() -> void:
 	cfg.set_value("progress", "guns", unlocked_guns)
 	cfg.save(PATH)
 	apply()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.5):
+		using_gamepad = true
+	elif event is InputEventKey or event is InputEventMouseButton or (event is InputEventMouseMotion and event.relative.length() > 2.0):
+		using_gamepad = false
+
+
+func set_retro(value: bool) -> void:
+	retro_enabled = value
+	video_changed.emit()

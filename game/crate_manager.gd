@@ -78,7 +78,8 @@ func _open_double(crate: Node, player: Node) -> void:
 			get_tree().create_timer(1.3).timeout.connect(_give.bind(victim, cursed))
 	else:
 		_double_waiting[key] = [player, _clock]
-		GameManager.show_banner("DOUBLE OR NOTHING: a partner has %.1f s!" % DOUBLE_WINDOW, Color("FFE04A"), 1.5)
+		if crate.has_method("set_partner_waiting"):
+			crate.set_partner_waiting(DOUBLE_WINDOW)
 
 
 func _roll(player: Node) -> String:
@@ -96,7 +97,7 @@ func _roll(player: Node) -> String:
 func _reveal(crate: Node, item: String, override_text := "") -> void:
 	var pool: Array = (loot.common_items + loot.rare_items + loot.cursed_items).map(func(i): return loot.display_name(i))
 	var text := override_text if override_text != "" else loot.display_name(item)
-	crate.play_spin(text, loot.tier_of(item), pool)
+	crate.play_spin(text, loot.tier_of(item), pool, item)
 
 
 func _give(player: Node, item: String) -> void:

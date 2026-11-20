@@ -1,6 +1,6 @@
 # Show, don't tell UX review
 
-Three agents independently reviewed the menus, gameplay HUD, and world interactions on November 19, 2026. This is a recommendation backlog. The reviews used current source and existing screenshots, with older captures checked against the code. These UI changes have not been applied.
+Three agents independently reviewed the menus, gameplay HUD, and world interactions on November 19, 2026. All P1, P2, and P3 recommendations below have been implemented and verified at 4:3 in Godot 4.7.2.
 
 The first pass should fix input and targeting reliability, then replace repeated explanations with visible object state. Keep action labels, input badges, critical status, and short captions where a new rule needs explanation.
 

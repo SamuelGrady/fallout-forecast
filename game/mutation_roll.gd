@@ -13,6 +13,7 @@ signal roll_started
 signal pulls_changed(pulled: int, needed: int)
 signal roll_result(symbols: Array, mutations: Array, jackpot: bool)
 signal vote_started(options: Array)
+signal vote_cast(index: int)
 signal mutations_changed(active: Array)
 
 const PULL_TIME := 5.0
@@ -75,9 +76,13 @@ func _process(delta: float) -> void:
 		return
 	if stage == "voting" and not _local_voted:
 		for i in 2:
-			if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
-				_local_voted = true
-				_votes[i] = int(_votes.get(i, 0)) + 1
+			if Input.is_action_just_pressed("weapon_%d" % (i+1)):
+				vote(i)
+		if Settings.using_gamepad:
+			if Input.is_action_just_pressed("ui_left"):
+				vote(0)
+			elif Input.is_action_just_pressed("ui_right"):
+				vote(1)
 	_timer -= delta
 	match stage:
 		"pulling":
@@ -123,8 +128,15 @@ func _finish(result: Array) -> void:
 	active.assign(result)
 	stage = ""
 	mutations_changed.emit(active)
-	var names := active.map(func(id): return table.get_entry(id).display_name.to_upper())
-	GameManager.show_banner("MUTATION: " + " + ".join(names), table.get_entry(active[0]).color, 3.0)
 	WeatherManager.hold = false
 	if WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
 		WeatherManager.next_phase()
+
+
+func vote(index: int) -> bool:
+	if stage != "voting" or _local_voted or index < 0 or index > 1:
+		return false
+	_local_voted = true
+	_votes[index] = int(_votes.get(index,0)) + 1
+	vote_cast.emit(index)
+	return true

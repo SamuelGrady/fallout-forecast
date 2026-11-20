@@ -39,7 +39,8 @@ static func apply(node: Node) -> void:
 	for child in node.get_children():
 		apply(child)
 	if node is Label:
-		node.add_theme_constant_override("outline_size", 0)
+		node.add_theme_constant_override("outline_size", 2)
+		node.add_theme_color_override("font_outline_color", INK)
 		node.add_theme_font_override("font", FONT)
 	if node is ProgressBar:
 		bar(node, CYAN)
@@ -76,20 +77,40 @@ void fragment() {
 	parent.move_child(background, 0)
 
 static func animate_button(button: Button) -> void:
-	button.pivot_offset = button.size * 0.5
+	button.resized.connect(func(): button.pivot_offset = button.size * 0.5)
 	var active := [null]
-	var animate := func(amount: float):
+	var animate := func(brightness: float):
 		if active[0] is Tween and active[0].is_valid():
 			active[0].kill()
 		var tween := button.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 		active[0] = tween
-		tween.tween_property(button, "scale", Vector2.ONE * amount, .12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	button.mouse_entered.connect(func(): animate.call(1.025))
+		tween.tween_property(button, "modulate", Color(brightness,brightness,brightness), .12)
+	button.mouse_entered.connect(func(): animate.call(1.15))
 	button.mouse_exited.connect(func(): animate.call(1.0))
-	button.focus_entered.connect(func(): animate.call(1.025))
+	button.focus_entered.connect(func(): animate.call(1.15))
 	button.focus_exited.connect(func(): animate.call(1.0))
-	button.button_down.connect(func(): animate.call(.97))
+	button.button_down.connect(func(): animate.call(.8))
 	button.button_up.connect(func(): animate.call(1.0))
+
+
+static func button_role(button: Button, primary := false, quiet := false) -> void:
+	var style := panel(Color("#29545d") if primary else Color("#14232d"))
+	style.border_width_left = 4 if primary else 0
+	if quiet:
+		style.bg_color.a = 0.15
+		button.add_theme_font_size_override("font_size", 20)
+		button.custom_minimum_size.y = 40
+	button.add_theme_stylebox_override("normal", style)
+	var focus := panel(Color(0,0,0,0), CYAN)
+	focus.set_border_width_all(2)
+	button.add_theme_stylebox_override("focus", focus)
+
+
+static func input_hint(action: String) -> String:
+	if Settings.using_gamepad:
+		return {"interact":"Y", "use_item":"LB", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
+	return {"interact":"E", "use_item":"T", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
+
 
 static func reveal(control: Control) -> void:
 	control.modulate.a = 0.0

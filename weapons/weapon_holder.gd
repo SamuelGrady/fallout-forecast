@@ -73,7 +73,7 @@ func _process(delta: float) -> void:
 
 
 func _handle_input() -> void:
-	if loadout.is_empty() or player.get("state") != "ok":
+	if loadout.is_empty() or player.get("state") != "ok" or GameManager.mutations.stage != "":
 		_fire_buffer = 0.0
 		_reload_left = 0.0
 		return

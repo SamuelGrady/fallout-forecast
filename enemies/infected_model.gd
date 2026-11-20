@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 ## Original chunky infected silhouettes with articulated limbs.
 var limbs: Array[Node3D] = []
 var _clock := 0.0
@@ -9,6 +9,8 @@ var _enemy: EnemyBase
 var _head := Node3D.new()
 var _head_kick := 0.0
 var _anticipation := 0.0
+var _mutation_root := Node3D.new()
+var _spore_sacs: Array[MeshInstance3D] = []
 
 func _ready() -> void:
 	_enemy = get_parent() as EnemyBase
@@ -45,6 +47,10 @@ func _ready() -> void:
 	if gutter:
 		scale = Vector3(1.05, .82, 1.0)
 		_body.rotation.x = -.25
+	_body.add_child(_mutation_root)
+	_apply_mutations()
+	if GameManager.mutations:
+		GameManager.mutations.mutations_changed.connect(_on_mutations_changed)
 	_enemy.winding_up.connect(func(): _anticipation = 1.0)
 	_enemy.staggered.connect(func(): _hurt = 1.0)
 	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
@@ -55,7 +61,62 @@ func _ready() -> void:
 		if _enemy._bullet_critical:
 			_head_kick = 1.0)
 
-func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false) -> void:
+
+func _exit_tree() -> void:
+	if GameManager.mutations and GameManager.mutations.mutations_changed.is_connected(_on_mutations_changed):
+		GameManager.mutations.mutations_changed.disconnect(_on_mutations_changed)
+
+
+func _on_mutations_changed(_active: Array) -> void:
+	_apply_mutations()
+
+
+func _apply_mutations() -> void:
+	for child in _mutation_root.get_children():
+		child.queue_free()
+	_spore_sacs.clear()
+	if GameManager.has_mutation("armor"):
+		# Front metallic chest plate, visor brow and shoulder pauldrons matching the Armor shield card.
+		var plate := Color("#7b90a3")
+		var trim := Color("#c6d6e2")
+		_piece(_mutation_root, Vector3(0, 1.06, -0.21), Vector3(0.68, 0.58, 0.12), plate, false, 0.65)
+		_piece(_mutation_root, Vector3(0, 1.06, -0.28), Vector3(0.14, 0.48, 0.05), trim, true, 0.7)
+		for side in [-1.0, 1.0]:
+			_piece(_mutation_root, Vector3(side * 0.44, 1.36, -0.05), Vector3(0.28, 0.24, 0.34), plate, false, 0.65)
+		_piece(_mutation_root, Vector3(0, 1.72, -0.26), Vector3(0.46, 0.12, 0.12), plate, false, 0.65)
+	if GameManager.has_mutation("spores"):
+		# Swollen glowing spore sacs clustered on shoulders and upper back.
+		for spec in [
+			[Vector3(-0.28, 1.44, 0.2), 0.19],
+			[Vector3(0.26, 1.38, 0.22), 0.22],
+			[Vector3(0.0, 1.24, 0.28), 0.25],
+			[Vector3(0.0, 1.56, 0.16), 0.15],
+		]:
+			var sac := MeshInstance3D.new()
+			var sphere := SphereMesh.new()
+			sphere.radius = spec[1]
+			sphere.height = spec[1] * 1.85
+			sphere.radial_segments = 8
+			sphere.rings = 5
+			sac.mesh = sphere
+			sac.position = spec[0]
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color("#b8f259")
+			mat.emission_enabled = true
+			mat.emission = Color("#9ee838")
+			mat.emission_energy_multiplier = 1.4
+			sac.material_override = mat
+			_mutation_root.add_child(sac)
+			_spore_sacs.append(sac)
+	if GameManager.has_mutation("splitters") and not _enemy.is_small:
+		# Glowing vertical split seam and twin side-buds matching the forked Splitters card.
+		_piece(_mutation_root, Vector3(0, 1.05, 0.0), Vector3(0.1, 0.78, 0.42), Color("#ff5689"), true)
+		_piece(_mutation_root, Vector3(0, 1.63, -0.04), Vector3(0.08, 0.5, 0.46), Color("#ff5689"), true)
+		for side in [-1.0, 1.0]:
+			_piece(_mutation_root, Vector3(side * 0.38, 1.52, 0.05), Vector3(0.22, 0.24, 0.22), Color("#ff8f5c"), true)
+
+
+func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> void:
 	var mesh := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = size
@@ -63,7 +124,8 @@ func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := fa
 	mesh.position = at
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
-	material.roughness = .9
+	material.roughness = 0.35 if metallic > 0.0 else 0.9
+	material.metallic = metallic
 	material.emission_enabled = glow
 	material.emission = color
 	material.emission_energy_multiplier = .7
@@ -83,3 +145,6 @@ func _process(delta: float) -> void:
 		limbs[i].rotation.x = swing - ((_attack * 1.5 - _anticipation * 0.8) if i % 2 == 0 else 0.0)
 	_body.position.y = absf(sin(_clock))*.045
 	_body.rotation.z = sin(_clock*.5)*.04 + _hurt*.16
+	for i in _spore_sacs.size():
+		var pulse := 1.0 + 0.14 * sin(_clock * 1.4 + i * 1.3)
+		_spore_sacs[i].scale = Vector3.ONE * pulse

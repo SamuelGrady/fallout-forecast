@@ -26,7 +26,23 @@ const STORM_COLORS := [Color(0.75, 0.85, 0.9), Color(0.6, 0.8, 1.0), Color(0.45,
 var _cards := {}
 var _time := 0.0
 var _combat_status := Label.new()
-var _hit_marker := Label.new()
+var _hit_marker := Control.new()
+var _weather := GameIcon.new()
+var _enemy_icon := GameIcon.new()
+var _exposure := GameIcon.new()
+var _tarp_icon := GameIcon.new()
+var _regen := GameIcon.new()
+var _active_icons := HBoxContainer.new()
+var _active_ids: Array = []
+var _breather := ProgressBar.new()
+var _pips := Control.new()
+var _slots := HBoxContainer.new()
+var _unlock_box := HBoxContainer.new()
+var _unlock_label := Label.new()
+var _unlock_left := 0.0
+var _last_weapon := ""
+var _weapon_name_left := 0.0
+var _sac_bars: Array[ProgressBar] = []
 var _hit_time := 0.0
 var _last_health := -1.0
 var _damage_left := 0.0
@@ -56,19 +72,11 @@ func _ready() -> void:
 	_combat_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_style(_combat_status, 18, BroadcastUI.CYAN)
 	add_child(_combat_status)
-	_hit_marker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_hit_marker.offset_left = -30
-	_hit_marker.offset_right = 30
-	_hit_marker.offset_top = -30
-	_hit_marker.offset_bottom = 30
-	_hit_marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hit_marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style(_hit_marker, 38, Color.WHITE)
+	_hit_marker.set_script(preload("res://ui/reticle.gd"))
+	_hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_hit_marker)
-	GameManager.combat_hit.connect(func(killed: bool, critical: bool):
-		_hit_time = .28 if killed else .12
-		_hit_marker.text = "X" if critical else "?"
-		_hit_marker.modulate = Color("#ffcc66") if critical else (Color("#ff5689") if killed else Color.WHITE))
+	$Crosshair.visible = false
+	GameManager.combat_hit.connect(_hit_marker.hit)
 	_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hurt.color = Color.WHITE
@@ -121,17 +129,19 @@ func _ready() -> void:
 	_progress.max_value = 1.0
 	add_child(_progress)
 
-	_decon.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_decon.position = Vector2(28, 0)
 	_decon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_decon.offset_left = 28
+	_decon.offset_left = 56
+	_decon.offset_right = 150
 	_decon.offset_top = -174
-	_style(_decon, 16, Color(0.4, 1, 0.9))
+	_decon.offset_bottom = -148
+	_style(_decon, 18, Color(0.4, 1, 0.9))
 	add_child(_decon)
 	_tarp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_tarp.offset_left = 28
-	_tarp.offset_top = -200
-	_style(_tarp, 16, Color(0.6, 0.8, 1))
+	_tarp.offset_left = 56
+	_tarp.offset_right = 150
+	_tarp.offset_top = -204
+	_tarp.offset_bottom = -178
+	_style(_tarp, 18, Color(0.6, 0.8, 1))
 	add_child(_tarp)
 
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -142,6 +152,7 @@ func _ready() -> void:
 	_banner.visible = false
 	add_child(_banner)
 	GameManager.banner.connect(_show_banner)
+	GameManager.weapon_unlocked.connect(_on_weapon_unlocked)
 	_mutation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_mutation.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_mutation.offset_top = 114
@@ -182,6 +193,16 @@ func _ready() -> void:
 		box.add_theme_constant_override("separation", 6)
 	storm_label.add_theme_font_size_override("font_size", 36)
 	ammo_label.add_theme_font_size_override("font_size", 48)
+	_build_visual_status()
+
+
+func _exit_tree() -> void:
+	if GameManager.combat_hit.is_connected(_hit_marker.hit):
+		GameManager.combat_hit.disconnect(_hit_marker.hit)
+	if GameManager.banner.is_connected(_show_banner):
+		GameManager.banner.disconnect(_show_banner)
+	if GameManager.weapon_unlocked.is_connected(_on_weapon_unlocked):
+		GameManager.weapon_unlocked.disconnect(_on_weapon_unlocked)
 
 
 func _style(l: Label, size: int, color: Color) -> void:
@@ -198,10 +219,21 @@ func _show_banner(text: String, color: Color, seconds: float) -> void:
 	_banner_left = seconds
 
 
+func _on_weapon_unlocked(weapon_name: String) -> void:
+	_unlock_label.text = weapon_name
+	_unlock_box.visible = true
+	_unlock_left = 4.0
+	_weapon_name_left = 4.0
+	BroadcastUI.reveal(_unlock_box)
+
+
 func _process(delta: float) -> void:
 	_time += delta
-	_hit_time = maxf(0.0, _hit_time - delta)
-	_hit_marker.visible = _hit_time > 0.0
+	_weapon_name_left = maxf(0.0, _weapon_name_left - delta)
+	if _unlock_left > 0.0:
+		_unlock_left = maxf(0.0, _unlock_left - delta)
+		if _unlock_left <= 0.0:
+			_unlock_box.visible = false
 	var player := get_tree().get_first_node_in_group("local_player")
 	_update_storm()
 	if player == null:
@@ -213,21 +245,42 @@ func _process(delta: float) -> void:
 
 func _update_storm() -> void:
 	var spawner := get_parent().get_node_or_null("Enemies")
-	_combat_status.text = spawner.combat_status() if spawner else ""
-	storm_label.text = WeatherManager.storm_name().to_upper()
-	storm_label.modulate = STORM_COLORS[WeatherManager.storm_state]
-	var seconds := ceili(WeatherManager.phase_time_left)
-	wave_label.text = "WAVE %d / %d  ·  %s  ·  %d:%02d" % [
-		WeatherManager.wave, WeatherManager.FINAL_WAVE, WeatherManager.phase_name().to_upper(),
-		seconds / 60, seconds % 60]
-	var active: Array = GameManager.mutations.active if GameManager.mutations else []
+	var combat := WeatherManager.phase in [WeatherManager.Phase.DRIZZLE,WeatherManager.Phase.DOWNPOUR]
+	_enemy_icon.visible = spawner != null and combat
+	_combat_status.text = str(spawner.remaining()) if spawner and combat else ""
+	storm_label.visible = false
+	var seconds := maxi(0,ceili(WeatherManager.phase_time_left))
+	wave_label.text = "WAVE %d / %d    %d:%02d" % [WeatherManager.wave,WeatherManager.FINAL_WAVE,seconds/60,seconds%60]
+	_weather.value = WeatherManager.storm_intensity
+	_weather.color = STORM_COLORS[WeatherManager.storm_state]
+	_breather.visible = spawner != null and combat and spawner._timer > 1.0
+	if _breather.visible:
+		var breather_max: float = spawner.drizzle_breather if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else spawner.downpour_breather
+		_breather.value = clampf(spawner._timer / maxf(breather_max, 0.1), 0.0, 1.0)
+	var active: Array = GameManager.mutations.active
+	if active != _active_ids:
+		_active_ids = active.duplicate()
+		for old in _active_icons.get_children():
+			old.queue_free()
+		for id in active:
+			var icon := GameIcon.new()
+			icon.kind = id
+			icon.custom_minimum_size = Vector2(36,36)
+			icon.color = GameManager.mutations.table.get_entry(id).color
+			icon.tooltip_text = GameManager.mutations.table.get_entry(id).description
+			_active_icons.add_child(icon)
+	_mutation.visible = false
 	var boss := get_tree().get_first_node_in_group("boss")
 	_boss_label.visible = boss != null
-	_boss_bar.visible = boss != null
+	_boss_bar.visible = boss != null and boss.core_exposed()
+	_regen.visible = boss != null and boss.is_burning()
+	for i in _sac_bars.size():
+		_sac_bars[i].visible = boss != null and not boss.core_exposed()
+		if boss:
+			_sac_bars[i].value = boss.part_health[i]/maxf(1,boss.part_max[i])
 	if boss:
-		_boss_label.text = "CUMULUS   %s" % ("CORE EXPOSED" if boss.core_exposed() else "SACS %d / 3" % boss.sacs_left) + ("   (BURNING: no healing)" if boss.is_burning() else "")
-		_boss_bar.value = boss.total_fraction()
-	_mutation.text = ("MUTATION: " + " + ".join(active.map(func(m): return str(m).to_upper()))) if not active.is_empty() else ""
+		_boss_label.text = "CUMULUS"
+		_boss_bar.value = boss.part_health[3]/maxf(1,boss.part_max[3])
 
 
 func _update_vitals(player: Node) -> void:
@@ -255,10 +308,14 @@ func _update_vitals(player: Node) -> void:
 		"out":
 			_downed.text = "OUT until Clearing"
 	_prompt.text = str(player.get("interact_prompt"))
-	_progress.visible = float(player.get("interact_progress")) > 0.0
+	_progress.visible = false
+	_hit_marker.progress = float(player.get("interact_progress"))
+	_hit_marker.targeted = not str(player.get("interact_prompt")).is_empty()
 	_progress.value = float(player.get("interact_progress"))
-	_decon.text = "DECON CHARGES  %d" % GameManager.decon_charges
-	_tarp.text = ("TARP UP [T]" if player.get("tarp_raised") else "TARP READY [T]") if player.get("has_tarp") else ""
+	_decon.text = str(GameManager.decon_charges)
+	_tarp.text = "[%s]" % BroadcastUI.input_hint("use_item") if player.get("has_tarp") else ""
+	_tarp_icon.visible = player.get("has_tarp")
+	_tarp_icon.value = lerpf(_tarp_icon.value,1.0 if player.get("tarp_raised") else 0.0,0.15)
 	if _banner_left > 0.0:
 		_banner_left -= get_process_delta_time()
 		_banner.visible = _banner_left > 0.0
@@ -268,24 +325,49 @@ func _update_vitals(player: Node) -> void:
 	_last_suit = suit_bar.value
 	_suit_flash = maxf(0.0, _suit_flash - delta)
 	(_acid.material as ShaderMaterial).set_shader_parameter("strength", _suit_flash * (0.5 + 0.12 * sin(_time * 18.0)))
-	$BottomLeft/SuitText.text = "SUIT INTEGRITY   %03d" % int(suit_bar.value)
-	$BottomLeft/HealthText.text = "VITAL SIGNS   %03d" % int(health_bar.value)
+	$BottomLeft/SuitText.text = "     %03d" % int(suit_bar.value)
+	$BottomLeft/HealthText.text = "     %03d" % int(health_bar.value)
 	var exposed_in_rain: bool = player.get("exposed") != false and WeatherManager.is_raining()
-	exposed_label.text = "FLARE COVER" if preload("res://weapons/projectile.gd").protects(player.global_position + Vector3.UP, get_tree()) else "EXPOSED"
-	exposed_label.visible = exposed_in_rain
-	if exposed_in_rain:
-		exposed_label.modulate.a = 0.55 + 0.45 * sin(_time * 8.0)
+	exposed_label.visible = false
+	_exposure.visible = exposed_in_rain
+	var protected: bool = preload("res://weapons/projectile.gd").protects(player.global_position+Vector3.UP,get_tree())
+	_exposure.kind = "suit" if protected else "weather"
+	_exposure.color = BroadcastUI.CYAN if protected else Color("#b8e56d")
+	_exposure.value = 1.0
+	_exposure.modulate.a = 1.0 if protected else .65 + .35*sin(_time*6)
+
 
 
 func _update_weapon(player: Node) -> void:
-	var weapon = player.get("weapon_name")
-	weapon_label.visible = weapon != null
-	ammo_label.visible = weapon != null and player.get("ammo") != null
-	if weapon != null:
-		weapon_label.text = str(weapon).to_upper()
-	if ammo_label.visible:
-		var max_ammo = player.get("max_ammo")
-		ammo_label.text = str(player.get("ammo")) + ("" if max_ammo == null else " / %s" % max_ammo)
+	var holder := player.get_node_or_null("Head/Camera3D/WeaponHolder")
+	if holder == null or holder.loadout.is_empty():
+		weapon_label.visible = false
+		ammo_label.visible = false
+		return
+	var weapon: WeaponData = holder.loadout[holder.current]
+	if _last_weapon != weapon.resource_path:
+		_last_weapon = weapon.resource_path
+		_weapon_name_left = 3.0
+	weapon_label.text = weapon.display_name.to_upper()
+	weapon_label.visible = _weapon_name_left > 0.0
+	ammo_label.visible = true
+	ammo_label.text = "%d / %d" % [holder.ammo[holder.current],holder.reserve[holder.current]]
+	_pips.rounds = holder.ammo[holder.current]
+	_pips.capacity = weapon.mag_size
+	_pips.reload_progress = 1.0-holder._reload_left/weapon.reload_time if holder._reload_left > 0 else 0.0
+	if _slots.get_child_count() != holder.loadout.size():
+		for child in _slots.get_children():
+			_slots.remove_child(child)
+			child.queue_free()
+		for i in holder.loadout.size():
+			var slot := Label.new()
+			slot.text = str(i+1)
+			slot.custom_minimum_size = Vector2(34,30)
+			slot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_slots.add_child(slot)
+	for i in _slots.get_child_count():
+		var active_slot: bool = i == holder.current
+		_slots.get_child(i).modulate = Color("#ffe066") if (active_slot and _unlock_left > 0.0) else (BroadcastUI.CYAN if active_slot else Color(1,1,1,.3))
 
 
 func _update_teammates(local: Node) -> void:
@@ -298,6 +380,9 @@ func _update_teammates(local: Node) -> void:
 			var card := TeammateCard.instantiate()
 			teammates.add_child(card)
 			BroadcastUI.apply(card)
+			BroadcastUI.bar(card.get_node("%Health"),BroadcastUI.PINK)
+			card.get_node("%Health").custom_minimum_size.y = 6
+			card.get_node("%Suit").custom_minimum_size.y = 10
 			_cards[other] = card
 		var c: Control = _cards[other]
 		var display = other.get("display_name")
@@ -319,3 +404,107 @@ func _update_teammates(local: Node) -> void:
 func _num(node: Node, property: String, fallback: float) -> float:
 	var value = node.get(property)
 	return float(value) if value != null else fallback
+
+
+func _build_visual_status() -> void:
+	_combat_status.offset_left = 100
+	_combat_status.offset_right = 160
+	_combat_status.offset_top = 24
+	_combat_status.add_theme_font_size_override("font_size",24)
+	$TopCenter.offset_top = 26
+	_weather.kind = "weather"
+	_weather.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_weather.offset_left = -175
+	_weather.offset_top = 14
+	_weather.size = Vector2(48,48)
+	add_child(_weather)
+	_enemy_icon.kind = "enemy"
+	_enemy_icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_enemy_icon.offset_left = 75
+	_enemy_icon.offset_top = 20
+	_enemy_icon.size = Vector2(28,28)
+	_enemy_icon.visible = false
+	add_child(_enemy_icon)
+	_breather.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_breather.offset_left = -110
+	_breather.offset_right = 110
+	_breather.offset_top = 60
+	_breather.offset_bottom = 64
+	_breather.max_value = 1
+	_breather.show_percentage = false
+	BroadcastUI.bar(_breather,BroadcastUI.CYAN)
+	add_child(_breather)
+	_active_icons.position = Vector2(28,82)
+	add_child(_active_icons)
+	_exposure.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_exposure.offset_left = 356
+	_exposure.offset_top = -94
+	_exposure.size = Vector2(36,36)
+	add_child(_exposure)
+	for spec in [
+		["health", $BottomLeft/HealthText, Vector2(0, -1), BroadcastUI.PINK],
+		["suit", $BottomLeft/SuitText, Vector2(0, -1), BroadcastUI.CYAN],
+		["shower", _decon, Vector2(-28, 0), BroadcastUI.CYAN],
+	]:
+		var icon := GameIcon.new()
+		icon.kind = spec[0]
+		icon.color = spec[3]
+		icon.position = spec[2]
+		icon.size = Vector2(22,22)
+		spec[1].add_child(icon)
+	_tarp_icon.kind = "tarp"
+	_tarp_icon.color = Color(0.6, 0.85, 1.0)
+	_tarp_icon.position = Vector2(-28,0)
+	_tarp_icon.size = Vector2(22,22)
+	_tarp.add_child(_tarp_icon)
+	_pips.set_script(preload("res://ui/ammo_pips.gd"))
+	_pips.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_pips.offset_left = -230
+	_pips.offset_right = -28
+	_pips.offset_top = -25
+	_pips.offset_bottom = -4
+	add_child(_pips)
+	_slots.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_slots.offset_left = -230
+	_slots.offset_right = -28
+	_slots.offset_top = -170
+	_slots.offset_bottom = -138
+	_slots.alignment = BoxContainer.ALIGNMENT_END
+	add_child(_slots)
+	_unlock_box.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_unlock_box.offset_left = -260
+	_unlock_box.offset_right = -28
+	_unlock_box.offset_top = -206
+	_unlock_box.offset_bottom = -176
+	_unlock_box.alignment = BoxContainer.ALIGNMENT_END
+	_unlock_box.add_theme_constant_override("separation", 8)
+	_unlock_box.visible = false
+	var unlock_icon := GameIcon.new()
+	unlock_icon.kind = "unlock"
+	unlock_icon.color = Color("#ffe066")
+	unlock_icon.custom_minimum_size = Vector2(24, 24)
+	_unlock_box.add_child(unlock_icon)
+	_style(_unlock_label, 20, Color("#ffe066"))
+	_unlock_box.add_child(_unlock_label)
+	add_child(_unlock_box)
+	_boss_label.offset_top = 84
+	_boss_bar.offset_top = 120
+	_boss_bar.offset_bottom = 132
+	for i in 3:
+		var bar := ProgressBar.new()
+		bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		bar.offset_left = -200+i*136
+		bar.offset_right = bar.offset_left+128
+		bar.offset_top = 120
+		bar.offset_bottom = 132
+		bar.max_value = 1
+		bar.show_percentage = false
+		BroadcastUI.bar(bar,Color("#b8e56d"))
+		add_child(bar)
+		_sac_bars.append(bar)
+	_regen.kind = "regen"
+	_regen.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_regen.offset_left = 210
+	_regen.offset_top = 88
+	_regen.size = Vector2(30,30)
+	add_child(_regen)

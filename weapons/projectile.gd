@@ -145,18 +145,53 @@ func _explode() -> void:
 
 
 func _build_flare_ring() -> void:
-	var ring := MeshInstance3D.new()
-	var mesh := TorusMesh.new()
-	mesh.inner_radius = data.effect_radius - 0.1
-	mesh.outer_radius = data.effect_radius
-	ring.mesh = mesh
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(1.0, 0.45, 0.2, 0.45)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	ring.material_override = material
-	add_child(ring)
-	ring.position.y = 0.08
+	var zone := Node3D.new()
+	zone.position.y = 0.06
+	add_child(zone)
+	var border_mat := StandardMaterial3D.new()
+	border_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	border_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	border_mat.albedo_color = Color(0.32, 0.92, 0.92, 0.62)
+	var tick_mat := StandardMaterial3D.new()
+	tick_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tick_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tick_mat.albedo_color = Color(1.0, 0.68, 0.35, 0.5)
+	# Dashed perimeter segments + inward shelter ticks clearly distinguish safe ground from enemy rings.
+	var segments := 16
+	var r := data.effect_radius
+	var arc_len := (TAU * r / segments) * 0.58
+	for i in segments:
+		var angle := TAU * i / segments
+		var seg := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(arc_len, 0.03, 0.14)
+		seg.mesh = box
+		seg.position = Vector3(cos(angle) * r, 0.0, sin(angle) * r)
+		seg.rotation.y = -angle + PI * 0.5
+		seg.material_override = border_mat
+		zone.add_child(seg)
+		if i % 2 == 0:
+			var tick := MeshInstance3D.new()
+			var tbox := BoxMesh.new()
+			tbox.size = Vector3(0.08, 0.025, 0.55)
+			tick.mesh = tbox
+			tick.position = Vector3(cos(angle) * (r - 0.35), 0.0, sin(angle) * (r - 0.35))
+			tick.rotation.y = -angle + PI * 0.5
+			tick.material_override = tick_mat
+			zone.add_child(tick)
+	var inner := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = r * 0.96
+	disc.bottom_radius = r * 0.96
+	disc.height = 0.01
+	disc.radial_segments = 24
+	inner.mesh = disc
+	var inner_mat := StandardMaterial3D.new()
+	inner_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	inner_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	inner_mat.albedo_color = Color(0.25, 0.85, 0.88, 0.08)
+	inner.material_override = inner_mat
+	zone.add_child(inner)
 
 
 static func protects(point: Vector3, tree: SceneTree) -> bool:

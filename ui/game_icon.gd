@@ -1,0 +1,94 @@
+class_name GameIcon
+extends Control
+## Small geometric pictograms shared by cards, HUD and world signage.
+
+@export var kind := "health"
+@export var color := Color("#e8e9d5")
+var value := 1.0
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+
+func _draw() -> void:
+	var scale_factor := minf(size.x, size.y) / 64.0
+	draw_set_transform(size * 0.5, 0.0, Vector2.ONE * scale_factor)
+	match kind:
+		"health", "regen":
+			draw_rect(Rect2(-6, -22, 12, 44), color)
+			draw_rect(Rect2(-22, -6, 44, 12), color)
+			if kind == "regen":
+				draw_line(Vector2(-25, 25), Vector2(25, -25), Color("#ff5689"), 6, true)
+		"suit", "armor", "department":
+			var shield := PackedVector2Array([Vector2(-23,-23),Vector2(23,-23),Vector2(20,9),Vector2(0,27),Vector2(-20,9)])
+			draw_colored_polygon(shield, color * Color(1,1,1,0.2))
+			shield.append(shield[0])
+			draw_polyline(shield, color, 4, true)
+			draw_line(Vector2(0,-15), Vector2(0,14), color, 4, true)
+		"spores":
+			for i in 7:
+				var direction := Vector2.from_angle(i * TAU / 7.0)
+				draw_line(direction * 9, direction * 24, color, 3, true)
+				draw_circle(direction * 24, 4, color)
+			draw_circle(Vector2.ZERO, 11, color)
+		"swarm", "enemy":
+			var count := 3 if kind == "swarm" else 1
+			for i in count:
+				var center := Vector2((i - (count - 1)*0.5)*19, -6 if i % 2 == 0 else 6)
+				draw_circle(center, 8, color)
+				draw_line(center + Vector2(-8,18), center + Vector2(8,18), color, 8, true)
+		"runners":
+			draw_circle(Vector2(8,-22), 6, color)
+			_line([Vector2(0,-12), Vector2(-6,5), Vector2(-22,21)], 6)
+			_line([Vector2(-6,5), Vector2(12,10), Vector2(18,24)], 6)
+			_line([Vector2(-12,-5), Vector2(0,-12), Vector2(14,-3), Vector2(25,-7)], 4)
+		"splitters":
+			_line([Vector2(0,-26),Vector2(0,-5),Vector2(-20,20)], 6)
+			_line([Vector2(0,-5),Vector2(20,20)], 6)
+			draw_circle(Vector2(-20,20), 7, color)
+			draw_circle(Vector2(20,20), 7, color)
+		"ammo":
+			for x in [-16, 0, 16]:
+				draw_rect(Rect2(x-5,-12,10,33), color)
+				draw_colored_polygon(PackedVector2Array([Vector2(x-5,-12),Vector2(x,-23),Vector2(x+5,-12)]), color)
+		"shower":
+			_line([Vector2(-20,25),Vector2(-20,-20),Vector2(4,-20),Vector2(15,-8)], 4)
+			draw_line(Vector2(3,-7),Vector2(24,-7),color,5,true)
+			for x in [6,14,22]:
+				draw_line(Vector2(x,1),Vector2(x-4,19),color,3,true)
+		"tarp":
+			var spread := lerpf(7,26,value)
+			_line([Vector2(-spread,17),Vector2(0,-22),Vector2(spread,17),Vector2(-spread,17)], 4)
+		"weather":
+			for i in 3:
+				draw_circle(Vector2(-16+i*16,-12), 10, color)
+			for i in ceili(value * 5):
+				var x := -22+i*10
+				draw_line(Vector2(x,5),Vector2(x-6,23),color,3,true)
+		"lever":
+			draw_rect(Rect2(-25,12,50,15), color)
+			var end := Vector2(18,-23).lerp(Vector2(-18,7),value)
+			draw_line(Vector2(0,12),end,color,6,true)
+			draw_circle(end,9,Color("#ff5689"))
+		"unlock":
+			draw_rect(Rect2(-20,-2,40,28),color)
+			draw_arc(Vector2(0,-4),15,PI,TAU,20,color,4,true)
+		"bus":
+			draw_rect(Rect2(-23,-23,46,40),color,false,4)
+			draw_rect(Rect2(-15,-15,30,13),color)
+			for x in [-15,15]:
+				draw_circle(Vector2(x,22),5,color)
+		"park":
+			draw_colored_polygon(PackedVector2Array([Vector2(0,-27),Vector2(25,12),Vector2(-25,12)]),color)
+			draw_rect(Rect2(-4,12,8,17),color)
+		_:
+			draw_circle(Vector2.ZERO, 20, color, false, 4, true)
+
+
+func _line(points: Array, width: float) -> void:
+	draw_polyline(PackedVector2Array(points), color, width, true)
