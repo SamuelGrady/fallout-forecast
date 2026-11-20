@@ -5,12 +5,14 @@ signal video_changed
 var using_gamepad := false
 
 const PATH := "user://settings.cfg"
+const HUD_SCALE_LARGE := 1.15
 
 var mouse_sensitivity := 0.0025
 var master_volume := 0.8
 var retro_enabled := true
-## Comfort: dims lightning flashes and VHS tracking glitches.
+## Comfort: reduces screen flashes, shake and tracking noise.
 var reduced_flash := false
+var hud_scale := 1.0
 var unlocked_guns: Array = ["res://weapons/pump_shotgun.tres"]
 ## Survivor look (indices into Cosmetics.COLORS / Cosmetics.SKINS).
 var suit_color := 0
@@ -38,6 +40,7 @@ func _ready() -> void:
 		master_volume = cfg.get_value("audio", "master_volume", master_volume)
 		retro_enabled = cfg.get_value("video", "retro_enabled", retro_enabled)
 		reduced_flash = cfg.get_value("video", "reduced_flash", reduced_flash)
+		hud_scale = HUD_SCALE_LARGE if cfg.get_value("video", "large_hud", false) else 1.0
 		unlocked_guns = cfg.get_value("progress", "guns", unlocked_guns)
 		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
@@ -59,6 +62,7 @@ func save() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("video", "retro_enabled", retro_enabled)
 	cfg.set_value("video", "reduced_flash", reduced_flash)
+	cfg.set_value("video", "large_hud", hud_scale > 1.0)
 	cfg.set_value("progress", "guns", unlocked_guns)
 	cfg.set_value("cosmetic", "color", suit_color)
 	cfg.set_value("cosmetic", "skin", suit_skin)
@@ -84,6 +88,11 @@ func flash_scale() -> float:
 
 func set_reduced_flash(value: bool) -> void:
 	reduced_flash = value
+	save()
+
+
+func set_large_hud(value: bool) -> void:
+	hud_scale = HUD_SCALE_LARGE if value else 1.0
 	save()
 
 

@@ -113,7 +113,7 @@ func _process(delta: float) -> void:
 	if screen.material is ShaderMaterial:
 		(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
 
-	var recording := fmod(_clock, 1.0) < 0.6
+	var recording := Settings.reduced_flash or fmod(_clock, 1.0) < 0.6
 	if _web:
 		rec.text = ("* REC" if recording else "   REC") + "  >"
 	else:

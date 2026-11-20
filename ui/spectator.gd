@@ -1,3 +1,4 @@
+class_name SpectatorView
 extends Node3D
 ## Spectator camera: while the local player is OUT (bled out in a session,
 ## waiting for Clearing), follow a teammate over the shoulder instead of
@@ -18,31 +19,36 @@ func _ready() -> void:
 	_camera.fov = 70.0
 	_camera.cull_mask = 0xFFFFF
 	add_child(_camera)
-	_layer.layer = 4
+	_layer.layer = 7
 	add_child(_layer)
-	_label.add_theme_font_size_override("font_size", 24)
-	_label.add_theme_color_override("font_color", BroadcastUI.CYAN)
-	_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_label.add_theme_constant_override("outline_size", 6)
+	BroadcastUI.text(_label, roundi(24 * Settings.hud_scale), BroadcastUI.CYAN)
+	BroadcastUI.back_label(_label)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_label.offset_left = -300
-	_label.offset_right = 300
-	_label.offset_top = -150
+	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_label.offset_left = -252
+	_label.offset_right = 252
+	_label.offset_top = 60
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label.visible = false
 	_layer.add_child(_label)
 
 
-func _targets(me: Node) -> Array:
-	return get_tree().get_nodes_in_group("players").filter(func(p):
-		return p != me and str(p.get("state")) in ["ok", "downed"])
+static func targets(tree: SceneTree, me: Node) -> Array[Node]:
+	return tree.get_nodes_in_group("players").filter(func(p: Node):
+		return p != me and p is Node3D and str(p.get("state")) in ["ok", "downed"])
+
+
+static func has_target(tree: SceneTree, me: Node) -> bool:
+	return not targets(tree, me).is_empty()
 
 
 func _process(delta: float) -> void:
 	var me := get_tree().get_first_node_in_group("local_player")
 	var spectating := me != null and str(me.get("state")) == "out"
-	var targets := _targets(me) if spectating else []
-	if not spectating or targets.is_empty():
+	var available: Array[Node] = []
+	if spectating:
+		available = targets(get_tree(), me)
+	if not spectating or available.is_empty():
 		if _active:
 			_active = false
 			_label.visible = false
@@ -50,10 +56,11 @@ func _process(delta: float) -> void:
 			if own:
 				own.current = true
 		return
-	if Input.is_action_just_pressed("fire") or Input.is_action_just_pressed("weapon_next"):
+	if available.size() > 1 and (Input.is_action_just_pressed("fire") or Input.is_action_just_pressed("weapon_next")):
 		_index += 1
-	_index = posmod(_index, targets.size())
-	var target := targets[_index] as Node3D
+		Sound.play("ui_click")
+	_index = posmod(_index, available.size())
+	var target := available[_index] as Node3D
 	if not _active:
 		_active = true
 		_camera.current = true
@@ -69,6 +76,8 @@ func _process(delta: float) -> void:
 		want = hit.position + (head - want).normalized() * 0.3
 	_camera.global_position = _camera.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
 	_camera.look_at(head, Vector3.UP)
-	var name := str(target.get("display_name")) if target.get("display_name") != null else "TEAMMATE"
-	_label.text = "SPECTATING %s   [%s] NEXT   -   BACK IN AT CLEARING" % [name.to_upper(), "LMB" if not Settings.using_gamepad else "RT"]
+	var callsign := str(target.get("display_name")) if target.get("display_name") != null else "TEAMMATE"
+	_label.text = "SPECTATING  /  %s\nBACK AT CLEARING" % callsign.to_upper()
+	if available.size() > 1:
+		_label.text += "   [%s] NEXT" % ("RT" if Settings.using_gamepad else "LMB")
 	_label.visible = true

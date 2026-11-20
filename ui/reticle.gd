@@ -33,7 +33,7 @@ func _draw() -> void:
 	if hit_left > 0:
 		var hit_color := Color("#ffd56a") if critical else (BroadcastUI.PINK if killed else Color.WHITE)
 		var duration := 0.28 if killed else 0.13
-		var pulse := (hit_left / duration) * (6.0 if critical or killed else 3.0)
+		var pulse := 0.0 if Settings.reduced_flash else (hit_left / duration) * (6.0 if critical or killed else 3.0)
 		var inner := (13.0 if killed else 10.0) + pulse
 		var outer := inner + (9.0 if critical or killed else 6.0)
 		for i in 4:

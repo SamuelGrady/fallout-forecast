@@ -13,7 +13,10 @@ var _clock := 0.0
 
 
 func _ready() -> void:
-	layer = 1
+	if DisplayServer.get_name() == "headless" or Net.dedicated:
+		set_process(false)
+		return
+	layer = 5
 	_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_markers)
@@ -49,7 +52,9 @@ func _draw_markers() -> void:
 		var accent := color
 		if state == "downed":
 			label = "REVIVE " + label
-			accent = Color(1.0, 0.25, 0.25).lerp(Color(1, 0.8, 0.8), 0.5 + 0.5 * sin(_clock * 8.0))
+			accent = BroadcastUI.PINK
+			if not Settings.reduced_flash:
+				accent = accent.lerp(Color("#ffc1cd"), 0.25 + 0.25 * sin(_clock * 8.0))
 		elif state == "turned":
 			label = "TURNED " + label
 			accent = Color(0.55, 1.0, 0.3)
