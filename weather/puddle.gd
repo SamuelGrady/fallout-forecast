@@ -63,7 +63,8 @@ func _physics_process(delta: float) -> void:
 		return
 	var intensity := WeatherManager.storm_intensity
 	if raining:
-		growth = minf(growth + intensity * dt / grow_time, 1.0)
+		var growth_rate := 3.0 if WeatherManager.wave_modifier() == WeatherManager.WavePlan.FLOOD else 1.0
+		growth = minf(growth + intensity * growth_rate * dt / grow_time, 1.0)
 	else:
 		growth = maxf(growth - dt / dry_time, 0.0)
 	var base := color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
@@ -122,7 +123,11 @@ func can_spawn_gutter() -> bool:
 
 ## Dry the puddle at once (Bug Bomb).
 func clear() -> void:
-	growth = 0.0
+	set_growth(0.0)
+
+
+func set_growth(value: float) -> void:
+	growth = clampf(value, 0.0, 1.0)
 	_apply()
 
 

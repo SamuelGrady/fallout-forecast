@@ -27,7 +27,7 @@ func _ready() -> void:
 			player.health = player.max_health
 			player.suit_integrity = 100.0)
 	_section(box, "SPAWN")
-	for kind in ["drip", "gutter", "mister"]:
+	for kind in ["drip", "gutter", "mister", "sleet", "hailstone", "undertow", "static", "smog", "thunderhead"]:
 		var selected: String = kind
 		_button(box, "SPAWN " + kind.to_upper(), func():
 			var spawner := get_parent().get_node("Enemies")

@@ -103,6 +103,8 @@ var sprint_lock := 0.0
 var _grace_left := 0.0
 var _revive_grace_left := 0.0
 var invulnerable := false
+var _enemy_pull := Vector3.ZERO
+var _applied_pull := Vector3.ZERO
 var _acid_blood_cooldown := 0.0
 var _last_headshot_ms := 0
 const HIT_IFRAMES := 0.65
@@ -227,7 +229,7 @@ func _build_children() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_multiplayer_authority():
+	if not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_look(event.relative * Settings.mouse_sensitivity)
@@ -252,6 +254,8 @@ func _process(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
+		return
+	if GameManager.awaiting_tape_choice:
 		return
 	if state == "out":
 		velocity = Vector3.ZERO
@@ -310,7 +314,8 @@ func _physics_process(delta: float) -> void:
 				speed = minf(speed, walk_speed * 0.7)
 
 	var accel := ground_accel if is_on_floor() else air_accel
-	var horizontal := Vector2(velocity.x, velocity.z).move_toward(
+	var own_velocity := velocity - _applied_pull
+	var horizontal := Vector2(own_velocity.x, own_velocity.z).move_toward(
 		Vector2(direction.x, direction.z) * speed, accel * delta)
 	# Undertow mutation: active puddles tug nearby players inward (Hydro-Skin resists 70%).
 	if state == "ok" and GameManager.has_mutation("undertow"):
@@ -327,7 +332,15 @@ func _physics_process(delta: float) -> void:
 				horizontal += Vector2(to_puddle.x, to_puddle.z).normalized() * (22.0 * falloff * pull_scale * delta)
 	velocity.x = horizontal.x
 	velocity.z = horizontal.y
+	_enemy_pull = _enemy_pull.move_toward(Vector3.ZERO, 22.0 * delta)
+	_applied_pull = _enemy_pull if state == "ok" else Vector3.ZERO
+	velocity += _applied_pull
+	var requested_velocity := velocity
 	move_and_slide()
+	# Remove only the portion of the impulse that survived sliding along cover.
+	if not velocity.is_equal_approx(requested_velocity):
+		for index in get_slide_collision_count():
+			_applied_pull = _applied_pull.slide(get_slide_collision(index).get_normal())
 	if is_on_floor() and state in ["ok", "turned"]:
 		var travel := get_position_delta()
 		_step_distance += Vector2(travel.x, travel.z).length()
@@ -549,6 +562,23 @@ func take_damage(amount: float, _source: Node = null) -> void:
 				_set_state("out")
 
 
+## The host chooses the impulse. Only the movement owner applies it.
+func pull_from_enemy(impulse: Vector3) -> void:
+	if not Net.is_host():
+		return
+	var pull_scale := 0.3 if GameManager.has_player_mutation("hydro_skin") else 1.0
+	if is_multiplayer_authority():
+		_enemy_pull = impulse * pull_scale
+	else:
+		_receive_enemy_pull.rpc_id(get_multiplayer_authority(), impulse * pull_scale)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_enemy_pull(impulse: Vector3) -> void:
+	if multiplayer.get_remote_sender_id() == 1 and is_multiplayer_authority():
+		_enemy_pull = impulse
+
+
 func heal(amount: float) -> void:
 	if Net.is_host() and state == "ok":
 		health = minf(health + amount, max_health)
@@ -641,6 +671,8 @@ func _teleport(xf: Transform3D) -> void:
 	if multiplayer.get_remote_sender_id() in [0, 1]:
 		global_transform = xf
 		velocity = Vector3.ZERO
+		_enemy_pull = Vector3.ZERO
+		_applied_pull = Vector3.ZERO
 
 
 ## Host: give this player an item. Health and suit items apply on the host;

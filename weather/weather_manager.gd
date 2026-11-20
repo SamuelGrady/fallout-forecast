@@ -26,6 +26,7 @@ enum StormState { CLEAR, DRIZZLE, DOWNPOUR, ACID_STORM }
 const PHASE_NAMES := ["Calm", "Mutation Roll", "Drizzle", "Downpour", "Clearing"]
 const STORM_NAMES := ["Clear", "Drizzle", "Downpour", "Acid Storm"]
 const FINAL_WAVE := 5
+const WavePlan := preload("res://enemies/wave_plan.gd")
 
 ## Starting values from the design doc's weather table. Index by StormState.
 const STORM_INTENSITY := [0.0, 0.3, 0.7, 1.0]
@@ -75,7 +76,8 @@ func _process(delta: float) -> void:
 		if Net.is_host() and phase == Phase.DOWNPOUR:
 			_lightning_timer -= delta
 			if _lightning_timer <= 0.0:
-				_lightning_timer = randf_range(lightning_min_interval, lightning_max_interval)
+				var interval_scale := .62 if wave_modifier() == WavePlan.HEAVY_WEATHER else 1.0
+				_lightning_timer = randf_range(lightning_min_interval, lightning_max_interval) * interval_scale
 				strike_lightning()
 
 	var before := storm_intensity
@@ -90,7 +92,7 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not OS.is_debug_build() or not Net.is_host():
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
+	if event is InputEventKey and event.pressed and not event.echo and not event.shift_pressed:
 		match event.keycode:
 			KEY_F1:
 				next_phase()
@@ -149,7 +151,7 @@ func stop() -> void:
 ## After the final wave's Clearing the cycle stops.
 func next_phase() -> void:
 	if phase == Phase.CLEARING:
-		if wave >= FINAL_WAVE:
+		if wave >= FINAL_WAVE and not GameManager.endless:
 			running = false
 			return
 		set_phase(Phase.CALM, wave + 1)
@@ -180,7 +182,13 @@ func strike_lightning(at: Variant = null) -> void:
 	if at is Vector3:
 		position = at
 	else:
-		position = Vector3(randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
+		var sites := get_tree().get_nodes_in_group("enemy_spawn")
+		if sites.is_empty():
+			sites = get_tree().get_nodes_in_group("player_spawn")
+		var site := sites.pick_random() as Node3D if not sites.is_empty() else null
+		var center := site.global_position if site else Vector3.ZERO
+		var spread := lightning_area * (.11 if wave_modifier() == WavePlan.HEAVY_WEATHER else .32)
+		position = center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
 		# Conductors mutation: pull most strikes near an infected so the chain jump matters.
 		if GameManager.has_mutation("conductors") and randf() < 0.65:
 			var enemies := get_tree().get_nodes_in_group("enemies")
@@ -204,10 +212,35 @@ func sync_to_peer(peer_id: int) -> void:
 	if Net.is_host():
 		_receive_phase.rpc_id(peer_id, phase, wave, phase_time_left)
 		_receive_intensity.rpc_id(peer_id, storm_intensity)
+		_override.rpc_id(peer_id, intensity_override)
+
+
+## The run scene is loaded on this peer, so existing water and lurking
+## Undertows agree on what the new player sees.
+func sync_puddles_to_peer(peer_id: int) -> void:
+	if not Net.is_host():
+		return
+	var wet := {}
+	for node in get_tree().get_nodes_in_group("puddles"):
+		if node.has_method("set_growth"):
+			wet[node.get_path()] = node.growth
+	_sync_puddles.rpc_id(peer_id, wet)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_puddles(wet: Dictionary) -> void:
+	for path in wet:
+		var puddle := get_node_or_null(path)
+		if puddle and puddle.has_method("set_growth"):
+			puddle.set_growth(float(wet[path]))
 
 
 func phase_name() -> String:
 	return PHASE_NAMES[phase]
+
+
+func wave_modifier() -> String:
+	return WavePlan.modifier(wave)
 
 
 func storm_name() -> String:

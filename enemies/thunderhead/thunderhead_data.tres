@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://enemies/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Thunderhead"
+max_health = 83.0
+move_speed = 3.35
+damage = 32.0
+attack_range = 3.2
+attack_cooldown = 3.0

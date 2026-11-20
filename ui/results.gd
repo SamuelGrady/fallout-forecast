@@ -20,6 +20,7 @@ func _ready() -> void:
 
 	var result: Dictionary = GameManager.last_results if GameManager.last_results is Dictionary else {}
 	var won: bool = bool(result.get("won", false))
+	var endless := bool(result.get("endless", false))
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -29,8 +30,13 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 20)
 	center.add_child(box)
 
-	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 52, BroadcastUI.CYAN if won else BroadcastUI.PINK)
-	_label(box, _epilogue(won, int(result.get("wave_reached", result.get("waves", 0)))), 20, Color(0.85, 0.86, 0.8))
+	var title := "PINECREST IS SAFE" if won else "PINECREST IS LOST"
+	var epilogue := _epilogue(won, int(result.get("wave_reached", result.get("waves", 0))))
+	if endless:
+		title = "ENDLESS TAPE COMPLETE"
+		epilogue = "Cumulus fell. The squad stayed on the air until the signal cut out."
+	_label(box, title, 52, BroadcastUI.CYAN if won or endless else BroadcastUI.PINK)
+	_label(box, epilogue, 20, Color(0.85, 0.86, 0.8))
 	var waves := HBoxContainer.new()
 	waves.alignment = BoxContainer.ALIGNMENT_CENTER
 	waves.add_theme_constant_override("separation", 12)
@@ -54,7 +60,11 @@ func _ready() -> void:
 	summary.alignment = BoxContainer.ALIGNMENT_CENTER
 	summary.add_theme_constant_override("separation", 40)
 	box.add_child(summary)
-	for pair in [["TIME ON TAPE", "%d:%02d" % [secs / 60, secs % 60]], ["WAVES", "%d / 5" % int(result.get("waves", 0))], ["ELIMINATIONS", str(total_kills)]]:
+	var survived := int(result.get("waves", 0))
+	var measures := [["TIME ON TAPE", "%d:%02d" % [secs / 60, secs % 60]], ["WAVES SURVIVED", str(survived) if endless else "%d / 5" % survived], ["ELIMINATIONS", str(total_kills)]]
+	if endless:
+		measures.append(["TAPE SCORE", "%08d" % int(result.get("endless_score", 0))])
+	for pair in measures:
 		var col := VBoxContainer.new()
 		summary.add_child(col)
 		_label(col, pair[1], 34, BroadcastUI.PAPER)

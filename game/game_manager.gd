@@ -11,6 +11,7 @@ signal decon_changed(charges: int)
 signal weapon_unlocked(weapon_name: String)
 signal run_finished(won: bool, results: Dictionary)
 signal banner(text: String, color: Color, seconds: float)
+signal tape_choice_changed
 
 const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
 const MutationRoll := preload("res://game/mutation_roll.gd")
@@ -31,6 +32,10 @@ var run_active := false
 var finished := false
 ## Set the moment Cumulus dies so a late wipe can't turn the win into a loss.
 var victory_locked := false
+var awaiting_tape_choice := false
+var endless := false
+var endless_score := 0
+var _waves_survived := 0
 var _run_id := 0
 var last_results := {}
 
@@ -43,6 +48,7 @@ func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	Net.peer_joined.connect(_on_peer_joined)
+	Net.run_peer_loaded.connect(_on_run_peer_loaded)
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
 	add_child(mutations)
@@ -66,7 +72,8 @@ func start_run() -> void:
 	if not is_host():
 		return
 	finished = false
-	victory_locked = false
+	_waves_survived = 0
+	_set_tape_state(false, false, false)
 	_run_id += 1
 	_run_started_ms = Time.get_ticks_msec()
 	run_active = true
@@ -93,6 +100,20 @@ func _on_peer_joined(peer_id: int) -> void:
 		mutations.sync_to_peer(peer_id)
 
 
+func _on_run_peer_loaded(peer_id: int) -> void:
+	if not is_host() or not run_active or finished:
+		return
+	_sync_tape_state.rpc_id(peer_id, awaiting_tape_choice, endless, victory_locked)
+	_on_peer_joined(peer_id)
+	WeatherManager.sync_puddles_to_peer(peer_id)
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner:
+		spawner.sync_to_peer(peer_id)
+	var boss := get_tree().get_first_node_in_group("boss") as Node3D
+	if boss and not boss.get("dead"):
+		_spawn_boss.rpc_id(peer_id, boss.global_position)
+
+
 func players() -> Array:
 	return get_tree().get_nodes_in_group("players")
 
@@ -110,7 +131,8 @@ func enemy_count_scale() -> float:
 
 
 func enemy_health_scale() -> float:
-	return ENEMY_HEALTH_SCALE[player_count()] * (0.5 if has_mutation("swarm") else 1.0)
+	var escalation := 1.0 + maxf(0.0, WeatherManager.wave - WeatherManager.FINAL_WAVE) * .08
+	return ENEMY_HEALTH_SCALE[player_count()] * escalation * (0.5 if has_mutation("swarm") else 1.0)
 
 
 ## How many enemies to keep alive and how fast to spawn them, vs. solo.
@@ -119,7 +141,8 @@ func enemy_spawn_scale() -> float:
 
 
 func enemy_speed_scale() -> float:
-	return 1.4 if has_mutation("runners") else 1.0
+	var escalation := 1.0 + clampf((WeatherManager.wave - WeatherManager.FINAL_WAVE) * .025, 0.0, .42)
+	return escalation * (1.4 if has_mutation("runners") else 1.0)
 
 
 func has_mutation(id: String) -> bool:
@@ -427,6 +450,10 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
+			if _wave > _waves_survived:
+				_waves_survived = _wave
+				if endless:
+					endless_score += 500 + 100 * (_wave - WeatherManager.FINAL_WAVE)
 			_set_objective("")
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
 			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
@@ -440,7 +467,8 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 					p.grant("issue:" + gun.resource_path)
 				if is_new:
 					_announce_unlock(gun.display_name.to_upper())
-			mutations.clear()
+			if not endless:
+				mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
 					p.on_clearing()
@@ -509,10 +537,12 @@ func _stat(player: Node) -> Dictionary:
 var _volatile_popping := false
 
 
-func record_kill(source: Node, at := Vector3.INF) -> void:
+func record_kill(source: Node, at := Vector3.INF, elite := false) -> void:
 	if not is_host() or not source or not source.is_in_group("players"):
 		return
 	_stat(source).kills += 1
+	if endless:
+		endless_score += 250 if elite else 100
 	# Bio-Siphon: each kill restores health and suit integrity.
 	if has_player_mutation("vampiric_siphon"):
 		if source.has_method("heal"):
@@ -642,7 +672,7 @@ func record_cursed(player: Node, weapon_name: String) -> void:
 # ------------------------------------------------------------------ boss
 ## Host: Cumulus rolls in over Main Street; the Acid Storm won't end until it dies.
 func spawn_boss() -> void:
-	if not get_tree().get_nodes_in_group("boss").is_empty():
+	if not is_host() or victory_locked or not get_tree().get_nodes_in_group("boss").is_empty():
 		return
 	var world := _world()
 	var spawner := world.get_node_or_null("Enemies") if world else null
@@ -674,30 +704,88 @@ func _spawn_boss(at: Vector3) -> void:
 	_spawn_boss_node(spawner, at)
 
 
-## Host: the core popped. Clear skies, then the win.
+## Host: the core popped. Keep this run loaded until the squad chooses.
 var _run_started_ms := 0
 
 
 func boss_defeated() -> void:
-	if victory_locked or finished:
+	if not is_host() or victory_locked or finished or endless:
 		return
-	victory_locked = true
+	_waves_survived = WeatherManager.FINAL_WAVE
+	_set_tape_state(false, false, true)
 	WeatherManager.set_intensity_override(0.0)
-	WeatherManager.hold = false
+	WeatherManager.hold = true
 	show_banner("STORM CLEARED", Color(0.4, 1, 0.6), 2.5)
 	# With Cumulus gone the infected lose their storm: the stragglers drop.
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if e.has_method("take_damage"):
 			e.take_damage(99999.0, null)
-	var announce_run := _run_id
-	get_tree().create_timer(2.6).timeout.connect(func():
-		if announce_run == _run_id and run_active:
-			show_banner("EMERGENCY BROADCAST: QUARANTINE LIFTED", Color("#ffd56a"), 2.4))
 	var run := _run_id
-	get_tree().create_timer(5.0).timeout.connect(func():
-		# Ignore the timer if the run ended or a new one started meanwhile.
+	get_tree().create_timer(2.6, false).timeout.connect(func():
 		if run == _run_id and run_active and not finished:
-			finish(true))
+			_set_tape_state(true, false, true))
+
+
+## The player-host makes the decision. On a dedicated server the first
+## remaining roster peer takes that role.
+func tape_decider() -> int:
+	if Net.roster.has(1) or not Net.is_online():
+		return 1
+	var peers := Net.roster.keys()
+	return int(peers[0]) if not peers.is_empty() else 0
+
+
+func choose_tape(keep_playing: bool) -> void:
+	if not awaiting_tape_choice:
+		return
+	if is_host():
+		_apply_tape_choice(1, keep_playing)
+	elif multiplayer.get_unique_id() == tape_decider():
+		_request_tape_choice.rpc_id(1, keep_playing)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_tape_choice(keep_playing: bool) -> void:
+	if is_host():
+		_apply_tape_choice(multiplayer.get_remote_sender_id(), keep_playing)
+
+
+func _apply_tape_choice(peer: int, keep_playing: bool) -> void:
+	if not awaiting_tape_choice or not run_active or finished or peer != tape_decider():
+		return
+	if not keep_playing:
+		_set_tape_state(false, false, true)
+		finish(true)
+		return
+	for player in players():
+		player.on_clearing()
+		if player.state == "downed":
+			player.revive(null)
+	endless_score = 0
+	_set_tape_state(false, true, false)
+	WeatherManager.hold = false
+	WeatherManager.set_intensity_override(-1.0)
+	WeatherManager.set_phase(WeatherManager.Phase.CALM, WeatherManager.FINAL_WAVE + 1)
+
+
+func _set_tape_state(choice: bool, is_endless: bool, locked: bool) -> void:
+	Net.rpc_to_all(_sync_tape_state, [choice, is_endless, locked])
+	_sync_tape_state(choice, is_endless, locked)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_tape_state(choice: bool, is_endless: bool, locked: bool) -> void:
+	var changed := awaiting_tape_choice != choice
+	if not is_host():
+		finished = false
+		run_active = true
+	awaiting_tape_choice = choice
+	endless = is_endless
+	victory_locked = locked
+	if not endless:
+		endless_score = 0
+	if changed:
+		tape_choice_changed.emit()
 
 
 # ------------------------------------------------------------------ win / lose
@@ -732,8 +820,10 @@ func finish(won: bool) -> void:
 				squad.append(str(PLAYER_MUTATIONS[id].name))
 	var results := {
 		"won": won,
-		"waves": WeatherManager.wave if won else WeatherManager.wave - 1,
+		"waves": _waves_survived,
 		"wave_reached": WeatherManager.wave,
+		"endless": endless,
+		"endless_score": endless_score,
 		"seconds": int((Time.get_ticks_msec() - _run_started_ms) / 1000.0) if _run_started_ms > 0 else 0,
 		"squad_mutations": squad,
 		"players": stats.duplicate(true),
@@ -759,25 +849,29 @@ func _finish(won: bool, results: Dictionary) -> void:
 	finished = true
 	run_active = false
 	last_results = results
-	banner.emit("PINECREST IS SAFE" if won else "PINECREST IS LOST", Color(0.4, 1, 0.6) if won else Color(1, 0.3, 0.3), 4.0)
+	var headline := "PINECREST IS SAFE" if won else "PINECREST IS LOST"
+	if bool(results.get("endless", false)):
+		headline = "ENDLESS TAPE COMPLETE"
+	banner.emit(headline, Color(0.4, 1, 0.6) if won else Color(1, 0.3, 0.3), 4.0)
 	run_finished.emit(won, results)
 
 
 # ------------------------------------------------------------------ shared effects
-## Host: a spore glob on an arc, simulated on every peer; only the host's cloud hurts.
-func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float) -> void:
+## Host: a glob on an arc, simulated on every peer; only the host's hazard hurts.
+func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false) -> void:
 	if _online():
-		Net.rpc_to_all(_spawn_spore, [from, to, flight, damage_per_second])
-	_spawn_spore(from, to, flight, damage_per_second)
+		Net.rpc_to_run(_spawn_spore, [from, to, flight, damage_per_second, acid])
+	_spawn_spore(from, to, flight, damage_per_second, acid)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float) -> void:
+func _spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool) -> void:
 	var world := _world()
 	if world == null:
 		return
 	var spore := SporeProjectile.new()
 	spore.damage_per_second = damage_per_second
+	spore.acid = acid
 	world.add_child(spore)
 	spore.launch(from, to, flight)
 

@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 7
+const PROTOCOL := 8
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -446,6 +446,9 @@ func rpc_to_all(method: Callable, args: Array = []) -> void:
 
 
 ## Every peer: call when the run scene is ready (true) or being left (false).
+signal run_peer_loaded(peer_id: int)
+
+
 func report_in_run(value: bool) -> void:
 	if not is_online():
 		return
@@ -460,7 +463,10 @@ func _report_in_run(value: bool) -> void:
 		return
 	var peer := multiplayer.get_remote_sender_id()
 	if value:
+		if not run_active or not roster.has(peer) or run_peers.has(peer):
+			return
 		run_peers[peer] = true
+		run_peer_loaded.emit(peer)
 	else:
 		run_peers.erase(peer)
 

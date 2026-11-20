@@ -34,6 +34,7 @@ var _collision: GPUParticlesCollisionHeightField3D
 var _environment: Environment
 var _sun: DirectionalLight3D
 var _base_sky_energy := 1.0
+var _base_ambient_energy := 1.0
 var _base_sun_energy := 1.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
 
@@ -79,17 +80,23 @@ func _process(delta: float) -> void:
 		_rain.emitting = intensity > 0.01
 		_rain_material.albedo_color = color
 
+	var blackout := WeatherManager.wave_modifier() == WeatherManager.WavePlan.BLACKOUT and WeatherManager.is_storm_active()
+	var darken := .5 if blackout else 1.0
 	if _environment:
 		# Fog stays enabled (density 0 when clear): flipping fog_enabled changes
 		# the shader variant of every material, so the first rain recompiled
 		# the whole scene (a 1 s hitch on desktop, far worse on WebGL).
 		_environment.fog_enabled = true
-		_environment.fog_density = _sample_fog(intensity) * (0.65 if flare_cover else 1.0)
+		var fog := _sample_fog(intensity)
+		if blackout:
+			fog = fog * 1.4 + minf(intensity, .3) * .036
+		_environment.fog_density = fog * (0.65 if flare_cover else 1.0)
 		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
-		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) + flash * 3.0
+		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 3.0
+		_environment.ambient_light_energy = _base_ambient_energy * lerpf(1.0, darken, minf(intensity / .3, 1.0))
 		_environment.fog_density *= 1.0 - flash * 0.6
 	if _sun:
-		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) + flash * 2.5
+		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 2.5
 
 
 func _update_web_shelter_hole(player: Player) -> void:
@@ -242,6 +249,7 @@ func _find_scene_lighting() -> void:
 		break
 	if _environment:
 		_base_sky_energy = _environment.background_energy_multiplier
+		_base_ambient_energy = _environment.ambient_light_energy
 		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 		if _web_rain:
 			_environment.glow_enabled = false

@@ -34,6 +34,33 @@ var _kind := "drip"
 func _ready() -> void:
 	_enemy = get_parent() as EnemyBase
 	_kind = _enemy.data.display_name.to_lower()
+	_body = Node3D.new()
+	add_child(_body)
+	_build_model()
+	if _enemy.miniboss_wave > 0:
+		_build_miniboss_trappings(_enemy.miniboss_wave)
+	scale *= randf_range(0.94, 1.06)
+	# One mesh per bone instead of ~40 boxes per enemy.
+	for bone in [_body, _head, _jaw] + limbs + _elbows + _knees:
+		if bone:
+			MeshMerge.merge_children(bone, not _web_model)
+	_body.add_child(_mutation_root)
+	_apply_mutations()
+	if GameManager.mutations:
+		GameManager.mutations.mutations_changed.connect(_on_mutations_changed)
+	_enemy.winding_up.connect(func(): _anticipation = 1.0)
+	_enemy.staggered.connect(func(): _hurt = 1.0)
+	_enemy.molted.connect(_on_molted)
+	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
+	scale *= 0.1
+	create_tween().tween_property(self, "scale", scale * 10.0, .3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_enemy.damaged.connect(func(_amount, _health):
+		_hurt = 1.0
+		if _enemy._bullet_critical:
+			_head_kick = 1.0)
+
+
+func _build_model() -> void:
 	var gutter := _kind == "gutter"
 	var mister := _kind == "mister"
 	var outfit: Array = OUTFITS.pick_random()
@@ -54,8 +81,6 @@ func _ready() -> void:
 		accent = Color("#c6f075")
 		_reach = 0.3
 	var web := OS.has_feature("web")
-	_body = Node3D.new()
-	add_child(_body)
 	# Torso: pelvis, belly, chest. The shirt is torn open over the ribs.
 	_piece(_body, Vector3(0, 0.8, 0), Vector3(.5, .2, .3), pants)
 	_piece(_body, Vector3(0, 1.0, 0), Vector3(.52, .24, .3), shirt)
@@ -141,28 +166,6 @@ func _ready() -> void:
 	if gutter:
 		scale = Vector3(1.05, .82, 1.0)
 		_body.rotation.x = -.25
-	if _enemy.miniboss_wave > 0:
-		_build_miniboss_trappings(_enemy.miniboss_wave)
-	scale *= randf_range(0.94, 1.06)
-	# One mesh per bone instead of ~40 boxes per enemy: a horde was over a
-	# thousand draw calls, which is what made big fights crawl on WebGL.
-	for bone in [_body, _head, _jaw] + limbs + _elbows + _knees:
-		if bone:
-			MeshMerge.merge_children(bone, not _web_model)
-	_body.add_child(_mutation_root)
-	_apply_mutations()
-	if GameManager.mutations:
-		GameManager.mutations.mutations_changed.connect(_on_mutations_changed)
-	_enemy.winding_up.connect(func(): _anticipation = 1.0)
-	_enemy.staggered.connect(func(): _hurt = 1.0)
-	_enemy.molted.connect(_on_molted)
-	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
-	scale *= 0.1
-	create_tween().tween_property(self, "scale", scale * 10.0, .3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_enemy.damaged.connect(func(_amount, _health):
-		_hurt = 1.0
-		if _enemy._bullet_critical:
-			_head_kick = 1.0)
 
 
 func _exit_tree() -> void:
@@ -183,6 +186,7 @@ func _on_molted() -> void:
 
 func _apply_mutations() -> void:
 	for child in _mutation_root.get_children():
+		_mutation_root.remove_child(child)
 		child.queue_free()
 	_spore_sacs.clear()
 	_molt_plates.clear()
@@ -244,8 +248,19 @@ func _apply_mutations() -> void:
 		for y in [0.95, 1.15, 1.35]:
 			_piece(_mutation_root, Vector3(0, y, 0.0), Vector3(0.66, 0.07, 0.4), Color("#6a73d9"), false, 0.7)
 	if _enemy.is_elite:
-		# Glowing elite crest above the head (False Clearing).
-		_piece(_mutation_root, Vector3(0, 2.02, -0.02), Vector3(0.32, 0.1, 0.28), Color("#8ce8ff"), true)
+		# Twin amber bars above the silhouette identify elites through the rain.
+		for side in [-1.0, 1.0]:
+			_piece(_mutation_root, Vector3(side * 0.19, elite_crest_height(), -0.02), Vector3(0.23, 0.085, 0.18), Color("#ffc76f"), true)
+	_mesh_merge_mutation_trim()
+
+
+func elite_crest_height() -> float:
+	return 2.02
+
+
+func _mesh_merge_mutation_trim() -> void:
+	if _web_model:
+		MeshMerge.merge_children(_mutation_root, false)
 
 
 ## One material per color/glow/metal combo, shared by every infected, so the
@@ -312,18 +327,23 @@ func _build_miniboss_trappings(wave: int) -> void:
 			_piece(_head, Vector3(0, 0.26, 0), Vector3(0.5, 0.12, 0.46), volt, true)
 
 
-func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> void:
+func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> MeshInstance3D:
 	if _unit_box == null:
 		_unit_box = BoxMesh.new()
 		_unit_box.size = Vector3.ONE
+	return _shape(parent, _unit_box, at, size, color, glow, metallic)
+
+
+func _shape(parent: Node3D, shape: Mesh, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
-	mesh.mesh = _unit_box
+	mesh.mesh = shape
 	mesh.position = at
 	mesh.scale = size
 	if _web_model:
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mesh.material_override = _shared_material(color, glow, metallic)
 	parent.add_child(mesh)
+	return mesh
 
 var _gait := {}
 

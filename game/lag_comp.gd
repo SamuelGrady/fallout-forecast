@@ -10,7 +10,7 @@ extends RefCounted
 ## its recorded historical position for `now_ms - rewind_ms`.
 
 const WORLD_LAYER := 1 << 0
-const BOSS_LAYER := 1 << 2
+const ENEMY_LAYER := 1 << 2
 const MAX_REWIND_MS := 250
 
 
@@ -104,7 +104,7 @@ static func cast_rewound(world: World3D, tree: SceneTree, origin: Vector3, dir: 
 	# 2. Rewound enemies (analytical vertical capsule).
 	for node in tree.get_nodes_in_group("enemies"):
 		var enemy := node as EnemyBase
-		if enemy == null or not enemy.is_inside_tree() or enemy.health <= 0.0:
+		if enemy == null or not enemy.is_inside_tree() or enemy.health <= 0.0 or (enemy.collision_layer & ENEMY_LAYER) == 0:
 			continue
 		var pos: Vector3 = enemy.sample_position(target_ms) if enemy.has_method("sample_position") else enemy.global_position
 		var cap := capsule_at(enemy, pos)
@@ -127,7 +127,7 @@ static func cast_rewound(world: World3D, tree: SceneTree, origin: Vector3, dir: 
 	if not tree.get_nodes_in_group("boss_parts").is_empty():
 		var boss_exclude := exclude.duplicate()
 		for _i in 4:
-			var bq := PhysicsRayQueryParameters3D.create(origin, origin + dir * wall_dist, BOSS_LAYER, boss_exclude)
+			var bq := PhysicsRayQueryParameters3D.create(origin, origin + dir * wall_dist, ENEMY_LAYER, boss_exclude)
 			var bh := space.intersect_ray(bq)
 			if bh.is_empty():
 				break
