@@ -15,12 +15,4 @@ Web uses the single-threaded Compatibility renderer export and retains Jolt. It 
 
 The production image builds with `docker build -f web/Dockerfile .` on ARM64 or AMD64. Nginx serves port 8080 with a `/healthz` probe. It serves the HTML with `no-store` and compressed WASM, PCK, and JS from a content-hashed directory. The launcher resolves assets relative to `/fallout/`.
 
-Coolify should deploy this image from the GitHub App source on `master`, with its native push webhook enabled. For the first deployment, select `web-build`, deploy it, then set the monitored branch to `master` without redeploying until the branch is merged. Use the Dockerfile build pack, base directory `/`, Dockerfile `/web/Dockerfile`, and no generated domain. Add these Caddy labels to the game app. They extend the existing `https://drewdettmer.com` site block with a more specific route, stripping the prefix before proxying to nginx.
-
-```ini
-caddy_ingress_network=coolify
-caddy_0=https://drewdettmer.com
-caddy_0.redir=/fallout /fallout/ 308
-caddy_0.handle_path=/fallout/*
-caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}
-```
+The **Web export** GitHub Actions workflow builds the ARM64 image, checks nginx responses, and uploads the web files as a workflow artifact on pushes to `web-build` and `master`. Production builds run in a separate Coolify app through the existing GitHub App push webhook. See [the rollout steps](deploy.md).
