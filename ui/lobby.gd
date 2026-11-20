@@ -249,7 +249,7 @@ func _on_run_started() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	get_tree().change_scene_to_file(RUN_SCENE)
+	SceneLoader.goto(RUN_SCENE)
 
 
 func _on_server_closed() -> void:

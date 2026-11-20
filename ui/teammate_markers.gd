@@ -6,7 +6,7 @@ extends CanvasLayer
 ## pulse red with REVIVE; Turned ones show as a hostile marker.
 
 const EDGE := 34.0
-const FONT := preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
+const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
 
 var _canvas := Control.new()
 var _clock := 0.0

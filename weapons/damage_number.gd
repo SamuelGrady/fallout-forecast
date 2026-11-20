@@ -7,7 +7,7 @@ var _tween: Tween
 
 
 func _ready() -> void:
-	font = preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
+	font = preload("res://assets/fonts/VT323-Regular.ttf")
 	pixel_size = .006
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	# Draw over the enemy that was hit; it spawns at the impact point, which

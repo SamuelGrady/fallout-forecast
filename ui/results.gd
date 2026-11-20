@@ -74,7 +74,7 @@ func _ready() -> void:
 	if Net.is_online():
 		play = _button(actions, "BACK TO LOBBY", func(): get_tree().change_scene_to_file(LOBBY_SCENE))
 	else:
-		play = _button(actions, "PLAY AGAIN", func(): get_tree().change_scene_to_file(RUN_SCENE))
+		play = _button(actions, "PLAY AGAIN", func(): SceneLoader.goto(RUN_SCENE))
 	BroadcastUI.button_role(play, true)
 	_button(actions, "MAIN MENU", _on_menu)
 	play.grab_focus()

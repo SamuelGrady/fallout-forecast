@@ -27,7 +27,7 @@ var _hand_pads: Array[MeshInstance3D] = []
 func _ready() -> void:
 	add_to_group("crates")
 	label.visible = false
-	label.font = preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
+	label.font = preload("res://assets/fonts/VT323-Regular.ttf")
 	label.pixel_size = 0.008
 	label.font_size = 56
 	_build_lid_and_pads()

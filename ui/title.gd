@@ -315,7 +315,7 @@ func _set_volume(value: float) -> void:
 func _on_play() -> void:
 	Settings.save()
 	Net.leave()
-	get_tree().change_scene_to_file(RUN_SCENE)
+	SceneLoader.goto(RUN_SCENE)
 
 
 func _on_host() -> void:

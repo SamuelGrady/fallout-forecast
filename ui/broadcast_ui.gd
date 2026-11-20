@@ -1,7 +1,7 @@
 ﻿class_name BroadcastUI
 extends RefCounted
 
-const FONT := preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
+const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
 const INK := Color("#0c1422")
 const PAPER := Color("#e8e9d5")
 const CYAN := Color("#66dfda")
