@@ -94,5 +94,5 @@ func _burst(at: Vector3) -> void:
 		var floor_hit := get_world_3d().direct_space_state.intersect_ray(query)
 		at = floor_hit.get("position", at)
 	Sound.play_at("smog_splash" if acid else "spore_burst", at)
-	SporeCloud.spawn(get_parent(), at, acid, 3.0 if acid else 2.5, 6.0 if acid else 4.0, damage_per_second, source, hazard_id)
+	SporeCloud.spawn(get_parent(), at, acid, 3.0 if acid else 2.5, 6.0 if acid else 4.0, damage_per_second, source if is_instance_valid(source) else null, hazard_id)
 	queue_free()

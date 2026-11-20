@@ -12,7 +12,7 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": "harbor", "name": "HARBOR POINT", "blurb": "Flooded docks and a silent cannery.",
 		"scene": "res://levels/harbor/level_harbor.tscn", "accent": Color("#83b8ff"),
 		"preview": "res://assets/ui/harbor.webp", "channel": "02"},
-	{"id": "maple_hollow", "name": "MAPLE HOLLOW", "blurb": "A quiet cul-de-sac beside the cemetery.",
+	{"id": "maple_hollow", "name": "MAPLE HOLLOW", "blurb": "Misty pine woods around an old chapel and cemetery.",
 		"scene": "res://levels/maple_hollow/level_maple_hollow.tscn", "accent": Color("#ff9a75"),
 		"preview": "res://assets/ui/maple_hollow.webp", "channel": "03"},
 ]
