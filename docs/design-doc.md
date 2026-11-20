@@ -279,6 +279,22 @@ What still crosses the network only as visuals: rain, fog, puddles, the retro sh
 
 Known gaps: death particles and spore clouds spawned by a death only appear on the host until they are broadcast the same way ammo drops are; the decon shower sound plays on the host only; there is no lag compensation and no interpolation, so remote players move at 20 Hz steps.
 
+**November 20 update.** The build now has custom art throughout, a dedicated cloud server, a browser build, and fixes for every finding from the November 19 playtest and whole-game review.
+
+| Area | What was built | Where |
+| --- | --- | --- |
+| Guns | Code-built firearms replace the Kenney blasters: carbine with a reflex red dot, pump shotgun with a brass bead and animated forend, custom cursed weapons. ADS aligns the sight to screen centre and hides the crosshair. | `weapons/gun_models.gd`, `weapons/weapon_holder.gd` |
+| Gun audio | Synthesized gunshots (crack, body, thump, slapback echo), flesh impacts, pump and mag-swap sounds. Buses with a limiter and music ducking. | `tools/audio/gen_gun_sfx.py`, `game/sound.gd` |
+| Grenades | Flare Gun became the Shield Dome (thrown, full shelter inside, pushes infected out). Bug Bomb became a Frag Grenade. Both show a throw-arc preview with a landing ring. | `weapons/projectile.gd`, `weapons/*.tres` |
+| Infected | Jointed limbs, reaching arms, hanging jaws, varied outfits, archetype gaits, hit reactions, growls and windup tells. | `enemies/infected_model.gd`, `enemies/enemy_base.gd` |
+| Players | Animated hazmat model in per-player suit colours (walk, sprint, aim, downed, Turned). Remote players are interpolated. | `player/player_model.gd`, `player/player.gd` |
+| Map | All 17 buildings individually modelled. Signs are modelled neon tubes mounted on facades or posts; none float. | `props/building_kit.gd`, `props/pinecrest_*.gd`, `props/neon_lettering.gd` |
+| Pacing | Ready-up (G) skips Calm and Clearing, a 12 s first Calm with a storm countdown, a crate near each player at Calm, authored wave beats, rotating district objectives. | `game/game_manager.gd`, `enemies/enemy_spawner.gd` |
+| Mutations | The roll explains itself, auto-pulls in solo, and every mutation grants a matching player perk. | `ui/slot_reel.gd`, `game/game_manager.gd` |
+| Multiplayer | All transport is WebSocket. LAN discovery uses broadcast, per-interface broadcast and multicast. Global pause. Dedicated headless server at `wss://fallout.drew.place`. | `game/net.gd`, `game/dedicated_server.gd`, `server/` |
+| Web | Godot web export (Compatibility renderer, single-threaded) with an nginx container and a GitHub Actions workflow for drewdettmer.com/fallout. Production deploy waits on Coolify access. | `web/`, `.github/workflows/web-export.yml` |
+| Fixes | Decon repair hold no longer resets near the shower; HUD vitals readable; lightning reveal is announced; solo play no longer errors after leaving a session. | `player/player.gd`, `ui/hud.gd`, `game/net.gd` |
+
 ## Team, milestones and risks
 
 Sam and Drew build the game in three weeks.
@@ -370,7 +386,7 @@ Each week ends with both of you playing the gate together in 2+ instances.
 - [x] Boss\_Cumulus (fallback: a Mister swarm in an Acid Storm)
 - [x] RetroScreen: PS1 shader, dither, VHS overlay
 - [x] SlotReelUI that lands on the host's result
-- [ ] Title, lobby UI and results screen
+- [x] Title, lobby UI and results screen
 
   Title, settings and results are implemented. Play starts a solo run.
 - [ ] PSA screens and recorded voice lines
