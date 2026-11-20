@@ -34,6 +34,7 @@ func _ready() -> void:
 	screen.material = screen.material.duplicate()
 	(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", false)
 	enabled = Settings.retro_enabled
+	Settings.video_changed.connect(_on_video_changed)
 	var recording_layer := CanvasLayer.new()
 	recording_layer.layer = 4
 	add_child(recording_layer)
@@ -52,12 +53,30 @@ func _ready() -> void:
 		(overlay.material as ShaderMaterial).set_shader_parameter("interface_pass", true)
 		_interface_layer.add_child(overlay)
 
-	WeatherManager.lightning_struck.connect(func(_p, _s): _glitch = maxf(_glitch, lightning_glitch))
+	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
 	_apply_enabled()
 	rec.add_theme_font_override("font", BroadcastUI.FONT)
 	stamp.add_theme_font_override("font", BroadcastUI.FONT)
+
+
+func _exit_tree() -> void:
+	if Settings.video_changed.is_connected(_on_video_changed):
+		Settings.video_changed.disconnect(_on_video_changed)
+	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
+		WeatherManager.lightning_struck.disconnect(_on_lightning_struck)
+	if get_tree() and get_tree().node_added.is_connected(_on_node_added):
+		get_tree().node_added.disconnect(_on_node_added)
+
+
+func _on_lightning_struck(_p: Vector3, _s: float) -> void:
+	_glitch = maxf(_glitch, lightning_glitch)
+
+
+func _on_video_changed() -> void:
+	enabled = Settings.retro_enabled
+	_apply_enabled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -87,6 +106,9 @@ func _process(delta: float) -> void:
 	var month := MONTH if day <= 31 else "NOV"
 	if day > 31:
 		day -= 31
+	stamp.visible = enabled and (interface_only or get_tree().paused)
+	rec.add_theme_font_size_override("font_size", 20)
+	stamp.add_theme_font_size_override("font_size", 16)
 	stamp.text = "%s %02d 1987\n%2d:%02d:%02d %s" % [month, day, h12, (s / 60) % 60, s % 60, ampm]
 
 

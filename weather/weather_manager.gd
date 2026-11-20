@@ -36,9 +36,9 @@ const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 @export var calm_duration := 30.0
 ## Placeholder until the slot reel exists; the roll itself is Sam's.
 @export var mutation_roll_duration := 5.0
-@export var drizzle_duration := 60.0
-@export var downpour_min_duration := 60.0
-@export var downpour_max_duration := 90.0
+@export var drizzle_duration := 30.0
+@export var downpour_min_duration := 40.0
+@export var downpour_max_duration := 50.0
 @export var clearing_duration := 15.0
 ## How fast storm_intensity eases toward its target, in intensity per second.
 @export var intensity_ramp := 0.1
@@ -68,7 +68,7 @@ var intensity_override := -1.0
 func _process(delta: float) -> void:
 	if running:
 		phase_time_left = maxf(phase_time_left - delta, 0.0)
-		if auto_cycle and Net.is_host() and phase_time_left <= 0.0 and not hold:
+		if auto_cycle and Net.is_host() and phase_time_left <= 0.0 and not hold and _combat_complete():
 			next_phase()
 		if Net.is_host() and phase == Phase.DOWNPOUR:
 			_lightning_timer -= delta
@@ -254,3 +254,13 @@ func _state_for(value: float) -> StormState:
 		if value >= STORM_INTENSITY[s] - 0.001:
 			return s
 	return StormState.CLEAR
+
+
+## A Downpour doesn't end while the horde is still alive. Host only, since it
+## is only used to decide whether the phase timer may advance.
+func _combat_complete() -> bool:
+	if phase != Phase.DOWNPOUR or not GameManager.run_active:
+		return true
+	var scene := get_tree().current_scene
+	var spawner := scene.get_node_or_null("Enemies") if scene else null
+	return spawner == null or spawner.can_finish_wave()

@@ -1,91 +1,92 @@
 extends Control
-## Results screen after a run: won or lost, waves survived, and per player
-## kills, revives, times Turned and best cursed weapon roll.
-
 const RUN_SCENE := "res://main.tscn"
 const TITLE_SCENE := "res://ui/title.tscn"
 const LOBBY_SCENE := "res://ui/lobby.tscn"
 
-
 func _ready() -> void:
+	MenuState.reset()
 	theme = BroadcastUI.theme()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color("100A1E")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
 	BroadcastUI.backdrop(self)
-	bg.queue_free()
-	var r: Dictionary = GameManager.last_results
-	var won: bool = r.get("won", false)
+	var result: Dictionary = GameManager.last_results
+	var won: bool = result.get("won",false)
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 26)
-	BroadcastUI.reveal(box)
-	box.offset_left = -440
-	box.offset_right = 440
-	box.offset_top = -210
+	box.offset_left = -400
+	box.offset_right = 400
+	box.offset_top = -230
+	box.add_theme_constant_override("separation",20)
 	add_child(box)
-	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 60, Color("8FD65A") if won else Color("FF3EA5"))
-	_label(box, "WAVES SURVIVED: %d / %d" % [int(r.get("waves", 0)), WeatherManager.FINAL_WAVE], 28, Color("F2E3C6"))
-	var grid := GridContainer.new()
-	grid.columns = 5
-	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	grid.add_theme_constant_override("h_separation", 36)
-	grid.add_theme_constant_override("v_separation", 8)
-	box.add_child(grid)
-	for h in ["PLAYER", "KILLS", "REVIVES", "TURNED", "BEST CURSED ROLL"]:
-		_label(grid, h, 18, Color("2EE6E6"))
-	var players: Dictionary = r.get("players", {})
-	for id in players:
-		var p: Dictionary = players[id]
-		_label(grid, str(p.get("name", "?")).to_upper(), 22, Color("F2E3C6"))
-		_label(grid, str(p.get("kills", 0)), 22, Color("F2E3C6"))
-		_label(grid, str(p.get("revives", 0)), 22, Color("F2E3C6"))
-		_label(grid, str(p.get("turned", 0)), 22, Color("F2E3C6"))
-		var cursed := str(p.get("cursed", ""))
-		_label(grid, cursed.to_upper() if cursed != "" else "-", 22, Color("FF3EA5") if cursed != "" else Color("F2E3C6"))
-	_label(box, "STAY DRY, STAY ALIVE.  PINECREST HEALTH DEPT.", 16, Color("8FD65A"))
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 20)
-	box.add_child(row)
+	_label(box,"PINECREST IS SAFE" if won else "PINECREST IS LOST",52,BroadcastUI.CYAN if won else BroadcastUI.PINK)
+	var waves := HBoxContainer.new()
+	waves.alignment = BoxContainer.ALIGNMENT_CENTER
+	waves.add_theme_constant_override("separation",12)
+	box.add_child(waves)
+	for i in 5:
+		var segment := PanelContainer.new()
+		segment.custom_minimum_size = Vector2(90,45)
+		segment.add_theme_stylebox_override("panel",BroadcastUI.panel(Color("#29545d") if i < int(result.get("waves",0)) else Color("#14232d")))
+		waves.add_child(segment)
+		_label(segment,str(i+1),24,BroadcastUI.PAPER)
+	var players: Dictionary = result.get("players",{})
+	if players.size() <= 1:
+		var stats: Dictionary = players.values()[0] if not players.is_empty() else {}
+		_label(box,str(stats.get("kills",0)),80,BroadcastUI.PAPER)
+		_label(box,"ELIMINATIONS",18,BroadcastUI.CYAN)
+		var weapon := str(stats.get("weapon",stats.get("cursed","")))
+		if not weapon.is_empty():
+			_label(box,weapon.to_upper(),24,BroadcastUI.PAPER)
+	else:
+		var grid := GridContainer.new()
+		grid.columns = 4
+		grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		grid.add_theme_constant_override("h_separation",24)
+		box.add_child(grid)
+		for heading in ["PLAYER","KILLS","REVIVES","TURNED"]:
+			_label(grid,heading,18,BroadcastUI.CYAN)
+		for stats in players.values():
+			for value in [stats.get("name","PLAYER"),stats.get("kills",0),stats.get("revives",0),stats.get("turned",0)]:
+				_label(grid,str(value),22,BroadcastUI.PAPER)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation",16)
+	box.add_child(actions)
+	var play: Button
 	# Online, another run has to start from the lobby: only the host can send
 	# everyone into the run scene.
 	if Net.is_online():
-		_button(row, "BACK TO LOBBY", func(): get_tree().change_scene_to_file(LOBBY_SCENE))
+		play = _button(actions,"BACK TO LOBBY",func(): get_tree().change_scene_to_file(LOBBY_SCENE))
 	else:
-		_button(row, "PLAY AGAIN", func(): get_tree().change_scene_to_file(RUN_SCENE))
-	_button(row, "TITLE", _on_title)
+		play = _button(actions,"PLAY AGAIN",func(): get_tree().change_scene_to_file(RUN_SCENE))
+	BroadcastUI.button_role(play,true)
+	_button(actions,"MAIN MENU",_on_menu)
+	play.grab_focus()
+	BroadcastUI.reveal(box)
 
-
-func _on_title() -> void:
+func _on_menu() -> void:
 	Net.leave()
 	get_tree().change_scene_to_file(TITLE_SCENE)
 
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		_on_menu()
+		get_viewport().set_input_as_handled()
 
-func _label(parent: Control, text: String, size: int, color: Color) -> void:
-	var l := Label.new()
-	l.text = text
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 0)
-	parent.add_child(l)
+func _label(parent: Node, text: String, font_size: int, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size",font_size)
+	label.add_theme_color_override("font_color",color)
+	parent.add_child(label)
 
-
-func _button(parent: Control, text: String, action: Callable) -> void:
-	var b := Button.new()
-	b.text = text
-	BroadcastUI.animate_button(b)
-	b.custom_minimum_size = Vector2(240, 52)
-	b.add_theme_font_size_override("font_size", 24)
-	b.pressed.connect(func():
+func _button(parent: Node, text: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(240,54)
+	BroadcastUI.animate_button(button)
+	button.pressed.connect(func():
 		Sound.play("ui_click")
 		action.call())
-	parent.add_child(b)
+	parent.add_child(button)
+	return button

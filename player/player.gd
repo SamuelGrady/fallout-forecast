@@ -103,6 +103,7 @@ var _jump_buffer_timer := 0.0
 var _pitch := 0.0
 var _shelter_query := PhysicsPointQueryParameters3D.new()
 var _puddle_query := PhysicsPointQueryParameters3D.new()
+var _hold_target: Interactable
 var _hold := 0.0
 var _hold_done := false
 var _melee_left := 0.0
@@ -298,6 +299,8 @@ func _host_tick(delta: float) -> void:
 	match state:
 		"ok":
 			var drain := WeatherManager.suit_loss_per_second() if exposed else 0.0
+			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
+				drain *= 0.25
 			if holding_leaky:
 				drain = maxf(drain, leaky_drain)
 			if drain > 0.0:
@@ -449,42 +452,49 @@ func _apply_grant(item: String) -> void:
 func _handle_interact(delta: float) -> void:
 	var best: Interactable = null
 	var best_score := INF
-	if state != "turned":
+	if state != "turned" and GameManager.mutations.stage == "":
 		var forward := -camera.global_basis.z
 		for node in get_tree().get_nodes_in_group("interactables"):
 			var it := node as Interactable
-			if it == null or not it.is_visible_in_tree():
+			if it == null or not it.is_visible_in_tree() or not it.can_interact(self):
 				continue
-			var to := it.global_position - global_position
-			var d := to.length()
-			if d > it.radius or not it.can_interact(self):
+			var self_revive := it.get_parent() == self and state == "downed"
+			var direction := it.global_position - camera.global_position
+			var distance := global_position.distance_to(it.global_position)
+			if distance > it.radius:
 				continue
-			var score := d - forward.dot(to.normalized() if d > 0.01 else forward)
+			if not self_revive:
+				if forward.dot(direction.normalized()) < 0.65:
+					continue
+				var query := PhysicsRayQueryParameters3D.create(camera.global_position,it.global_position, WORLD_LAYER,[get_rid()])
+				var hit := get_world_3d().direct_space_state.intersect_ray(query)
+				if not hit.is_empty() and hit.collider != it.get_parent():
+					continue
+			var score := distance - forward.dot(direction.normalized())
 			if score < best_score:
-				best_score = score
 				best = it
-	if best == null and GameManager.has_method("lever_prompt"):
-		var lever: String = GameManager.lever_prompt(self)
-		if lever != "":
-			interact_prompt = "[E] " + lever
-			interact_progress = 0.0
-			if Input.is_action_just_pressed("interact"):
-				GameManager.pull_lever()
-			return
+				best_score = score
+	if best != _hold_target:
+		if is_instance_valid(_hold_target):
+			_hold_target.set_targeted(false)
+		_hold_target = best
+		_hold = 0.0
+		_hold_done = false
+		interact_progress = 0.0
+		if best:
+			best.set_targeted(true)
 	if best == null:
 		interact_prompt = ""
 		interact_progress = 0.0
-		_hold = 0.0
-		_hold_done = false
 		return
-	interact_prompt = "[E] " + best.get_prompt(self)
+	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), best.get_prompt(self)]
 	var need := best.get_hold_time(self)
 	if Input.is_action_pressed("interact"):
 		_hold += delta
-		interact_progress = clampf(_hold / maxf(need, 0.001), 0.0, 1.0)
+		interact_progress = clampf(_hold / maxf(need,0.001),0,1)
 		if _hold >= need and not _hold_done:
 			_hold_done = true
-			GameManager.interact(best, self)
+			GameManager.interact(best,self)
 	else:
 		_hold = 0.0
 		_hold_done = false
@@ -591,6 +601,8 @@ const VITALS_RATE := 0.2
 
 var _net_left := 0.0
 var _vitals_left := 0.0
+## enemy net id -> the damage number still floating over it.
+var _numbers := {}
 
 
 func _net_step(delta: float) -> void:
@@ -678,36 +690,43 @@ func _apply_tarp(value: bool) -> void:
 
 ## Host: tell whoever fired that the shot landed. The host's own player shows
 ## it straight away; a client's is sent to that client.
-func notify_hit(killed: bool, critical: bool, point: Vector3, amount: int) -> void:
+func notify_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id := 0) -> void:
 	if not Net.is_host():
 		return
 	if get_multiplayer_authority() == 1 or not Net.is_online():
-		local_hit(killed, critical, point, amount)
+		local_hit(killed, critical, point, amount, enemy_id)
 	else:
-		_receive_hit.rpc_id(get_multiplayer_authority(), killed, critical, point, amount)
+		_receive_hit.rpc_id(get_multiplayer_authority(), killed, critical, point, amount, enemy_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _receive_hit(killed: bool, critical: bool, point: Vector3, amount: int) -> void:
+func _receive_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id: int) -> void:
 	if multiplayer.get_remote_sender_id() != 1:
 		return
-	local_hit(killed, critical, point, amount)
+	local_hit(killed, critical, point, amount, enemy_id)
 
 
 ## Owner of the shot: hit marker, floating number and the headshot sting.
-func local_hit(killed: bool, critical: bool, point: Vector3, amount: int) -> void:
+func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id := 0) -> void:
 	GameManager.combat_hit.emit(killed, critical)
 	if amount > 0:
-		show_damage(point, amount, critical)
+		show_damage(point, amount, critical, enemy_id)
 	if critical:
 		Sound.play("headshot", -10.0)
 
 
-## A damage number that every peer could see, at the point the shot landed.
-func show_damage(point: Vector3, amount: int, critical: bool) -> void:
+## A damage number at the point the shot landed. Rapid hits on the same enemy
+## stack into one number, which is why the enemy's net id comes along: the
+## stacking has to happen on the shooter's machine, whichever peer that is.
+func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
+	if enemy_id > 0:
+		var existing = _numbers.get(enemy_id)
+		if is_instance_valid(existing) and float(existing.get("age")) < 0.12:
+			existing.add_hit(amount, critical)
+			return
 	var number := Label3D.new()
 	number.set_script(preload("res://weapons/damage_number.gd"))
 	# Set before add_child: damage_number's _ready() reads both.
@@ -715,3 +734,7 @@ func show_damage(point: Vector3, amount: int, critical: bool) -> void:
 	number.set("critical", critical)
 	parent.add_child(number)
 	number.global_position = point + Vector3.UP * 0.25
+	if enemy_id > 0:
+		if _numbers.size() > 64:
+			_numbers.clear()
+		_numbers[enemy_id] = number

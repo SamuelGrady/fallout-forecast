@@ -109,7 +109,8 @@ func _open_double(crate: Node, player: Node) -> void:
 			get_tree().create_timer(1.3).timeout.connect(_give.bind(victim, cursed))
 	else:
 		_double_waiting[key] = [player, _clock]
-		GameManager.show_banner("DOUBLE OR NOTHING: a partner has %.1f s!" % DOUBLE_WINDOW, Color("FFE04A"), 1.5)
+		if crate.has_method("set_partner_waiting"):
+			crate.set_partner_waiting(DOUBLE_WINDOW)
 
 
 func _roll(player: Node) -> String:
@@ -129,12 +130,12 @@ func _reveal(crate: Node, item: String, override_text := "") -> void:
 	var pool: Array = (loot.common_items + loot.rare_items + loot.cursed_items).map(func(i): return loot.display_name(i))
 	var text := override_text if override_text != "" else loot.display_name(item)
 	var tier := loot.tier_of(item)
-	_apply_reveal(crate.name, text, tier, pool)
-	_apply_reveal.rpc(crate.name, text, tier, pool)
+	_apply_reveal(crate.name, text, tier, pool, item)
+	_apply_reveal.rpc(crate.name, text, tier, pool, item)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _apply_reveal(node_name: String, text: String, tier: String, pool: Array) -> void:
+func _apply_reveal(node_name: String, text: String, tier: String, pool: Array, item_id: String) -> void:
 	var parent := _container()
 	if parent == null:
 		return
@@ -145,7 +146,7 @@ func _apply_reveal(node_name: String, text: String, tier: String, pool: Array) -
 	var interact := crate.get_node_or_null("Interact")
 	if interact:
 		interact.set("opened", true)
-	crate.play_spin(text, tier, pool)
+	crate.play_spin(text, tier, pool, item_id)
 
 
 func _give(player: Node, item: String) -> void:

@@ -8,6 +8,8 @@ extends CharacterBody3D
 ## Speed and damage are multiplied by WeatherManager.enemy_buff().
 
 signal damaged(amount: float, health_left: float)
+signal winding_up
+signal staggered
 signal attacked(target: Node3D, amount: float)
 signal died(enemy: EnemyBase)
 
@@ -17,9 +19,15 @@ var health := 0.0
 ## Host-assigned, used by the spawner to match this enemy across peers.
 var net_id := 0
 var _bullet_critical := false
-## Where the last bullet landed; falls back to the body for splash damage.
-var _hit_point := Vector3.ZERO
 var target: Node3D
+var _stagger_left := 0.0
+var _slow_left := 0.0
+var _weaken_left := 0.0
+var _windup_left := 0.0
+var _recover_left := 0.0
+var _attack_victim: Node3D
+var _attack_amount := 0.0
+var _dead := false
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _retarget_timer := 0.0
@@ -38,8 +46,11 @@ var _repath_timer := 0.0
 static var _visibility_material: ShaderMaterial
 static var _reveal_material: StandardMaterial3D
 static var _hit_material: StandardMaterial3D
+static var _attack_material: StandardMaterial3D
 var _reveal_left := 0.0
 var _hit_left := 0.0
+var _attack_flash_left := 0.0
+var _last_bullet_point := Vector3.ZERO
 var _push := Vector3.ZERO
 var _last_hit_by: Node = null
 ## Splitters mutation: the small copies don't split again.
@@ -65,21 +76,46 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _dead:
+		return
+	_slow_left = maxf(0.0, _slow_left - delta)
+	_weaken_left = maxf(0.0, _weaken_left - delta)
+	if _stagger_left > 0.0 or _recover_left > 0.0 or _windup_left > 0.0:
+		_stagger_left = maxf(0.0, _stagger_left - delta)
+		_recover_left = maxf(0.0, _recover_left - delta)
+		if _windup_left > 0.0:
+			_windup_left = maxf(0.0, _windup_left - delta)
+			if _windup_left <= 0.0:
+				if is_instance_valid(_attack_victim) and _can_attack(_attack_victim):
+					attack(_attack_victim, _attack_amount)
+				_recover_left = 0.5
+		velocity = Vector3(_push.x, velocity.y - _gravity * delta, _push.z)
+		_push = _push.move_toward(Vector3.ZERO, 25.0 * delta)
+		move_and_slide()
+		return
 	_retarget_timer -= delta
 	_attack_timer -= delta
 	if _retarget_timer <= 0.0 or not is_instance_valid(target):
 		_retarget_timer = data.retarget_interval
 		target = choose_target()
+		var lure := _nearest(get_tree().get_nodes_in_group("enemy_lures"))
+		if lure and global_position.distance_to(lure.global_position) < 12.0:
+			target = lure
 
 	var buff := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	if _slow_left > 0.0:
+		buff *= 0.5
+	if _weaken_left > 0.0:
+		buff *= 0.65
 	var move := Vector3.ZERO
 	if is_instance_valid(target):
 		var to_target := target.global_position - global_position
 		to_target.y = 0.0
-		if to_target.length() <= data.attack_range:
-			if _attack_timer <= 0.0:
+		var stop_range := 1.0 if target.is_in_group("enemy_lures") else data.attack_range
+		if to_target.length() <= stop_range:
+			if _attack_timer <= 0.0 and not target.is_in_group("enemy_lures"):
 				_attack_timer = data.attack_cooldown
-				attack(target, data.damage * buff)
+				_begin_attack(target, data.damage * buff)
 			move = in_range_move(to_target, buff)
 		else:
 			# Re-path when the target has moved, or every REPATH_INTERVAL in case
@@ -104,48 +140,80 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	var changed := false
 	if _hit_left > 0.0:
-		_hit_left -= delta
+		_hit_left = maxf(0.0, _hit_left - delta)
 		if _hit_left <= 0.0:
-			_set_overlay(_reveal_material if _reveal_left > 0.0 else _visibility_material)
+			changed = true
+	if _attack_flash_left > 0.0:
+		_attack_flash_left = maxf(0.0, _attack_flash_left - delta)
+		if _attack_flash_left <= 0.0:
+			changed = true
 	if _reveal_left > 0.0:
-		_reveal_left -= delta
-		if _reveal_left <= 0.0 and _hit_left <= 0.0:
-			_set_overlay.call_deferred(_visibility_material)
+		_reveal_left = maxf(0.0, _reveal_left - delta)
+		if _reveal_left <= 0.0:
+			changed = true
+	if changed:
+		_refresh_overlay()
+
+
+func _refresh_overlay() -> void:
+	if _hit_left > 0.0 and _hit_material:
+		_set_overlay(_hit_material)
+	elif _attack_flash_left > 0.0 and _attack_material:
+		_set_overlay(_attack_material)
+	elif _reveal_left > 0.0 and _reveal_material:
+		_set_overlay(_reveal_material)
+	else:
+		_set_overlay(_visibility_material)
 
 
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
 func knockback(impulse: Vector3) -> void:
 	_push += impulse
+	if impulse.length() >= 0.8:
+		stagger(0.4)
 
 
-## Local only: brief red flash when a shot lands.
+## Local only: brief white-red hit confirmation flash when a shot lands.
 func hit_flash() -> void:
 	if _hit_material == null:
 		_hit_material = StandardMaterial3D.new()
 		_hit_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_hit_material.albedo_color = Color(1, 0.2, 0.15, 0.6)
+		_hit_material.albedo_color = Color(1.0, 0.25, 0.2, 0.55)
 		_hit_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_hit_material.grow = true
-		_hit_material.grow_amount = 0.02
+		_hit_material.grow_amount = 0.015
 	_hit_left = 0.08
-	_set_overlay(_hit_material)
+	_refresh_overlay()
 
 
-## Local only: outline this enemy through walls and fog for `duration` seconds
-## (lightning strikes, the Flare Gun).
+## Local only: distinct warm front-lit attack windup pulse (does not draw through walls).
+func attack_flash(duration: float) -> void:
+	if _attack_material == null:
+		_attack_material = StandardMaterial3D.new()
+		_attack_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_attack_material.albedo_color = Color(1.0, 0.32, 0.12, 0.42)
+		_attack_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_attack_material.grow = true
+		_attack_material.grow_amount = 0.025
+	_attack_flash_left = maxf(_attack_flash_left, duration)
+	_refresh_overlay()
+
+
+## Local only: explicit through-wall reveal outline (lightning strikes, Flare Gun).
 func reveal(duration: float) -> void:
 	if _reveal_material == null:
 		_reveal_material = StandardMaterial3D.new()
 		_reveal_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_reveal_material.albedo_color = Color(1.0, 0.95, 0.6)
+		_reveal_material.albedo_color = Color(0.55, 0.96, 1.0)
 		_reveal_material.grow = true
-		_reveal_material.grow_amount = 0.05
+		_reveal_material.grow_amount = 0.055
 		_reveal_material.cull_mode = BaseMaterial3D.CULL_FRONT
 		_reveal_material.no_depth_test = true
 		_reveal_material.disable_fog = true
 	_reveal_left = maxf(_reveal_left, duration)
-	_set_overlay(_reveal_material)
+	_refresh_overlay()
 
 
 func _set_overlay(material: Material) -> void:
@@ -183,30 +251,39 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
-	# Armor mutation: half damage from the front.
+	# Armor mutation: half damage from the front with visible deflection sparks.
 	if GameManager.has_mutation("armor") and _source is Node3D:
 		var to_source: Vector3 = (_source as Node3D).global_position - global_position
 		to_source.y = 0.0
-		if (-global_basis.z).dot(to_source.normalized()) > 0.3:
+		if to_source.length_squared() > 0.001 and (-global_basis.z).dot(to_source.normalized()) > 0.3:
 			amount *= 0.5
+			var hit_at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.1
+			ShotFX.sparks(get_parent(), hit_at, to_source.normalized(), 4)
 	health -= amount
 	# Hit feedback belongs to whoever fired, host or client, so the shooter's
 	# Player node decides where it appears (see Player.notify_hit).
 	if is_instance_valid(_source) and _source.has_method("notify_hit"):
-		var where := _hit_point if _hit_point != Vector3.ZERO else global_position
-		_source.notify_hit(health <= 0.0, _bullet_critical, where, ceili(amount))
-	_hit_point = Vector3.ZERO
+		var where := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position
+		_source.notify_hit(health <= 0.0, _bullet_critical, where, ceili(amount), net_id)
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
 		die()
 
 
 func die() -> void:
-	# The spawner owns the drop and tells every peer to make one: a drop is
-	# collected locally by whoever walks over it.
-	var drop := not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32
-	if drop and get_parent() and get_parent().has_method("spawn_ammo_drop"):
-		get_parent().spawn_ammo_drop(global_position)
+	if _dead:
+		return
+	_dead = true
+	# The spawner owns the drops and tells every peer to make them: a drop is
+	# collected locally by whoever walks over it, so it has to exist everywhere.
+	var drops: Array = []
+	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+		drops.append([global_position, "ammo"])
+	if not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
+		drops.append([global_position + Vector3(0.6, 0.0, 0.0), "health" if randf() < 0.5 else "suit"])
+	if get_parent() and get_parent().has_method("spawn_drop"):
+		for entry in drops:
+			get_parent().spawn_drop(entry[0], str(entry[1]))
 	for i in 6:
 		var fragment := MeshInstance3D.new()
 		var cube := BoxMesh.new()
@@ -216,7 +293,7 @@ func die() -> void:
 		material.albedo_color = Color("#b5df68") if i % 2 == 0 else Color("#337c87")
 		fragment.material_override = material
 		get_parent().add_child(fragment)
-		fragment.global_position = global_position + Vector3.UP
+		fragment.global_position = global_position + Vector3.UP * (1.6 if _bullet_critical else 1.0)
 		var tween := fragment.create_tween()
 		tween.tween_property(fragment, "position", fragment.position + Vector3(randf_range(-1.5, 1.5), randf_range(.3, 1.2), randf_range(-1.5, 1.5)), .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(fragment, "scale", Vector3.ZERO, .3)
@@ -229,7 +306,7 @@ func die() -> void:
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
 	if get_parent() and get_parent().has_method("notify_despawn"):
-		get_parent().notify_despawn(self, drop)
+		get_parent().notify_despawn(self, drops)
 	died.emit(self)
 	queue_free()
 
@@ -276,7 +353,7 @@ func _face(direction: Vector3) -> void:
 
 
 func take_bullet(amount: float, point: Vector3, source: Node) -> void:
-	if health <= 0.0:
+	if health <= 0.0 or not Net.is_host():
 		return
 	var height := to_local(point).y
 	var head_height := 1.42
@@ -284,7 +361,44 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		"gutter": head_height = 1.16
 		"mister": head_height = 1.63
 	_bullet_critical = height >= head_height
-	# Where the shot landed, so the shooter's damage number floats there.
-	_hit_point = point + Vector3.UP * 0.25
+	if height < 0.65:
+		_slow_left = 1.8
+	if _bullet_critical:
+		stagger(0.3)
+	_last_bullet_point = point
 	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
+	_last_bullet_point = Vector3.ZERO
+	# The floating number is the shooter's business: take_damage routes it
+	# through Player.notify_hit, so it stacks on their screen wherever the host
+	# is. Drew's stacking moved to Player.local_hit for that reason.
 	_bullet_critical = false
+
+
+func stagger(duration: float) -> void:
+	_stagger_left = maxf(_stagger_left, duration)
+	_windup_left = 0.0
+	_attack_victim = null
+	staggered.emit()
+
+
+func weaken(duration: float) -> void:
+	_weaken_left = maxf(_weaken_left, duration)
+
+
+func _can_attack(victim: Node3D) -> bool:
+	if victim.get("state") != "ok" or global_position.distance_to(victim.global_position) > data.attack_range + 0.25:
+		return false
+	var direction := victim.global_position - global_position
+	direction.y = 0.0
+	if data.attack_range < 3.0 and direction.length_squared() > 0.01 and (-global_basis.z).dot(direction.normalized()) < 0.3:
+		return false
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP, victim.global_position + Vector3.UP, 1)
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+func _begin_attack(victim: Node3D, amount: float) -> void:
+	_attack_victim = victim
+	_attack_amount = amount
+	_windup_left = 0.45
+	winding_up.emit()
+	attack_flash(0.45)

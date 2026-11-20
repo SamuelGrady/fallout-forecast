@@ -37,33 +37,41 @@ var _net_left := 0.0
 var _spore_timer := 3.0
 var _summon_timer := 8.0
 var _parts: Array[Node] = []
+var _sac_halos: Array[MeshInstance3D] = []
 var _shell: MeshInstance3D
 var _body: Node3D
+var _cloud_material := StandardMaterial3D.new()
 var _sac_material := StandardMaterial3D.new()
+var _core_material := StandardMaterial3D.new()
+var _core_rings: Node3D
+var _entrance_left := 1.8
 
 
 func _ready() -> void:
 	add_to_group("boss")
 	_anchor = global_position
-	_height = start_height
+	_height = start_height + 16.0
 	var scale_hp := GameManager.enemy_health_scale() if GameManager.has_method("enemy_health_scale") else 1.0
 	for i in 3:
 		part_max[i] = sac_health * scale_hp
 	part_max[3] = core_health * scale_hp
 	part_health = part_max.duplicate()
 	_build()
+	scale = Vector3.ONE * 0.15
+	create_tween().tween_property(self, "scale", Vector3.ONE, 1.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if Net.is_host():
+		WeatherManager.strike_lightning()
 
 
 func _build() -> void:
 	_body = Node3D.new()
 	_body.name = "Body"
 	add_child(_body)
-	var cloud := StandardMaterial3D.new()
-	cloud.albedo_color = Color(0.36, 0.48, 0.28)
-	cloud.roughness = 1.0
-	cloud.disable_fog = true
-	cloud.emission_enabled = true
-	cloud.emission = Color(0.12, 0.2, 0.08)
+	_cloud_material.albedo_color = Color(0.36, 0.48, 0.28)
+	_cloud_material.roughness = 1.0
+	_cloud_material.disable_fog = true
+	_cloud_material.emission_enabled = true
+	_cloud_material.emission = Color(0.12, 0.2, 0.08)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5
 	for i in 9:
@@ -74,7 +82,7 @@ func _build() -> void:
 		s.height = r * 1.6
 		s.radial_segments = 10
 		s.rings = 6
-		s.material = cloud
+		s.material = _cloud_material
 		m.mesh = s
 		m.position = Vector3(rng.randf_range(-4, 4), rng.randf_range(0.5, 2.5), rng.randf_range(-4, 4))
 		_body.add_child(m)
@@ -82,22 +90,52 @@ func _build() -> void:
 	_sac_material.albedo_color = Color(0.85, 1.0, 0.3)
 	_sac_material.emission_enabled = true
 	_sac_material.emission = Color(0.6, 1.0, 0.2)
-	_sac_material.emission_energy_multiplier = 2.0
+	_sac_material.emission_energy_multiplier = 2.2
+	var halo_mat := StandardMaterial3D.new()
+	halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	halo_mat.albedo_color = Color(0.82, 1.0, 0.32, 0.72)
 	for i in 3:
 		var a := TAU * i / 3.0
-		_parts.append(_make_part("Sac%d" % i, i, 1.7, Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0), _sac_material))
-	var core_material := StandardMaterial3D.new()
-	core_material.albedo_color = Color(1.0, 0.3, 0.6)
-	core_material.emission_enabled = true
-	core_material.emission = Color(1.0, 0.2, 0.5)
-	core_material.emission_energy_multiplier = 1.5
-	_parts.append(_make_part("Core", 3, 2.2, Vector3(0, -1.8, 0), core_material))
+		var sac := _make_part("Sac%d" % i, i, 1.7, Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0), _sac_material)
+		var halo := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 2.05
+		torus.outer_radius = 2.32
+		halo.mesh = torus
+		halo.material_override = halo_mat
+		sac.add_child(halo)
+		_sac_halos.append(halo)
+		_parts.append(sac)
+
+	_core_material.albedo_color = Color(1.0, 0.3, 0.6)
+	_core_material.emission_enabled = true
+	_core_material.emission = Color(1.0, 0.2, 0.5)
+	_core_material.emission_energy_multiplier = 1.6
+	var core := _make_part("Core", 3, 2.2, Vector3(0, -1.8, 0), _core_material)
+	_parts.append(core)
+	_core_rings = Node3D.new()
+	_core_rings.visible = false
+	core.add_child(_core_rings)
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_mat.albedo_color = Color("#ff5689")
+	for tilt in [Vector3(0.4, 0, 0.2), Vector3(-0.5, 0.3, 0.7)]:
+		var rmesh := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 2.75
+		torus.outer_radius = 3.0
+		rmesh.mesh = torus
+		rmesh.rotation = tilt
+		rmesh.material_override = ring_mat
+		_core_rings.add_child(rmesh)
+
 	_shell = MeshInstance3D.new()
 	var shell_mesh := SphereMesh.new()
-	shell_mesh.radius = 2.8
-	shell_mesh.height = 5.6
+	shell_mesh.radius = 2.85
+	shell_mesh.height = 5.7
 	var shell_mat := StandardMaterial3D.new()
-	shell_mat.albedo_color = Color(0.5, 0.7, 0.4, 0.55)
+	shell_mat.albedo_color = Color(0.5, 0.7, 0.4, 0.58)
 	shell_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shell_mesh.material = shell_mat
 	_shell.mesh = shell_mesh
@@ -131,7 +169,19 @@ func _make_part(part_name: String, i: int, radius: float, pos: Vector3, material
 func _process(delta: float) -> void:
 	_t += delta
 	_body.rotation.y += delta * 0.15
-	_sac_material.emission_energy_multiplier = 1.5 + sin(_t * 4.0) * 0.8
+	_sac_material.emission_energy_multiplier = 2.0 + sin(_t * 5.0) * 1.1
+	for i in _sac_halos.size():
+		var halo := _sac_halos[i]
+		if is_instance_valid(halo):
+			halo.rotation.x += delta * 1.4
+			halo.rotation.y += delta * 1.9
+			var s := 1.0 + 0.12 * sin(_t * 5.0 + i * 2.1)
+			halo.scale = Vector3.ONE * s
+	if _core_rings and _core_rings.visible:
+		_core_rings.rotation.y += delta * 2.2
+		_core_rings.rotation.x += delta * 1.1
+		_core_material.emission_energy_multiplier = 2.6 + sin(_t * 7.5) * 1.2
+	_cloud_material.emission = Color(0.65, 0.28, 0.08) if is_burning() else Color(0.12, 0.2, 0.08)
 	# Clients only draw it: position, part health and the burn timer ride one
 	# unreliable packet ten times a second, the kill is sent reliably below.
 	if Net.is_host() and Net.is_online():
@@ -141,9 +191,12 @@ func _process(delta: float) -> void:
 			_sync.rpc(global_position, part_health, sacs_left, _burn_left)
 	if not Net.is_host() or dead:
 		return
+	if _entrance_left > 0.0:
+		_entrance_left = maxf(0.0, _entrance_left - delta)
 	# Drift in a slow circle over Main Street and sink as sacs pop.
 	var goal_height := start_height - drop_per_sac * (3 - sacs_left)
-	_height = move_toward(_height, goal_height, delta * 2.0)
+	var descend_rate := 10.0 if _entrance_left > 0.0 else 2.2
+	_height = move_toward(_height, goal_height, delta * descend_rate)
 	var drift := Vector3(cos(_t * 0.12), 0, sin(_t * 0.12)) * drift_radius
 	global_position = _anchor + drift + Vector3(0, _height - _anchor.y + sin(_t * 0.8) * 0.6, 0)
 	# Rain heals it, unless a flare is burning nearby.
@@ -201,15 +254,38 @@ func total_fraction() -> float:
 func _pop_sac(i: int) -> void:
 	sacs_left -= 1
 	var part: Node3D = _parts[i]
+	Sound.play_at("explosion", part.global_position)
+	ShotFX.flash(get_parent(), part.global_position, Color(0.8, 1.0, 0.3), 8.0, 0.18)
 	GameManager.spawn_cloud(part.global_position, 10.0, 4.0)
 	part.visible = false
 	part.collision_layer = 0
 	WeatherManager.set_intensity_override(STORM_STEPS[2 - sacs_left])
 	if sacs_left == 0:
-		_shell.visible = false
-		GameManager.show_banner("THE CORE IS EXPOSED!", Color("FF3EA5"), 3.0)
-	else:
-		GameManager.show_banner("SAC BURST: the storm weakens (%d left)" % sacs_left, Color("8FD65A"), 2.5)
+		_shatter_shell()
+
+
+func _shatter_shell() -> void:
+	Sound.play_at("explosion_big", _shell.global_position)
+	ShotFX.flash(get_parent(), _shell.global_position, Color("#ff5689"), 10.0, 0.25)
+	_shell.visible = false
+	if _core_rings:
+		_core_rings.visible = true
+	for k in 8:
+		var shard := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.7, 0.45, 0.3)
+		shard.mesh = box
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.55, 0.78, 0.45)
+		shard.material_override = mat
+		get_parent().add_child(shard)
+		shard.global_position = _shell.global_position
+		var dir := Vector3(randf_range(-1, 1), randf_range(-0.4, 1.0), randf_range(-1, 1)).normalized()
+		var t := shard.create_tween().set_parallel(true)
+		t.tween_property(shard, "global_position", shard.global_position + dir * randf_range(5.0, 9.0), 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.tween_property(shard, "rotation", Vector3(randf() * 6, randf() * 6, randf() * 6), 0.7)
+		t.tween_property(shard, "scale", Vector3.ZERO, 0.35).set_delay(0.35)
+		t.chain().tween_callback(shard.queue_free)
 
 
 func _die() -> void:

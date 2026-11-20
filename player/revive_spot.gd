@@ -22,8 +22,8 @@ func can_interact(player: Node) -> bool:
 func get_prompt(player: Node) -> String:
 	var owner_player := get_parent()
 	if player == owner_player:
-		return "Get back up (self-revive, hold)"
-	return "Revive %s (hold)" % owner_player.get("display_name")
+		return "Revive"
+	return "Revive %s" % owner_player.get("display_name")
 
 
 func interact(player: Node) -> void:

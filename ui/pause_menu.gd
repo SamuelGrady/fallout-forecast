@@ -38,26 +38,27 @@ func _button(box: Control, text: String, action: Callable) -> void:
 		Sound.play("ui_click")
 		action.call())
 	box.add_child(button)
+	BroadcastUI.button_role(button, text == "RESUME", text == "QUIT")
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	if event.is_action_pressed("ui_cancel") and not event.is_echo():
+		if not MenuState.stack.is_empty() and MenuState.stack.back() != self:
+			return
 		get_viewport().set_input_as_handled()
 		if visible:
 			_resume()
 		else:
-			visible = true
+			MenuState.open(self)
 			BroadcastUI.reveal(_panel)
-			get_tree().paused = true
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			_panel.get_child(0).get_child(1).grab_focus()
+
+func focus_default() -> void:
+	_panel.get_child(0).get_child(1).grab_focus()
 
 func _resume() -> void:
-	get_tree().paused = false
-	visible = false
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	MenuState.close(self)
 
 func _main_menu() -> void:
-	get_tree().paused = false
+	MenuState.reset()
 	GameManager.run_active = false
 	GameManager.mutations.clear()
 	WeatherManager.stop()

@@ -23,6 +23,8 @@ Settings="*res://game/settings.gd"
 Sound="*res://game/sound.gd"
 RNG="*res://game/rng.gd"
 GameManager="*res://game/game_manager.gd"
+Playtest="*res://game/playtest.gd"
+MenuState="*res://ui/menu_state.gd"
 
 [display]
 

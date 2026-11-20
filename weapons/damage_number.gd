@@ -1,18 +1,47 @@
-﻿extends Label3D
+extends Label3D
 var amount := 0
 var critical := false
 var killed := false
+var age := 0.0
+var _tween: Tween
+
+
 func _ready() -> void:
-	text = str(amount) + ("!" if critical else "")
 	font = preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
-	font_size = 70 if critical else 52
 	pixel_size = .006
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	no_depth_test = false
-	modulate = Color("#ffd56a") if critical else Color("#f4f5e5")
 	outline_modulate = Color("#17212c")
 	outline_size = 10
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(self, "position", position + Vector3(randf_range(-.3,.3), .75, 0), .7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "modulate:a", 0.0, .25).set_delay(.45)
-	tween.chain().tween_callback(queue_free)
+	_refresh()
+	_animate()
+
+
+func _process(delta: float) -> void:
+	age += delta
+
+
+func add_hit(delta_amount: int, is_critical: bool) -> void:
+	amount += delta_amount
+	critical = critical or is_critical
+	age = 0.0
+	_refresh()
+	scale = Vector3.ONE * (1.28 if critical else 1.15)
+	_animate()
+
+
+func _refresh() -> void:
+	text = str(amount) + ("!" if critical else "")
+	font_size = 74 if critical else 54
+	modulate = Color("#ffd56a") if critical else Color("#f4f5e5")
+
+
+func _animate() -> void:
+	if _tween and _tween.is_valid():
+		_tween.kill()
+	modulate.a = 1.0
+	_tween = create_tween().set_parallel(true)
+	_tween.tween_property(self, "position", position + Vector3(randf_range(-.22, .22), .72, 0), .7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "scale", Vector3.ONE, .14)
+	_tween.tween_property(self, "modulate:a", 0.0, .25).set_delay(.45)
+	_tween.chain().tween_callback(queue_free)

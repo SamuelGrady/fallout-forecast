@@ -31,6 +31,7 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 	global_position = from
 	velocity = direction * weapon.projectile_speed
 	if weapon.kind == WeaponData.Kind.GRENADE:
+		add_to_group("enemy_lures")
 		velocity += Vector3.UP * 3.0
 	if from_shooter is CollisionObject3D:
 		_exclude.append(from_shooter.get_rid())
@@ -65,6 +66,8 @@ func _flare_process(delta: float) -> void:
 		var hit := _step(delta)
 		if not hit.is_empty():
 			_stuck = true
+			add_to_group("active_flares")
+			_build_flare_ring()
 			global_position = hit.position + hit.normal * 0.1
 			_light.light_energy = 4.0
 			_light.omni_range = data.effect_radius * 1.6
@@ -78,6 +81,8 @@ func _flare_process(delta: float) -> void:
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.global_position.distance_to(global_position) <= data.effect_radius:
 				enemy.reveal(1.0)
+				if authoritative:
+					enemy.weaken(0.7)
 		for boss in get_tree().get_nodes_in_group("boss"):
 			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0:
 				boss.burn(1.0)
@@ -90,6 +95,8 @@ func _bomb_process(delta: float) -> void:
 	if not hit.is_empty():
 		global_position = hit.position + hit.normal * 0.1
 		velocity = velocity.bounce(hit.normal) * 0.4
+	if data.kind == WeaponData.Kind.GRENADE:
+		rotation.y += delta * 4.0
 	if _age >= data.effect_time:
 		_explode()
 
@@ -107,6 +114,8 @@ func _step(delta: float) -> Dictionary:
 func _explode() -> void:
 	Sound.play_at("explosion", global_position)
 	_done = true
+	if is_in_group("enemy_lures"):
+		remove_from_group("enemy_lures")
 	var center := global_position
 	if authoritative:
 		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
@@ -133,3 +142,63 @@ func _explode() -> void:
 	ShotFX.puff(parent, center, Color(0.7, 0.95, 0.3, 0.6), data.effect_radius * 0.4, 0.7)
 	ShotFX.flash(parent, center + Vector3.UP, Color(0.8, 1.0, 0.4), 8.0, 0.12)
 	queue_free()
+
+
+func _build_flare_ring() -> void:
+	var zone := Node3D.new()
+	zone.position.y = 0.06
+	add_child(zone)
+	var border_mat := StandardMaterial3D.new()
+	border_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	border_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	border_mat.albedo_color = Color(0.32, 0.92, 0.92, 0.62)
+	var tick_mat := StandardMaterial3D.new()
+	tick_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tick_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tick_mat.albedo_color = Color(1.0, 0.68, 0.35, 0.5)
+	# Dashed perimeter segments + inward shelter ticks clearly distinguish safe ground from enemy rings.
+	var segments := 16
+	var r := data.effect_radius
+	var arc_len := (TAU * r / segments) * 0.58
+	for i in segments:
+		var angle := TAU * i / segments
+		var seg := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(arc_len, 0.03, 0.14)
+		seg.mesh = box
+		seg.position = Vector3(cos(angle) * r, 0.0, sin(angle) * r)
+		seg.rotation.y = -angle + PI * 0.5
+		seg.material_override = border_mat
+		zone.add_child(seg)
+		if i % 2 == 0:
+			var tick := MeshInstance3D.new()
+			var tbox := BoxMesh.new()
+			tbox.size = Vector3(0.08, 0.025, 0.55)
+			tick.mesh = tbox
+			tick.position = Vector3(cos(angle) * (r - 0.35), 0.0, sin(angle) * (r - 0.35))
+			tick.rotation.y = -angle + PI * 0.5
+			tick.material_override = tick_mat
+			zone.add_child(tick)
+	var inner := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = r * 0.96
+	disc.bottom_radius = r * 0.96
+	disc.height = 0.01
+	disc.radial_segments = 24
+	inner.mesh = disc
+	var inner_mat := StandardMaterial3D.new()
+	inner_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	inner_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	inner_mat.albedo_color = Color(0.25, 0.85, 0.88, 0.08)
+	inner.material_override = inner_mat
+	zone.add_child(inner)
+
+
+static func protects(point: Vector3, tree: SceneTree) -> bool:
+	for flare in tree.get_nodes_in_group("active_flares"):
+		if flare.is_queued_for_deletion() or flare.global_position.distance_to(point) > flare.data.effect_radius:
+			continue
+		var query := PhysicsRayQueryParameters3D.create(flare.global_position + Vector3.UP * 0.2, point, 1)
+		if flare.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+			return true
+	return false

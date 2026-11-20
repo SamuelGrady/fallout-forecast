@@ -24,6 +24,10 @@ enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
 @export var mag_size := 6
 @export var reserve_ammo := 30
 @export var reload_time := 2.0
+@export var shell_reload := false
+@export var recoil_degrees := 0.6
+## Extra spread after a sustained automatic burst.
+@export var burst_spread := 0.0
 
 @export_group("Projectile")
 @export var projectile_speed := 30.0

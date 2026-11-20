@@ -11,23 +11,37 @@ extends EnemyBase
 var _windup := 0.0
 var _recovery := 0.0
 var _direction := Vector3.ZERO
-var _telegraph: MeshInstance3D
+var _telegraph: Node3D
 
 func attack(_victim: Node3D, _amount: float) -> void:
 	pass
 
 func _ready() -> void:
 	super._ready()
-	_telegraph = MeshInstance3D.new()
-	var ring := TorusMesh.new()
-	ring.inner_radius = .65
-	ring.outer_radius = .75
-	_telegraph.mesh = ring
-	_telegraph.position.y = .12
+	_telegraph = Node3D.new()
+	_telegraph.position.y = 0.08
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color("#ff783e")
-	_telegraph.material_override = material
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(1.0, 0.36, 0.16, 0.85)
+	# Directional lunge lane + two forward chevron arrowheads pointing along -Z.
+	var lane := MeshInstance3D.new()
+	var lane_box := BoxMesh.new()
+	lane_box.size = Vector3(0.32, 0.03, 2.2)
+	lane.mesh = lane_box
+	lane.position = Vector3(0, 0, -1.5)
+	lane.material_override = material
+	_telegraph.add_child(lane)
+	for offset_z in [-2.0, -2.75]:
+		for side in [-1.0, 1.0]:
+			var wing := MeshInstance3D.new()
+			var wbox := BoxMesh.new()
+			wbox.size = Vector3(0.58, 0.04, 0.14)
+			wing.mesh = wbox
+			wing.position = Vector3(side * 0.24, 0.01, offset_z)
+			wing.rotation_degrees.y = side * 42.0
+			wing.material_override = material
+			_telegraph.add_child(wing)
 	add_child(_telegraph)
 	_telegraph.visible = false
 
@@ -37,6 +51,13 @@ var _lunge_hit := false
 
 
 func _physics_process(delta: float) -> void:
+	if _dead:
+		return
+	if _stagger_left > 0.0:
+		super._physics_process(delta)
+		return
+	_slow_left = maxf(0.0, _slow_left - delta)
+	_weaken_left = maxf(0.0, _weaken_left - delta)
 	_lunge_cooldown_left -= delta
 	if _recovery > 0.0:
 		_recovery -= delta
@@ -47,7 +68,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if _windup > 0.0:
 		_windup -= delta
-		_telegraph.scale = Vector3.ONE * (1.0 + _windup)
+		var progress := clampf(1.0 - _windup / 0.65, 0.0, 1.0)
+		_telegraph.scale = Vector3(1.0, 1.0, 0.55 + progress * 0.95)
 		if _windup <= 0.0:
 			_telegraph.visible = false
 			_start_lunge(_direction)
@@ -59,9 +81,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= _gravity * delta
 		move_and_slide()
 		if not _lunge_hit and is_instance_valid(target) \
-				and global_position.distance_to(target.global_position) < data.attack_range:
+				and _can_attack(target):
 			_lunge_hit = true
-			super.attack(target, data.damage * WeatherManager.enemy_buff())
+			super.attack(target, data.damage * WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0))
 		if _lunge_left <= 0.0:
 			_recovery = 1.0
 		return
@@ -74,8 +96,10 @@ func _physics_process(delta: float) -> void:
 		var distance := to_target.length()
 		if distance < lunge_range and distance > 0.5:
 			_direction = to_target.normalized()
+			_face(_direction)
 			_windup = 0.65
 			_telegraph.visible = true
+			attack_flash(0.65)
 			Sound.play_at("spore_burst", global_position, -16.0)
 
 
@@ -84,4 +108,23 @@ func _start_lunge(direction: Vector3) -> void:
 	_lunge_cooldown_left = lunge_cooldown
 	_lunge_hit = false
 	var speed := lunge_speed * WeatherManager.enemy_buff()
+	if _slow_left > 0.0:
+		speed *= 0.5
+	if _weaken_left > 0.0:
+		speed *= 0.65
 	velocity = direction * speed + Vector3.UP * lunge_up
+
+
+func stagger(duration: float) -> void:
+	super.stagger(duration)
+	_windup = 0.0
+	_lunge_left = 0.0
+	_recovery = 0.7
+	_lunge_cooldown_left = lunge_cooldown
+	if _telegraph:
+		_telegraph.visible = false
+
+
+func _begin_attack(_victim: Node3D, _amount: float) -> void:
+	# Gutters use the committed pounce windup instead of standing melee.
+	pass

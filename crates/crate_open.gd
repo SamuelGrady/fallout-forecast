@@ -18,9 +18,9 @@ func can_interact(player: Node) -> bool:
 func get_prompt(_player: Node) -> String:
 	if get_parent().double:
 		if GameManager.is_solo():
-			return "Double or nothing (needs 2 players)"
-		return "Double or nothing: open together (hold)"
-	return "Open mystery crate (hold)"
+			return "Two players"
+		return "Open together"
+	return "Open"
 
 
 func interact(player: Node) -> void:

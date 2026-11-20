@@ -17,6 +17,7 @@ signal roll_started
 signal pulls_changed(pulled: int, needed: int)
 signal roll_result(symbols: Array, mutations: Array, jackpot: bool)
 signal vote_started(options: Array)
+signal vote_cast(index: int)
 signal mutations_changed(active: Array)
 
 const PULL_TIME := 5.0
@@ -170,11 +171,28 @@ func _local_vote_input() -> void:
 		return
 	for i in mini(_pending.size(), 2):
 		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
-			_local_voted = true
-			if Net.is_host():
-				_votes[1] = i
-			else:
-				_request_vote.rpc_id(1, i)
+			vote(i)
+			return
+	if Settings.using_gamepad:
+		if Input.is_action_just_pressed("ui_left"):
+			vote(0)
+		elif Input.is_action_just_pressed("ui_right"):
+			vote(1)
+
+
+## One vote per player per roll. Keys, the reel's buttons and the gamepad all
+## come through here; a client's vote is forwarded to the host, which tallies
+## by peer id so each player counts once.
+func vote(index: int) -> bool:
+	if stage != "voting" or _local_voted or index < 0 or index > 1:
+		return false
+	_local_voted = true
+	if Net.is_host():
+		_votes[multiplayer.get_unique_id()] = index
+	else:
+		_request_vote.rpc_id(1, index)
+	vote_cast.emit(index)
+	return true
 
 
 @rpc("any_peer", "call_remote", "reliable")

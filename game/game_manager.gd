@@ -8,6 +8,7 @@ extends Node
 
 signal combat_hit(killed: bool, critical: bool)
 signal decon_changed(charges: int)
+signal weapon_unlocked(weapon_name: String)
 signal run_finished(won: bool, results: Dictionary)
 signal banner(text: String, color: Color, seconds: float)
 
@@ -151,13 +152,15 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
+			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
+			Sound.play("reel_land", -6.0)
 			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
 			if unlocks.has(_wave):
 				var gun := load("res://weapons/%s.tres" % unlocks[_wave]) as WeaponData
 				Settings.unlock_gun(gun.resource_path)
 				for p in players():
 					p.grant("weapon:" + gun.resource_path)
-				show_banner("UNLOCKED  " + gun.display_name.to_upper(), Color("#66dfda"))
+				_announce_unlock(gun.display_name.to_upper())
 			mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
@@ -260,7 +263,7 @@ func spawn_boss() -> void:
 	_spawn_boss.rpc(at)
 	WeatherManager.hold = true
 	WeatherManager.set_intensity_override(1.0)
-	show_banner("CUMULUS IS HERE: burst its three sacs!", Color("8FD65A"), 4.0)
+	show_banner("CUMULUS", Color("8FD65A"), 2.2)
 
 
 func _spawn_boss_node(parent: Node, at: Vector3) -> void:
@@ -283,7 +286,7 @@ func _spawn_boss(at: Vector3) -> void:
 func boss_defeated() -> void:
 	WeatherManager.set_intensity_override(0.0)
 	WeatherManager.hold = false
-	show_banner("CUMULUS BROKE: the storm is over!", Color(0.4, 1, 0.6), 4.0)
+	show_banner("STORM CLEARED", Color(0.4, 1, 0.6), 2.5)
 	get_tree().create_timer(5.0).timeout.connect(finish.bind(true))
 
 
@@ -305,6 +308,11 @@ func finish(won: bool) -> void:
 	if finished or not is_host():
 		return
 	finished = true
+	for p in players():
+		var s := _stat(p)
+		var holder: Node = p.get_node_or_null("Head/Camera3D/WeaponHolder")
+		if holder and not holder.loadout.is_empty():
+			s["weapon"] = holder.loadout[holder.current].display_name
 	var results := {
 		"won": won,
 		"waves": WeatherManager.wave if won else WeatherManager.wave - 1,
@@ -313,6 +321,17 @@ func finish(won: bool) -> void:
 	if _online():
 		_finish.rpc(won, results)
 	_finish(won, results)
+
+
+func _announce_unlock(weapon_name: String) -> void:
+	if _online():
+		_weapon_unlocked.rpc(weapon_name)
+	_weapon_unlocked(weapon_name)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _weapon_unlocked(weapon_name: String) -> void:
+	weapon_unlocked.emit(weapon_name)
 
 
 @rpc("authority", "call_remote", "reliable")

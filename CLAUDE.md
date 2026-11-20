@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-"Acid Rain Protocol" (repo name fallout-forecast): a 1–4 player co-op first-person shooter for a CSCI 3103 game jam, built by Sam and Drew in three weeks. The design is in `docs/design-doc.md`. That file is a snapshot. The live doc (https://claude.ai/artifact/NwyXaaPmhz2YVwNuYezedt) is the source of truth, so re-export it when it changes. Its "As built" section lists what exists and where Sam's code hooks in.
+"Fallout Forecast" (repo name fallout-forecast): a 1–4 player co-op first-person shooter for a CSCI 3103 game jam, built by Sam and Drew in three weeks. The design is in `docs/design-doc.md`. That file is a snapshot. The live doc (https://claude.ai/artifact/NwyXaaPmhz2YVwNuYezedt) is the source of truth, so re-export it when it changes. Its "As built" section lists what exists and where Sam's code hooks in.
 
 Work is split by owner (see "Team, milestones and risks" in the design doc):
 - **Sam:** networking, lobby, downed/revive/Turned, crates and cursed weapons, mutation rolls, GameManager.
@@ -66,4 +66,4 @@ The Godot console executable on Drew's PC is `C:/Users/drewd/Desktop/Godot_v4.7.
   - F3, F4, F5 spawn a Drip, Gutter or Mister
   - F6 lightning, F8 retro effect, F9 debug text, F11 fullscreen
 
-Not built yet: the ping wheel, export builds for the demo machines, and per-player colours. Known networking gaps: death particles and death-spawned spore clouds only appear on the host, and there is no interpolation, so remote players move in 20 Hz steps.
+Not built yet: the ping wheel, export builds for the demo machines, and per-player colours. Known networking gaps: enemy death fragments and the death sound only play on the host, the decon shower sound is host-only, and there is no interpolation, so remote players move in 20 Hz steps.

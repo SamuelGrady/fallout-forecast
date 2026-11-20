@@ -14,6 +14,8 @@ var _snow := ColorRect.new()
 var _logo := Label.new()
 var _sub := Label.new()
 var _t := 0.0
+var _menu_ready := false
+var _vhs: CanvasLayer
 
 
 func _ready() -> void:
@@ -25,7 +27,7 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	BroadcastUI.backdrop(self)
+	_build_street_backdrop()
 	bg.queue_free()
 
 	# The tape.
@@ -37,7 +39,7 @@ func _ready() -> void:
 	tape_style.set_border_width_all(6)
 	_tape.add_theme_stylebox_override("panel", tape_style)
 	var sticker := Label.new()
-	sticker.text = "ACID RAIN PROTOCOL\nSP  T-120  OCT 31 1987"
+	sticker.text = "FALLOUT FORECAST\nSP  T-120  OCT 31 1987"
 	sticker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sticker.add_theme_font_size_override("font_size", 22)
 	sticker.add_theme_color_override("font_color", Color("1F2A55"))
@@ -61,7 +63,7 @@ func _ready() -> void:
 	_snow.modulate.a = 0.0
 	add_child(_snow)
 
-	_logo.text = "ACID RAIN\nPROTOCOL"
+	_logo.text = "FALLOUT\nFORECAST"
 	_logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_logo.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_logo.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -72,7 +74,7 @@ func _ready() -> void:
 	_logo.add_theme_constant_override("outline_size", 0)
 	_logo.modulate.a = 0.0
 	add_child(_logo)
-	_sub.text = "PINECREST HEALTH DEPT.  ·  EMERGENCY BROADCAST"
+	_sub.text = "PHD"
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_sub.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -119,25 +121,34 @@ func _ready() -> void:
 	var retro := CheckButton.new()
 	retro.text = "RETRO VHS EFFECT"
 	retro.button_pressed = Settings.retro_enabled
-	retro.toggled.connect(func(on): Settings.retro_enabled = on)
+	retro.toggled.connect(Settings.set_retro)
 	_style_button(retro)
 	_settings.add_child(retro)
 	_button(_settings, "BACK", _on_back)
-	_menu.get_child(0).grab_focus()
-	var vhs := (load("res://retro/retro_screen.tscn") as PackedScene).instantiate()
-	vhs.interface_only = true
-	add_child(vhs)
+	for button in _menu.get_children():
+		button.disabled = true
+	BroadcastUI.button_role(_menu.get_child(0), true)
+	BroadcastUI.button_role(_menu.get_child(2), false, true)
+	_vhs = (load("res://retro/retro_screen.tscn") as PackedScene).instantiate()
+	_vhs.interface_only = true
+	add_child(_vhs)
 
 
 func _process(delta: float) -> void:
 	if _t < 1.4 and _t + delta >= 1.4:
 		Sound.play("vhs_glitch")
 	_t += delta
+	if not _menu_ready and _t >= 2.5:
+		_menu_ready = true
+		for button in _menu.get_children():
+			button.disabled = false
+		_menu.get_child(0).grab_focus()
 	var view := get_viewport_rect().size
 	# 0-1.4 s: tape slides up into the deck. 1.4-2.0 s: snow. Then the menu.
 	var slide := clampf(_t / 1.4, 0.0, 1.0)
 	_tape.position = Vector2((view.x - _tape.size.x) * 0.5, lerpf(view.y + 20.0, view.y * 0.5 - 100.0, ease(slide, 0.4)))
 	_tape.modulate.a = 1.0 - clampf((_t - 1.4) / 0.3, 0.0, 1.0)
+	_tape.visible = _tape.modulate.a > 0.01
 	_snow.modulate.a = clampf(1.0 - absf(_t - 1.7) / 0.4, 0.0, 1.0) * 0.9
 	var menu_a := clampf((_t - 2.0) / 0.5, 0.0, 1.0)
 	_logo.modulate.a = menu_a
@@ -147,9 +158,14 @@ func _process(delta: float) -> void:
 	_logo.position.x += sin(_t * 23.0) * 0.6 * menu_a
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if _t < 2.0 and (event is InputEventKey or event is InputEventMouseButton) and event.is_pressed():
-		_t = 2.0
+func _input(event: InputEvent) -> void:
+	if not _menu_ready and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton):
+		_t = 2.5
+		get_viewport().set_input_as_handled()
+	elif _settings.visible and event.is_action_pressed("ui_cancel"):
+		_on_back()
+		get_viewport().set_input_as_handled()
+
 
 
 func _button(parent: Control, text: String, action: Callable) -> Button:
@@ -238,12 +254,14 @@ func _on_settings() -> void:
 	_menu.visible = false
 	_settings.visible = true
 	BroadcastUI.reveal(_settings)
+	_settings.get_child(1).grab_focus()
 
 
 func _on_back() -> void:
 	Settings.save()
 	_settings.visible = false
 	_menu.visible = true
+	_menu.get_child(1).grab_focus()
 
 
 func _snow_shader() -> Shader:
@@ -256,3 +274,43 @@ void fragment() {
 	COLOR = vec4(vec3(n), 1.0);
 }"""
 	return s
+
+
+func _build_street_backdrop() -> void:
+	var container := SubViewportContainer.new()
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(container)
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(960,720)
+	viewport.own_world_3d = true
+	container.add_child(viewport)
+	var level := (load("res://levels/pinecrest/level_pinecrest.tscn") as PackedScene).instantiate()
+	viewport.add_child(level)
+	var camera := Camera3D.new()
+	viewport.add_child(camera)
+	camera.position = Vector3(-28,2.2,-2)
+	camera.look_at(Vector3(-5,1.5,1))
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.02,0.04,0.08,0.72)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
+	var insignia := GameIcon.new()
+	insignia.kind = "department"
+	insignia.color = BroadcastUI.CYAN
+	insignia.position = Vector2(30,30)
+	insignia.size = Vector2(48,48)
+	add_child(insignia)
+	# A quiet streak texture animates the wet street without changing gameplay weather.
+	var rain := ColorRect.new()
+	rain.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = """shader_type canvas_item;
+void fragment(){ vec2 p=UV*vec2(170.0,35.0); p.y+=TIME*9.0; float streak=step(.97,fract(p.x+p.y*.08))*step(.72,fract(p.y)); COLOR=vec4(.55,.8,.86,streak*.16); }"""
+	material.shader = shader
+	rain.material = material
+	add_child(rain)
