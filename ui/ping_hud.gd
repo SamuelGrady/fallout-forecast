@@ -212,7 +212,8 @@ func _draw() -> void:
 	elif _can_ping(_local()):
 		var key := "D-PAD DOWN" if Settings.using_gamepad else "Z / MMB"
 		var hint := "[%s] TAP TO PING  /  HOLD FOR WHEEL" % key
-		_text(BroadcastUI.FONT, Vector2(size.x * 0.5 - 145.0, size.y - 24.0), hint, 290, 16, Color(BroadcastUI.PAPER, 0.8))
+		# Under the hotbar (bottom center, 24 px off the bottom edge).
+		_text(BroadcastUI.FONT, Vector2(size.x * 0.5 - 145.0, size.y - 6.0), hint, 290, 16, Color(BroadcastUI.PAPER, 0.8))
 
 
 func _draw_marker(ping: Dictionary, icon: GameIcon, camera: Camera3D) -> void:

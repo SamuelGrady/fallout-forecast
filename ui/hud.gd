@@ -233,12 +233,15 @@ func _build_messages() -> void:
 	_notice(_banner, Control.PRESET_CENTER_TOP, 504, 235, 28, BroadcastUI.PAPER)
 	_notice(_lightning, Control.PRESET_TOP_RIGHT, 208, 108, 19, BroadcastUI.CYAN)
 	_notice(_downed, Control.PRESET_CENTER, 408, 48, 34, BroadcastUI.PINK)
-	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 408, -168, 22, BroadcastUI.PAPER)
+	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 408, -124, 22, BroadcastUI.PAPER)
+	# Grows upward from just above the hotbar's scrap line, so a two-line
+	# prompt never drops onto the hotbar or the side panels.
+	_prompt.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_revive_progress.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_revive_progress.offset_left = -100
 	_revive_progress.offset_right = 100
-	_revive_progress.offset_top = -124
-	_revive_progress.offset_bottom = -118
+	_revive_progress.offset_top = -112
+	_revive_progress.offset_bottom = -106
 	_bar(_layout, _revive_progress, 6, BroadcastUI.CYAN)
 	_revive_progress.hide()
 
@@ -462,7 +465,7 @@ func _update_weapon(player: Player) -> void:
 	var holder := player.get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
 	_reticle.visible = player.state in ["ok", "turned"]
 	_reticle.modulate.a = move_toward(_reticle.modulate.a, 0.0 if holder and holder.sighted() else 1.0, 0.2)
-	_slots.visible = holder != null and player.state in ["ok", "downed"]
+	_slots.visible = holder != null and player.state == "ok"
 	if holder:
 		_slots.refresh(holder)
 	var definition: ItemDefinition = holder.selected_definition() if holder else null
