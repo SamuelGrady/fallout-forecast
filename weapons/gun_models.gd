@@ -36,8 +36,12 @@ static func build(id: String) -> Node3D:
 			_shotgun(root)
 		"flare":
 			_flare_gun(root)
+		"dome":
+			_dome_grenade(root)
 		"bug_bomb":
 			_bug_bomb(root)
+		"frag":
+			_frag(root)
 		"revolver":
 			_revolver(root)
 		"nailgun":
@@ -138,6 +142,52 @@ static func _flare_gun(root: Node3D) -> void:
 	root.set_meta("muzzle", Vector3(0, 0.022, -0.18))
 
 
+## Shield Dome: a squat emitter canister with a glowing projector ring.
+static func _dome_grenade(root: Node3D) -> void:
+	_cylinder(root, 0.034, 0.075, Vector3(0, 0, 0), Color("#d8dee4"), 0.5, Vector3.ZERO)
+	var ring := _cylinder(root, 0.036, 0.014, Vector3(0, 0.012, 0), NEON_TEAL, 0.0, Vector3.ZERO)
+	ring.material_override = _glow(NEON_TEAL, 2.4)
+	_cylinder(root, 0.028, 0.016, Vector3(0, 0.045, 0), Color("#2b3038"), 0.6, Vector3.ZERO)
+	var lens := _cylinder(root, 0.016, 0.01, Vector3(0, 0.056, 0), NEON_TEAL, 0.0, Vector3.ZERO)
+	lens.material_override = _glow(NEON_TEAL, 3.0)
+	for i in 3:
+		var angle := TAU * i / 3.0
+		_box(root, Vector3(0.012, 0.03, 0.012), Vector3(cos(angle) * 0.03, -0.045, sin(angle) * 0.03), Color("#2b3038"), 0.6)  # feet
+	_box(root, Vector3(0.008, 0.02, 0.03), Vector3(0.036, 0.02, 0), Color("#e23b2e"))  # arming switch
+	root.set_meta("muzzle", Vector3(0, 0.06, 0))
+
+
+## Frag grenade: segmented olive body, fuse head, spoon and pull ring.
+static func _frag(root: Node3D) -> void:
+	var olive := Color("#4b5a32")
+	var body := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.032
+	sphere.height = 0.075
+	sphere.radial_segments = 10
+	sphere.rings = 6
+	body.mesh = sphere
+	body.material_override = _material(olive, 0.15)
+	root.add_child(body)
+	# Pineapple segmentation: raised bands both ways.
+	for i in 3:
+		_cylinder(root, 0.0335, 0.006, Vector3(0, -0.02 + i * 0.02, 0), olive.darkened(0.3), 0.1, Vector3.ZERO)
+	for i in 4:
+		_box(root, Vector3(0.006, 0.066, 0.068), Vector3.ZERO, olive.darkened(0.3), 0.1, Vector3(0, i * 45.0, 0))
+	_cylinder(root, 0.013, 0.022, Vector3(0, 0.045, 0), STEEL, 0.7, Vector3.ZERO)  # fuse head
+	_box(root, Vector3(0.012, 0.07, 0.006), Vector3(0, 0.02, -0.036), STEEL, 0.7, Vector3(-8, 0, 0))  # spoon
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.008
+	torus.outer_radius = 0.012
+	ring.mesh = torus
+	ring.position = Vector3(0.018, 0.05, 0)
+	ring.rotation_degrees = Vector3(0, 0, 90)
+	ring.material_override = _material(STEEL, 0.7)
+	root.add_child(ring)
+	root.set_meta("muzzle", Vector3(0, 0.06, 0))
+
+
 ## Bug Bomb: a pressurized insecticide canister with a pull ring.
 static func _bug_bomb(root: Node3D) -> void:
 	_cylinder(root, 0.032, 0.09, Vector3(0, 0, 0), HAZARD_YELLOW, 0.2, Vector3.ZERO)
@@ -199,8 +249,8 @@ static func _boombox(root: Node3D) -> void:
 
 ## What a thrown or launched round looks like in flight.
 static func projectile(id: String) -> Node3D:
-	if id == "bug_bomb":
-		var canister := build("bug_bomb")
+	if id == "bug_bomb" or id == "dome" or id == "frag":
+		var canister := build(id)
 		canister.scale = Vector3.ONE * 1.6
 		return canister
 	var root := Node3D.new()

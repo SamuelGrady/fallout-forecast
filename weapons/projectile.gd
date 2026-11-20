@@ -3,12 +3,13 @@ extends Node3D
 ## same start, so everyone sees it; only the copy with `authoritative` (the
 ## host's) deals damage.
 ##
-## Flare: flies until it hits something, sticks, burns for effect_time with a
-## red light and keeps every enemy within effect_radius revealed. A direct
-## hit on an enemy does `damage`.
-## Bug Bomb: bounces, and after effect_time bursts in a green cloud that hurts
-## enemies within effect_radius (more near the center), knocks them back and
-## dries any puddle it touches.
+## Shield Dome (Kind.FLARE slot): thrown, bounces off walls, settles on the
+## ground and projects a dome of effect_radius for effect_time. Players inside
+## are fully sheltered from acid rain (see protects()); infected inside are
+## shoved back out, weakened and outlined.
+## Frag grenade (Kind.GRENADE): bounces, and after effect_time explodes,
+## hurting enemies within effect_radius (more near the center), knocking them
+## back and drying any puddle it touches.
 
 var data: WeaponData
 var authoritative := false
@@ -31,7 +32,6 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 	global_position = from
 	velocity = direction * weapon.projectile_speed
 	if weapon.kind == WeaponData.Kind.GRENADE:
-		add_to_group("enemy_lures")
 		velocity += Vector3.UP * 3.0
 	if from_shooter is CollisionObject3D:
 		_exclude.append(from_shooter.get_rid())
@@ -42,10 +42,11 @@ func launch(from: Vector3, direction: Vector3, weapon: WeaponData, is_authoritat
 		model.scale = Vector3.ONE * 2.0
 		add_child(model)
 	if weapon.kind == WeaponData.Kind.FLARE:
+		velocity += Vector3.UP * 3.0
 		_light = OmniLight3D.new()
-		_light.light_color = Color(1.0, 0.25, 0.2)
-		_light.light_energy = 2.0
-		_light.omni_range = 6.0
+		_light.light_color = Color(0.35, 0.95, 1.0)
+		_light.light_energy = 1.0
+		_light.omni_range = 3.0
 		add_child(_light)
 
 
@@ -67,32 +68,88 @@ func _flare_process(delta: float) -> void:
 	if not _stuck:
 		var hit := _step(delta)
 		if not hit.is_empty():
-			_stuck = true
-			add_to_group("active_flares")
-			_build_flare_ring()
-			global_position = hit.position + hit.normal * 0.1
-			_light.light_energy = 4.0
-			_light.omni_range = data.effect_radius * 1.6
-			if authoritative and WeaponHolder.is_damageable(hit.collider):
-				hit.collider.take_damage(data.damage, shooter)
-	else:
-		_light.light_energy = 3.5 + randf() * 1.5
+			global_position = hit.position + hit.normal * 0.05
+			if hit.normal.y < 0.6 and _age < 3.0:
+				# Walls and cars: bounce off and keep falling.
+				velocity = velocity.bounce(hit.normal) * 0.35
+			else:
+				_stuck = true
+				_deploy_dome()
+		return
+	var left := data.effect_time - (_age - _deployed_at)
+	if _dome:
+		# Shimmer, then flicker out in the last second.
+		var fade := clampf(left, 0.0, 1.0)
+		_dome_material.albedo_color.a = (0.16 + 0.04 * sin(_age * 6.0)) * fade * (1.0 if left > 1.0 or fmod(_age, 0.2) < 0.1 else 0.3)
+		_dome_rim.albedo_color.a = 0.7 * fade
+		_light.light_energy = 2.2 * fade
 	_reveal_tick -= delta
-	if _reveal_tick <= 0.0:
-		_reveal_tick = 0.5
-		var flare_eye := global_position + Vector3.UP * 0.25
+	if _reveal_tick <= 0.0 and left > 0.0:
+		_reveal_tick = 0.25
 		for enemy in get_tree().get_nodes_in_group("enemies"):
-			if enemy.global_position.distance_to(global_position) <= data.effect_radius \
-					and _has_los(flare_eye, enemy.global_position + Vector3.UP * 0.9):
-				enemy.reveal(1.0)
+			var offset: Vector3 = enemy.global_position - global_position
+			offset.y = 0.0
+			if offset.length() <= data.effect_radius:
+				enemy.reveal(0.5)
 				if authoritative:
-					enemy.weaken(0.7)
-		for boss in get_tree().get_nodes_in_group("boss"):
-			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0 \
-					and _has_los(flare_eye, boss.global_position):
-				boss.burn(1.0)
-	if _age > data.effect_time + 1.5:
-		queue_free()
+					enemy.weaken(0.6)
+					# Push infected out through the dome wall.
+					var push := offset.normalized() if offset.length_squared() > 0.01 else Vector3.RIGHT
+					enemy.knockback(push * 3.5)
+	if left <= 0.0:
+		if is_in_group("active_flares"):
+			remove_from_group("active_flares")
+		if left < -0.3:
+			queue_free()
+
+
+var _dome: MeshInstance3D
+var _dome_material: StandardMaterial3D
+var _dome_rim: StandardMaterial3D
+var _deployed_at := 0.0
+
+
+func _deploy_dome() -> void:
+	_deployed_at = _age
+	add_to_group("active_flares")
+	rotation = Vector3.ZERO
+	Sound.play_at("decon", global_position, -4.0, 1.4)
+	ShotFX.flash(get_parent(), global_position + Vector3.UP, Color(0.35, 0.95, 1.0), 6.0, 0.2)
+	var r := data.effect_radius
+	_dome = MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = r
+	sphere.height = r  # a hemisphere's height is its radius
+	sphere.is_hemisphere = true
+	sphere.radial_segments = 24
+	sphere.rings = 8
+	_dome.mesh = sphere
+	_dome_material = StandardMaterial3D.new()
+	_dome_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_dome_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_dome_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_dome_material.albedo_color = Color(0.35, 0.95, 1.0, 0.18)
+	_dome_material.disable_fog = true
+	_dome.material_override = _dome_material
+	_dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_dome)
+	var rim := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = r - 0.08
+	torus.outer_radius = r
+	torus.rings = 32
+	rim.mesh = torus
+	rim.position.y = 0.05
+	_dome_rim = StandardMaterial3D.new()
+	_dome_rim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_dome_rim.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_dome_rim.albedo_color = Color(0.5, 1.0, 1.0, 0.7)
+	rim.material_override = _dome_rim
+	add_child(rim)
+	_dome.scale = Vector3.ONE * 0.1
+	_dome.create_tween().tween_property(_dome, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_light.omni_range = r * 1.4
+	_light.position.y = 1.0
 
 
 func _bomb_process(delta: float) -> void:
@@ -101,7 +158,7 @@ func _bomb_process(delta: float) -> void:
 		global_position = hit.position + hit.normal * 0.1
 		velocity = velocity.bounce(hit.normal) * 0.4
 	if data.kind == WeaponData.Kind.GRENADE:
-		rotation.y += delta * 4.0
+		rotation.x += delta * 7.0
 	if _age >= data.effect_time:
 		_explode()
 
@@ -122,7 +179,7 @@ func _has_los(from: Vector3, to: Vector3) -> bool:
 
 
 func _explode() -> void:
-	Sound.play_at("explosion", global_position)
+	Sound.play_at("explosion_big" if data.kind == WeaponData.Kind.GRENADE else "explosion", global_position)
 	_done = true
 	if is_in_group("enemy_lures"):
 		remove_from_group("enemy_lures")
@@ -154,66 +211,20 @@ func _explode() -> void:
 		ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.4, 0.8), 8.0, 0.12)
 		queue_free()
 		return
-	ShotFX.puff(parent, center, Color(0.7, 0.95, 0.3, 0.6), data.effect_radius * 0.4, 0.7)
-	ShotFX.flash(parent, center + Vector3.UP, Color(0.8, 1.0, 0.4), 8.0, 0.12)
+	# Frag: white-hot core, orange fireball, dark smoke, flying debris.
+	ShotFX.puff(parent, center + Vector3.UP * 0.4, Color(1.0, 0.95, 0.75, 0.95), data.effect_radius * 0.15, 0.18)
+	ShotFX.puff(parent, center + Vector3.UP * 0.5, Color(1.0, 0.55, 0.15, 0.85), data.effect_radius * 0.3, 0.45)
+	ShotFX.puff(parent, center + Vector3.UP * 1.0, Color(0.18, 0.17, 0.16, 0.6), data.effect_radius * 0.38, 1.1)
+	ShotFX.sparks(parent, center + Vector3.UP * 0.3, Vector3.UP, 14)
+	ShotFX.flash(parent, center + Vector3.UP, Color(1.0, 0.6, 0.25), 10.0, 0.15)
 	queue_free()
 
 
-func _build_flare_ring() -> void:
-	var zone := Node3D.new()
-	zone.position.y = 0.06
-	add_child(zone)
-	var border_mat := StandardMaterial3D.new()
-	border_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	border_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	border_mat.albedo_color = Color(0.32, 0.92, 0.92, 0.62)
-	var tick_mat := StandardMaterial3D.new()
-	tick_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	tick_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	tick_mat.albedo_color = Color(1.0, 0.68, 0.35, 0.5)
-	# Dashed perimeter segments + inward shelter ticks clearly distinguish safe ground from enemy rings.
-	var segments := 16
-	var r := data.effect_radius
-	var arc_len := (TAU * r / segments) * 0.58
-	for i in segments:
-		var angle := TAU * i / segments
-		var seg := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(arc_len, 0.03, 0.14)
-		seg.mesh = box
-		seg.position = Vector3(cos(angle) * r, 0.0, sin(angle) * r)
-		seg.rotation.y = -angle + PI * 0.5
-		seg.material_override = border_mat
-		zone.add_child(seg)
-		if i % 2 == 0:
-			var tick := MeshInstance3D.new()
-			var tbox := BoxMesh.new()
-			tbox.size = Vector3(0.08, 0.025, 0.55)
-			tick.mesh = tbox
-			tick.position = Vector3(cos(angle) * (r - 0.35), 0.0, sin(angle) * (r - 0.35))
-			tick.rotation.y = -angle + PI * 0.5
-			tick.material_override = tick_mat
-			zone.add_child(tick)
-	var inner := MeshInstance3D.new()
-	var disc := CylinderMesh.new()
-	disc.top_radius = r * 0.96
-	disc.bottom_radius = r * 0.96
-	disc.height = 0.01
-	disc.radial_segments = 24
-	inner.mesh = disc
-	var inner_mat := StandardMaterial3D.new()
-	inner_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	inner_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	inner_mat.albedo_color = Color(0.25, 0.85, 0.88, 0.08)
-	inner.material_override = inner_mat
-	zone.add_child(inner)
-
-
+## True if `point` is under an active Shield Dome.
 static func protects(point: Vector3, tree: SceneTree) -> bool:
-	for flare in tree.get_nodes_in_group("active_flares"):
-		if flare.is_queued_for_deletion() or flare.global_position.distance_to(point) > flare.data.effect_radius:
+	for dome in tree.get_nodes_in_group("active_flares"):
+		if dome.is_queued_for_deletion():
 			continue
-		var query := PhysicsRayQueryParameters3D.create(flare.global_position + Vector3.UP * 0.2, point, 1)
-		if flare.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+		if dome.global_position.distance_to(point) <= dome.data.effect_radius:
 			return true
 	return false

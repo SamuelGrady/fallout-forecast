@@ -14,7 +14,7 @@ extends Resource
 ## Names shown on the crate's spin.
 @export var display_names := {
 	"ammo": "AMMO", "medkit": "MED KIT", "suit_patch": "SUIT PATCH", "base_ammo": "EXTRA SHELLS",
-	"flares": "FLARE PACK", "tarp": "TARP", "decon": "DECON CHARGE",
+	"flares": "DOME CHARGES", "tarp": "TARP", "decon": "DECON CHARGE",
 }
 
 

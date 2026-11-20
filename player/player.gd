@@ -326,7 +326,7 @@ func _host_tick(delta: float) -> void:
 				return
 			var drain := WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale() if exposed else 0.0
 			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
-				drain *= 0.25
+				drain = 0.0  # Shield Dome: full shelter
 			if holding_leaky:
 				drain = maxf(drain, leaky_drain)
 			if drain > 0.0:

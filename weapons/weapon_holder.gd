@@ -81,6 +81,7 @@ func _process(delta: float) -> void:
 		_handle_input()
 		_publish()
 	_animate(delta)
+	_update_throw_preview()
 
 
 func _handle_input() -> void:
@@ -473,6 +474,100 @@ func _animate(delta: float) -> void:
 	if barrel:
 		# Break action: the barrel tips open for the reload.
 		barrel.rotation.x = -deg_to_rad(42.0) * clampf(reload_dip / 1.25, 0.0, 1.0)
+
+
+# ------------------------------------------------------------------ throw preview
+const PREVIEW_DOTS := 40
+var _arc: MultiMeshInstance3D
+var _arc_ring: MeshInstance3D
+var _arc_material: StandardMaterial3D
+
+
+## Grenades (frag, Shield Dome): a dotted arc along the real throw physics and
+## a ring where it lands, sized to its blast/dome radius. Brighter while aiming.
+func _update_throw_preview() -> void:
+	var data: WeaponData = loadout[current] if not loadout.is_empty() else null
+	var wanted: bool = data != null and player != null and player.is_multiplayer_authority() 			and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE] 			and player.get("state") == "ok" and _reload_left <= 0.0 and ammo[current] > 0 			and GameManager.mutations.stage == ""
+	if not wanted:
+		if _arc:
+			_arc.visible = false
+			_arc_ring.visible = false
+		return
+	if _arc == null:
+		_build_preview()
+	var color: Color = data.tracer_color
+	_arc_material.albedo_color = Color(color.r, color.g, color.b, lerpf(0.35, 0.9, _aim))
+	var pos := _muzzle_position()
+	var vel := -camera.global_basis.z * data.projectile_speed + Vector3.UP * 3.0
+	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity") * data.projectile_gravity
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	if player is CollisionObject3D:
+		exclude.append(player.get_rid())
+	var dt := 1.0 / 30.0
+	var dots := 0
+	var landed := false
+	var land := Vector3.ZERO
+	var land_normal := Vector3.UP
+	var travelled := 0.0
+	var total := 0.0
+	for i in 120:
+		vel.y -= gravity * dt
+		var next := pos + vel * dt
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(pos, next, HIT_MASK, exclude))
+		if not hit.is_empty():
+			land = hit.position
+			land_normal = hit.normal
+			landed = true
+			break
+		travelled += pos.distance_to(next)
+		total += pos.distance_to(next)
+		# Start the dots a little out from the hand so they don't fill the screen.
+		if total >= 1.6 and travelled >= 0.45 and dots < PREVIEW_DOTS:
+			travelled = 0.0
+			_arc.multimesh.set_instance_transform(dots, Transform3D(Basis(), next))
+			dots += 1
+		pos = next
+	_arc.multimesh.visible_instance_count = dots
+	_arc.visible = true
+	_arc_ring.visible = landed
+	if landed:
+		_arc_ring.global_position = land + land_normal * 0.05
+		_arc_ring.scale = Vector3(data.effect_radius, 1.0, data.effect_radius)
+		_arc_ring.material_override = _arc_material
+
+
+func _build_preview() -> void:
+	_arc_material = StandardMaterial3D.new()
+	_arc_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_arc_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_arc_material.disable_fog = true
+	_arc_material.no_depth_test = false
+	var dot := SphereMesh.new()
+	dot.radius = 0.045
+	dot.height = 0.09
+	dot.radial_segments = 6
+	dot.rings = 3
+	dot.material = _arc_material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = dot
+	multimesh.instance_count = PREVIEW_DOTS
+	_arc = MultiMeshInstance3D.new()
+	_arc.multimesh = multimesh
+	_arc.top_level = true
+	_arc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_arc)
+	_arc.global_transform = Transform3D.IDENTITY
+	_arc_ring = MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.96
+	torus.outer_radius = 1.0
+	torus.rings = 32
+	_arc_ring.mesh = torus
+	_arc_ring.top_level = true
+	_arc_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_arc_ring)
 
 
 ## Where the model sits while aiming: the sight point lands on the camera's

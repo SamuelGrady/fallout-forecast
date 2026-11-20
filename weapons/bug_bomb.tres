@@ -5,19 +5,19 @@
 [resource]
 script = ExtResource("2_uslrf")
 shot_sound = "throw_bomb"
-display_name = "Bug Bomb"
+display_name = "Frag Grenade"
 kind = 2
-damage = 75.0
-knockback = 12.0
+damage = 90.0
+knockback = 10.0
 fire_interval = 0.9
 mag_size = 1
 reserve_ammo = 3
 reload_time = 0.6
-projectile_speed = 16.0
-effect_time = 2.8
+projectile_speed = 17.0
+effect_time = 2.4
 effect_radius = 6.0
-tracer_color = Color(0.7, 1, 0.3, 1)
+tracer_color = Color(1, 0.6, 0.25, 1)
 view_position = Vector3(0.18, -0.17, -0.32)
 view_scale = 1.0
-muzzle = Vector3(0, 0.12, 0)
-gun_model = "bug_bomb"
+muzzle = Vector3(0, 0.06, 0)
+gun_model = "frag"
