@@ -1,4 +1,4 @@
-﻿extends CanvasLayer
+extends CanvasLayer
 
 var _panel := PanelContainer.new()
 
@@ -28,6 +28,37 @@ func _ready() -> void:
 	_button(box, "MAIN MENU", _main_menu)
 	_button(box, "QUIT", get_tree().quit)
 	visible = false
+	_remote.theme = BroadcastUI.theme()
+	_remote.add_theme_font_size_override("font_size", 30)
+	_remote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_remote.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_remote.offset_left = -400
+	_remote.offset_right = 400
+	_remote.offset_top = -40
+	_remote.offset_bottom = 40
+	_remote.visible = false
+	_remote_layer.layer = 19
+	_remote_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_sibling.call_deferred(_remote_layer)
+	_remote_layer.add_child(_remote)
+	GameManager.global_pause_changed.connect(_on_global_pause)
+
+
+## Shown on everyone else's screen while someone has the game paused.
+var _remote := Label.new()
+var _remote_layer := CanvasLayer.new()
+
+
+func _exit_tree() -> void:
+	if GameManager.global_pause_changed.is_connected(_on_global_pause):
+		GameManager.global_pause_changed.disconnect(_on_global_pause)
+
+
+func _on_global_pause(paused: bool, by: String) -> void:
+	_remote.text = "PAUSED BY %s  -  ESC TO RESUME" % by.to_upper()
+	_remote.visible = paused and not visible
+	if not paused and visible:
+		MenuState.close(self)
 
 func _button(box: Control, text: String, action: Callable) -> void:
 	var button := Button.new()
@@ -47,17 +78,25 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if visible:
 			_resume()
+		elif GameManager.global_paused:
+			# Someone else paused: ESC resumes for everyone.
+			GameManager.request_pause(false)
 		else:
 			MenuState.open(self)
 			BroadcastUI.reveal(_panel)
+			GameManager.request_pause(true)
+			_remote.visible = false
 
 func focus_default() -> void:
 	_panel.get_child(0).get_child(1).grab_focus()
 
 func _resume() -> void:
 	MenuState.close(self)
+	GameManager.request_pause(false)
 
 func _main_menu() -> void:
+	# Don't leave the rest of the session frozen behind you.
+	GameManager.request_pause(false)
 	MenuState.reset()
 	GameManager.run_active = false
 	GameManager.mutations.clear()

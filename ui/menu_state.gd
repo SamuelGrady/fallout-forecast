@@ -20,7 +20,7 @@ func close(menu: Node) -> void:
 		return
 	stack.pop_back()
 	menu.visible = false
-	get_tree().paused = not stack.is_empty()
+	get_tree().paused = not stack.is_empty() or GameManager.global_paused
 	if not stack.is_empty():
 		stack.back().visible = true
 		stack.back().focus_default()
@@ -29,5 +29,6 @@ func close(menu: Node) -> void:
 
 func reset() -> void:
 	stack.clear()
+	GameManager.global_paused = false
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

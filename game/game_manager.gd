@@ -224,6 +224,45 @@ func complete_objective(objective: Node, player: Node) -> void:
 	s["objectives"] = int(s.get("objectives", 0)) + 1
 
 
+# ------------------------------------------------------------------ global pause
+## In a session, a pause stops the game for everyone (host-authoritative), and
+## anyone can resume. Solo play just pauses locally as before.
+signal global_pause_changed(paused: bool, by: String)
+var global_paused := false
+var paused_by := ""
+
+
+func request_pause(paused: bool) -> void:
+	if not _online():
+		return
+	var who := Net.local_name if Net.local_name != "" else "A PLAYER"
+	if is_host():
+		_apply_pause(paused, who)
+		_sync_pause.rpc(paused, who)
+	else:
+		_request_pause_rpc.rpc_id(1, paused, who)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_pause_rpc(paused: bool, who: String) -> void:
+	if not is_host():
+		return
+	_apply_pause(paused, who)
+	_sync_pause.rpc(paused, who)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_pause(paused: bool, who: String) -> void:
+	_apply_pause(paused, who)
+
+
+func _apply_pause(paused: bool, who: String) -> void:
+	global_paused = paused
+	paused_by = who if paused else ""
+	get_tree().paused = paused or not MenuState.stack.is_empty()
+	global_pause_changed.emit(paused, who)
+
+
 # ------------------------------------------------------------------ ready up
 signal ready_changed(ready_count: int, needed: int)
 var _ready_peers := {}
