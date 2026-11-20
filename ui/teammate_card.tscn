@@ -1,40 +1,28 @@
 [gd_scene format=3]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5pp6w"]
-content_margin_left = 8.0
-content_margin_top = 8.0
-content_margin_right = 8.0
-content_margin_bottom = 8.0
-bg_color = Color(0, 0, 0, 0.45)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
+content_margin_left = 10.0
+content_margin_top = 7.0
+content_margin_right = 10.0
+content_margin_bottom = 7.0
+bg_color = Color(0.025, 0.045, 0.075, 0.94)
+border_width_left = 3
+border_color = Color(0.666667, 0.729412, 0.780392, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ieqnn"]
-bg_color = Color(0, 0, 0, 0.55)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0, 0, 0, 0.8)
+bg_color = Color(0.0784314, 0.137255, 0.192157, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1jjn1"]
-bg_color = Color(0.85, 0.2, 0.2, 1)
+bg_color = Color(1, 0.337255, 0.537255, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qbyij"]
-bg_color = Color(0, 0, 0, 0.55)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0, 0, 0, 0.8)
+bg_color = Color(0.0784314, 0.137255, 0.192157, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1ehng"]
-bg_color = Color(0.2, 0.8, 0.75, 1)
+bg_color = Color(0.4, 0.87451, 0.854902, 1)
 
 [node name="TeammateCard" type="PanelContainer" unique_id=1133872603]
-custom_minimum_size = Vector2(170, 0)
+custom_minimum_size = Vector2(174, 0)
 theme_override_styles/panel = SubResource("StyleBoxFlat_5pp6w")
 
 [node name="VBox" type="VBoxContainer" parent="." unique_id=1902246759]
@@ -44,15 +32,15 @@ theme_override_constants/separation = 3
 [node name="Name" type="Label" parent="VBox" unique_id=863844386]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 19
+theme_override_colors/font_color = Color(0.909804, 0.913725, 0.835294, 1)
 text = "PLAYER"
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="Health" type="ProgressBar" parent="VBox" unique_id=1580490776]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 8)
+custom_minimum_size = Vector2(150, 7)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_ieqnn")
 theme_override_styles/fill = SubResource("StyleBoxFlat_1jjn1")
@@ -61,7 +49,7 @@ show_percentage = false
 
 [node name="Suit" type="ProgressBar" parent="VBox" unique_id=266828423]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 8)
+custom_minimum_size = Vector2(150, 7)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_qbyij")
 theme_override_styles/fill = SubResource("StyleBoxFlat_1ehng")
@@ -72,8 +60,6 @@ show_percentage = false
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(1, 0.5, 0.3, 1)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 0.337255, 0.537255, 1)
 text = "DOWNED"

@@ -24,10 +24,13 @@ func _ready() -> void:
 	BroadcastUI.text(_label, roundi(24 * Settings.hud_scale), BroadcastUI.CYAN)
 	BroadcastUI.back_label(_label)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_label.offset_left = -252
-	_label.offset_right = 252
-	_label.offset_top = 60
+	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_label.offset_left = -220
+	_label.offset_right = 220
+	# Above the vitals/armory panels (even at Large HUD) and the bottom-center hotbar.
+	_label.offset_top = -176
+	_label.offset_bottom = -176
+	_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label.visible = false
 	_layer.add_child(_label)

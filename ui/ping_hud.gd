@@ -211,8 +211,15 @@ func _draw() -> void:
 		_draw_wheel()
 	elif _can_ping(_local()):
 		var key := "D-PAD DOWN" if Settings.using_gamepad else "Z / MMB"
-		var hint := "[%s] TAP TO PING  /  HOLD FOR WHEEL" % key
-		_text(BroadcastUI.FONT, Vector2(size.x * 0.5 - 145.0, size.y - 24.0), hint, 290, 16, Color(BroadcastUI.PAPER, 0.8))
+		var font := BroadcastUI.FONT
+		var tint := Color(BroadcastUI.PAPER, 0.8)
+		var ink := Color(BroadcastUI.INK, 0.8)
+		var l1 := "[%s] PING" % key
+		var l2 := "HOLD FOR WHEEL"
+		draw_string_outline(font, Vector2(20.0, 32.0), l1, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 17, 4, ink)
+		draw_string(font, Vector2(20.0, 32.0), l1, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 17, tint)
+		draw_string_outline(font, Vector2(20.0, 49.0), l2, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 15, 4, ink)
+		draw_string(font, Vector2(20.0, 49.0), l2, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 15, Color(BroadcastUI.MUTED, 0.8))
 
 
 func _draw_marker(ping: Dictionary, icon: GameIcon, camera: Camera3D) -> void:
@@ -321,15 +328,15 @@ func _draw_wheel() -> void:
 
 func _draw_feed() -> void:
 	var font := BroadcastUI.FONT
-	var right := size.x - 28.0
+	var right := size.x - 20.0
 	for i in _feed.size():
 		var line: Dictionary = _feed[i]
 		var alpha := clampf((FEED_TIME - line.age) / 0.6, 0.0, 1.0)
-		var y := 104.0 + i * 24.0
-		var width := 260.0
+		var y := 152.0 + i * 24.0
+		var width := 240.0
 		var color: Color = line.color
 		draw_rect(Rect2(right - 4, y - 17, 4, 22), Color(color, alpha))
-		draw_string_outline(font, Vector2(right - width - 10, y), line.text, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, 5, Color(BroadcastUI.INK, alpha))
+		draw_string_outline(font, Vector2(right - width - 10, y), line.text, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, 4, Color(BroadcastUI.INK, alpha))
 		draw_string(font, Vector2(right - width - 10, y), line.text, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, Color(BroadcastUI.PAPER, alpha))
 
 
