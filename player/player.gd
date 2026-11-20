@@ -147,7 +147,8 @@ func _ready() -> void:
 	if is_multiplayer_authority():
 		add_to_group("local_player")
 		camera.current = true
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if not OS.has_feature("web"):
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		camera.current = false
 

@@ -27,6 +27,7 @@ var flash := 0.0
 @export var flash_fade := 4.0
 
 var _rain: GPUParticles3D
+var _web_rain: CPUParticles3D
 var _rain_material: StandardMaterial3D
 var _collision: GPUParticlesCollisionHeightField3D
 var _environment: Environment
@@ -49,15 +50,25 @@ func _process(delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
 		var p := camera.global_position
-		_rain.global_position = Vector3(p.x, p.y + spawn_height, p.z)
-		# Snap to a 4 m grid: the heightfield only re-renders when it moves,
-		# instead of every frame.
-		_collision.global_position = Vector3(snappedf(p.x, 4.0), snappedf(p.y, 4.0), snappedf(p.z, 4.0))
+		var rain_position := p + Vector3.UP * spawn_height
+		if _web_rain:
+			_web_rain.global_position = rain_position
+		else:
+			_rain.global_position = rain_position
+			# Only rerender the heightfield when the camera moves to another cell.
+			_collision.global_position = p.snapped(Vector3.ONE * 4.0)
 
 	var flare_cover := camera and preload("res://weapons/projectile.gd").protects(camera.global_position, get_tree())
-	_rain.amount_ratio = intensity * (0.25 if flare_cover else 1.0)
-	_rain.emitting = intensity > 0.01
-	_rain_material.albedo_color = rain_color.lerp(acid_color, acid)
+	var rain_intensity := intensity * (0.25 if flare_cover else 1.0)
+	var color := rain_color.lerp(acid_color, acid)
+	if _web_rain:
+		var player := get_tree().get_first_node_in_group("local_player") as Player
+		color.a *= rain_intensity if not player or not player.sheltered else 0.0
+		_web_rain.emitting = color.a > 0.0
+	else:
+		_rain.amount_ratio = rain_intensity
+		_rain.emitting = intensity > 0.01
+	_rain_material.albedo_color = color
 
 	if _environment:
 		_environment.fog_enabled = intensity > 0.01
@@ -70,6 +81,21 @@ func _process(delta: float) -> void:
 
 
 func _build_rain() -> void:
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.025, 0.6)
+	_rain_material = StandardMaterial3D.new()
+	_rain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_rain_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_rain_material.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	_rain_material.billboard_keep_scale = true
+	_rain_material.albedo_color = rain_color
+	_rain_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.material = _rain_material
+
+	if OS.has_feature("web"):
+		_build_web_rain(mesh)
+		return
+
 	_rain = GPUParticles3D.new()
 	_rain.name = "Rain"
 	_rain.amount = max_drops
@@ -91,16 +117,6 @@ func _build_rain() -> void:
 	_rain.process_material = process
 	_rain.collision_base_size = 0.05
 
-	var mesh := QuadMesh.new()
-	mesh.size = Vector2(0.025, 0.6)
-	_rain_material = StandardMaterial3D.new()
-	_rain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_rain_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_rain_material.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
-	_rain_material.billboard_keep_scale = true
-	_rain_material.albedo_color = rain_color
-	_rain_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mesh.material = _rain_material
 	_rain.draw_pass_1 = mesh
 	add_child(_rain)
 
@@ -113,6 +129,24 @@ func _build_rain() -> void:
 	add_child(_collision)
 
 
+func _build_web_rain(mesh: QuadMesh) -> void:
+	_web_rain = CPUParticles3D.new()
+	_web_rain.name = "Rain"
+	_web_rain.amount = mini(max_drops, 900)
+	_web_rain.lifetime = (spawn_height + 10.0) / fall_speed
+	_web_rain.fixed_fps = 30
+	_web_rain.emitting = false
+	_web_rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_web_rain.emission_box_extents = Vector3(area_size * 0.3, 1.0, area_size * 0.3)
+	_web_rain.direction = Vector3(0.05, -1.0, 0.0)
+	_web_rain.spread = 2.0
+	_web_rain.initial_velocity_min = fall_speed * 0.9
+	_web_rain.initial_velocity_max = fall_speed * 1.1
+	_web_rain.gravity = Vector3.ZERO
+	_web_rain.mesh = mesh
+	add_child(_web_rain)
+
+
 func _find_scene_lighting() -> void:
 	for node in get_tree().root.find_children("*", "WorldEnvironment", true, false):
 		_environment = (node as WorldEnvironment).environment
@@ -123,8 +157,13 @@ func _find_scene_lighting() -> void:
 	if _environment:
 		_base_sky_energy = _environment.background_energy_multiplier
 		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+		if _web_rain:
+			_environment.glow_enabled = false
 	if _sun:
 		_base_sun_energy = _sun.light_energy
+		if _web_rain:
+			# Keep bright facades readable with the Compatibility lighting response.
+			_base_sun_energy *= 0.75
 
 
 func _sample_fog(intensity: float) -> float:

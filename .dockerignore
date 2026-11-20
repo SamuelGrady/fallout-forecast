@@ -1,0 +1,6 @@
+.git
+.godot
+.env*
+build
+docs
+tools
