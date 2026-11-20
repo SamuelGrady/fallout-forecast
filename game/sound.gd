@@ -23,6 +23,7 @@ var _rain_filter := AudioEffectLowPassFilter.new()
 var _boss_active := false
 var _rain_gain := 0.0
 var _shelter_mix := 0.0
+var _pressure := 0.0
 
 
 func _ready() -> void:
@@ -112,10 +113,15 @@ func _process(delta: float) -> void:
 	var intensity := WeatherManager.storm_intensity
 	var blend := 1.0 - exp(-3.0 * delta)
 	var boss := get_tree().get_first_node_in_group("boss") != null
+	# Combat pressure (enemies alive) pushes the drums and lead up on top of
+	# the storm layers, so a quiet Downpour and a packed one sound different.
+	_pressure = lerpf(_pressure, clampf(get_tree().get_nodes_in_group("enemies").size() / 14.0, 0.0, 1.0), blend * 0.5)
 	for i in THRESHOLDS.size():
 		var gain := 0.0 if boss else 0.24 * smoothstep(THRESHOLDS[i], THRESHOLDS[i] + 0.2, intensity)
 		if i == 0 and not boss:
 			gain = 0.20
+		elif i >= 2 and not boss:
+			gain = maxf(gain, 0.24 * _pressure * (1.0 if i == 2 else 0.7))
 		_layers[i].volume_linear = lerpf(_layers[i].volume_linear, gain, blend)
 	var boss_track := _layers.back() as AudioStreamPlayer
 	if boss and not _boss_active:

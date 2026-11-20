@@ -274,6 +274,9 @@ func _pop_sac(i: int) -> void:
 	sacs_left -= 1
 	var part: Node3D = _parts[i]
 	Sound.play_at("explosion", part.global_position)
+	# Sac shatter: a wet low burst plus a rising reel tick per sac popped.
+	Sound.play("spore_burst", -4.0, 0.6)
+	Sound.play("reel_land", -8.0, 0.9 + 0.15 * (3 - sacs_left))
 	ShotFX.flash(get_parent(), part.global_position, Color(0.8, 1.0, 0.3), 8.0, 0.18)
 	GameManager.spawn_cloud(part.global_position, 10.0, 4.0)
 	part.visible = false
@@ -309,6 +312,9 @@ func _shatter_shell() -> void:
 
 func _die() -> void:
 	Sound.play_at("explosion_big", global_position)
+	# Final kill punctuation: a full-mix boom and the jackpot sting.
+	Sound.play("explosion_big", -2.0, 0.8)
+	Sound.play("reel_land", -4.0, 1.3)
 	dead = true
 	for k in 6:
 		GameManager.spawn_cloud(global_position + Vector3(randf_range(-5, 5), randf_range(-3, 1), randf_range(-5, 5)), 0.0, 3.5)

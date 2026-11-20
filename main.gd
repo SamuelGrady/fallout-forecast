@@ -16,6 +16,7 @@ func _ready() -> void:
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
 		add_child(dev_menu)
 	_setup_decon_showers()
+	_setup_objectives()
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
 	$Level.add_child(signs)
@@ -25,6 +26,21 @@ func _ready() -> void:
 	if GameManager.is_host():
 		GameManager.start_run.call_deferred()
 	GameManager.run_finished.connect(_on_run_finished)
+
+
+## Same three district objectives on every peer; the host picks the live one.
+func _setup_objectives() -> void:
+	var root := Node3D.new()
+	root.name = "DistrictObjectives"
+	$Level.add_child(root)
+	for site in preload("res://props/district_objective.gd").SITES:
+		var objective := Node3D.new()
+		objective.set_script(preload("res://props/district_objective.gd"))
+		objective.name = site
+		objective.site = site
+		root.add_child(objective)
+		# Lift the use point off the ground so the interact ray reaches it.
+		objective.global_position = objective.SITES[site].at + Vector3.UP
 
 
 func _exit_tree() -> void:

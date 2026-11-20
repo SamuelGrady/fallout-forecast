@@ -175,6 +175,39 @@ func player_for_peer(peer: int) -> Node:
 	return null
 
 
+# ------------------------------------------------------------------ objectives
+const OBJECTIVE_ORDER := ["pharmacy", "water_tower", "gas_pumps"]
+
+
+func _set_objective(site: String) -> void:
+	if _online():
+		_sync_objective.rpc(site)
+	_sync_objective(site)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_objective(site: String) -> void:
+	for objective in get_tree().get_nodes_in_group("district_objectives"):
+		objective.set_active(objective.site == site)
+
+
+## Host: a player finished the live objective.
+func complete_objective(objective: Node, player: Node) -> void:
+	if not is_host() or not objective.active:
+		return
+	_set_objective("")
+	add_decon_charge(1)
+	var pack := Node3D.new()
+	pack.set_script(preload("res://weapons/ammo_drop.gd"))
+	pack.kind = "supply"
+	objective.get_parent().add_child(pack)
+	pack.global_position = objective.global_position + Vector3(1.2, 0.12, 0.0)
+	Sound.play("reel_land", -6.0, 1.2)
+	show_banner("%s: +1 DECON, SUPPLIES" % str(objective.SITES[objective.site].label), Color("ffd56a"), 2.4)
+	var s := _stat(player)
+	s["objectives"] = int(s.get("objectives", 0)) + 1
+
+
 # ------------------------------------------------------------------ ready up
 signal ready_changed(ready_count: int, needed: int)
 var _ready_peers := {}
@@ -231,6 +264,10 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 	if not is_host() or not run_active:
 		return
 	match phase:
+		WeatherManager.Phase.DRIZZLE:
+			var site: String = OBJECTIVE_ORDER[(_wave - 1) % OBJECTIVE_ORDER.size()]
+			_set_objective(site)
+			show_banner("OBJECTIVE: %s" % site.replace("_", " ").to_upper(), Color("ffd56a"), 2.2)
 		WeatherManager.Phase.CALM:
 			crates.spawn_for_calm()
 			# Clear weather: showers refill one charge.
@@ -242,6 +279,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
+			_set_objective("")
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
 			Sound.play("reel_land", -6.0)
 			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}

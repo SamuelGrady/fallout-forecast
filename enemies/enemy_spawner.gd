@@ -21,6 +21,8 @@ var _spawned := 0
 var _burst_left := 0
 var _reveal_timer := 0.0
 var _supplies_pending := false
+## One authored beat per wave (from wave 2), fired halfway through Downpour.
+var _beat_done := false
 
 
 func _ready() -> void:
@@ -33,6 +35,7 @@ func _on_phase(phase: int, wave: int) -> void:
 		_budget = roundi((18 + wave * 8) * GameManager.enemy_spawn_scale())
 		_spawned = 0
 		_supplies_pending = true
+		_beat_done = false
 	_timer = 1.5
 	_burst_left = 0
 
@@ -60,11 +63,70 @@ func _physics_process(delta: float) -> void:
 			_timer = drizzle_breather if WeatherManager.phase == WeatherManager.Phase.DRIZZLE else downpour_breather
 		else:
 			_timer = 0.5
+	if not _beat_done and WeatherManager.phase == WeatherManager.Phase.DOWNPOUR and _spawned >= ceili(_budget * 0.5):
+		_beat_done = true
+		_run_beat(_wave)
 	_reveal_timer -= delta
 	if _spawned >= _budget and alive_count() <= 5 and _reveal_timer <= 0.0:
 		_reveal_timer = 1.0
 		for enemy in get_tree().get_nodes_in_group("enemies"):
 			enemy.reveal(1.2)
+
+
+## Memorable mid-wave encounters on top of the count-based horde. Beat
+## enemies are extra: they show up in alive_count() but not the budget.
+func _run_beat(wave: int) -> void:
+	var players := GameManager.players().filter(func(p): return p.state == "ok")
+	if players.is_empty():
+		return
+	var focus: Node3D = players.pick_random()
+	match wave:
+		2:
+			# Supply ambush: Gutters burst out around the supply pack nearest a player.
+			var packs := get_tree().get_nodes_in_group("street_supplies")
+			var at := focus.global_position
+			var best := INF
+			for pack in packs:
+				var d: float = pack.global_position.distance_to(focus.global_position)
+				if d < best:
+					best = d
+					at = pack.global_position
+			GameManager.show_banner("SUPPLY AMBUSH", Color("ff8a4c"), 2.0)
+			for i in 3 + GameManager.player_count():
+				_spawn_near(gutter_scene, at, 6.0)
+		3:
+			# Street push: a wall of Drips from one direction at once.
+			var origin: Variant = _marker_position("enemy_spawn")
+			if origin == null:
+				return
+			GameManager.show_banner("STREET PUSH", Color("ff5a6e"), 2.0)
+			for i in 8 + 3 * GameManager.player_count():
+				_spawn_near(drip_scene, origin, 4.0)
+		4:
+			# Elite squad: Misters with a Gutter escort, briefly revealed.
+			var origin: Variant = _marker_position("enemy_spawn")
+			if origin == null:
+				return
+			GameManager.show_banner("ELITE SQUAD", Color("b48cff"), 2.0)
+			for i in 2 + GameManager.player_count():
+				var mister := _spawn_near(mister_scene, origin, 3.0)
+				if mister:
+					mister.reveal(3.0)
+			for i in 2:
+				_spawn_near(gutter_scene, origin, 3.0)
+
+
+func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBase:
+	if alive_count() >= 60:
+		return null
+	var enemy := scene.instantiate() as EnemyBase
+	add_child(enemy, true)
+	var point := center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) > 0:
+		point = NavigationServer3D.map_get_closest_point(map, point)
+	enemy.global_position = point + Vector3(0, 0.15, 0)
+	return enemy
 
 
 func can_finish_wave() -> bool:

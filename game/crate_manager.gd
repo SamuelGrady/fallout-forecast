@@ -65,7 +65,10 @@ func open(crate: Node, player: Node) -> void:
 func _open_double(crate: Node, player: Node) -> void:
 	var key := crate.get_instance_id()
 	var waiting: Array = _double_waiting.get(key, [])
-	if not waiting.is_empty() and waiting[0] != player and _clock - float(waiting[1]) <= DOUBLE_WINDOW:
+	if GameManager.is_solo():
+		# Solo variant: the same coin flip, both outcomes land on you.
+		waiting = [player, _clock]
+	if not waiting.is_empty() and (waiting[0] != player or GameManager.is_solo()) and _clock - float(waiting[1]) <= DOUBLE_WINDOW:
 		crate.get_node("Interact").opened = true
 		_double_waiting.erase(key)
 		var partner: Node = waiting[0]
@@ -77,7 +80,7 @@ func _open_double(crate: Node, player: Node) -> void:
 			get_tree().create_timer(1.3).timeout.connect(_give.bind(partner, b))
 		else:
 			var cursed: String = loot.cursed_items.pick_random()
-			var victim: Node = GameManager.players().pick_random()
+			var victim: Node = player if GameManager.is_solo() else GameManager.players().pick_random()
 			_reveal(crate, cursed, "CURSED for %s!" % victim.get("display_name"))
 			get_tree().create_timer(1.3).timeout.connect(_give.bind(victim, cursed))
 	else:

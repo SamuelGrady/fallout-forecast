@@ -18,9 +18,17 @@ func can_interact(player: Node) -> bool:
 func get_prompt(_player: Node) -> String:
 	if get_parent().double:
 		if GameManager.is_solo():
-			return "Two players"
+			return "Gamble alone (long hold)"
 		return "Open together"
 	return "Open"
+
+
+## Solo players can still take the double-or-nothing gamble, but must stand
+## in the open holding for 3 seconds.
+func get_hold_time(_player: Node) -> float:
+	if get_parent().double and GameManager.is_solo():
+		return 3.0
+	return hold_time
 
 
 func interact(player: Node) -> void:
