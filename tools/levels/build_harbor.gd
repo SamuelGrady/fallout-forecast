@@ -172,10 +172,15 @@ func canneries() -> void:
 	var names := ["NORTH STAR  /  ICE","HARBOR POINT CANNING CO.","PIER 3  /  COLD STORE"]
 	for i in 3:
 		section("CanneryBay"+str(i+1))
-		part.position = Vector3(-41+i*40,0,-47)
+		# Leave a service lane beside the ice house for the water-filter objective.
+		part.position = Vector3([-35,-1,39][i],0,-47)
 		var wall := surface(["#98c4bd","#dc9b73","#abc7c3"][i],"quay_steel",0.26)
 		var steel := paint("#354f59")
 		box(Vector3(0,4.3,0),Vector3(30,8.6,16),wall)
+		if i == 0:
+			for z: float in [2.7,4.8]:
+				tube(Vector3(-15.32,1.45,z),0.26,2.9,steel,1,true)
+				tube(Vector3(-15.32,2.5,z),0.34,0.19,paint("#d7ae73"))
 		for side: float in [-1,1]:
 			box(Vector3(0,9.28,side*4.25),Vector3(31.2,0.42,8.9),steel,true,Vector3(side*10,0,0))
 		box(Vector3(0,8.9,0),Vector3(30,0.75,11),wall)
