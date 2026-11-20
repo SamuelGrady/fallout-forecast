@@ -34,6 +34,7 @@ Preload="*res://game/preload.gd"
 SceneLoader="*res://game/scene_loader.gd"
 Perf="*res://game/perf.gd"
 Juice="*res://game/juice.gd"
+Telemetry="*res://game/telemetry.gd"
 
 [display]
 

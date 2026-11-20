@@ -39,6 +39,7 @@ func _ready() -> void:
 	_level.name = "Level"
 	add_child(_level)
 	GameManager.map_id = map_id
+	Telemetry.run_started(map_id)
 	if map_id == Maps.DEFAULT_ID and not Net.dedicated:
 		preload("res://props/building_restyle.gd").apply(_level)
 		var signs := Node.new()

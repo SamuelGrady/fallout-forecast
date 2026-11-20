@@ -161,6 +161,9 @@ func _build_playback_menu() -> void:
 	_toggle("PERFORMANCE OVERLAY", Settings.perf_overlay, func(on: bool):
 		Settings.perf_overlay = on
 		Settings.save())
+	_toggle("SEND TELEMETRY", Settings.telemetry_enabled, func(on: bool):
+		Settings.telemetry_enabled = on
+		Settings.save())
 	var server_caption := Label.new()
 	server_caption.text = "SERVER (WSS)"
 	BroadcastUI.text(server_caption, 19, BroadcastUI.CYAN)

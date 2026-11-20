@@ -25,6 +25,10 @@ var solo_map_id := Maps.DEFAULT_ID
 var server_url := ""
 ## Show the live performance overlay (Perf autoload). Recording is always on.
 var perf_overlay := false
+## Send anonymous performance/run telemetry to the Fallout Forecast server.
+var telemetry_enabled := true
+## Random anonymous id for this install (no personal data), made on first launch.
+var install_id := ""
 
 func unlock_gun(path: String) -> void:
 	if path not in unlocked_guns:
@@ -48,6 +52,12 @@ func _ready() -> void:
 		solo_map_id = Maps.fallback(str(cfg.get_value("profile", "solo_map", solo_map_id)))
 		server_url = str(cfg.get_value("network", "server_url", server_url)).strip_edges()
 		perf_overlay = bool(cfg.get_value("debug", "perf_overlay", perf_overlay))
+		telemetry_enabled = bool(cfg.get_value("debug", "telemetry", telemetry_enabled))
+		install_id = str(cfg.get_value("debug", "install_id", install_id))
+	if install_id.length() != 32:
+		var bytes := Crypto.new().generate_random_bytes(16)
+		install_id = bytes.hex_encode()
+		save()
 	apply()
 
 
@@ -70,6 +80,8 @@ func save() -> void:
 	cfg.set_value("profile", "solo_map", solo_map_id)
 	cfg.set_value("network", "server_url", server_url.strip_edges())
 	cfg.set_value("debug", "perf_overlay", perf_overlay)
+	cfg.set_value("debug", "telemetry", telemetry_enabled)
+	cfg.set_value("debug", "install_id", install_id)
 	cfg.save(PATH)
 	apply()
 
