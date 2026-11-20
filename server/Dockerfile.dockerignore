@@ -5,7 +5,8 @@
 .claude/
 tools/
 docs/
-server/
+server/*
+!server/healthcheck.sh
 recordings/
 Playtest.cmd
 **/__pycache__/

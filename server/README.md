@@ -27,11 +27,18 @@ FALLOUT_TAG=<git sha> docker compose -f server/docker-compose.yml up -d
 
 ### Redeploy on ballista
 
-From the repo, on Drew's PC:
+GitHub Actions runs **Dedicated server build** on pushes to `master`. It builds the ARM64 image and checks Docker health and a WebSocket upgrade. Check the workflow for the revision before redeploying.
 
-```
-git archive fallout-server | ssh root@ballista "rm -rf /opt/fallout-server/src && mkdir -p /opt/fallout-server/src && tar -x -C /opt/fallout-server/src"
-ssh root@ballista "cd /opt/fallout-server/src && docker build -f server/Dockerfile -t fallout-server:<sha> -t fallout-server:latest . && FALLOUT_TAG=<sha> docker compose -p fallout -f server/docker-compose.yml up -d"
+On ballista, from an exported copy of the tested `master` revision:
+
+```sh
+docker build -f server/Dockerfile -t fallout-server:<git sha> .
+FALLOUT_TAG=<git sha> docker compose -p fallout -f server/docker-compose.yml up -d --wait
+docker logs --tail 20 fallout-server
 ```
 
 Clients must run the same build as the server. Bump `Net.PROTOCOL` whenever an RPC or a networked scene path changes; mismatched clients are turned away with a message.
+
+### Enable Coolify push deploys
+
+Create an application from the GitHub App source for `kickofline/fallout-forecast` on `master`. Use Dockerfile build pack, repository root as the context, `/server/Dockerfile`, and port `7777`. The image checks the game loop heartbeat. Validate the staged application with a matching client before moving the `fallout.drew.place` Caddy route off the standalone container. With that route on the Coolify app, enable auto-deploy and verify that the next push queues a webhook deployment.

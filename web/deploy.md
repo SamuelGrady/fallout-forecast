@@ -1,19 +1,16 @@
 # Deploy to drewdettmer.com/fallout
 
-This rollout adds one Coolify app on ballista. Caddy combines the game container’s labels with the existing site block. The more specific `/fallout/*` handler forwards to nginx. The current site app keeps handling every other path and does not need a redeploy. The GitHub App push webhook handles future production builds. GitHub Actions independently verifies the same ARM64 Dockerfile and keeps the build artifact.
-
-## Push and check the build
-
-From the `web-build` checkout:
+Caddy combines the game container’s labels with the existing site block. The more specific `/fallout/*` handler forwards to nginx. The **Fallout Forecast Web** Coolify app rebuilds from `master` through the GitHub App push webhook. GitHub Actions verifies the ARM64 Dockerfile and keeps the build artifact.
 
 ```powershell
-git push -u origin web-build
-gh run list --workflow web-export.yml --branch web-build --limit 1
+gh run list --workflow web-export.yml --branch master --limit 1
+curl.exe -fsSI https://drewdettmer.com/fallout
+curl.exe -fsS https://drewdettmer.com/fallout/healthz
 ```
 
-Wait for **Web export** to succeed. Make sure the Coolify GitHub App installation includes `kickofline/fallout-forecast`.
+## Recreate the Coolify resource
 
-## Create and deploy the game app
+Make sure the Coolify GitHub App installation includes `kickofline/fallout-forecast`. Use the same `master` revision for the browser build and dedicated server.
 
 From Drew’s Tailnet-connected Windows workstation, start a PowerShell session with the Coolify environment. Approve the 1Password prompt when it appears.
 
@@ -43,7 +40,7 @@ function Invoke-Coolify($Method, $Path, $RequestBody) {
 $gameApps = @((Invoke-Coolify GET /applications) | Where-Object { $_.name -eq 'Fallout Forecast Web' })
 if ($gameApps.Count -gt 1) { throw 'Resolve the duplicate game apps before proceeding' }
 if ($gameApps.Count -eq 1) {
-    if ($gameApps[0].git_repository -ne 'kickofline/fallout-forecast' -or $gameApps[0].git_branch -ne 'web-build') {
+    if ($gameApps[0].git_repository -ne 'kickofline/fallout-forecast' -or $gameApps[0].git_branch -ne 'master') {
         throw 'The existing app has a different repository or branch'
     }
     $appId = $gameApps[0].uuid
@@ -56,7 +53,7 @@ if ($gameApps.Count -eq 1) {
         destination_uuid = 'doww80cw8kc8844w4gcs88s0'
         github_app_uuid = 'k0o84oowooog8ksk04cg8ocs'
         git_repository = 'kickofline/fallout-forecast'
-        git_branch = 'web-build'
+        git_branch = 'master'
         build_pack = 'dockerfile'
         base_directory = '/'
         dockerfile_location = '/web/Dockerfile'
@@ -110,7 +107,7 @@ curl.exe -fsS https://drewdettmer.com/fallout/healthz
 
 ## Enable production push deploys
 
-Run this in the same 1Password session after the branch deployment passes. The PATCH saves the branch and webhook settings. The next push to `master` starts the production build.
+Run this in the same 1Password session after the production check passes. The next push to `master` starts the production build.
 
 ```powershell
 Invoke-Coolify PATCH "/applications/$appId" @{
@@ -119,4 +116,4 @@ Invoke-Coolify PATCH "/applications/$appId" @{
 } | Select-Object uuid, name, git_branch
 ```
 
-Merge `web-build` into `master` and confirm the new deployment has `is_webhook` set. Repeat the live browser and homepage checks against that deployment. To take down only the game, use **Stop** on the **Fallout Forecast Web** app in Coolify.
+On the next push, confirm the new deployment has `is_webhook` set. Repeat the live browser and homepage checks against that deployment. To take down only the game, use **Stop** on the **Fallout Forecast Web** app in Coolify.

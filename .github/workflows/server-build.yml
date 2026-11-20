@@ -1,0 +1,52 @@
+name: Dedicated server build
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Build the ARM64 dedicated server
+        run: docker build -f server/Dockerfile -t fallout-server:ci .
+
+      - name: Verify startup and WebSocket upgrade
+        shell: bash
+        run: |
+          docker run -d --name fallout-server-ci -p 127.0.0.1::7777 fallout-server:ci
+          trap 'docker logs fallout-server-ci; docker rm -f fallout-server-ci >/dev/null' EXIT
+          timeout 90 bash -c 'until [ "$(docker inspect --format "{{.State.Health.Status}}" fallout-server-ci)" = healthy ]; do sleep 2; done'
+          host="$(docker port fallout-server-ci 7777/tcp)"
+          python3 - "$host" <<'PY'
+          from http.client import HTTPConnection
+          from secrets import token_bytes
+          from base64 import b64encode
+          import sys
+
+          conn = HTTPConnection(sys.argv[1], timeout=5)
+          conn.request("GET", "/", headers={
+              "Connection": "Upgrade",
+              "Upgrade": "websocket",
+              "Sec-WebSocket-Version": "13",
+              "Sec-WebSocket-Key": b64encode(token_bytes(16)).decode("ascii"),
+          })
+          with conn.getresponse() as response:
+              if response.status != 101:
+                  raise SystemExit(f"WebSocket upgrade returned {response.status} {response.reason}")
+          conn.close()
+          PY
+          docker logs fallout-server-ci 2>&1 | grep -F 'listening for WebSocket'

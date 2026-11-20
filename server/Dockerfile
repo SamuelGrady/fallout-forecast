@@ -24,6 +24,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --create-home --uid 10001 fallout
 COPY --from=godot /usr/local/bin/godot /usr/local/bin/godot
+COPY --chmod=755 server/healthcheck.sh /usr/local/bin/fallout-healthcheck
 COPY --chown=fallout:fallout . /game
 USER fallout
 ENV HOME=/home/fallout
@@ -36,7 +37,7 @@ RUN godot --headless --path /game --import >/tmp/import.log 2>&1 || true; \
 EXPOSE 7777/tcp
 # The server rewrites this file every 15 s; a stale file means the main loop hung.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD find /tmp/fallout-heartbeat -mmin -1 | grep -q . || exit 1
+  CMD ["/usr/local/bin/fallout-healthcheck"]
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["godot", "--headless", "--path", "/game", "--audio-driver", "Dummy", \
      "--", "--server", "--port=7777", "--heartbeat=/tmp/fallout-heartbeat"]
