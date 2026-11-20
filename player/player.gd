@@ -154,6 +154,15 @@ func _ready() -> void:
 
 ## Children every peer builds the same way, so their node paths match for RPCs.
 func _build_children() -> void:
+	# Custom animated hazmat model replaces the static Kenney worker.
+	var old_body := get_node_or_null("BodyModel")
+	if old_body:
+		remove_child(old_body)
+		old_body.queue_free()
+	var body := Node3D.new()
+	body.name = "BodyModel"
+	body.set_script(preload("res://player/player_model.gd"))
+	add_child(body)
 	var spot := ReviveSpot.new()
 	spot.name = "ReviveSpot"
 	add_child(spot)
@@ -209,6 +218,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_net_step(delta)
+	_smooth_remote(delta)
 	if Net.is_host():
 		_host_tick(delta)
 	if state != _shown_state:
@@ -671,10 +681,38 @@ func _relay_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> v
 func _apply_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> void:
 	if is_multiplayer_authority():
 		return
-	global_position = pos
-	rotation.y = yaw
-	head.rotation.x = pitch
+	# Remote copies glide toward the latest network state instead of snapping
+	# 20 times a second (see _smooth_remote).
+	_net_target_pos = pos
+	_net_target_yaw = yaw
+	_net_target_pitch = pitch
+	_net_age = 0.0
 	velocity = vel
+	if not _net_has_target or global_position.distance_to(pos) > 4.0:
+		global_position = pos
+		rotation.y = yaw
+		head.rotation.x = pitch
+	_net_has_target = true
+
+
+var _net_target_pos := Vector3.ZERO
+var _net_target_yaw := 0.0
+var _net_target_pitch := 0.0
+var _net_age := 0.0
+var _net_has_target := false
+
+
+## Every frame on remote copies: extrapolate a little along the synced
+## velocity, then ease toward it. Hides the 20 Hz steps.
+func _smooth_remote(delta: float) -> void:
+	if not _net_has_target or is_multiplayer_authority():
+		return
+	_net_age += delta
+	var predicted := _net_target_pos + velocity * minf(_net_age, 0.1)
+	var blend := 1.0 - exp(-14.0 * delta)
+	global_position = global_position.lerp(predicted, blend)
+	rotation.y = lerp_angle(rotation.y, _net_target_yaw, blend)
+	head.rotation.x = lerpf(head.rotation.x, _net_target_pitch, blend)
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
