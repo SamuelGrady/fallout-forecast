@@ -1,7 +1,6 @@
 [gd_resource type="Resource" script_class="LootTable" format=3]
 
-[ext_resource type="Script" path="res://crates/loot_table.gd" id="1_hco14"]
+[ext_resource type="Script" path="res://crates/loot_table.gd" id="1"]
 
 [resource]
-script = ExtResource("1_hco14")
-cursed_items = Array[String](["weapon:res://weapons/cursed/leaky_nailgun.tres", "weapon:res://weapons/cursed/boombox_launcher.tres", "weapon:res://weapons/cursed/lucky_penny_revolver.tres"])
+script = ExtResource("1")
