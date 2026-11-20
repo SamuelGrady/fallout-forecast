@@ -13,6 +13,10 @@ const DOUBLE_WINDOW := 1.5
 var loot: LootTable
 var CrateScene: PackedScene
 var DoubleCrateScene: PackedScene
+## Drought protection: after this many crates without a cursed roll, the
+## next eligible roll is cursed.
+const CURSED_DROUGHT := 8
+var _since_cursed := 0
 var _last_cursed := {}  # player instance id -> true if their last roll was cursed
 var _double_waiting := {}  # crate instance id -> [player, time]
 var _clock := 0.0
@@ -85,13 +89,44 @@ func _open_double(crate: Node, player: Node) -> void:
 func _roll(player: Node) -> String:
 	var tier := RNG.weighted_index([loot.common_weight, loot.rare_weight, loot.cursed_weight])
 	var pid := player.get_instance_id()
+	if _since_cursed >= CURSED_DROUGHT and not loot.cursed_items.is_empty():
+		tier = 2
 	if tier == 2 and _last_cursed.get(pid, false):
 		tier = 1
 	_last_cursed[pid] = tier == 2
+	_since_cursed = 0 if tier == 2 else _since_cursed + 1
 	var items: Array = [loot.common_items, loot.rare_items, loot.cursed_items][tier]
 	if items.is_empty():
 		items = loot.common_items
-	return items[RNG.rng.randi() % items.size()]
+	# Reroll within the tier against what this player can actually use, then
+	# fall back to ammo or a decon charge instead of a wasted reward.
+	var useful := items.filter(func(i): return _is_useful(player, i))
+	if not useful.is_empty():
+		return useful[RNG.rng.randi() % useful.size()]
+	return "ammo" if _is_useful(player, "ammo") else "decon"
+
+
+func _is_useful(player: Node, item: String) -> bool:
+	var holder: Node = player.get_node_or_null("Head/Camera3D/WeaponHolder")
+	match item:
+		"medkit":
+			return float(player.get("health")) < float(player.get("max_health")) * 0.95
+		"suit_patch":
+			return float(player.get("suit_integrity")) < 95.0
+		"tarp":
+			return not player.get("has_tarp")
+		"flares":
+			if holder == null:
+				return false
+			return holder.loadout.any(func(w): return w.kind == WeaponData.Kind.FLARE)
+		"ammo", "base_ammo":
+			if holder == null:
+				return true
+			for i in holder.loadout.size():
+				if holder.reserve[i] < holder.loadout[i].reserve_ammo:
+					return true
+			return false
+	return true
 
 
 func _reveal(crate: Node, item: String, override_text := "") -> void:

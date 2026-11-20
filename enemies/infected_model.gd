@@ -100,12 +100,13 @@ func _apply_mutations() -> void:
 			sphere.rings = 5
 			sac.mesh = sphere
 			sac.position = spec[0]
-			var mat := StandardMaterial3D.new()
-			mat.albedo_color = Color("#b8f259")
-			mat.emission_enabled = true
-			mat.emission = Color("#9ee838")
-			mat.emission_energy_multiplier = 1.4
-			sac.material_override = mat
+			if _sac_material == null:
+				_sac_material = StandardMaterial3D.new()
+				_sac_material.albedo_color = Color("#b8f259")
+				_sac_material.emission_enabled = true
+				_sac_material.emission = Color("#9ee838")
+				_sac_material.emission_energy_multiplier = 1.4
+			sac.material_override = _sac_material
 			_mutation_root.add_child(sac)
 			_spore_sacs.append(sac)
 	if GameManager.has_mutation("splitters") and not _enemy.is_small:
@@ -116,35 +117,74 @@ func _apply_mutations() -> void:
 			_piece(_mutation_root, Vector3(side * 0.38, 1.52, 0.05), Vector3(0.22, 0.24, 0.22), Color("#ff8f5c"), true)
 
 
+## One material per color/glow/metal combo, shared by every infected, so the
+## RetroScreen material cache stays bounded over a long run.
+static var _materials := {}
+static var _sac_material: StandardMaterial3D
+
+
+static func _shared_material(color: Color, glow: bool, metallic: float) -> StandardMaterial3D:
+	var key := "%s|%s|%s" % [color.to_html(), glow, metallic]
+	if not _materials.has(key):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.roughness = 0.35 if metallic > 0.0 else 0.9
+		material.metallic = metallic
+		material.emission_enabled = glow
+		material.emission = color
+		material.emission_energy_multiplier = .7
+		_materials[key] = material
+	return _materials[key]
+
+
 func _piece(parent: Node3D, at: Vector3, size: Vector3, color: Color, glow := false, metallic := 0.0) -> void:
 	var mesh := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = size
 	mesh.mesh = box
 	mesh.position = at
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.35 if metallic > 0.0 else 0.9
-	material.metallic = metallic
-	material.emission_enabled = glow
-	material.emission = color
-	material.emission_energy_multiplier = .7
-	mesh.material_override = material
+	mesh.material_override = _shared_material(color, glow, metallic)
 	parent.add_child(mesh)
 
+var _gait := {}
+
+
+## Distinct gaits per archetype, with a random start so a crowd doesn't march
+## in lockstep.
+func _setup_gait() -> void:
+	_clock = randf() * TAU
+	var kind := str(_enemy.data.display_name).to_lower() if _enemy and _enemy.data else "drip"
+	match kind:
+		"gutter":
+			_gait = {"freq": 5.0, "freq_per_speed": 2.6, "arm": 0.7, "leg": 0.55, "bounce": 0.025, "sway": 0.02, "lean": -0.25}
+		"mister":
+			_gait = {"freq": 2.4, "freq_per_speed": 1.4, "arm": 0.2, "leg": 0.35, "bounce": 0.06, "sway": 0.07, "lean": 0.03}
+		_:
+			_gait = {"freq": 2.6, "freq_per_speed": 1.7, "arm": 0.55, "leg": 0.45, "bounce": 0.05, "sway": 0.06, "lean": -0.1}
+
+
 func _process(delta: float) -> void:
-	_clock += delta * (3.0 + Vector2(_enemy.velocity.x, _enemy.velocity.z).length()*2.0)
+	if _gait.is_empty():
+		_setup_gait()
+	_clock += delta * (_gait.freq + Vector2(_enemy.velocity.x, _enemy.velocity.z).length() * _gait.freq_per_speed)
 	_hurt = move_toward(_hurt, 0.0, delta*5.0)
 	_head_kick = move_toward(_head_kick, 0.0, delta * 4.0)
 	_anticipation = move_toward(_anticipation, 0.0, delta * 2.0)
 	_head.rotation.x = _head_kick * 0.7
 	_attack = move_toward(_attack, 0.0, delta * 3.0)
 	var speed := Vector2(_enemy.velocity.x, _enemy.velocity.z).length()
+	# Arms counter-swing their own side's leg; amplitude follows speed.
+	var amount := clampf(speed / 3.5, 0.0, 1.2)
 	for i in limbs.size():
-		var swing := sin(_clock + (PI if i > 1 else 0.0)) * .45 * minf(speed, 1.0)
-		limbs[i].rotation.x = swing - ((_attack * 1.5 - _anticipation * 0.8) if i % 2 == 0 else 0.0)
-	_body.position.y = absf(sin(_clock))*.045
-	_body.rotation.z = sin(_clock*.5)*.04 + _hurt*.16
+		var is_arm := i % 2 == 0
+		var phase := (PI if i > 1 else 0.0) + (PI if not is_arm else 0.0)
+		var reach: float = _gait.arm if is_arm else _gait.leg
+		var swing := sin(_clock + phase) * reach * amount
+		limbs[i].rotation.x = swing - ((_attack * 1.5 - _anticipation * 0.8) if is_arm else 0.0) + (_hurt * 0.6 if is_arm else 0.0)
+	_body.position.y = absf(sin(_clock)) * _gait.bounce * maxf(amount, 0.2)
+	# Hit reaction: snap back and twist away from the shot.
+	_body.rotation.z = sin(_clock * .5) * _gait.sway + _hurt * .22
+	_body.rotation.x = _gait.lean + _hurt * 0.35
 	for i in _spore_sacs.size():
 		var pulse := 1.0 + 0.14 * sin(_clock * 1.4 + i * 1.3)
 		_spore_sacs[i].scale = Vector3.ONE * pulse

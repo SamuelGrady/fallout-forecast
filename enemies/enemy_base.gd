@@ -5,7 +5,9 @@ extends CharacterBody3D
 ## show the synced position. Drip, Gutter, Mister and Boss_Cumulus inherit
 ## enemy_base.tscn and override choose_target() / attack().
 ##
-## Speed and damage are multiplied by WeatherManager.enemy_buff().
+## Speed and damage both scale with WeatherManager.enemy_buff(), but status
+## effects split them: Runners and leg-shot slow only change speed, while
+## flare weaken lowers both. See speed_multiplier() and damage_multiplier().
 
 signal damaged(amount: float, health_left: float)
 signal winding_up
@@ -26,6 +28,10 @@ var _recover_left := 0.0
 var _attack_victim: Node3D
 var _attack_amount := 0.0
 var _dead := false
+var _status_frame := -1
+var _last_hit_dir := Vector3.ZERO
+var _last_hit_force := 0.0
+static var _fragment_materials: Array[StandardMaterial3D] = []
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _retarget_timer := 0.0
@@ -41,6 +47,7 @@ var _repath_timer := 0.0
 
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 
+static var _last_headshot_ms := 0
 static var _visibility_material: ShaderMaterial
 static var _reveal_material: StandardMaterial3D
 static var _hit_material: StandardMaterial3D
@@ -77,8 +84,8 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
-	_slow_left = maxf(0.0, _slow_left - delta)
-	_weaken_left = maxf(0.0, _weaken_left - delta)
+	_tick_status(delta)
+	_attack_timer -= delta
 	if _stagger_left > 0.0 or _recover_left > 0.0 or _windup_left > 0.0:
 		_stagger_left = maxf(0.0, _stagger_left - delta)
 		_recover_left = maxf(0.0, _recover_left - delta)
@@ -93,7 +100,6 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	_retarget_timer -= delta
-	_attack_timer -= delta
 	if _retarget_timer <= 0.0 or not is_instance_valid(target):
 		_retarget_timer = data.retarget_interval
 		target = choose_target()
@@ -101,20 +107,20 @@ func _physics_process(delta: float) -> void:
 		if lure and global_position.distance_to(lure.global_position) < 12.0:
 			target = lure
 
-	var buff := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
-	if _slow_left > 0.0:
-		buff *= 0.5
-	if _weaken_left > 0.0:
-		buff *= 0.65
+	var buff := speed_multiplier()
 	var move := Vector3.ZERO
 	if is_instance_valid(target):
 		var to_target := target.global_position - global_position
 		to_target.y = 0.0
-		var stop_range := 1.0 if target.is_in_group("enemy_lures") else data.attack_range
-		if to_target.length() <= stop_range:
-			if _attack_timer <= 0.0 and not target.is_in_group("enemy_lures"):
+		var is_lure := target.is_in_group("enemy_lures")
+		var stop_range := 1.0 if is_lure else data.attack_range
+		# In range but walled off: keep pathing around the cover instead of
+		# winding up swings that can never land.
+		var in_range := to_target.length() <= stop_range and (is_lure or _has_attack_los(target))
+		if in_range:
+			if _attack_timer <= 0.0 and not is_lure:
 				_attack_timer = data.attack_cooldown
-				_begin_attack(target, data.damage * buff)
+				_begin_attack(target, data.damage * damage_multiplier())
 			move = in_range_move(to_target, buff)
 		else:
 			# Re-path when the target has moved, or every REPATH_INTERVAL in case
@@ -138,7 +144,68 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## Movement multiplier: storm, Runners mutation, leg-shot slow, flare weaken.
+func speed_multiplier() -> float:
+	var m := WeatherManager.enemy_buff() * GameManager.enemy_speed_scale()
+	if _slow_left > 0.0:
+		m *= 0.5
+	if _weaken_left > 0.0:
+		m *= 0.65
+	return m
+
+
+## Attack damage multiplier: storm and flare weaken only.
+func damage_multiplier() -> float:
+	return WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0)
+
+
+## Status timers decay once per physics frame, even when a subclass and the
+## base class both run their physics step.
+func _tick_status(delta: float) -> void:
+	var frame := Engine.get_physics_frames()
+	if frame == _status_frame:
+		return
+	_status_frame = frame
+	_slow_left = maxf(0.0, _slow_left - delta)
+	_weaken_left = maxf(0.0, _weaken_left - delta)
+
+
+func _has_attack_los(victim: Node3D) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP, victim.global_position + Vector3.UP, 1)
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+## Spatial warning audio: a periodic growl when near the local player, kept
+## to a small budget so a horde doesn't drown the mix.
+static var _growl_budget_ms := 0
+var _growl_left := randf_range(2.0, 6.0)
+
+
+func _growl(delta: float) -> void:
+	_growl_left -= delta
+	if _growl_left > 0.0 or _dead:
+		return
+	_growl_left = randf_range(4.0, 8.0)
+	var me := get_tree().get_first_node_in_group("local_player") as Node3D
+	if me == null or me.global_position.distance_to(global_position) > 16.0:
+		return
+	var now := Time.get_ticks_msec()
+	if now < _growl_budget_ms:
+		return
+	_growl_budget_ms = now + 700
+	var kind := str(data.display_name).to_lower()
+	match kind:
+		"mister":
+			Sound.play_at("spore_burst", global_position + Vector3.UP, -20.0, 0.55)
+		"gutter":
+			Sound.play_at("turned", global_position, -20.0, 1.35)
+		_:
+			# Drips stay restrained: quiet, low.
+			Sound.play_at("turned", global_position + Vector3.UP, -24.0, 0.8)
+
+
 func _process(delta: float) -> void:
+	_growl(delta)
 	var changed := false
 	if _hit_left > 0.0:
 		_hit_left = maxf(0.0, _hit_left - delta)
@@ -170,6 +237,9 @@ func _refresh_overlay() -> void:
 ## Host only: shove the enemy (shotgun, Bug Bomb). Fades over a fraction of a second.
 func knockback(impulse: Vector3) -> void:
 	_push += impulse
+	if impulse.length_squared() > 0.0001:
+		_last_hit_dir = impulse.normalized()
+		_last_hit_force = maxf(_last_hit_force, impulse.length())
 	if impulse.length() >= 0.8:
 		stagger(0.4)
 
@@ -281,18 +351,25 @@ func die() -> void:
 		recovery.kind = "health" if randf() < 0.5 else "suit"
 		get_parent().add_child(recovery)
 		recovery.global_position = global_position + Vector3(0.6, 0.0, 0.0)
+	if _fragment_materials.is_empty():
+		for c in [Color("#b5df68"), Color("#337c87")]:
+			var material := StandardMaterial3D.new()
+			material.albedo_color = c
+			_fragment_materials.append(material)
+	# Debris carries the killing hit: shotgun blasts and headshots throw it
+	# further along the shot direction.
+	var throw := _last_hit_dir * clampf(0.6 + _last_hit_force * 0.12, 0.6, 2.6)
 	for i in 6:
 		var fragment := MeshInstance3D.new()
 		var cube := BoxMesh.new()
 		cube.size = Vector3.ONE * randf_range(0.1, 0.22)
 		fragment.mesh = cube
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color("#b5df68") if i % 2 == 0 else Color("#337c87")
-		fragment.material_override = material
+		fragment.material_override = _fragment_materials[i % 2]
 		get_parent().add_child(fragment)
 		fragment.global_position = global_position + Vector3.UP * (1.6 if _bullet_critical else 1.0)
+		var scatter := Vector3(randf_range(-1.0, 1.0), randf_range(.3, 1.2), randf_range(-1.0, 1.0)) + throw * randf_range(0.7, 1.3)
 		var tween := fragment.create_tween()
-		tween.tween_property(fragment, "position", fragment.position + Vector3(randf_range(-1.5, 1.5), randf_range(.3, 1.2), randf_range(-1.5, 1.5)), .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(fragment, "position", fragment.position + scatter, .25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(fragment, "scale", Vector3.ZERO, .3)
 		tween.tween_callback(fragment.queue_free)
 	Sound.play_at("enemy_death", global_position)
@@ -360,13 +437,19 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 		"gutter": head_height = 1.16
 		"mister": head_height = 1.63
 	_bullet_critical = height >= head_height
+	if source is Node3D:
+		var shot_dir := point - (source as Node3D).global_position
+		shot_dir.y = 0.0
+		if shot_dir.length_squared() > 0.001:
+			_last_hit_dir = shot_dir.normalized()
+			_last_hit_force = amount * 0.1 * (2.0 if _bullet_critical else 1.0)
 	if height < 0.65:
 		_slow_left = 1.8
 	if _bullet_critical:
 		stagger(0.3)
 	_last_bullet_point = point
 	var before := health
-	take_damage(amount * (2.0 if _bullet_critical else 1.0), source)
+	take_damage(amount * (GameManager.headshot_multiplier() if _bullet_critical else 1.0), source)
 	_last_bullet_point = Vector3.ZERO
 	if is_instance_valid(source) and source.is_in_group("local_player"):
 		var dealt := ceili(minf(before, before - health))
@@ -380,7 +463,9 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 			get_parent().add_child(number)
 			number.global_position = point + Vector3.UP * .25
 			_damage_number = number
-		if _bullet_critical:
+		# One headshot cue per shot even when several pellets crit.
+		if _bullet_critical and Time.get_ticks_msec() - _last_headshot_ms > 60:
+			_last_headshot_ms = Time.get_ticks_msec()
 			Sound.play("headshot", -10.0)
 	_bullet_critical = false
 
@@ -413,3 +498,8 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 	_windup_left = 0.45
 	winding_up.emit()
 	attack_flash(0.45)
+	# Audible windup tell so attacks from behind can still be dodged.
+	if str(data.display_name).to_lower() == "mister":
+		Sound.play_at("spore_burst", global_position + Vector3.UP * 1.5, -12.0, 0.7)
+	else:
+		Sound.play_at("turned", global_position + Vector3.UP, -14.0, 1.6)

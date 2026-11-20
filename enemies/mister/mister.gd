@@ -10,8 +10,18 @@ const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
 
 
 func in_range_move(to_target: Vector3, buff: float) -> Vector3:
-	if to_target.length() < keep_away:
-		return -to_target.normalized() * data.move_speed * buff
+	if to_target.length() >= keep_away:
+		return Vector3.ZERO
+	# Back away along whichever direction still lands on the navmesh, so a
+	# Mister doesn't grind into a dead corner.
+	var away := -to_target.normalized()
+	var map := get_world_3d().navigation_map
+	for angle in [0.0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]:
+		var dir := away.rotated(Vector3.UP, angle)
+		var probe := global_position + dir * 2.0
+		var snapped := NavigationServer3D.map_get_closest_point(map, probe)
+		if Vector2(snapped.x - probe.x, snapped.z - probe.z).length() < 0.6:
+			return dir * data.move_speed * buff
 	return Vector3.ZERO
 
 

@@ -128,6 +128,10 @@ func _finish(result: Array) -> void:
 	active.assign(result)
 	stage = ""
 	mutations_changed.emit(active)
+	var perks := GameManager.active_perks()
+	if not perks.is_empty() and GameManager.is_host():
+		var names := perks.map(func(p): return p[0])
+		GameManager.show_banner("PERK: " + " + ".join(PackedStringArray(names)), Color("6ee7f2"), 2.4)
 	WeatherManager.hold = false
 	if WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
 		WeatherManager.next_phase()

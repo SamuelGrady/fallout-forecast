@@ -23,17 +23,30 @@ func _ready() -> void:
 	add_child(shape)
 
 	var mesh := MeshInstance3D.new()
+	# The visible bubble is exactly the damage sphere, plus a ground ring so
+	# its edge reads even from above.
 	var sphere := SphereMesh.new()
 	sphere.radius = radius
-	sphere.height = radius * 1.2
+	sphere.height = radius * 2.0
 	_mesh_material.albedo_color = Color(0.45, 0.9, 0.25, 0.35)
 	_mesh_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_mesh_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_mesh_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	sphere.material = _mesh_material
 	mesh.mesh = sphere
-	mesh.position.y = radius * 0.3
 	add_child(mesh)
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = radius - 0.08
+	torus.outer_radius = radius
+	torus.rings = 24
+	ring.mesh = torus
+	ring.position.y = 0.05
+	var ring_material := StandardMaterial3D.new()
+	ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_material.albedo_color = Color(0.7, 1.0, 0.3)
+	ring.material_override = ring_material
+	add_child(ring)
 
 
 func _physics_process(delta: float) -> void:

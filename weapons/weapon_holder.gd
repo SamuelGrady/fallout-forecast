@@ -10,7 +10,7 @@ extends Node3D
 ## then tells the other peers to play the effects. Offline (or on the host
 ## itself) the same path runs locally.
 ##
-## Controls: fire (LMB / RT), reload (R / X), weapon_1-4 (1-4),
+## Controls: fire (LMB / RT), aim (RMB / LT), reload (R / X), weapon_1-4 (1-4),
 ## weapon_next / weapon_prev (wheel / RB / LB).
 
 signal weapon_changed(data: WeaponData)
@@ -36,6 +36,10 @@ var _recoil := 0.0
 var _camera_kick := 0.0
 var _heat := 0.0
 var _hip_fov := 75.0
+## Time left before a weapon lowered for sprinting can fire.
+var _raise_left := 0.0
+var _reload_total := 1.0
+const SPRINT_RAISE := 0.15
 var _model: Node3D
 var player: Node3D
 var camera: Camera3D
@@ -56,6 +60,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_cooldown -= delta
 	_fire_buffer = maxf(0.0, _fire_buffer - delta)
+	if player and player.get("is_sprinting"):
+		_raise_left = SPRINT_RAISE
+	else:
+		_raise_left = maxf(0.0, _raise_left - delta)
 	_heat = move_toward(_heat, 0.0, delta * 1.6)
 	_camera_kick = move_toward(_camera_kick, 0.0, delta * deg_to_rad(8.0))
 	if player and player.is_multiplayer_authority():
@@ -81,10 +89,11 @@ func _handle_input() -> void:
 		for i in range(mini(loadout.size(), 5)):
 			if Input.is_action_just_pressed("weapon_%d" % (i + 1)):
 				_equip(i)
-	if Input.is_action_just_pressed("weapon_next"):
-		_equip((current + 1) % loadout.size())
-	if Input.is_action_just_pressed("weapon_prev"):
-		_equip((current - 1 + loadout.size()) % loadout.size())
+	if loadout.size() > 1:
+		if Input.is_action_just_pressed("weapon_next"):
+			_equip((current + 1) % loadout.size())
+		if Input.is_action_just_pressed("weapon_prev"):
+			_equip((current - 1 + loadout.size()) % loadout.size())
 	if Input.is_action_just_pressed("reload"):
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
@@ -94,11 +103,14 @@ func _handle_input() -> void:
 		return
 	var data := loadout[current]
 	if Input.is_action_just_pressed("fire"):
-		_fire_buffer = 0.15
+		_fire_buffer = 0.15 + _raise_left
 	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
+	if wants:
+		# Firing drops out of a sprint; the gun takes a beat to come up.
+		player.set("sprint_lock", 0.35)
 	if wants and data.shell_reload and ammo[current] > 0:
 		_reload_left = 0.0
-	if wants and _cooldown <= 0.0 and _reload_left <= 0.0:
+	if wants and _cooldown <= 0.0 and _reload_left <= 0.0 and _raise_left <= 0.0:
 		if ammo[current] > 0:
 			fire()
 		elif reserve[current] > 0:
@@ -145,7 +157,8 @@ func start_reload() -> void:
 	if _reload_left > 0.0 or ammo[current] >= data.mag_size or reserve[current] <= 0:
 		return
 	Sound.play("reel_tick" if data.shell_reload else "reload", -12.0 if data.shell_reload else -10.0)
-	_reload_left = data.reload_time
+	_reload_total = data.reload_time * GameManager.reload_scale()
+	_reload_left = _reload_total
 
 
 func _finish_reload() -> void:
@@ -156,6 +169,10 @@ func _finish_reload() -> void:
 	reserve[current] -= take
 	if data.shell_reload and ammo[current] < data.mag_size and reserve[current] > 0:
 		start_reload()
+	elif data.shell_reload:
+		# Last shell in: rack the pump.
+		Sound.play("reload", -12.0, 1.25)
+		_kick = 0.6
 
 
 # ------------------------------------------------------------------ network
@@ -226,14 +243,23 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 	var data := loadout[index]
 	var world := player.get_parent()
 	var muzzle := _muzzle_position() if is_local else origin + dir * 0.6
+	var ballistic := data.kind == WeaponData.Kind.HITSCAN
+	# Ballistic guns: slightly lower, varied report so they read as gunpowder
+	# rather than identical zaps.
+	var pitch := randf_range(0.86, 0.97) if ballistic else 1.0
 	if not data.shot_sound.is_empty():
 		if is_local:
-			Sound.play(data.shot_sound, -7.0)
+			Sound.play(data.shot_sound, -7.0, pitch)
 		else:
-			Sound.play_at(data.shot_sound, muzzle)
-	ShotFX.flash(world, muzzle, data.tracer_color.lightened(0.3), 3.0)
+			Sound.play_at(data.shot_sound, muzzle, -6.0, pitch)
+	if ballistic:
+		ShotFX.flash(world, muzzle, Color(1.0, 0.72, 0.38), 3.5)
+		ShotFX.puff(world, muzzle, Color(1.0, 0.86, 0.55, 0.9), 0.07, 0.05)
+	else:
+		ShotFX.flash(world, muzzle, data.tracer_color.lightened(0.3), 3.0)
 	match data.kind:
 		WeaponData.Kind.HITSCAN:
+			var hit_points: Array[Vector3] = []
 			for ray in _pellet_rays(data, origin, dir, shot_seed):
 				var hit := _cast(origin, ray, data.max_range)
 				var end: Vector3 = hit.position if not hit.is_empty() else origin + ray * data.max_range
@@ -242,9 +268,16 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 					var enemy_hit: bool = is_damageable(hit.collider)
 					ShotFX.puff(world, end, Color(0.6, 1.0, 0.4, 0.8) if enemy_hit else Color(0.8, 0.8, 0.75, 0.7), 0.08, 0.2)
 					if enemy_hit:
-						Sound.play_at("hit_enemy", end, -18.0)
+						hit_points.append(end)
 						if hit.collider.has_method("hit_flash"):
 							hit.collider.hit_flash()
+			# One layered impact per shot, louder for more pellets, instead of
+			# a voice per pellet.
+			if not hit_points.is_empty():
+				var center := Vector3.ZERO
+				for p in hit_points:
+					center += p
+				Sound.play_at("hit_enemy", center / hit_points.size(), -18.0 + minf(6.0, 2.0 * (hit_points.size() - 1)))
 
 		_:
 			var projectile := Projectile.new()
@@ -291,6 +324,25 @@ func grant(item: String) -> void:
 		reserve[i] += loadout[i].mag_size * 3
 	elif item.begins_with("weapon:"):
 		add_weapon(load(item.trim_prefix("weapon:")))
+	elif item.begins_with("issue:"):
+		_issue_weapon(load(item.trim_prefix("issue:")))
+
+
+## Wave reward: make sure the player carries this gun with a full reserve,
+## without switching to it mid-fight or stacking ammo past the cap.
+func _issue_weapon(data: WeaponData) -> void:
+	if data == null:
+		return
+	for i in loadout.size():
+		if loadout[i].resource_path == data.resource_path:
+			reserve[i] = maxi(reserve[i], data.reserve_ammo)
+			return
+	if loadout.size() >= 5:
+		return
+	loadout.append(data)
+	ammo.append(data.mag_size)
+	reserve.append(data.reserve_ammo)
+	weapon_changed.emit(loadout[current])
 
 
 ## Owner: add a weapon (cursed ones from crates) and switch to it.
@@ -353,7 +405,8 @@ func _animate(delta: float) -> void:
 	if loadout.is_empty() or _model == null:
 		return
 	var data := loadout[current]
-	var aiming: bool = player.get("state") == "ok" and not player.get("tarp_raised") and _reload_left <= 0.0 and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	var aiming: bool = player.is_multiplayer_authority() and player.get("state") == "ok" and not player.get("tarp_raised") 			and _reload_left <= 0.0 and GameManager.mutations.stage == "" 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
+	player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
 	camera.fov = lerpf(_hip_fov, 52.0, _aim)
 	var speed := 0.0
@@ -363,11 +416,27 @@ func _animate(delta: float) -> void:
 	var bob := Vector3(sin(_bob) * 0.012, absf(cos(_bob)) * 0.014, 0.0) * minf(speed, 6.0) / 6.0
 	_equip_left = move_toward(_equip_left, 0.0, delta * 4.0)
 	var reload_dip := 0.0
+	var reload_roll := 0.0
+	var reload_push := 0.0
 	if _reload_left > 0.0:
-		var t := 1.0 - _reload_left / data.reload_time
-		reload_dip = sin(t * PI)
-	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left, 0.08 * _kick)
-	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick + _recoil * 8.0 - 35.0 * reload_dip, 0, sin(_bob) * _kick * 1.5)
+		var t := 1.0 - _reload_left / maxf(_reload_total, 0.01)
+		if data.shell_reload:
+			# Shell by shell: rolled to the side, a thumb-push bump per shell.
+			reload_dip = 0.35
+			reload_roll = 28.0
+			reload_push = sin(t * PI) * 0.05
+		elif data.kind == WeaponData.Kind.FLARE:
+			# Break action: barrel tips down, then snaps shut at the end.
+			reload_dip = 1.25 * sin(minf(t / 0.8, 1.0) * PI * 0.5) * (1.0 if t < 0.85 else (1.0 - t) / 0.15)
+		else:
+			# Mag swap: tilt and drop, then a sharp bolt rack near the end.
+			reload_dip = sin(minf(t / 0.75, 1.0) * PI) * 0.8
+			reload_roll = -32.0 * sin(minf(t / 0.75, 1.0) * PI)
+			if t > 0.8:
+				reload_push = sin((t - 0.8) / 0.2 * PI) * 0.07
+	var lowered := _raise_left / SPRINT_RAISE
+	_model.position = data.view_position.lerp(Vector3(0.0, -0.12, data.view_position.z - 0.08), _aim) + bob * (1.0 - _aim * 0.85) + Vector3(0, -0.12 * reload_dip - .35 * _equip_left - 0.06 * lowered, 0.08 * _kick + reload_push)
+	_model.rotation_degrees = data.view_rotation_degrees + Vector3(6.0 * _kick + _recoil * 8.0 - 35.0 * reload_dip - 14.0 * lowered, 12.0 * lowered, sin(_bob) * _kick * 1.5 + reload_roll)
 	_model.scale = Vector3.ONE * data.view_scale
 
 
@@ -402,13 +471,17 @@ func _is_host() -> bool:
 	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
 
 
-func collect_ammo() -> bool:
+## Kill drops refill ballistic guns only; supply packs also restock flares and
+## Bug Bombs so those stay tactical.
+func collect_ammo(include_special := false) -> bool:
 	var collected := false
 	for i in loadout.size():
 		var data := loadout[i]
+		if not include_special and data.kind in [WeaponData.Kind.FLARE, WeaponData.Kind.GRENADE]:
+			continue
 		var cap := data.reserve_ammo
 		if reserve[i] < cap:
-			var amount := maxi(1, roundi(data.mag_size * 0.4))
+			var amount := maxi(1, roundi(data.mag_size * GameManager.ammo_pickup_fraction()))
 			reserve[i] = mini(cap, reserve[i] + amount)
 			collected = true
 	return collected

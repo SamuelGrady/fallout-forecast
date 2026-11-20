@@ -56,8 +56,7 @@ func _physics_process(delta: float) -> void:
 	if _stagger_left > 0.0:
 		super._physics_process(delta)
 		return
-	_slow_left = maxf(0.0, _slow_left - delta)
-	_weaken_left = maxf(0.0, _weaken_left - delta)
+	_tick_status(delta)
 	_lunge_cooldown_left -= delta
 	if _recovery > 0.0:
 		_recovery -= delta
@@ -83,9 +82,14 @@ func _physics_process(delta: float) -> void:
 		if not _lunge_hit and is_instance_valid(target) \
 				and _can_attack(target):
 			_lunge_hit = true
-			super.attack(target, data.damage * WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0))
+			super.attack(target, data.damage * damage_multiplier())
 		if _lunge_left <= 0.0:
 			_recovery = 1.0
+			if not _lunge_hit:
+				# Missed: an audible skid and a splash so players know the
+				# opening is now.
+				Sound.play_at("step_2", global_position, -6.0, 0.6)
+				ShotFX.puff(get_parent(), global_position + Vector3.UP * 0.1, Color(0.5, 0.65, 0.7, 0.7), 0.35, 0.4)
 		return
 
 	super._physics_process(delta)
@@ -107,11 +111,7 @@ func _start_lunge(direction: Vector3) -> void:
 	_lunge_left = lunge_time
 	_lunge_cooldown_left = lunge_cooldown
 	_lunge_hit = false
-	var speed := lunge_speed * WeatherManager.enemy_buff()
-	if _slow_left > 0.0:
-		speed *= 0.5
-	if _weaken_left > 0.0:
-		speed *= 0.65
+	var speed := lunge_speed * speed_multiplier()
 	velocity = direction * speed + Vector3.UP * lunge_up
 
 

@@ -29,6 +29,9 @@ var decon_max := 4
 var stats := {}
 var run_active := false
 var finished := false
+## Set the moment Cumulus dies so a late wipe can't turn the win into a loss.
+var victory_locked := false
+var _run_id := 0
 var last_results := {}
 
 var _lose_check := 0.0
@@ -61,6 +64,8 @@ func start_run() -> void:
 	if not is_host():
 		return
 	finished = false
+	victory_locked = false
+	_run_id += 1
 	run_active = true
 	stats.clear()
 	for p in players():
@@ -104,6 +109,51 @@ func has_mutation(id: String) -> bool:
 	return mutations != null and mutations.has(id)
 
 
+# ------------------------------------------------------------------ perks
+## Every enemy mutation hands the players a matching perk for the same waves,
+## so a roll changes both sides of the fight.
+const PERKS := {
+	"spores": ["FILTER MASK", "Suit drains 30% slower"],
+	"armor": ["HOLLOW POINTS", "Headshots deal 2.5x"],
+	"swarm": ["QUICK HANDS", "Reload 30% faster"],
+	"runners": ["SECOND WIND", "Move 12% faster"],
+	"splitters": ["SCAVENGER", "Kill drops refill more ammo"],
+}
+
+
+func has_perk(mutation_id: String) -> bool:
+	return has_mutation(mutation_id)
+
+
+func active_perks() -> Array:
+	var out := []
+	if mutations:
+		for id in mutations.active:
+			if PERKS.has(id):
+				out.append(PERKS[id])
+	return out
+
+
+func headshot_multiplier() -> float:
+	return 2.5 if has_perk("armor") else 2.0
+
+
+func reload_scale() -> float:
+	return 0.7 if has_perk("swarm") else 1.0
+
+
+func player_speed_scale() -> float:
+	return 1.12 if has_perk("runners") else 1.0
+
+
+func ammo_pickup_fraction() -> float:
+	return 0.6 if has_perk("splitters") else 0.4
+
+
+func suit_drain_scale() -> float:
+	return 0.7 if has_perk("spores") else 1.0
+
+
 func lever_prompt(player: Node) -> String:
 	return mutations.lever_prompt(player)
 
@@ -125,7 +175,59 @@ func player_for_peer(peer: int) -> Node:
 	return null
 
 
+# ------------------------------------------------------------------ ready up
+signal ready_changed(ready_count: int, needed: int)
+var _ready_peers := {}
+var ready_count := 0
+
+
+func can_ready_up() -> bool:
+	return run_active and not finished and not WeatherManager.hold 			and WeatherManager.phase in [WeatherManager.Phase.CALM, WeatherManager.Phase.CLEARING] 			and WeatherManager.phase_time_left > 3.0
+
+
+## Owner: this player is done looting and wants the next phase now.
+func ready_up() -> void:
+	if not can_ready_up():
+		return
+	if is_host():
+		_mark_ready(multiplayer.get_unique_id() if _online() else 1)
+	else:
+		_request_ready.rpc_id(1)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_ready() -> void:
+	if is_host():
+		_mark_ready(multiplayer.get_remote_sender_id())
+
+
+func _mark_ready(peer: int) -> void:
+	if not can_ready_up():
+		return
+	_ready_peers[peer] = true
+	_broadcast_ready(_ready_peers.size(), player_count())
+	if _ready_peers.size() >= player_count():
+		_ready_peers.clear()
+		WeatherManager.skip_wait()
+
+
+func _broadcast_ready(count: int, needed: int) -> void:
+	if _online():
+		_ready_changed.rpc(count, needed)
+	ready_count = count
+	ready_changed.emit(count, needed)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _ready_changed(count: int, needed: int) -> void:
+	ready_count = count
+	ready_changed.emit(count, needed)
+
+
 func _on_phase_changed(phase: int, _wave: int) -> void:
+	if is_host() and not _ready_peers.is_empty():
+		_ready_peers.clear()
+		_broadcast_ready(0, player_count())
 	if not is_host() or not run_active:
 		return
 	match phase:
@@ -145,10 +247,14 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
 			if unlocks.has(_wave):
 				var gun := load("res://weapons/%s.tres" % unlocks[_wave]) as WeaponData
+				# Persistent unlock (title loadout) is separate from the in-run
+				# issue, which never force-swaps or stacks reserve ammo.
+				var is_new := gun.resource_path not in Settings.unlocked_guns
 				Settings.unlock_gun(gun.resource_path)
 				for p in players():
-					p.grant("weapon:" + gun.resource_path)
-				_announce_unlock(gun.display_name.to_upper())
+					p.grant("issue:" + gun.resource_path)
+				if is_new:
+					_announce_unlock(gun.display_name.to_upper())
 			mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
@@ -256,14 +362,23 @@ func spawn_boss() -> void:
 
 ## Host: the core popped. Clear skies, then the win.
 func boss_defeated() -> void:
+	if victory_locked or finished:
+		return
+	victory_locked = true
 	WeatherManager.intensity_override = 0.0
 	WeatherManager.hold = false
 	show_banner("STORM CLEARED", Color(0.4, 1, 0.6), 2.5)
-	get_tree().create_timer(5.0).timeout.connect(finish.bind(true))
+	var run := _run_id
+	get_tree().create_timer(5.0).timeout.connect(func():
+		# Ignore the timer if the run ended or a new one started meanwhile.
+		if run == _run_id and run_active and not finished:
+			finish(true))
 
 
 # ------------------------------------------------------------------ win / lose
 func _check_lose() -> void:
+	if victory_locked:
+		return
 	var all := players()
 	if all.is_empty():
 		return

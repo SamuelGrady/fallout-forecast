@@ -221,12 +221,39 @@ func core_exposed() -> bool:
 	return sacs_left == 0
 
 
-func damage_part(i: int, amount: float, _source: Node) -> void:
+var _last_deflect_ms := 0
+var _damage_number: Label3D
+
+
+func damage_part(i: int, amount: float, source: Node, point := Vector3.INF) -> void:
 	if not _is_host() or dead or part_health[i] <= 0.0:
 		return
+	var at: Vector3 = point if point != Vector3.INF else (_parts[i] as Node3D).global_position
+	var local_hit := is_instance_valid(source) and source.is_in_group("local_player")
 	if i == 3 and not core_exposed():
+		# Shielded core: metallic deflect so players know to pop the sacs first.
+		if local_hit and Time.get_ticks_msec() - _last_deflect_ms > 90:
+			_last_deflect_ms = Time.get_ticks_msec()
+			var away := Vector3.UP
+			if source is Node3D:
+				away = ((source as Node3D).global_position - at).normalized()
+			ShotFX.sparks(get_parent(), at, away, 6)
+			Sound.play_at("lever", at, -6.0, 1.8)
 		return
+	var before := part_health[i]
 	part_health[i] = maxf(part_health[i] - amount, 0.0)
+	if local_hit:
+		GameManager.combat_hit.emit(part_health[i] <= 0.0, false)
+		var dealt := ceili(before - part_health[i])
+		if is_instance_valid(_damage_number) and _damage_number.age < 0.12:
+			_damage_number.add_hit(dealt, false)
+		else:
+			var number := Label3D.new()
+			number.set_script(preload("res://weapons/damage_number.gd"))
+			number.amount = dealt
+			get_parent().add_child(number)
+			number.global_position = at + Vector3.UP * 0.25
+			_damage_number = number
 	if part_health[i] <= 0.0:
 		if i < 3:
 			_pop_sac(i)

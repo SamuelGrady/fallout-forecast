@@ -78,13 +78,16 @@ func _flare_process(delta: float) -> void:
 	_reveal_tick -= delta
 	if _reveal_tick <= 0.0:
 		_reveal_tick = 0.5
+		var flare_eye := global_position + Vector3.UP * 0.25
 		for enemy in get_tree().get_nodes_in_group("enemies"):
-			if enemy.global_position.distance_to(global_position) <= data.effect_radius:
+			if enemy.global_position.distance_to(global_position) <= data.effect_radius \
+					and _has_los(flare_eye, enemy.global_position + Vector3.UP * 0.9):
 				enemy.reveal(1.0)
 				if authoritative:
 					enemy.weaken(0.7)
 		for boss in get_tree().get_nodes_in_group("boss"):
-			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0:
+			if boss.has_method("burn") and boss.global_position.distance_to(global_position) <= data.effect_radius + 8.0 \
+					and _has_los(flare_eye, boss.global_position):
 				boss.burn(1.0)
 	if _age > data.effect_time + 1.5:
 		queue_free()
@@ -111,12 +114,18 @@ func _step(delta: float) -> Dictionary:
 	return hit
 
 
+func _has_los(from: Vector3, to: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(from, to, 1)
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
 func _explode() -> void:
 	Sound.play_at("explosion", global_position)
 	_done = true
 	if is_in_group("enemy_lures"):
 		remove_from_group("enemy_lures")
 	var center := global_position
+	var blast_eye := center + Vector3.UP * 0.35
 	if authoritative:
 		var targets: Array = get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + get_tree().get_nodes_in_group("players")
 		for target in targets:
@@ -124,6 +133,9 @@ func _explode() -> void:
 				continue
 			var d: float = target.global_position.distance_to(center)
 			if d <= data.effect_radius:
+				var aim_point: Vector3 = target.global_position + (Vector3.ZERO if target.is_in_group("boss_parts") else Vector3.UP * 0.9)
+				if not _has_los(blast_eye, aim_point):
+					continue
 				var falloff := 1.0 - 0.6 * d / data.effect_radius
 				target.take_damage(data.damage * falloff, shooter)
 				if target.has_method("knockback"):
@@ -131,7 +143,8 @@ func _explode() -> void:
 					push.y = 0.0
 					target.knockback(push.normalized() * data.knockback * falloff)
 	for puddle in get_tree().get_nodes_in_group("puddles"):
-		if puddle.global_position.distance_to(center) <= data.effect_radius + puddle.radius():
+		if puddle.global_position.distance_to(center) <= data.effect_radius + puddle.radius() \
+				and _has_los(blast_eye, puddle.global_position + Vector3.UP * 0.2):
 			puddle.clear()
 	var parent := get_parent()
 	if data.kind == WeaponData.Kind.ROCKET:

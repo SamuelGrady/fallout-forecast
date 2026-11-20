@@ -98,6 +98,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				strike_lightning()
 
 
+## Host: everyone is ready, so cut a waiting phase (Calm or Clearing) short.
+func skip_wait() -> void:
+	if not _is_host() or hold or not (phase == Phase.CALM or phase == Phase.CLEARING):
+		return
+	if phase_time_left > 3.0:
+		_apply_phase(phase, wave, 3.0)
+		if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
+			_receive_phase.rpc(phase, wave, 3.0)
+
+
 ## Host: start wave 1 at Calm.
 func start_run() -> void:
 	hold = false
@@ -170,8 +180,16 @@ func storm_name() -> String:
 	return STORM_NAMES[storm_state]
 
 
+## True only while an active rain/storm phase (or boss storm override) is driving hazard rain.
+## Clearing, Calm, and Mutation Roll immediately end hazardous rain even while visuals ease out.
+func is_storm_active() -> bool:
+	if intensity_override >= 0.0:
+		return intensity_override > 0.001
+	return phase == Phase.DRIZZLE or phase == Phase.DOWNPOUR
+
+
 func is_raining() -> bool:
-	return storm_state != StormState.CLEAR
+	return storm_state != StormState.CLEAR and is_storm_active()
 
 
 ## Multiplier for enemy speed and damage at the current storm state.
@@ -181,6 +199,8 @@ func enemy_buff() -> float:
 
 ## Suit integrity an exposed player loses per second right now.
 func suit_loss_per_second() -> float:
+	if not is_storm_active():
+		return 0.0
 	return SUIT_LOSS_PER_SECOND[storm_state]
 
 

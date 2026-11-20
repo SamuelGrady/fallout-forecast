@@ -19,7 +19,13 @@ func _ready() -> void:
 
 func take_damage(amount: float, source: Node = null) -> void:
 	if boss:
-		boss.damage_part(index, amount, source)
+		boss.damage_part(index, amount, source, global_position)
+
+
+## Guns call this with the exact hit point so feedback lands where you shot.
+func take_bullet(amount: float, point: Vector3, source: Node) -> void:
+	if boss:
+		boss.damage_part(index, amount, source, point)
 
 
 func hit_flash() -> void:

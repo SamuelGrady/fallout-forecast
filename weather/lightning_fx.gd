@@ -37,7 +37,7 @@ func _ready() -> void:
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 	var fx := get_parent()
 	if fx and "flash" in fx:
-		fx.flash = 1.0
+		fx.flash = Settings.flash_scale()
 	flashed.emit(position)
 
 	var rng := RandomNumberGenerator.new()

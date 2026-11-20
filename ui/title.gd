@@ -120,6 +120,12 @@ func _ready() -> void:
 	retro.toggled.connect(Settings.set_retro)
 	_style_button(retro)
 	_settings.add_child(retro)
+	var calm := CheckButton.new()
+	calm.text = "REDUCED FLASHING"
+	calm.button_pressed = Settings.reduced_flash
+	calm.toggled.connect(Settings.set_reduced_flash)
+	_style_button(calm)
+	_settings.add_child(calm)
 	_button(_settings, "BACK", _on_back)
 	for button in _menu.get_children():
 		button.disabled = true

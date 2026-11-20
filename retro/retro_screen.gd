@@ -71,7 +71,7 @@ func _exit_tree() -> void:
 
 
 func _on_lightning_struck(_p: Vector3, _s: float) -> void:
-	_glitch = maxf(_glitch, lightning_glitch)
+	_glitch = maxf(_glitch, lightning_glitch * Settings.flash_scale())
 
 
 func _on_video_changed() -> void:
@@ -87,10 +87,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_prune_left -= delta
+	if _prune_left <= 0.0:
+		_prune_left = 5.0
+		_prune_cache()
 	var target := 0.0
 	var player := get_tree().get_first_node_in_group("local_player")
 	if player and player.get("state") == "downed":
-		target = downed_glitch
+		target = downed_glitch * Settings.flash_scale()
 	_glitch = maxf(move_toward(_glitch, 0.0, delta * 1.6), target)
 	(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
 
@@ -110,6 +114,20 @@ func _process(delta: float) -> void:
 	rec.add_theme_font_size_override("font_size", 20)
 	stamp.add_theme_font_size_override("font_size", 16)
 	stamp.text = "%s %02d 1987\n%2d:%02d:%02d %s" % [month, day, h12, (s / 60) % 60, s % 60, ampm]
+
+
+var _prune_left := 5.0
+
+
+## Drop converted materials nothing renders with any more (freed enemies,
+## debris), so the cache doesn't grow for the whole run.
+func _prune_cache() -> void:
+	for original in _converted.keys():
+		var converted: ShaderMaterial = _converted[original]
+		# References: the dict value, the array entry and this local variable.
+		if converted.get_reference_count() <= 3:
+			_converted.erase(original)
+			_ps1_materials.erase(converted)
 
 
 func _apply_enabled() -> void:

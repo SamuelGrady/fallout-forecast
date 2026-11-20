@@ -251,6 +251,11 @@ func _update_storm() -> void:
 	storm_label.visible = false
 	var seconds := maxi(0,ceili(WeatherManager.phase_time_left))
 	wave_label.text = "WAVE %d / %d    %d:%02d" % [WeatherManager.wave,WeatherManager.FINAL_WAVE,seconds/60,seconds%60]
+	if GameManager.can_ready_up():
+		var hint := "[%s] READY" % BroadcastUI.input_hint("ready_up")
+		if GameManager.player_count() > 1:
+			hint += " %d/%d" % [GameManager.ready_count, GameManager.player_count()]
+		wave_label.text += "    " + hint
 	_weather.value = WeatherManager.storm_intensity
 	_weather.color = STORM_COLORS[WeatherManager.storm_state]
 	_breather.visible = spawner != null and combat and spawner._timer > 1.0
@@ -308,7 +313,8 @@ func _update_vitals(player: Node) -> void:
 		"out":
 			_downed.text = "OUT until Clearing"
 	_prompt.text = str(player.get("interact_prompt"))
-	_progress.visible = false
+	# Show the hold bar while a hold interaction (decon, revive, crate) fills.
+	_progress.visible = float(player.get("interact_progress")) > 0.0
 	_hit_marker.progress = float(player.get("interact_progress"))
 	_hit_marker.targeted = not str(player.get("interact_prompt")).is_empty()
 	_progress.value = float(player.get("interact_progress"))
@@ -354,7 +360,7 @@ func _update_weapon(player: Node) -> void:
 	ammo_label.text = "%d / %d" % [holder.ammo[holder.current],holder.reserve[holder.current]]
 	_pips.rounds = holder.ammo[holder.current]
 	_pips.capacity = weapon.mag_size
-	_pips.reload_progress = 1.0-holder._reload_left/weapon.reload_time if holder._reload_left > 0 else 0.0
+	_pips.reload_progress = 1.0-holder._reload_left/maxf(holder._reload_total,0.01) if holder._reload_left > 0 else 0.0
 	if _slots.get_child_count() != holder.loadout.size():
 		for child in _slots.get_children():
 			_slots.remove_child(child)

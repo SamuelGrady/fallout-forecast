@@ -10,7 +10,10 @@ func _ready() -> void:
 	font = preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
 	pixel_size = .006
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	no_depth_test = false
+	# Draw over the enemy that was hit; it spawns at the impact point, which
+	# is often inside the body.
+	no_depth_test = true
+	render_priority = 10
 	outline_modulate = Color("#17212c")
 	outline_size = 10
 	_refresh()
@@ -31,9 +34,10 @@ func add_hit(delta_amount: int, is_critical: bool) -> void:
 
 
 func _refresh() -> void:
-	text = str(amount) + ("!" if critical else "")
+	text = str(amount)
 	font_size = 74 if critical else 54
-	modulate = Color("#ffd56a") if critical else Color("#f4f5e5")
+	# Headshots get their own hot red instead of a "!" suffix.
+	modulate = Color("#ff4f6a") if critical else Color("#f4f5e5")
 
 
 func _animate() -> void:

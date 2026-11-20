@@ -89,6 +89,14 @@ var has_tarp := false
 var tarp_raised := false
 ## Set by WeaponHolder: the held weapon drains the suit even in shelter.
 var holding_leaky := false
+## Set by WeaponHolder: aiming down sights slows movement and blocks sprint.
+var aiming := false
+## Set by WeaponHolder when firing: suppresses sprint briefly.
+var sprint_lock := 0.0
+## Host: post-revive grace. No damage or suit drain until it runs out.
+var _grace_left := 0.0
+const REVIVE_GRACE := 1.0
+const SELF_REVIVE_SUIT := 30.0
 
 # Local UI.
 var weapon_name = null
@@ -251,7 +259,8 @@ func _physics_process(delta: float) -> void:
 
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
-	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok"
+	sprint_lock = maxf(0.0, sprint_lock - delta)
+	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" 			and not aiming and sprint_lock <= 0.0
 	var speed := walk_speed
 	match state:
 		"downed":
@@ -263,7 +272,8 @@ func _physics_process(delta: float) -> void:
 				speed = crouch_speed
 			elif is_sprinting:
 				speed = sprint_speed
-			if tarp_raised:
+			speed *= GameManager.player_speed_scale()
+			if tarp_raised or aiming:
 				speed = minf(speed, walk_speed * 0.7)
 
 	var accel := ground_accel if is_on_floor() else air_accel
@@ -281,6 +291,8 @@ func _physics_process(delta: float) -> void:
 	_update_shelter()
 
 	_handle_interact(delta)
+	if Input.is_action_just_pressed("ready_up") and state == "ok":
+		GameManager.ready_up()
 	if state == "turned":
 		_melee_left -= delta
 		if Input.is_action_just_pressed("fire") and _melee_left <= 0.0:
@@ -295,9 +307,12 @@ func _physics_process(delta: float) -> void:
 
 # ------------------------------------------------------------------ host rules
 func _host_tick(delta: float) -> void:
+	_grace_left = maxf(0.0, _grace_left - delta)
 	match state:
 		"ok":
-			var drain := WeatherManager.suit_loss_per_second() if exposed else 0.0
+			if _grace_left > 0.0:
+				return
+			var drain := WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale() if exposed else 0.0
 			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
 				drain *= 0.25
 			if holding_leaky:
@@ -320,6 +335,8 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	match state:
 		"ok":
+			if _grace_left > 0.0:
+				return
 			health = maxf(health - amount, 0.0)
 			damaged.emit(amount)
 			if health <= 0.0:
@@ -345,8 +362,12 @@ func revive(by: Node) -> void:
 	if state != "downed":
 		return
 	health = revive_health
+	_grace_left = REVIVE_GRACE
 	if by == self:
 		self_revives -= 1
+		# A small suit buffer so a solo self-revive in acid rain isn't an
+		# instant re-down.
+		suit_integrity = maxf(suit_integrity, SELF_REVIVE_SUIT)
 	else:
 		GameManager.record_revive(by)
 	_set_state("ok")

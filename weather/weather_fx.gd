@@ -50,7 +50,9 @@ func _process(delta: float) -> void:
 	if camera:
 		var p := camera.global_position
 		_rain.global_position = Vector3(p.x, p.y + spawn_height, p.z)
-		_collision.global_position = Vector3(p.x, p.y, p.z)
+		# Snap to a 4 m grid: the heightfield only re-renders when it moves,
+		# instead of every frame.
+		_collision.global_position = Vector3(snappedf(p.x, 4.0), snappedf(p.y, 4.0), snappedf(p.z, 4.0))
 
 	var flare_cover := camera and preload("res://weapons/projectile.gd").protects(camera.global_position, get_tree())
 	_rain.amount_ratio = intensity * (0.25 if flare_cover else 1.0)
@@ -107,7 +109,7 @@ func _build_rain() -> void:
 	_collision.name = "RainCollision"
 	_collision.size = Vector3(area_size, 60.0, area_size)
 	_collision.resolution = GPUParticlesCollisionHeightField3D.RESOLUTION_512
-	_collision.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_ALWAYS
+	_collision.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
 	add_child(_collision)
 
 

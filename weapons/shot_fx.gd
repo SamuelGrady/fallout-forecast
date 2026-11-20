@@ -3,23 +3,48 @@ class_name ShotFX
 ## All local and short-lived.
 
 
-static func tracer(parent: Node, from: Vector3, to: Vector3, color: Color, life := 0.06) -> void:
+## Shared unit-length streak mesh and one material per color, so firing
+## doesn't allocate resources per shot.
+static var _streak_mesh: BoxMesh
+static var _materials := {}
+
+
+static func _unshaded(color: Color) -> StandardMaterial3D:
+	var key := color.to_html()
+	if not _materials.has(key):
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.albedo_color = color
+		material.disable_fog = true
+		_materials[key] = material
+	return _materials[key]
+
+
+## A short bright bullet streak that travels from the muzzle to the hit,
+## rather than a beam that spans the whole distance at once.
+static func tracer(parent: Node, from: Vector3, to: Vector3, color: Color, _life := 0.06) -> void:
 	var length := from.distance_to(to)
 	if length < 0.05:
 		return
+	if _streak_mesh == null:
+		_streak_mesh = BoxMesh.new()
+		_streak_mesh.size = Vector3(0.018, 0.018, 1.0)
 	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.025, 0.025, length)
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = color
-	material.disable_fog = true
-	box.material = material
-	mesh.mesh = box
+	mesh.mesh = _streak_mesh
+	mesh.material_override = _unshaded(color.lerp(Color(1.0, 0.93, 0.7), 0.6))
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var streak := minf(1.6, length)
+	mesh.scale = Vector3(1.0, 1.0, streak)
 	parent.add_child(mesh)
-	mesh.look_at_from_position((from + to) * 0.5, to, Vector3.UP if absf((to - from).normalized().y) < 0.99 else Vector3.RIGHT)
-	parent.get_tree().create_timer(life).timeout.connect(mesh.queue_free)
+	var dir := (to - from) / length
+	var up := Vector3.UP if absf(dir.y) < 0.99 else Vector3.RIGHT
+	var start := from + dir * streak * 0.5
+	var finish := to - dir * streak * 0.5
+	mesh.look_at_from_position(start, start + dir, up)
+	var travel := maxf(0.02, length / 320.0)
+	var tween := mesh.create_tween()
+	tween.tween_property(mesh, "global_position", finish, travel)
+	tween.tween_callback(mesh.queue_free)
 
 
 static func flash(parent: Node, at: Vector3, color := Color(1.0, 0.8, 0.4), energy := 4.0, life := 0.05) -> void:

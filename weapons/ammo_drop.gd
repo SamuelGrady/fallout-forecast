@@ -161,7 +161,7 @@ func _physics_process(delta: float) -> void:
 func _collect(player: Node, holder: Node) -> bool:
 	var collected := false
 	if kind in ["ammo", "supply"]:
-		collected = holder.collect_ammo()
+		collected = holder.collect_ammo(kind == "supply")
 	if kind in ["health", "supply"] and player.health < player.max_health:
 		player.heal(20.0)
 		collected = true
