@@ -328,6 +328,10 @@ func start_beacon() -> void:
 		push_warning("Net: discovery port %d is busy; the host won't be listed" % DISCOVERY_PORT)
 		return
 	_beacon.set_broadcast_enabled(true)
+	# Also listen on a multicast group on every interface: limited broadcast
+	# often leaves Windows through only one adapter (VPNs, virtual NICs).
+	for iface in _lan_interfaces():
+		_beacon.join_multicast_group(DISCOVERY_GROUP, iface)
 
 
 func stop_beacon() -> void:
@@ -344,7 +348,7 @@ func _pump_beacon() -> void:
 		var from_port := _beacon.get_packet_port()
 		if packet.get_string_from_utf8() != PROBE:
 			continue
-		var reply := "%s|%s|%d|%d|%d" % [GAME_ID, local_name, roster.size(), MAX_PLAYERS, _host_port]
+		var reply := "%s|%s|%d|%d|%d|%s" % [GAME_ID, local_name, roster.size(), MAX_PLAYERS, _host_port, _instance_id]
 		_beacon.set_dest_address(from_ip, from_port)
 		_beacon.put_packet(reply.to_utf8_buffer())
 
@@ -375,9 +379,58 @@ func _send_probe() -> void:
 	var data := PROBE.to_utf8_buffer()
 	_scout.set_dest_address("255.255.255.255", DISCOVERY_PORT)
 	_scout.put_packet(data)
+	# Directed broadcast on every LAN interface (assumes a /24, the norm for
+	# home and lab networks) plus the multicast group, so hosts behind a
+	# different adapter than the default route still answer.
+	var sent := {}
+	for ip in _lan_addresses():
+		var parts: PackedStringArray = ip.split(".")
+		var directed := "%s.%s.%s.255" % [parts[0], parts[1], parts[2]]
+		if sent.has(directed):
+			continue
+		sent[directed] = true
+		_scout.set_dest_address(directed, DISCOVERY_PORT)
+		_scout.put_packet(data)
+	_scout.set_dest_address(DISCOVERY_GROUP, DISCOVERY_PORT)
+	_scout.put_packet(data)
 	# Loopback as well, so two windows on one machine can find each other.
 	_scout.set_dest_address("127.0.0.1", DISCOVERY_PORT)
 	_scout.put_packet(data)
+
+
+const DISCOVERY_GROUP := "239.255.77.77"
+## Random per-process id in beacon replies, for de-duplicating hosts.
+var _instance_id := "%08x" % randi()
+
+
+## Lower is better: private LAN, then this machine, then VPN/CGNAT ranges.
+func _address_rank(ip: String) -> int:
+	if ip.begins_with("10.") or ip.begins_with("192.168.") or ip.begins_with("172."):
+		return 0
+	if ip.begins_with("127."):
+		return 1
+	return 2
+
+
+## Private IPv4 addresses of this machine (no loopback or link-local).
+func _lan_addresses() -> Array:
+	var out := []
+	for ip in IP.get_local_addresses():
+		if ip.contains(":") or ip.begins_with("127.") or ip.begins_with("169.254."):
+			continue
+		out.append(ip)
+	return out
+
+
+## Interface names that carry one of those addresses, for multicast joins.
+func _lan_interfaces() -> Array:
+	var out := []
+	for info in IP.get_local_interfaces():
+		for ip in info.addresses:
+			if not ip.contains(":") and not ip.begins_with("127.") and not ip.begins_with("169.254."):
+				out.append(info.name)
+				break
+	return out
 
 
 func _pump_scout() -> void:
@@ -388,12 +441,26 @@ func _pump_scout() -> void:
 		var parts := packet.get_string_from_utf8().split("|")
 		if parts.size() < 4 or parts[0] != GAME_ID:
 			continue
+		# One host answers on every path (LAN, loopback, VPN); keep one entry
+		# per host instance, on the most useful address.
+		var instance := parts[5] if parts.size() > 5 else ip
+		var duplicate := ""
+		for other_ip in servers:
+			if other_ip != ip and str(servers[other_ip].get("instance", "")) == instance:
+				duplicate = other_ip
+		if duplicate != "":
+			if _address_rank(duplicate) <= _address_rank(ip):
+				_seen[duplicate] = Time.get_ticks_msec() / 1000.0
+				continue
+			servers.erase(duplicate)
+			_seen.erase(duplicate)
+			changed = true
 		var existing: Dictionary = servers.get(ip, {})
 		var count := int(parts[2])
 		if str(existing.get("name", "")) != parts[1] or int(existing.get("players", -1)) != count:
 			changed = true
 		servers[ip] = {"name": parts[1], "players": count, "max": int(parts[3]),
-			"port": int(parts[4]) if parts.size() > 4 else PORT}
+			"port": int(parts[4]) if parts.size() > 4 else PORT, "instance": instance}
 		_seen[ip] = Time.get_ticks_msec() / 1000.0
 	if changed:
 		servers_changed.emit()
