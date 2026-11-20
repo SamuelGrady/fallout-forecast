@@ -1,4 +1,4 @@
-# Acid Rain Protocol — Game Design Doc
+# Fallout Forecast — Game Design Doc
 
 Nov 19, 2026 · @Drew
 
@@ -6,7 +6,7 @@ Nov 19, 2026 · @Drew
 
 ## Overview
 
-Acid Rain Protocol is a 1–4 player co-op first-person shooter in Godot 4.7, set in a quarantined 1987 suburb where a plague falls with the rain. Players are hazmat exterminators who clear five waves on one map, survive each storm's downpour by sharing cover, and gamble on gear from mystery crates.
+Fallout Forecast is a 1–4 player co-op first-person shooter in Godot 4.7, set in a quarantined 1987 suburb where a plague falls with the rain. Players are hazmat exterminators who clear five waves on one map, survive each storm's downpour by sharing cover, and gamble on gear from mystery crates.
 
 | Jam theme | How the game meets it |
 | --- | --- |
@@ -426,3 +426,10 @@ VHS readability uses two composites. The world keeps the coarse pixel grid and t
 - [x] Aggressive recovery. Ammo drops remain automatic within 1.8 m and clear line of sight. Full-size Gutters and Misters also have a 40% chance of dropping a small health or suit pickup. Health restores 20 and suit restores 25, capped at their maximums. Full players leave unnecessary pickups in place.
 
 Verification covered the normal Title-to-Play entry, one-shell ammo accounting and interruption, rifle spread recovery, stagger and pounce cancellation, leg shots, bomb attraction, flare protection and expiry, pickup caps, wave cleanup gating and navigation paths through three combat areas. A scripted five-wave simulation reached the win condition with 291 kills and a peak of 18 active infected. Combat and flare effects were also rendered in Godot. These are starting balance values for hands-on playtesting.
+
+
+### Recorded playtests and UX review - November 19, 2026
+
+The game is named Fallout Forecast, including the title tape and menu branding. Playtest.cmd launches a local Windows recorder with microphone selection. Its opt-in Godot bridge records game audio, phase/scene/combat events, periodic vitals and position snapshots, and F7 screenshot markers. F12 finishes the recording. The external Windows Graphics Capture process records the Direct3D game window and microphone. Afterward, a local Whisper transcription and offline review page provide timestamped feedback, clickable playback, and screenshots. Session folders include AGENT_REVIEW.md for agent handoff and live outside the repository in Videos/FalloutForecastPlaytests. Setup and recovery are described in docs/playtesting.md.
+
+Three independent UX reviews are consolidated in docs/ux-review.md. They prioritize reliable targeting and menu focus, clearer pause ownership, symbol-based mutation cards, distinct pickup models, visible decon charges, a simpler HUD, and aggregation of damage counters. These are review proposals awaiting implementation.

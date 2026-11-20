@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-"Acid Rain Protocol" (repo name fallout-forecast): a 1–4 player co-op first-person shooter for a CSCI 3103 game jam, built by Sam and Drew in three weeks. The design is in `docs/design-doc.md`. That file is a snapshot. The live doc (https://claude.ai/artifact/NwyXaaPmhz2YVwNuYezedt) is the source of truth, so re-export it when it changes. Its "As built" section lists what exists and where Sam's code hooks in.
+"Fallout Forecast" (repo name fallout-forecast): a 1–4 player co-op first-person shooter for a CSCI 3103 game jam, built by Sam and Drew in three weeks. The design is in `docs/design-doc.md`. That file is a snapshot. The live doc (https://claude.ai/artifact/NwyXaaPmhz2YVwNuYezedt) is the source of truth, so re-export it when it changes. Its "As built" section lists what exists and where Sam's code hooks in.
 
 Work is split by owner (see "Team, milestones and risks" in the design doc):
 - **Sam:** networking, lobby, downed/revive/Turned, crates and cursed weapons, mutation rolls, GameManager.

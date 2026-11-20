@@ -35,7 +35,7 @@ func _ready() -> void:
 	tape_style.set_border_width_all(6)
 	_tape.add_theme_stylebox_override("panel", tape_style)
 	var sticker := Label.new()
-	sticker.text = "ACID RAIN PROTOCOL\nSP  T-120  OCT 31 1987"
+	sticker.text = "FALLOUT FORECAST\nSP  T-120  OCT 31 1987"
 	sticker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sticker.add_theme_font_size_override("font_size", 22)
 	sticker.add_theme_color_override("font_color", Color("1F2A55"))
@@ -59,7 +59,7 @@ func _ready() -> void:
 	_snow.modulate.a = 0.0
 	add_child(_snow)
 
-	_logo.text = "ACID RAIN\nPROTOCOL"
+	_logo.text = "FALLOUT\nFORECAST"
 	_logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_logo.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_logo.grow_horizontal = Control.GROW_DIRECTION_BOTH
