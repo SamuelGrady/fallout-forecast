@@ -25,15 +25,15 @@ var _skin_label: Label
 var _color_label: Label
 
 
-func _init(preview_size := Vector2i(260, 250)) -> void:
-	add_theme_constant_override("separation", 8)
+func _init(preview_size := Vector2i(260, 224)) -> void:
+	add_theme_constant_override("separation", 7)
 	color = posmod(Settings.suit_color, Cosmetics.COLORS.size())
 	skin = Cosmetics.wrap_skin(Settings.suit_skin)
 	if OS.has_feature("web") or force_2d_preview:
 		_build_preview_2d(preview_size)
 	else:
 		_build_preview_3d(preview_size)
-	_color_label = _label(16, Color("8FD65A"))
+	_color_label = _label(20, BroadcastUI.ACID)
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 6)
@@ -42,7 +42,7 @@ func _init(preview_size := Vector2i(260, 250)) -> void:
 	add_child(grid)
 	for i in Cosmetics.COLORS.size():
 		var swatch := Button.new()
-		swatch.custom_minimum_size = Vector2(56, 34)
+		swatch.custom_minimum_size = Vector2(58, 34)
 		BroadcastUI.animate_button(swatch)
 		swatch.pressed.connect(func():
 			_pick(i, skin))
@@ -54,9 +54,9 @@ func _init(preview_size := Vector2i(260, 250)) -> void:
 	add_child(row)
 	_arrow(row, "<", -1)
 	_skin_label = Label.new()
-	_skin_label.custom_minimum_size.x = 150
+	_skin_label.custom_minimum_size.x = 152
 	_skin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_skin_label.add_theme_font_size_override("font_size", 22)
+	BroadcastUI.text(_skin_label, 22, BroadcastUI.PAPER)
 	row.add_child(_skin_label)
 	_arrow(row, ">", 1)
 	_refresh()
@@ -157,7 +157,7 @@ class _SuitPreview2D extends Control:
 		var h := size.y
 		if w <= 2.0 or h <= 2.0:
 			return
-		# Subtle broadcast monitor grid + pink rim glow.
+		# Subtle broadcast monitor grid, scanlines, and corner registration ticks.
 		draw_rect(Rect2(Vector2.ZERO, size), Color("#09111d"))
 		var grid_col := Color(0.25, 0.55, 0.62, 0.14)
 		for gx in range(1, 8):
@@ -166,12 +166,32 @@ class _SuitPreview2D extends Control:
 		for gy in range(1, 8):
 			var y := h * float(gy) / 8.0
 			draw_line(Vector2(0.0, y), Vector2(w, y), grid_col, 1.0)
-		draw_circle(Vector2(w * 0.5, h * 0.87), w * 0.28, Color(0.03, 0.07, 0.12, 0.85))
-		draw_arc(Vector2(w * 0.5, h * 0.87), w * 0.28, 0.0, TAU, 24, Color(0.4, 0.87, 0.85, 0.35), 2.0)
+		var scan_col := Color(0.0, 0.0, 0.0, 0.14)
+		for sy in range(0, int(h), 4):
+			draw_line(Vector2(0.0, float(sy)), Vector2(w, float(sy)), scan_col, 1.0)
+		var tick_col := Color(BroadcastUI.CYAN, 0.45)
+		var m := 8.0
+		var t := 10.0
+		draw_line(Vector2(m, m), Vector2(m + t, m), tick_col, 1.5)
+		draw_line(Vector2(m, m), Vector2(m, m + t), tick_col, 1.5)
+		draw_line(Vector2(w - m, m), Vector2(w - m - t, m), tick_col, 1.5)
+		draw_line(Vector2(w - m, m), Vector2(w - m, m + t), tick_col, 1.5)
+		draw_line(Vector2(m, h - m), Vector2(m + t, h - m), tick_col, 1.5)
+		draw_line(Vector2(m, h - m), Vector2(m, h - m - t), tick_col, 1.5)
+		draw_line(Vector2(w - m, h - m), Vector2(w - m - t, h - m), tick_col, 1.5)
+		draw_line(Vector2(w - m, h - m), Vector2(w - m, h - m - t), tick_col, 1.5)
+		draw_string(BroadcastUI.FONT, Vector2(m + 4.0, m + 14.0), "CAM 02", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(BroadcastUI.CYAN, 0.65))
+		draw_string(BroadcastUI.FONT, Vector2(w - 58.0, m + 14.0), "LIVE", HORIZONTAL_ALIGNMENT_RIGHT, 46.0, 15, Color(BroadcastUI.PINK, 0.75))
 
-		var bob := sin(_t * 2.4) * 3.0
+		var bob := 0.0 if Settings.reduced_flash else sin(_t * 2.4) * 2.5
 		var cx := w * 0.5
-		var s := minf(w, h) / 250.0
+		var s := minf(w / 220.0, h / 238.0)
+		# Flat pedestal under the boots, kept inside the monitor.
+		var feet_y := minf(h * 0.36 + 132.0 * s, h - 12.0)
+		draw_set_transform(Vector2(cx, feet_y), 0.0, Vector2(1.0, 0.24))
+		draw_circle(Vector2.ZERO, 54.0 * s, Color(0.03, 0.07, 0.12, 0.85))
+		draw_arc(Vector2.ZERO, 54.0 * s, 0.0, TAU, 32, Color(0.4, 0.87, 0.85, 0.35), 2.0)
+		draw_set_transform(Vector2.ZERO)
 		var suit := suit_color
 		var shade := suit.darkened(0.26)
 		var trim := suit.darkened(0.42)
@@ -180,7 +200,7 @@ class _SuitPreview2D extends Control:
 		var outline := Color("#0b121c")
 
 		# Backpack / gear silhouette behind torso.
-		var torso_top := h * 0.37 + bob
+		var torso_top := h * 0.36 + bob
 		if skin_id == 0:
 			_box(Rect2(cx - 34 * s, torso_top + 6 * s, 68 * s, 54 * s), trim, outline)
 		elif skin_id == 2:
@@ -276,7 +296,7 @@ func _refresh() -> void:
 	for i in _swatches.size():
 		var swatch := _swatches[i]
 		var taken := i in _taken and i != color
-		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
 			var style := StyleBoxFlat.new()
 			style.bg_color = Cosmetics.COLORS[i].darkened(0.6 if taken else 0.0)
 			var selected := i == color
@@ -306,7 +326,8 @@ func _refresh() -> void:
 func _arrow(parent: Control, text: String, step: int) -> void:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(48, 40)
+	b.custom_minimum_size = Vector2(42, 36)
+	BroadcastUI.button_role(b, false, false)
 	BroadcastUI.animate_button(b)
 	b.pressed.connect(func():
 		_pick(color, skin + step))
@@ -316,19 +337,27 @@ func _arrow(parent: Control, text: String, step: int) -> void:
 func _label(font_size: int, font_color: Color) -> Label:
 	var l := Label.new()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", font_color)
+	BroadcastUI.text(l, font_size, font_color)
 	add_child(l)
 	return l
 
 
-func _build_preview_2d(preview_size: Vector2i) -> void:
+func _preview_frame() -> PanelContainer:
 	var frame := PanelContainer.new()
-	var style := BroadcastUI.panel(Color("#0a1320"), BroadcastUI.CYAN)
-	style.set_content_margin_all(0)
+	var style := BroadcastUI.panel(Color("#09111d"), Color(BroadcastUI.CYAN, 0.75))
+	style.set_border_width_all(1)
+	style.border_width_left = 3
+	# Inset the picture by the border so the frame stays visible around it.
+	style.set_content_margin_all(1)
+	style.content_margin_left = 3
 	frame.add_theme_stylebox_override("panel", style)
 	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	add_child(frame)
+	return frame
+
+
+func _build_preview_2d(preview_size: Vector2i) -> void:
+	var frame := _preview_frame()
 	_preview_2d = _SuitPreview2D.new()
 	_preview_2d.custom_minimum_size = preview_size
 	_preview_2d.set_look(Cosmetics.color(color), skin)
@@ -336,12 +365,7 @@ func _build_preview_2d(preview_size: Vector2i) -> void:
 
 
 func _build_preview_3d(preview_size: Vector2i) -> void:
-	var frame := PanelContainer.new()
-	var style := BroadcastUI.panel(Color("#0a1320"), BroadcastUI.CYAN)
-	style.set_content_margin_all(0)
-	frame.add_theme_stylebox_override("panel", style)
-	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	add_child(frame)
+	var frame := _preview_frame()
 	var container := SubViewportContainer.new()
 	container.custom_minimum_size = preview_size
 	container.stretch = true
