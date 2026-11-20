@@ -92,6 +92,7 @@ func attack(victim: Node3D, amount: float) -> void:
 				closest = distance
 				hop = candidate
 	GameManager.broadcast_arc(points, SHOCK_COLOR)
+	GameManager.achievement_event("static_chain", victim, points.size() - 1)
 
 
 func play_tell(cue: String, duration: float, volume: float) -> void:

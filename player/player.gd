@@ -604,7 +604,7 @@ func revive(by: Node) -> void:
 		# instant re-down.
 		suit_integrity = maxf(suit_integrity, SELF_REVIVE_SUIT)
 	else:
-		GameManager.record_revive(by)
+		GameManager.record_revive(by, self)
 	_set_state("ok")
 
 

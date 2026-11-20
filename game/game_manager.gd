@@ -17,6 +17,7 @@ const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
 const MutationRoll := preload("res://game/mutation_roll.gd")
 const CrateManager := preload("res://game/crate_manager.gd")
 const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
+const FeatTracker := preload("res://game/feat_tracker.gd")
 
 ## Index = player count (1-4); from the design doc's scaling table.
 const ENEMY_COUNT_SCALE := [1.0, 1.0, 1.6, 2.2, 2.8]
@@ -43,6 +44,8 @@ var map_id := Maps.DEFAULT_ID
 var _lose_check := 0.0
 var mutations: Node
 var crates: Node
+## Feats and achievements (game/feat_tracker.gd): host confirms, players save.
+var feats: Node
 
 
 func _ready() -> void:
@@ -55,6 +58,9 @@ func _ready() -> void:
 	crates = CrateManager.new()
 	crates.name = "CrateManager"
 	add_child(crates)
+	feats = FeatTracker.new()
+	feats.name = "Feats"
+	add_child(feats)
 
 
 func _process(delta: float) -> void:
@@ -84,6 +90,7 @@ func start_run() -> void:
 	for p in players():
 		p.set("max_health", 100.0)
 		_stat(p)
+	feats.reset_run()
 	var n := player_count()
 	decon_max = DECON_CHARGES[n]
 	_set_decon(decon_max)
@@ -439,6 +446,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 		_broadcast_ready(0, player_count())
 	if not is_host() or not run_active:
 		return
+	feats.on_phase(phase, _wave)
 	match phase:
 		WeatherManager.Phase.DRIZZLE:
 			var objectives := get_tree().get_nodes_in_group("district_objectives")
@@ -511,6 +519,7 @@ func use_decon(player: Node) -> void:
 	if decon_charges <= 0 or float(player.get("suit_integrity")) >= 99.0:
 		return
 	player.set("suit_integrity", 100.0)
+	feats.on_decon(player)
 	_set_decon(decon_charges - 1)
 
 
@@ -663,14 +672,23 @@ func _draw_blast(at: Vector3, size: float, color: Color) -> void:
 	Sound.play_at("explosion", at, -12.0, 1.35)
 
 
-func record_revive(reviver: Node) -> void:
+func record_revive(reviver: Node, revived: Node = null) -> void:
 	if is_host() and reviver:
 		_stat(reviver).revives += 1
+		feats.on_revive(reviver, revived)
 
 
 func record_turned(player: Node) -> void:
 	if is_host() and player:
 		_stat(player).turned += 1
+		feats.on_turned(player)
+
+
+## Host: enemy/weapon code reports an achievement moment for `player`
+## (game/feat_tracker.gd on_event). Keep these calls one line where they sit.
+func achievement_event(event: String, player: Node, value := 0) -> void:
+	if is_host():
+		feats.on_event(event, player, value)
 
 
 func record_cursed(player: Node, weapon_name: String) -> void:
@@ -727,6 +745,7 @@ func boss_defeated() -> void:
 	if not is_host() or victory_locked or finished or endless:
 		return
 	_waves_survived = WeatherManager.FINAL_WAVE
+	feats.on_boss_defeated()
 	_set_tape_state(false, false, true)
 	WeatherManager.set_intensity_override(0.0)
 	WeatherManager.hold = true
@@ -768,6 +787,7 @@ func _request_tape_choice(keep_playing: bool) -> void:
 func _apply_tape_choice(peer: int, keep_playing: bool) -> void:
 	if not awaiting_tape_choice or not run_active or finished or peer != tape_decider():
 		return
+	feats.on_tape_choice(keep_playing)
 	if not keep_playing:
 		_set_tape_state(false, false, true)
 		finish(true)
@@ -822,6 +842,7 @@ func _check_lose() -> void:
 func finish(won: bool) -> void:
 	if finished or not is_host():
 		return
+	feats.on_finish()
 	finished = true
 	for p in players():
 		var s := _stat(p)

@@ -32,7 +32,9 @@ var _backdrop_viewport: SubViewport
 var _counter: Label
 var _settings_button: Button
 var _suit_button: Button
+var _feats_button: Button
 var _suit_picker: SuitPicker
+var _feats_screen: FeatsScreen
 var _t := 0.0
 var _menu_ready := false
 var _ejecting := false
@@ -136,6 +138,7 @@ func _build_playback_menu() -> void:
 		BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
 	_button(_menu, "CLOUD PLAY", _on_join)
 	_suit_button = _button(_menu, "SUIT", _on_suit)
+	_feats_button = _button(_menu, "ACHIEVEMENTS", func(): _open_feats(FeatsScreen.Filter.ALL, _feats_button))
 	_settings_button = _button(_menu, "SETTINGS", _on_settings)
 	var quit := _button(_menu, "QUIT", _on_quit)
 	BroadcastUI.button_role(quit, false, true)
@@ -202,11 +205,13 @@ func _build_playback_menu() -> void:
 	suit_heading.text = "SUIT CONFIG"
 	BroadcastUI.text(suit_heading, 34, BroadcastUI.CYAN)
 	_suit.add_child(suit_heading)
-	_suit_picker = SuitPicker.new(Vector2i(264, 240))
+	_suit_picker = SuitPicker.new(Vector2i(264, 214))
 	_suit_picker.changed.connect(func(color: int, skin: int):
 		Settings.suit_color = color
 		Settings.suit_skin = skin)
 	_suit.add_child(_suit_picker)
+	var suit_feats: Button
+	suit_feats = _button(_suit, "FEATS  /  SUIT UNLOCKS", func(): _open_feats(FeatsScreen.Filter.SUITS, suit_feats), 40)
 	var suit_back := _button(_suit, "BACK", _on_back, 40)
 	BroadcastUI.button_role(suit_back, false, true)
 	_playback.hide()
@@ -489,6 +494,22 @@ func _on_settings() -> void:
 	_menu.hide()
 	_settings_panel.show()
 	_settings_initial.grab_focus()
+	SceneLoader.tracking_wipe()
+
+
+## The feats list over the menu; focus returns to `from` when it closes.
+func _open_feats(start: FeatsScreen.Filter, from: Control) -> void:
+	if is_instance_valid(_feats_screen):
+		return
+	_feats_screen = FeatsScreen.new(start)
+	# Hide the menu behind it so keyboard focus can't wander off the list.
+	_content.hide()
+	_feats_screen.closed.connect(func():
+		_content.show()
+		_suit_picker.refresh_locks()
+		if is_instance_valid(from):
+			from.grab_focus())
+	add_child(_feats_screen)
 	SceneLoader.tracking_wipe()
 
 

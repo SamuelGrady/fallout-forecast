@@ -14,8 +14,10 @@ const COLORS := [
 	Color("#9a6bff"),  # purple
 	Color("#e6e9ec"),  # white
 	Color("#e8423a"),  # red
+	Color("#3d7bff"),  # storm blue (feat: Silver Lining)
+	Color("#b5653a"),  # rust (feat: Triple Feature)
 ]
-const COLOR_NAMES := ["HAZMAT YELLOW", "TEAL", "HOT PINK", "LIME", "ORANGE", "PURPLE", "WHITE", "RED"]
+const COLOR_NAMES := ["HAZMAT YELLOW", "TEAL", "HOT PINK", "LIME", "ORANGE", "PURPLE", "WHITE", "RED", "STORM BLUE", "RUST"]
 
 const SKINS := ["STANDARD", "GAS MASK", "FIREFIGHTER", "BIO-TECH", "ION RIG"]
 
@@ -33,11 +35,13 @@ static func wrap_skin(index: int) -> int:
 
 
 ## The wanted colour if nobody else wears it, else the next free one along the
-## palette. `taken` holds colour indices other players already wear.
-static func free_color(wanted: int, taken: Array) -> int:
+## palette. `taken` holds colour indices other players already wear. A
+## non-empty `allowed` limits the pick to colours that player has unlocked
+## (Feats); the four free colours guarantee a full squad always fits.
+static func free_color(wanted: int, taken: Array, allowed: Array = []) -> int:
 	wanted = posmod(wanted, COLORS.size())
 	for step in COLORS.size():
 		var index := (wanted + step) % COLORS.size()
-		if index not in taken:
+		if index not in taken and (allowed.is_empty() or index in allowed):
 			return index
 	return wanted

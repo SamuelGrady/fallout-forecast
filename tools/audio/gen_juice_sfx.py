@@ -1,9 +1,11 @@
 """Synthesize the "juice" cues: shell casings, kill confirms, heartbeat,
-splashes, suit-breach beep, surface footsteps.
+splashes, suit-breach beep, surface footsteps, the achievement jingle.
 
 Run from the repo root:  python tools/audio/gen_juice_sfx.py   (numpy only)
+Only some cues:          python tools/audio/gen_juice_sfx.py ui_achievement
 """
 import os
+import sys
 import wave
 
 import numpy as np
@@ -116,7 +118,38 @@ def step(seed, cutoff, decay, body):
     return finish(x, 0.5)
 
 
+def achievement():
+    """VHS "you did it" sting: a quick rising square-ish arpeggio into a held
+    major chord, with tape wow (slow pitch wobble) and a little hiss."""
+    rng = np.random.default_rng(900)
+    t = t_axis(1.05)
+    wow = 1.0 + 0.006 * np.sin(2 * np.pi * 5.5 * t) + 0.003 * np.sin(2 * np.pi * 0.9 * t)
+    x = np.zeros_like(t)
+    notes = [659.25, 783.99, 987.77, 1318.5]  # E5 G5 B5 E6
+    for i, f in enumerate(notes):
+        start = i * 0.075
+        phase = 2 * np.pi * np.cumsum(f * wow) / SR
+        voice = np.sin(phase) + 0.30 * np.sin(3 * phase) + 0.12 * np.sin(5 * phase)
+        decay = 0.09 if i < len(notes) - 1 else 0.38
+        x += voice * env(t, decay, start) * (0.55 if i < len(notes) - 1 else 0.7)
+    chord_at = 0.3
+    for f, amp in [(659.25, 0.35), (830.61, 0.28), (987.77, 0.3), (1318.5, 0.18)]:
+        phase = 2 * np.pi * np.cumsum(f * wow) / SR
+        attack = np.clip((t - chord_at) / 0.02, 0.0, 1.0)
+        x += (np.sin(phase) + 0.15 * np.sin(2 * phase)) * env(t, 0.32, chord_at) * attack * amp
+    x += lowpass(rng.standard_normal(t.size), 6000) * 0.025 * env(t, 0.6)
+    return finish(lowpass(x, 7000), 0.72, 0.08)
+
+
+CUES = {"ui_achievement": achievement}
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        for name in sys.argv[1:]:
+            write(name, CUES[name]())
+        sys.exit(0)
+    write("ui_achievement", achievement())
     for i in range(3):
         write(f"casing_{i}", casing(100 + i))
     write("kill_confirm", kill_confirm())

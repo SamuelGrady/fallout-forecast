@@ -112,6 +112,7 @@ func attack(victim: Node3D, amount: float) -> void:
 		var toward := water - victim.global_position
 		toward.y = 0.0
 		victim.pull_from_enemy(toward.normalized() * (9.0 if is_elite else 7.5))
+		GameManager.achievement_event("undertow_drag", victim)
 	_ambush_used = true
 	super.attack(victim, amount)
 

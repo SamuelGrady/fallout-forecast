@@ -60,6 +60,17 @@ func _ready() -> void:
 	BroadcastUI.text(title, 34, BroadcastUI.CYAN)
 	box.add_child(title)
 	_resume_button = _button(box, "RESUME", _resume)
+	var feats: Button
+	feats = _button(box, "ACHIEVEMENTS", func():
+		var screen := FeatsScreen.new()
+		_panel.hide()
+		_mutations.hide()
+		screen.closed.connect(func():
+			_panel.show()
+			_mutations.show()
+			if is_instance_valid(feats):
+				feats.grab_focus())
+		add_child(screen))
 	_button(box, "MAIN MENU", _main_menu)
 	if not OS.has_feature("web"):
 		_button(box, "QUIT", get_tree().quit)

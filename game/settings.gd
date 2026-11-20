@@ -14,6 +14,11 @@ var retro_enabled := true
 var reduced_flash := false
 var hud_scale := 1.0
 var unlocked_guns: Array = ["res://weapons/pump_shotgun.tres"]
+## Feats and achievements (game/feats.gd): id -> count, and the finished ids.
+## Only this machine writes them, from host-confirmed events.
+var feat_progress: Dictionary = {}
+var feats_done: Array = []
+var _save_queued := false
 ## Survivor look (indices into Cosmetics.COLORS / Cosmetics.SKINS).
 var suit_color := 0
 var suit_skin := 0
@@ -36,6 +41,13 @@ func unlock_gun(path: String) -> void:
 		save()
 
 
+## Save once at the end of this frame (feat progress can tick several times).
+func queue_save() -> void:
+	if not _save_queued:
+		_save_queued = true
+		save.call_deferred()
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var cfg := ConfigFile.new()
@@ -46,6 +58,16 @@ func _ready() -> void:
 		reduced_flash = cfg.get_value("video", "reduced_flash", reduced_flash)
 		hud_scale = HUD_SCALE_LARGE if cfg.get_value("video", "large_hud", false) else 1.0
 		unlocked_guns = cfg.get_value("progress", "guns", unlocked_guns)
+		var saved_progress: Variant = cfg.get_value("progress", "feat_progress", {})
+		if saved_progress is Dictionary:
+			for id: Variant in saved_progress:
+				if Feats.exists(str(id)):
+					feat_progress[str(id)] = maxi(0, int(saved_progress[id]))
+		var saved_done: Variant = cfg.get_value("progress", "feats", [])
+		if saved_done is Array:
+			for id: Variant in saved_done:
+				if Feats.exists(str(id)) and str(id) not in feats_done:
+					feats_done.append(str(id))
 		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
 		player_name = str(cfg.get_value("profile", "name", player_name)).strip_edges().left(18)
@@ -54,6 +76,11 @@ func _ready() -> void:
 		perf_overlay = bool(cfg.get_value("debug", "perf_overlay", perf_overlay))
 		telemetry_enabled = bool(cfg.get_value("debug", "telemetry", telemetry_enabled))
 		install_id = str(cfg.get_value("debug", "install_id", install_id))
+	# A look whose feat isn't earned on this machine falls back to a free one.
+	if not Feats.color_unlocked(suit_color):
+		suit_color = 0
+	if not Feats.skin_unlocked(suit_skin):
+		suit_skin = 0
 	if install_id.length() != 32:
 		var bytes := Crypto.new().generate_random_bytes(16)
 		install_id = bytes.hex_encode()
@@ -66,6 +93,7 @@ func apply() -> void:
 
 
 func save() -> void:
+	_save_queued = false
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var cfg := ConfigFile.new()
 	cfg.set_value("input", "mouse_sensitivity", mouse_sensitivity)
@@ -74,6 +102,8 @@ func save() -> void:
 	cfg.set_value("video", "reduced_flash", reduced_flash)
 	cfg.set_value("video", "large_hud", hud_scale > 1.0)
 	cfg.set_value("progress", "guns", unlocked_guns)
+	cfg.set_value("progress", "feat_progress", feat_progress)
+	cfg.set_value("progress", "feats", feats_done)
 	cfg.set_value("cosmetic", "color", suit_color)
 	cfg.set_value("cosmetic", "skin", suit_skin)
 	cfg.set_value("profile", "name", player_name.strip_edges().left(18))

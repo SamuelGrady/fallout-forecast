@@ -33,6 +33,7 @@ func _physics_process(delta: float) -> void:
 		if absf(hit.get_normal().y) < .45 and hit.get_normal().dot(_charge_direction) < -.35:
 			if body is CollisionObject3D and (body.collision_layer & 1) == 0:
 				continue
+			set_meta("crashed_ms", Time.get_ticks_msec())  # Feats: Brake Check
 			stagger(2.0)
 			announce_tell("hailstone_crash", 0.0, -4.0)
 			GameManager.broadcast_blast(global_position + Vector3.UP * .55, .8, Color("#c6e3ed"))
@@ -71,6 +72,8 @@ func attack(_victim: Node3D, _amount: float) -> void:
 
 
 func stagger(duration: float) -> void:
+	if _charge_left > 0.0:
+		set_meta("charge_cut_ms", Time.get_ticks_msec())  # Feats: Hail Mary
 	_charge_left = 0.0
 	super.stagger(duration)
 	_warning_left = 0.0

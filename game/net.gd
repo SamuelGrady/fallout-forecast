@@ -26,7 +26,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 10
+const PROTOCOL := 11
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -144,8 +144,10 @@ func host(port := PORT, as_player := true, default_map := Maps.DEFAULT_ID) -> Er
 	var custom := Settings.player_name.strip_edges().left(18)
 	local_name = (custom if custom != "" else "HOST") if as_player else "CLOUD SERVER"
 	roster.clear()
+	_allowed_colors.clear()
 	if as_player:
 		roster[1] = {"name": local_name, "ready": false}
+		_allowed_colors[1] = Feats.unlocked_colors()
 		_assign_cosmetic(1, Settings.suit_color, Settings.suit_skin)
 	roster_changed.emit()
 	return OK
@@ -291,11 +293,12 @@ func set_cosmetic(color: int, skin: int) -> void:
 		return
 	if is_host():
 		if roster.has(1):
+			_allowed_colors[1] = Feats.unlocked_colors()
 			_assign_cosmetic(1, color, skin)
 			_broadcast_roster()
 			roster_changed.emit()
 	else:
-		_request_cosmetic.rpc_id(1, color, skin)
+		_request_cosmetic.rpc_id(1, color, skin, Feats.unlocked_colors())
 
 
 # ------------------------------------------------------------------ lobby chat
@@ -380,13 +383,18 @@ func set_display_name(new_name: String) -> void:
 		_request_name.rpc_id(1, clean)
 
 
+## Host: peer id -> colour indices that player has unlocked (Feats). Only used
+## to nudge them onto a colour they own; other players see whatever they wear.
+var _allowed_colors := {}
+
+
 ## Host: store a peer's look, nudging the colour to the next free one.
 func _assign_cosmetic(peer_id: int, color: int, skin: int) -> void:
 	var taken := []
 	for other in roster:
 		if int(other) != peer_id:
 			taken.append(int(roster[other].get("color", -1)))
-	roster[peer_id]["color"] = Cosmetics.free_color(color, taken)
+	roster[peer_id]["color"] = Cosmetics.free_color(color, taken, _allowed_colors.get(peer_id, []))
 	roster[peer_id]["skin"] = Cosmetics.wrap_skin(skin)
 
 
@@ -440,7 +448,8 @@ func _on_connected() -> void:
 		local_name = "PLAYER %d" % multiplayer.get_unique_id()
 	_connect_left = 0.0
 	# Keep the hello RPC's argument types stable so older hosts can decline it.
-	var hello := JSON.stringify({"name": local_name, "color": Settings.suit_color, "skin": Settings.suit_skin})
+	var hello := JSON.stringify({"name": local_name, "color": Settings.suit_color, "skin": Settings.suit_skin,
+		"colors": Feats.unlocked_colors()})
 	_hello.rpc_id(1, hello, PROTOCOL)
 	joined_server.emit()
 
@@ -568,6 +577,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	if not is_host():
 		return
 	roster.erase(peer_id)
+	_allowed_colors.erase(peer_id)
 	_map_votes.erase(peer_id)
 	_broadcast_roster(peer_id)
 	roster_changed.emit()
@@ -657,6 +667,7 @@ func _hello(hello: String, protocol := 0) -> void:
 	var player_name: Variant = data.get("name")
 	var color: Variant = data.get("color")
 	var skin: Variant = data.get("skin")
+	_allowed_colors[peer_id] = _color_list(data.get("colors"))
 	roster[peer_id] = {"name": player_name.left(32) if player_name is String else "PLAYER", "ready": false}
 	_assign_cosmetic(peer_id, int(color) if color is float else 0, int(skin) if skin is float else 0)
 	_broadcast_roster()
@@ -699,14 +710,25 @@ func _request_ready(value: bool) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_cosmetic(color: int, skin: int) -> void:
+func _request_cosmetic(color: int, skin: int, unlocked: Array = []) -> void:
 	if not is_host() or run_active:
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
 	if roster.has(peer_id):
+		_allowed_colors[peer_id] = _color_list(unlocked)
 		_assign_cosmetic(peer_id, color, skin)
 		_broadcast_roster()
 		roster_changed.emit()
+
+
+## Host: a client's unlocked-colour list, cleaned. Empty = no limit.
+func _color_list(value: Variant) -> Array:
+	var out := []
+	if value is Array:
+		for index: Variant in value:
+			if (index is int or index is float) and int(index) >= 0 and int(index) < Cosmetics.COLORS.size():
+				out.append(int(index))
+	return out
 
 
 @rpc("any_peer", "call_remote", "reliable")

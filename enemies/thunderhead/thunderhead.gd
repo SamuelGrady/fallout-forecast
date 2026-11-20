@@ -43,11 +43,14 @@ func _physics_blast(early: bool) -> void:
 			victim.take_damage(amount, self)
 	if early:
 		var source := _last_hit_by if is_instance_valid(_last_hit_by) else null
+		var chained := 0
 		for node in get_tree().get_nodes_in_group("enemies"):
 			var enemy := node as EnemyBase
 			if enemy != self and enemy.health > 0.0 and global_position.distance_to(enemy.global_position) <= radius and _has_attack_los(enemy):
 				enemy.take_damage(amount * 2.1, source)
 				enemy.knockback(flat_direction(enemy.global_position) * 5.0)
+				chained += 1 if enemy.health <= 0.0 else 0
+		GameManager.achievement_event("thunderhead_chain", source, chained)
 
 
 func die() -> void:

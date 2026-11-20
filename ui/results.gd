@@ -73,6 +73,7 @@ func _ready() -> void:
 		_build_segments(box)
 	_build_summary(box, result, players, endless)
 	_build_players(box, players)
+	_build_feats(box)
 	var squad: Array = result.get("squad_mutations", [])
 	if not squad.is_empty():
 		var mutations := _label(box, "SQUAD MUTATIONS  /  " + ", ".join(PackedStringArray(squad)), 20, BroadcastUI.ACID)
@@ -163,6 +164,76 @@ func _build_players(box: Control, players: Dictionary) -> void:
 		var weapon := str(stats.get("weapon", stats.get("cursed", "")))
 		if not weapon.is_empty():
 			_label(box, "FINISHED WITH  /  " + weapon.to_upper(), 20, BroadcastUI.MUTED)
+
+
+## This machine's feats from the run: a "SUIT UNLOCKED" card per new look,
+## then one line naming the new achievements.
+func _build_feats(box: Control) -> void:
+	var earned: Array = GameManager.feats.earned_this_run if GameManager.feats else []
+	if earned.is_empty():
+		return
+	var suits: Array[String] = []
+	var others: Array[String] = []
+	for id: String in earned:
+		if Feats.is_suit_unlock(id):
+			suits.append(id)
+		else:
+			others.append(id)
+	if not suits.is_empty():
+		var row := _row(box, 10)
+		for i in mini(suits.size(), 3):
+			row.add_child(_unlock_card(suits[i], suits.size()))
+		if suits.size() > 3:
+			_label(row, "+%d" % (suits.size() - 3), 26, BroadcastUI.ACID)
+	if not others.is_empty():
+		var names := PackedStringArray()
+		for i in mini(others.size(), 3):
+			names.append(str(Feats.entry(others[i]).name))
+		var line := "NEW ACHIEVEMENTS  /  " + ", ".join(names)
+		if others.size() > 3:
+			line += "  +%d MORE" % (others.size() - 3)
+		var label := _label(box, line, 20, BroadcastUI.AMBER)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	Sound.play("ui_achievement", -9.0)
+
+
+func _unlock_card(id: String, count: int) -> Control:
+	var feat := Feats.entry(id)
+	var card := PanelContainer.new()
+	var style := BroadcastUI.panel(Color("#13202b"), BroadcastUI.ACID)
+	style.set_content_margin_all(7)
+	style.content_margin_left = 10
+	style.content_margin_right = 12
+	card.add_theme_stylebox_override("panel", style)
+	card.custom_minimum_size.x = 704.0 if count == 1 else 228.0
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	card.add_child(row)
+	var chip := ColorRect.new()
+	chip.custom_minimum_size = Vector2(30, 30)
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	chip.color = Cosmetics.color(int(feat.color)) if feat.has("color") else BroadcastUI.AMBER
+	row.add_child(chip)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", -2)
+	row.add_child(col)
+	var look: String = Cosmetics.COLOR_NAMES[int(feat.color)] if feat.has("color") else Cosmetics.SKINS[int(feat.skin)]
+	var head := Label.new()
+	head.text = "SUIT UNLOCKED: " + look
+	head.clip_text = true
+	head.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	BroadcastUI.text(head, 22 if count == 1 else 19, BroadcastUI.ACID)
+	col.add_child(head)
+	var sub := Label.new()
+	sub.text = str(feat.name) + (("  /  " + str(feat.desc)) if count == 1 else "")
+	sub.clip_text = true
+	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	BroadcastUI.text(sub, 17, BroadcastUI.MUTED)
+	col.add_child(sub)
+	if count > 1:
+		head.custom_minimum_size.x = 168
+		sub.custom_minimum_size.x = 168
+	return card
 
 
 func _render_tally(fraction: float) -> bool:

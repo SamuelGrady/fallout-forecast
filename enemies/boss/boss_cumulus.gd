@@ -299,6 +299,7 @@ func damage_part(i: int, amount: float, source: Node, point := Vector3.INF) -> v
 		if i < 3:
 			_pop_sac(i)
 		else:
+			GameManager.achievement_event("boss_core", source)
 			_die()
 
 
