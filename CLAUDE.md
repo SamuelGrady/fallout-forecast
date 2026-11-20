@@ -67,4 +67,4 @@ The Godot console executable on Drew's PC is `C:/Users/drewd/Desktop/Godot_v4.7.
   - F3, F4, F5 spawn a Drip, Gutter or Mister
   - F6 lightning, F8 retro effect, F9 debug text, F11 fullscreen
 
-Not built yet: the ping wheel, export builds for the demo machines, and per-player colours. Known networking gaps: enemy death fragments and the death sound only play on the host, the decon shower sound is host-only, and there is no interpolation, so remote players move in 20 Hz steps.
+The lobby and title share the suit picker in `ui/suit_picker.gd`. `game/ping_system.gd` relays team pings through `Main/Pings`. Remote movement is interpolated, and infected tells and decon spray play on peers in the run. Remaining design tasks include the between-wave PSAs and native export builds for the demo machines.

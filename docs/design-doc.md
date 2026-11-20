@@ -89,7 +89,7 @@ The game supports 1–4 players, and shared resources give the team a reason to 
 - **Group Mutation Roll.** Every player pulls a lever, and the team votes to cancel one mutation on a jackpot (see Chance systems).
 - **Double-or-nothing crate.** It needs two players to open, and a cursed result lands on one random player.
 - **Shared cursed effects.** Some cursed weapons affect the whole team; the Boombox Launcher draws enemies to everyone nearby.
-- **Ping wheel.** There is no voice chat. Players mark enemies, crates, shelter and revive requests with a ping wheel.
+- **Ping wheel.** Tap Z, middle mouse or D-pad Down to mark what you are looking at. If downed, tap to ask for a revive. Hold to open the radial menu, aim with the mouse or right stick, and release to send. Aim at the center to cancel. Team markers show the sender's suit color, distance and an off-screen direction.
 
 **Scaling by player count** (starting values for tuning)
 
@@ -175,16 +175,17 @@ The game should look like a horror movie taped off late-night TV in 1987: low re
 
 - A synthwave score in layers (bass, drums, lead) added as `storm_intensity` rises.
 - A gated-reverb drum hit as each Downpour begins.
-- Rain loudness tied to the particle amount, muffled under shelter.
-- Music and sound effects come from royalty-free asset packs.
+- Rain and wind rise with the storm. Shelter filters the rain and softens the wind.
+- Synthesized radio cues announce the storm countdown, arrival and clearing. Spatial sounds telegraph infected attacks and signal decon spray and shield dome deployment or collapse.
+- The score and some effects come from royalty-free asset packs. Original effects and their generators are credited in `assets/audio/CREDITS.md`.
 - PSAs voiced by a team member doing a cheesy anchor voice, then bit-crushed.
 
 ## UI and game flow
 
 Screens run in a straight line: Title, Lobby, Run (5 waves with a PSA between each), then the Results screen and back to the Lobby.
 
-1. **Title:** a VHS tape "inserting" animation, then Host, Join, Settings, Quit.
-2. **Lobby:** the host shows its IP and port; others type it to join. Up to 4 player slots, a suit color per player, and a Ready button. The host starts the run when everyone is ready.
+1. **Title:** a skippable cassette insert with mechanical audio and a tracking transition into the VCR playback menu. Use **Suit** to customize the survivor for solo play.
+2. **Lobby:** up to four players can choose one of eight suit colors and five hazmat skins in a rotating 3D preview. The lobby syncs the selected look and assigns a free color if two players pick the same one. Players join through the LAN list, a direct address or the cloud server, then ready up.
 3. **Run HUD:**
    - Bottom left: health and suit integrity bars, plus an EXPOSED warning that flashes in rain.
    - Bottom right: weapon, ammo, and a cursed-weapon icon when one is held.
@@ -277,7 +278,7 @@ The title screen has **PLAY SOLO**, **HOST GAME** and **JOIN GAME**.
 
 What still crosses the network only as visuals: rain, fog, puddles, the retro shader, music and the HUD all run locally.
 
-Known gaps: death particles and spore clouds spawned by a death only appear on the host until they are broadcast the same way ammo drops are; the decon shower sound plays on the host only; there is no lag compensation and no interpolation, so remote players move at 20 Hz steps.
+Remote players interpolate host-relayed movement. Infected windup and death audio and decon spray play on clients. Enemy death fragments are local to the host. Lag compensation remains open.
 
 **November 20 update.** The build now has custom art throughout, a dedicated cloud server, a browser build, and fixes for every finding from the November 19 playtest and whole-game review.
 
@@ -287,12 +288,14 @@ Known gaps: death particles and spore clouds spawned by a death only appear on t
 | Gun audio | Synthesized gunshots (crack, body, thump, slapback echo), flesh impacts, pump and mag-swap sounds. Buses with a limiter and music ducking. | `tools/audio/gen_gun_sfx.py`, `game/sound.gd` |
 | Grenades | Flare Gun became the Shield Dome (thrown, full shelter inside, pushes infected out). Bug Bomb became a Frag Grenade. Both show a throw-arc preview with a landing ring. | `weapons/projectile.gd`, `weapons/*.tres` |
 | Infected | Jointed limbs, reaching arms, hanging jaws, varied outfits, archetype gaits, hit reactions, growls and windup tells. | `enemies/infected_model.gd`, `enemies/enemy_base.gd` |
-| Players | Animated hazmat model in per-player suit colours (walk, sprint, aim, downed, Turned). Remote players are interpolated. | `player/player_model.gd`, `player/player.gd` |
+| Players | Animated hazmat model (walk, sprint, aim, downed, Turned), with a synced color and skin picker and a saved solo preference. Remote players are interpolated. | `player/player_model.gd`, `ui/suit_picker.gd` |
 | Map | All 17 buildings individually modelled. Signs are modelled neon tubes mounted on facades or posts; none float. | `props/building_kit.gd`, `props/pinecrest_*.gd`, `props/neon_lettering.gd` |
 | Pacing | Ready-up (G) skips Calm and Clearing, a 12 s first Calm with a storm countdown, a crate near each player at Calm, authored wave beats, rotating district objectives. | `game/game_manager.gd`, `enemies/enemy_spawner.gd` |
 | Mutations | The roll explains itself, auto-pulls in solo, and every mutation grants a matching player perk. | `ui/slot_reel.gd`, `game/game_manager.gd` |
 | Multiplayer | All transport is WebSocket. LAN discovery uses broadcast, per-interface broadcast and multicast. Global pause. Dedicated headless server at `wss://fallout.drew.place`. | `game/net.gd`, `game/dedicated_server.gd`, `server/` |
-| Web | Godot web export (Compatibility renderer, single-threaded) with an nginx container and a GitHub Actions workflow for drewdettmer.com/fallout. Production deploy waits on Coolify access. | `web/`, `.github/workflows/web-export.yml` |
+| Web and deployment | Godot Web export runs in Compatibility mode. GitHub Actions verifies the browser and dedicated server images. Coolify follows `master` for both apps. | `web/`, `server/`, `.github/workflows/` |
+| Team pings | Contextual tap and six-command wheel, with host-checked relay, suit-colored markers, distance and radio cues. Infected and revive markers follow their targets. | `game/ping_system.gd`, `ui/ping_hud.gd` |
+| Title and sound | Cassette transport and VCR playback menu, gated Downpour drums, storm bulletins, shelter-responsive wind and spatial hazard cues. | `ui/title.gd`, `ui/vcr_deck.gd`, `game/sound.gd` |
 | Fixes | Decon repair hold no longer resets near the shower; HUD vitals readable; lightning reveal is announced; solo play no longer errors after leaving a session. | `player/player.gd`, `ui/hud.gd`, `game/net.gd` |
 
 ## Team, milestones and risks
@@ -322,9 +325,9 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
 **Week 1**
 
-- [x] Net autoload: host and join with ENetMultiplayerPeer, peer list, names and colors
+- [x] Net autoload: WebSocket host and join, peer list, names and colors
 
-  Nov 19: `game/net.gd`. Names are `HOST` and `PLAYER <peer id>`; per-player colours are not used yet. Also owns LAN discovery and is the single `is_host()`.
+  `game/net.gd` owns WebSocket sessions, LAN discovery, ready status, and replicated suit colors and skins.
 - [x] Lobby scene with direct IP or LAN join
 - [x] Player controller with a MultiplayerSynchronizer on position, rotation and aim
 
@@ -353,7 +356,7 @@ Each week ends with both of you playing the gate together in 2+ instances.
 **Week 3**
 
 - [x] Double-or-nothing crate
-- [ ] Ping wheel (enemy, crate, shelter, revive me)
+- [x] Ping wheel (enemy, crate, shelter, revive me)
 - [x] Win and lose checks
 - [x] Disconnect handling: a dropped player does not break the run
 
@@ -388,11 +391,11 @@ Each week ends with both of you playing the gate together in 2+ instances.
 - [x] SlotReelUI that lands on the host's result
 - [x] Title, lobby UI and results screen
 
-  Title, settings and results are implemented. Play starts a solo run.
+  The title opens with an animated cassette insert, then offers solo play, hosting, joining, suit customization and settings.
 - [ ] PSA screens and recorded voice lines
 - [x] Layered synthwave music and sound from asset packs
 
-  Storm intensity fades in bass, drums and lead over a piano bed. Cumulus has a separate boss track. Downpour starts with a gated drum hit, and shelter muffles the rain. Gameplay and menu cues use Kenney effects. Music and sound credits are in assets/audio/CREDITS.md.
+  Storm intensity fades in bass, drums and lead over piano. Cumulus has a separate boss track. The gated drum marks each Downpour. Rain and wind change under shelter. Synthesized cues cover storm phases, infected attacks, shield domes, decon, team pings and cassette transport. Credits are in `assets/audio/CREDITS.md`.
 
 **Risks**
 
