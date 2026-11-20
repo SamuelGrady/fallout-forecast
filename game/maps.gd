@@ -11,10 +11,10 @@ const ENTRIES: Array[Dictionary] = [
 		"preview": "res://assets/ui/title_street.png", "channel": "01"},
 	{"id": "harbor", "name": "HARBOR POINT", "blurb": "Flooded docks and a silent cannery.",
 		"scene": "res://levels/harbor/level_harbor.tscn", "accent": Color("#83b8ff"),
-		"preview": "", "channel": "02"},
+		"preview": "res://assets/ui/harbor.webp", "channel": "02"},
 	{"id": "maple_hollow", "name": "MAPLE HOLLOW", "blurb": "A quiet cul-de-sac beside the cemetery.",
 		"scene": "res://levels/maple_hollow/level_maple_hollow.tscn", "accent": Color("#ff9a75"),
-		"preview": "", "channel": "03"},
+		"preview": "res://assets/ui/maple_hollow.webp", "channel": "03"},
 ]
 const RANDOM := {"id": RANDOM_ID, "name": "RANDOM", "blurb": "Tune to any available channel.",
 	"accent": Color("#ff5689"), "preview": "", "channel": "??"}

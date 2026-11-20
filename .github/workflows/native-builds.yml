@@ -81,3 +81,23 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" --title "Fallout Forecast ${GITHUB_REF_NAME}" --generate-notes --repo "${GITHUB_REPOSITORY}" || true
           gh release upload "${GITHUB_REF_NAME}" build/FalloutForecast-windows-x86_64.zip build/FalloutForecast-linux-x86_64.tar.gz --clobber --repo "${GITHUB_REPOSITORY}"
+
+      # The web title's DOWNLOAD button links to this rolling prerelease:
+      # releases/download/nightly/<file>. Each master push moves the tag and
+      # replaces the files.
+      - name: Refresh the nightly release (master)
+        if: github.ref == 'refs/heads/master'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${GITHUB_REPOSITORY}"
+          if gh release view nightly --repo "$repo" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$repo/git/refs/tags/nightly" -f sha="${GITHUB_SHA}" -F force=true >/dev/null
+          else
+            gh release create nightly --repo "$repo" --prerelease --target "${GITHUB_SHA}" \
+              --title "Fallout Forecast (latest master)" \
+              --notes "Rolling desktop build of the latest master commit. Windows: unzip and run FalloutForecast.exe. Linux: untar and run FalloutForecast.x86_64."
+          fi
+          gh release edit nightly --repo "$repo" --notes "Rolling desktop build of master at ${GITHUB_SHA}. Windows: unzip and run FalloutForecast.exe. Linux: untar and run FalloutForecast.x86_64."
+          gh release upload nightly build/FalloutForecast-windows-x86_64.zip build/FalloutForecast-linux-x86_64.tar.gz --clobber --repo "$repo"

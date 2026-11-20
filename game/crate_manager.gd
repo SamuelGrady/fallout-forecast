@@ -87,6 +87,7 @@ func _try_spawn_airdrop() -> void:
 	if at == Vector3.INF:
 		return
 	_pending_drop = false
+	Perf.mark("crates spawn wave %d" % WeatherManager.wave)
 	_make_airdrop(at, SupplyStation.DESCENT)
 	Net.rpc_to_run(_airdrop_spawn, [_run, at, SupplyStation.DESCENT])
 	GameManager.show_banner("WEATHER SERVICE SUPPLY DROP", Color("#ffc365"), 3.2)

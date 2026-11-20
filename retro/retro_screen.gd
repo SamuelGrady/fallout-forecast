@@ -10,6 +10,7 @@ extends CanvasLayer
 ## F8 toggles the whole effect.
 
 const PS1 := preload("res://retro/ps1.gdshader")
+const WeatherFX := preload("res://weather/weather_fx.gd")
 const WEB_VHS := preload("res://retro/retro_web.gdshader")
 const MONTH := "OCT"
 const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
@@ -33,6 +34,10 @@ var _ps1_materials: Array[ShaderMaterial] = []
 
 
 func _ready() -> void:
+	if DisplayServer.get_name() == "headless":
+		hide()
+		set_process(false)
+		return
 	enabled = Settings.retro_enabled
 	Settings.video_changed.connect(_on_video_changed)
 	var recording_layer := CanvasLayer.new()
@@ -113,7 +118,7 @@ func _process(delta: float) -> void:
 	if screen.material is ShaderMaterial:
 		(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
 
-	var recording := fmod(_clock, 1.0) < 0.6
+	var recording := Settings.reduced_flash or fmod(_clock, 1.0) < 0.6
 	if _web:
 		rec.text = ("* REC" if recording else "   REC") + "  >"
 	else:
@@ -221,6 +226,9 @@ func _convert(material: Material) -> ShaderMaterial:
 	s.set_shader_parameter("uv_scale", m.uv1_scale)
 	s.set_shader_parameter("uv_offset", m.uv1_offset)
 	s.set_shader_parameter("snap", vertex_snap if enabled else 0.0)
+	if WeatherFX.is_wet_surface(m):
+		s.set_meta(WeatherFX.WET_SURFACE, true)
+		s.set_shader_parameter("dry_roughness", m.roughness)
 	_converted[material] = s
 	_ps1_materials.append(s)
 	return s

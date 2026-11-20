@@ -157,7 +157,7 @@ func waterfront() -> void:
 	# Tide gauge and hazard stripes identify the drivable concrete slip.
 	box(Vector3(-36.2,1.05,11.5),Vector3(0.24,2.1,0.24),paint("#645947"))
 	box(Vector3(-36.2,2.1,11.5),Vector3(3.4,0.86,0.14),paint("#345866"))
-	label("BOAT RAMP",Vector3(-36.2,2.12,11.41),0.35,"#ffe4ac",180)
+	label("BOAT RAMP",Vector3(-36.2,2.12,11.41),0.35,"#ffe4ac",180,true)
 	for x: float in [-35,-29]:
 		box(Vector3(x,0.021,8.1),Vector3(0.18,0.04,6.7),paint("#d8a858"),false)
 	prop("shrimp_boat",Vector3(-50,-1.27,37),174)
@@ -176,6 +176,7 @@ func canneries() -> void:
 		part.position = Vector3([-35,-1,39][i],0,-47)
 		var wall := surface(["#98c4bd","#dc9b73","#abc7c3"][i],"quay_steel",0.26)
 		var steel := paint("#354f59")
+		steel.set_meta("storm_wet_surface", true)
 		box(Vector3(0,4.3,0),Vector3(30,8.6,16),wall)
 		if i == 0:
 			for z: float in [2.7,4.8]:
@@ -351,5 +352,9 @@ func markers() -> void:
 	shower("IceHouse",Vector3(-48,0,-35))
 	shower("PilotsStore",Vector3(56,0,11))
 	shower("BuoyShed",Vector3(-15,0,51))
+	var grates := (directories.StormDrains as Node3D).get_children()
+	for i: int in [0, 4, 6]:
+		grates[i].add_to_group("district_objective_spawn", true)
+	points("StreetSupplySpawns","street_supply_spawn",[Vector2(-38,-24), Vector2(36,-19), Vector2(20,35), Vector2(44,46)],0.06)
 	marker("","boss_anchor","BossAnchor",Vector3(27,18,46))
-	puddles([Vector3(-57,3,-20),Vector3(-33,3,-30),Vector3(-10,3.2,-23),Vector3(2,2,-32),Vector3(30,3,-25),Vector3(55,3,-33),Vector3(-26,3,-3),Vector3(-4,2.5,5),Vector3(34,2.8,0),Vector3(48,2.4,6),Vector3(0,2.5,18),Vector3(12,3.2,34),Vector3(32,3.5,48),Vector3(-1,2,52),Vector3(50,2.5,57),Vector3(-50,2,5)])
+	puddles([Vector3(-57,3,-20),Vector3(-33,3,-30),Vector3(-10,3.2,-23),Vector3(2,2,-32),Vector3(30,3,-25),Vector3(55,3,-33),Vector3(-26,3,-3),Vector3(-4,2.5,5),Vector3(34,2.8,0),Vector3(48,2.4,6),Vector3(0,2.5,18),Vector3(12,3.2,34),Vector3(32,3.5,48),Vector3(-1,2,52),Vector3(44,2.5,54),Vector3(-50,2,5)])

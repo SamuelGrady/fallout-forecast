@@ -255,7 +255,7 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
-	if GameManager.awaiting_tape_choice:
+	if GameManager.awaiting_tape_choice or not Net.can_send_run_rpc():
 		return
 	if state == "out":
 		velocity = Vector3.ZERO
@@ -513,7 +513,7 @@ func _landing_check() -> void:
 	_was_floored = floored
 
 
-func take_damage(amount: float, _source: Node = null) -> void:
+func take_damage(amount: float, _source: Node = null, continuous := false) -> void:
 	if not Net.is_host():
 		return
 	match state:
@@ -526,11 +526,11 @@ func take_damage(amount: float, _source: Node = null) -> void:
 				_send_hurt_from((_source as Node3D).global_position)
 			# Brief hit i-frames on real combat hits so swarms can't instant-delete
 			# the player in a single frame (continuous rain drain ticks stay smooth).
-			if health > 0.0 and (_source != null or amount >= 4.0):
+			if not continuous and health > 0.0 and (_source != null or amount >= 4.0):
 				_grace_left = maxf(_grace_left, HIT_IFRAMES)
 				invulnerable = true
 			# Static Charge mutation: sprinting builds shock that retaliates on melee hit.
-			if GameManager.has_mutation("static_charge") and static_charge >= 0.25 and _source is EnemyBase:
+			if not continuous and GameManager.has_mutation("static_charge") and static_charge >= 0.25 and _source is EnemyBase:
 				var attacker := _source as EnemyBase
 				var shock := lerpf(15.0, 45.0, static_charge)
 				static_charge = 0.0
@@ -542,7 +542,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 					attacker.knockback(shove.normalized() * 7.5)
 				GameManager.broadcast_arc([global_position + Vector3.UP * 1.1, attacker.global_position + Vector3.UP * 1.0], Color(1.0, 0.92, 0.35))
 			# Acid Blood player mutation: splash nearby infected on real health hits.
-			if GameManager.has_player_mutation("acid_blood") and amount >= 2.0 and _acid_blood_cooldown <= 0.0:
+			if not continuous and GameManager.has_player_mutation("acid_blood") and amount >= 2.0 and _acid_blood_cooldown <= 0.0:
 				_acid_blood_cooldown = 1.5
 				for node in get_tree().get_nodes_in_group("enemies"):
 					var enemy := node as EnemyBase
@@ -637,6 +637,8 @@ func _bleed_out() -> void:
 
 
 func _set_state(new_state: String) -> void:
+	if new_state != state and new_state in ["downed", "turned", "out"]:
+		Perf.mark("player state " + new_state)
 	state = new_state
 	state_changed.emit(state)
 	match state:
@@ -835,9 +837,7 @@ func _update_shelter() -> void:
 	var now_sheltered := roof_check.is_colliding() or in_shelter_area
 	if now_sheltered != sheltered or now_in_puddle != in_puddle:
 		_set_exposure(now_sheltered, now_in_puddle)
-		# Clients tell the host; the host is the only one who acts on it.
-		if not Net.is_host():
-			_report_exposure.rpc_id(1, sheltered, in_puddle)
+		_exposure_sync_pending = true
 
 
 ## Client -> host: this player's shelter and puddle state changed.
@@ -871,13 +871,17 @@ const VITALS_RATE := 0.2
 
 var _net_left := 0.0
 var _vitals_left := 0.0
+var _exposure_sync_pending := true
 ## enemy net id -> the damage number still floating over it.
 var _numbers := {}
 
 
 func _net_step(delta: float) -> void:
-	if not Net.is_online():
+	if not Net.is_online() or not Net.can_send_run_rpc():
 		return
+	if not Net.is_host() and is_multiplayer_authority() and _exposure_sync_pending:
+		_exposure_sync_pending = false
+		_report_exposure.rpc_id(1, sheltered, in_puddle)
 	_net_left -= delta
 	if _net_left <= 0.0:
 		_net_left = 1.0 / NET_RATE
@@ -969,7 +973,7 @@ func _set_tarp(value: bool) -> void:
 	if not Net.is_online() or not is_multiplayer_authority():
 		return
 	if Net.is_host():
-		_apply_tarp.rpc(value)
+		Net.rpc_to_run(_apply_tarp, [value])
 	else:
 		_push_tarp.rpc_id(1, value)
 

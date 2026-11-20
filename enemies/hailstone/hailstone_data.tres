@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 display_name = "Hailstone"
-max_health = 150.0
+max_health = 138.0
 move_speed = 2.25
-damage = 27.0
+damage = 24.0
 attack_range = 8.6
 attack_cooldown = 5.5

@@ -119,18 +119,26 @@ static func projectile_model(id: String) -> Node3D:
 	var custom := prop_model(id)
 	return custom if custom != null else model(id, true)
 
+static var _missing_props: Dictionary[String, bool] = {}
+
 static func prop_model(id: String) -> Node3D:
+	if _missing_props.has("prop:%s" % id):
+		return null
 	var models := _item_models()
-	if models == null or not models.call("has", id):
+	if models == null:
 		return null
 	var key := "prop:%s" % id
 	if not _scenes.has(key):
+		# Props such as crate_station/airdrop/sandbag_wall are not hotbar items,
+		# so try projectile() for every id; an empty root means "no model".
 		var result: Node3D = models.call("projectile", id) as Node3D
-		if result == null:
-			result = models.call("build", id) as Node3D
-		if result == null:
+		if result != null and result.get_child_count() == 0:
+			result.free()
+			result = null
+		if result == null and models.call("has", id):
 			result = models.call("pickup", id) as Node3D
 		if result == null:
+			_missing_props[key] = true
 			return null
 		_cache_model(key, result)
 	return _scenes[key].instantiate() as Node3D

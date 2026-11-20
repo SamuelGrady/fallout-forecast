@@ -11,6 +11,21 @@ extends CanvasLayer
 signal load_failed(message: String)
 
 const MAP_REVEAL_SECONDS := 1.35
+const TRACKING_SHADER := """
+shader_type canvas_item;
+uniform float progress = 1.0;
+uniform bool steady = false;
+void fragment() {
+	float band = 1.0 - smoothstep(.025, .16, abs(UV.y - progress * 1.32 + .16));
+	vec2 cell = floor(UV * vec2(260.0, 160.0));
+	float noise = fract(sin(dot(cell, vec2(12.9898, 78.233)) + floor(progress * 17.0)) * 43758.5453);
+	float lines = step(.56, fract(UV.y * 130.0));
+	vec3 ink = vec3(.03, .06, .11);
+	float fade = 1.0 - smoothstep(0.0, .76, progress);
+	COLOR = vec4(ink + (steady ? 0.0 : band * noise * lines * .22),
+		steady ? fade * .60 : max(fade * .84, band * .55));
+}
+"""
 
 var _target := ""
 var _loading_path := ""
@@ -25,47 +40,90 @@ var _prefetched := {}
 var _waited := 0
 var _bar := ProgressBar.new()
 var _caption := Label.new()
+var _district := Label.new()
 var _counter := Label.new()
 var _clock := 0.0
+var _wipe := ColorRect.new()
+var _wipe_tween: Tween
 
 
 func _ready() -> void:
 	layer = 120
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var back := ColorRect.new()
-	back.color = Color(0.03, 0.06, 0.14)
+	back.color = BroadcastUI.INK
 	back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(back)
+	BroadcastUI.backdrop(back)
+	var center := CenterContainer.new()
+	center.theme = BroadcastUI.theme()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	back.add_child(center)
+	var panel := PanelContainer.new()
+	center.add_child(panel)
 	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	box.offset_left = -220
-	box.offset_right = 220
-	box.offset_top = -60
-	box.offset_bottom = 60
-	box.add_theme_constant_override("separation", 12)
-	add_child(box)
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
 	_caption.text = "LOADING TAPE"
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_caption.add_theme_font_size_override("font_size", 40)
-	_caption.add_theme_color_override("font_color", BroadcastUI.PAPER)
+	BroadcastUI.text(_caption, 40)
 	box.add_child(_caption)
+	_district.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	BroadcastUI.text(_district, 24, BroadcastUI.CYAN)
+	box.add_child(_district)
 	_bar.custom_minimum_size = Vector2(440, 10)
 	_bar.show_percentage = false
 	_bar.max_value = 1.0
 	BroadcastUI.bar(_bar, BroadcastUI.CYAN)
 	box.add_child(_bar)
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_counter.add_theme_font_size_override("font_size", 22)
-	_counter.add_theme_color_override("font_color", BroadcastUI.CYAN)
+	BroadcastUI.text(_counter, 20, BroadcastUI.MUTED)
 	box.add_child(_counter)
 	var corner := Label.new()
 	corner.text = "PLAY  >"
-	corner.add_theme_font_size_override("font_size", 24)
+	BroadcastUI.text(corner, 24)
 	corner.position = Vector2(40, 30)
 	add_child(corner)
+	var tracking := CanvasLayer.new()
+	tracking.layer = 121
+	add_child(tracking)
+	_wipe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wipe.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var shader := Shader.new()
+	shader.code = TRACKING_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	_wipe.material = material
+	_wipe.hide()
+	tracking.add_child(_wipe)
 	visible = false
 	set_process(false)
 	set_process_input(false)
+
+
+## Light menus switch on the normal scene-change frame while the wipe plays.
+func cut_to(path: String) -> void:
+	var error := get_tree().change_scene_to_file(path)
+	if error == OK:
+		tracking_wipe()
+	else:
+		push_error("SceneLoader: could not enter " + path)
+
+
+func tracking_wipe() -> void:
+	if DisplayServer.get_name() == "headless" or Net.dedicated:
+		return
+	if _wipe_tween and _wipe_tween.is_valid():
+		_wipe_tween.kill()
+	var material := _wipe.material as ShaderMaterial
+	material.set_shader_parameter("steady", Settings.reduced_flash)
+	material.set_shader_parameter("progress", 0.0)
+	_wipe.show()
+	_wipe_tween = create_tween()
+	_wipe_tween.tween_method(func(progress: float): material.set_shader_parameter("progress", progress), 0.0, 1.0, 0.21)
+	_wipe_tween.tween_callback(_wipe.hide)
+	if not Settings.reduced_flash:
+		Sound.play("vhs_glitch", -29.0, 1.35)
 
 
 ## Start loading `path` in the background (desktop only: the web build has no
@@ -117,8 +175,11 @@ func goto(path: String, map_id := "") -> void:
 	_clock = 0.0
 	_bar.value = 0.0
 	_caption.text = _announcement if _announcement != "" else "LOADING TAPE"
-	_counter.text = ""
+	_district.text = Maps.display_name(_map_id) if not _map_id.is_empty() and _announcement.is_empty() else ""
+	_district.visible = not _district.text.is_empty()
+	_counter.text = "00:00"
 	visible = true
+	tracking_wipe()
 	set_process(true)
 	set_process_input(true)
 
@@ -136,9 +197,11 @@ func _process(delta: float) -> void:
 	_clock += delta
 	if _announcement != "" and _clock < MAP_REVEAL_SECONDS:
 		return
-	var dots := int(_clock * 3.0) % 4
-	_caption.text = "LOADING TAPE" + ".".repeat(dots)
-	_counter.text = "%02d:%02d:%02d" % [0, int(_clock) / 60, int(_clock) % 60]
+	_caption.text = "LOADING TAPE"
+	if not _map_id.is_empty():
+		_district.text = Maps.display_name(_map_id)
+		_district.show()
+	_counter.text = "%02d:%02d" % [int(_clock) / 60, int(_clock) % 60]
 	if _prefetched.has(_loading_path):
 		var scene: PackedScene = _prefetched[_loading_path]
 		_prefetched.erase(_loading_path)
@@ -156,7 +219,8 @@ func _process(delta: float) -> void:
 	if not progress.is_empty():
 		var stage := float(progress[0])
 		if not _map_id.is_empty():
-			stage = 0.75 + stage * 0.25 if _map_scene else stage * 0.75
+			# Reserve 0.45..1.0 for post-load map batching and shader warm-up.
+			stage = 0.34 + stage * 0.11 if _map_scene else stage * 0.34
 		_bar.value = lerpf(_bar.value, stage, 0.4)
 	match status:
 		ResourceLoader.THREAD_LOAD_LOADED:
@@ -178,10 +242,23 @@ func _on_loaded(scene: PackedScene) -> void:
 	_finish(scene)
 
 
+## Update the visible loading card during post-load stages (batching, warm-up).
+func set_stage(caption: String, progress: float, detail := "") -> void:
+	if not visible:
+		return
+	_caption.text = caption
+	_bar.value = maxf(_bar.value, clampf(progress, 0.0, 1.0))
+	if not detail.is_empty():
+		_counter.text = detail
+
+
 func _finish(scene: PackedScene) -> void:
 	Perf.mark("load done, entering scene")
 	_entering = true
-	_bar.value = 1.0
+	if _map_scene == null:
+		_bar.value = 1.0
+	else:
+		_bar.value = maxf(_bar.value, 0.45)
 	_target = ""
 	var run: Node
 	var error: Error

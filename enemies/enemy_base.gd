@@ -19,6 +19,9 @@ signal died(enemy: EnemyBase)
 @export var data: EnemyData
 
 var health := 0.0
+## Max turn speed in radians per second while chasing. 0 = turn instantly.
+## Heavy infected (Hailstone) turn slowly, so flanking their plates works.
+var turn_rate := 0.0
 ## Host-assigned, used by the spawner to match this enemy across peers.
 var net_id := 0
 var _bullet_critical := false
@@ -168,7 +171,8 @@ func _physics_process(delta: float) -> void:
 		var stop_range := 1.0 if is_lure else data.attack_range
 		# In range but walled off: keep pathing around the cover instead of
 		# winding up swings that can never land.
-		var in_range := to_target.length() <= stop_range and (is_lure or _has_attack_los(target))
+		var in_range := global_position.distance_squared_to(target.global_position) <= stop_range * stop_range \
+				and (is_lure or _has_attack_los(target))
 		if in_range:
 			if _attack_timer <= 0.0 and not is_lure:
 				_attack_timer = data.attack_cooldown
@@ -178,7 +182,7 @@ func _physics_process(delta: float) -> void:
 			# Re-path when the target has moved, or every REPATH_INTERVAL in case
 			# this enemy was pushed off its path. Not every frame.
 			_repath_timer -= delta
-			if _repath_timer <= 0.0 or _last_target_position.distance_to(target.global_position) > 1.0:
+			if _repath_timer <= 0.0 or (_repath_timer < REPATH_INTERVAL - 0.3 and _last_target_position.distance_to(target.global_position) > 1.25):
 				_repath_timer = REPATH_INTERVAL
 				_last_target_position = target.global_position
 				_repath(_last_target_position)
@@ -237,6 +241,16 @@ func _tick_status(delta: float) -> void:
 
 
 func _record_position() -> void:
+	if global_position.y < -5.5:
+		var map := get_world_3d().navigation_map
+		if NavigationServer3D.map_get_iteration_id(map) > 0:
+			Perf.mark("recover infected below floor")
+			global_position = NavigationServer3D.map_get_closest_point(map, global_position) + Vector3.UP * 0.15
+			velocity = Vector3.ZERO
+			_push = Vector3.ZERO
+			_repath_timer = 0.0
+	if not Net.is_online():
+		return
 	_pos_history.append({"ms": Time.get_ticks_msec(), "pos": global_position})
 	if _pos_history.size() > POS_HISTORY_LIMIT:
 		_pos_history.remove_at(0)
@@ -671,8 +685,6 @@ func _repath(destination: Vector3) -> void:
 	agent.get_next_path_position()  # forces the path query
 	_path = agent.get_current_navigation_path()
 	_path_index = 0
-	if _path.is_empty():
-		_last_target_position = Vector3.INF  # map not ready yet; retry next frame
 
 
 func _path_direction(fallback: Vector3) -> Vector3:
@@ -704,9 +716,15 @@ func _nearest(candidates: Array) -> Node3D:
 	return best
 
 
-func _face(direction: Vector3) -> void:
-	if direction.length_squared() > 0.01:
-		rotation.y = atan2(-direction.x, -direction.z)
+func _face(direction: Vector3, instant := false) -> void:
+	if direction.length_squared() <= 0.01:
+		return
+	var want := atan2(-direction.x, -direction.z)
+	if instant or turn_rate <= 0.0:
+		rotation.y = want
+		return
+	var step := turn_rate * get_physics_process_delta_time()
+	rotation.y += clampf(wrapf(want - rotation.y, -PI, PI), -step, step)
 
 
 func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:

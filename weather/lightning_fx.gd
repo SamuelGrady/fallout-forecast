@@ -34,7 +34,7 @@ func _ready() -> void:
 				_cached_thunder = _make_thunder()
 		thunder_stream = _cached_thunder
 	_thunder_player.stream = thunder_stream
-	_thunder_player.volume_db = thunder_volume_db
+	_thunder_player.volume_db = Sound.cue_gain("thunder", thunder_volume_db)
 	var web := OS.has_feature("web")
 	_thunder_player.bus = &"Master" if web else &"Ambience"
 	if web:
@@ -47,16 +47,19 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_thunder_player.stop()
 	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
 		WeatherManager.lightning_struck.disconnect(_on_lightning_struck)
 
 
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
+	Perf.mark("lightning strike")
 	Juice.shake(0.45, position)
 	Juice.duck_music(-8.0, 1.2)
 	var fx := get_parent()
 	if fx and "flash" in fx:
 		fx.flash = Settings.flash_scale()
+		fx.light_strike(position)
 	flashed.emit(position)
 
 	var rng := RandomNumberGenerator.new()
@@ -73,17 +76,19 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 
 	var distance := listener.distance_to(position)
 	var delay := clampf(distance / 343.0 * 10.0, 0.5, 2.0)
-	if not Net.dedicated:
+	if not Net.dedicated and DisplayServer.get_name() != "headless":
 		var level := thunder_volume_db - clampf(distance / 10.0, 0.0, 8.0)
 		get_tree().create_timer(delay).timeout.connect(_play_thunder.bind(level))
 
 
 func _play_thunder(level: float) -> void:
-	_thunder_player.volume_db = level
+	_thunder_player.volume_db = Sound.cue_gain("thunder", level)
 	_thunder_player.play()
 
 
 func _spawn_bolt(ground: Vector3, rng: RandomNumberGenerator) -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless":
+		return
 	var bolt := Node3D.new()
 	add_child(bolt)
 	var top := ground + Vector3(rng.randf_range(-6.0, 6.0), 60.0, rng.randf_range(-6.0, 6.0))

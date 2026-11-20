@@ -523,6 +523,9 @@ emission_energy_multiplier = 2.0
 resource_name = "drain"
 albedo_color = Color(0.08, 0.08, 0.08, 1)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_district_floor"]
+size = Vector3(134, 1, 134)
+
 [node name="LevelPinecrest" type="Node3D" unique_id=739854475]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1178614164]
@@ -541,9 +544,14 @@ directional_shadow_max_distance = 90.0
 
 [node name="Grass" type="CSGBox3D" parent="Geometry/Ground" unique_id=781906091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-use_collision = true
 size = Vector3(134, 1, 134)
 material = SubResource("StandardMaterial3D_5phfp")
+
+[node name="GroundBody" type="StaticBody3D" parent="Geometry/Ground"]
+position = Vector3(0, -0.5, 0)
+
+[node name="Floor" type="CollisionShape3D" parent="Geometry/Ground/GroundBody"]
+shape = SubResource("BoxShape3D_district_floor")
 
 [node name="MainStreet" type="CSGBox3D" parent="Geometry/Ground" unique_id=580437265]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.03, 0)
@@ -2120,7 +2128,7 @@ use_collision = true
 size = Vector3(0.15, 1, 10.5)
 material = SubResource("StandardMaterial3D_n784q")
 
-[node name="DeckSign" type="Label3D" parent="Geometry/Downtown" unique_id=169289087]
+[node name="DeckSign" type="Label3D" parent="Geometry/Downtown" unique_id=169289087 groups=["wind_sway"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 5.6, 24.6)
 pixel_size = 0.02
 modulate = Color(0.9, 0.9, 1, 1)
@@ -2370,7 +2378,7 @@ transform = Transform3D(0.55338705, 0, 0.83292425, 0, 1, 0, -0.83292425, 0, 0.55
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4515, 0)
 shape = SubResource("BoxShape3D_od27s")
 
-[node name="Model" parent="Geometry/TownSquare/Tree-61_11" unique_id=1601257465 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/TownSquare/Tree-61_11" unique_id=1601257465 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
 [node name="Tree-45_11" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=800052314]
@@ -2380,7 +2388,7 @@ transform = Transform3D(0.62305075, 0, -0.7821814, 0, 1, 0, 0.7821814, 0, 0.6230
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4515, 0)
 shape = SubResource("BoxShape3D_t6l1p")
 
-[node name="Model" parent="Geometry/TownSquare/Tree-45_11" unique_id=1759955016 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/TownSquare/Tree-45_11" unique_id=1759955016 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
 [node name="Tree-61_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=1205784926]
@@ -2390,7 +2398,7 @@ transform = Transform3D(0.8734993, 0, -0.48682544, 0, 1, 0, 0.48682544, 0, 0.873
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4515, 0)
 shape = SubResource("BoxShape3D_ta2rv")
 
-[node name="Model" parent="Geometry/TownSquare/Tree-61_39" unique_id=2125113371 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/TownSquare/Tree-61_39" unique_id=2125113371 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
 [node name="Tree-45_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=805739787]
@@ -2400,7 +2408,7 @@ transform = Transform3D(-0.42470735, 0, 0.9053307, 0, 1, 0, -0.9053307, 0, -0.42
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4515, 0)
 shape = SubResource("BoxShape3D_8ecwy")
 
-[node name="Model" parent="Geometry/TownSquare/Tree-45_39" unique_id=30209880 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/TownSquare/Tree-45_39" unique_id=30209880 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
 [node name="GasStation" type="Node3D" parent="Geometry" unique_id=1624841541]
@@ -2479,7 +2487,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53, 1.85, 24.5)
 size = Vector3(1, 0.3, 1.4)
 material = SubResource("StandardMaterial3D_kt34p")
 
-[node name="GasSign" type="Label3D" parent="Geometry/GasStation" unique_id=218731969]
+[node name="GasSign" type="Label3D" parent="Geometry/GasStation" unique_id=218731969 groups=["wind_sway"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 49, 5.6, 15.8)
 pixel_size = 0.03
 modulate = Color(1, 0.55, 0.15, 1)
@@ -3148,7 +3156,7 @@ use_collision = true
 size = Vector3(0.2, 2.7, 0.2)
 material = SubResource("StandardMaterial3D_n784q")
 
-[node name="ParkSign" type="Label3D" parent="Geometry/Park" unique_id=731350760]
+[node name="ParkSign" type="Label3D" parent="Geometry/Park" unique_id=731350760 groups=["wind_sway"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -38, 2.2, -9.2)
 pixel_size = 0.016
 modulate = Color(0.9, 1, 0.9, 1)
@@ -3214,7 +3222,7 @@ transform = Transform3D(0.9980016, 0, 0.06318869, 0, 1, 0, -0.06318869, 0, 0.998
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.1424026, 0)
 shape = SubResource("BoxShape3D_gy47b")
 
-[node name="Model" parent="Geometry/Trees/Tree0" unique_id=1216693873 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree0" unique_id=1216693873 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.19401, 0, 0, 0, 8.19401, 0, 0, 0, 8.19401, 0, 0, 0)
 
 [node name="Tree1" type="StaticBody3D" parent="Geometry/Trees" unique_id=1752721778]
@@ -3224,7 +3232,7 @@ transform = Transform3D(-0.86242193, 0, 0.5061901, 0, 1, 0, -0.5061901, 0, -0.86
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6081386, 0)
 shape = SubResource("BoxShape3D_q6fyj")
 
-[node name="Model" parent="Geometry/Trees/Tree1" unique_id=1082912333 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree1" unique_id=1082912333 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.408445, 0, 0, 0, 9.408445, 0, 0, 0, 9.408445, 0, 0, 0)
 
 [node name="Tree2" type="StaticBody3D" parent="Geometry/Trees" unique_id=110494260]
@@ -3234,7 +3242,7 @@ transform = Transform3D(-0.087843105, 0, 0.99613434, 0, 1, 0, -0.99613434, 0, -0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.491604, 0)
 shape = SubResource("BoxShape3D_yarnt")
 
-[node name="Model" parent="Geometry/Trees/Tree2" unique_id=653351621 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree2" unique_id=653351621 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.788727, 0, 0, 0, 8.788727, 0, 0, 0, 8.788727, 0, 0, 0)
 
 [node name="Tree3" type="StaticBody3D" parent="Geometry/Trees" unique_id=251390317]
@@ -3244,7 +3252,7 @@ transform = Transform3D(-0.23912546, 0, -0.9709887, 0, 1, 0, 0.9709887, 0, -0.23
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.3759968, 0)
 shape = SubResource("BoxShape3D_vd4l5")
 
-[node name="Model" parent="Geometry/Trees/Tree3" unique_id=311871251 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree3" unique_id=311871251 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.803122, 0, 0, 0, 8.803122, 0, 0, 0, 8.803122, 0, 0, 0)
 
 [node name="Tree4" type="StaticBody3D" parent="Geometry/Trees" unique_id=1992851569]
@@ -3254,7 +3262,7 @@ transform = Transform3D(0.7789764, 0, 0.62705326, 0, 1, 0, -0.62705326, 0, 0.778
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.7092428, 0)
 shape = SubResource("BoxShape3D_kxjsy")
 
-[node name="Model" parent="Geometry/Trees/Tree4" unique_id=427276329 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree4" unique_id=427276329 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.672081, 0, 0, 0, 9.672081, 0, 0, 0, 9.672081, 0, 0, 0)
 
 [node name="Tree5" type="StaticBody3D" parent="Geometry/Trees" unique_id=497165228]
@@ -3264,7 +3272,7 @@ transform = Transform3D(0.83248836, 0, -0.5540425, 0, 1, 0, 0.5540425, 0, 0.8324
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8960261, 0)
 shape = SubResource("BoxShape3D_ojhd0")
 
-[node name="Model" parent="Geometry/Trees/Tree5" unique_id=1902250927 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree5" unique_id=1902250927 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.21526, 0, 0, 0, 10.21526, 0, 0, 0, 10.21526, 0, 0, 0)
 
 [node name="Tree6" type="StaticBody3D" parent="Geometry/Trees" unique_id=123780910]
@@ -3274,7 +3282,7 @@ transform = Transform3D(0.9960427, 0, -0.08887595, 0, 1, 0, 0.08887595, 0, 0.996
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9701114, 0)
 shape = SubResource("BoxShape3D_2vxbm")
 
-[node name="Model" parent="Geometry/Trees/Tree6" unique_id=231276289 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree6" unique_id=231276289 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(10.352312, 0, 0, 0, 10.352312, 0, 0, 0, 10.352312, 0, 0, 0)
 
 [node name="Tree7" type="StaticBody3D" parent="Geometry/Trees" unique_id=1504946079]
@@ -3284,7 +3292,7 @@ transform = Transform3D(0.96929306, 0, 0.24590848, 0, 1, 0, -0.24590848, 0, 0.96
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.20071, 0)
 shape = SubResource("BoxShape3D_qq7l8")
 
-[node name="Model" parent="Geometry/Trees/Tree7" unique_id=743660155 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree7" unique_id=743660155 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.34605, 0, 0, 0, 8.34605, 0, 0, 0, 8.34605, 0, 0, 0)
 
 [node name="Tree8" type="StaticBody3D" parent="Geometry/Trees" unique_id=231667582]
@@ -3294,7 +3302,7 @@ transform = Transform3D(0.5707434, 0, -0.8211285, 0, 1, 0, 0.8211285, 0, 0.57074
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.9234996, 0)
 shape = SubResource("BoxShape3D_bohvp")
 
-[node name="Model" parent="Geometry/Trees/Tree8" unique_id=1137124318 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree8" unique_id=1137124318 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.312167, 0, 0, 0, 10.312167, 0, 0, 0, 10.312167, 0, 0, 0)
 
 [node name="Tree9" type="StaticBody3D" parent="Geometry/Trees" unique_id=2088937910]
@@ -3304,7 +3312,7 @@ transform = Transform3D(0.4340592, 0, -0.90088433, 0, 1, 0, 0.90088433, 0, 0.434
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.3234403, 0)
 shape = SubResource("BoxShape3D_gyqeg")
 
-[node name="Model" parent="Geometry/Trees/Tree9" unique_id=1469744425 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree9" unique_id=1469744425 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.666077, 0, 0, 0, 8.666077, 0, 0, 0, 8.666077, 0, 0, 0)
 
 [node name="Tree10" type="StaticBody3D" parent="Geometry/Trees" unique_id=1193199383]
@@ -3314,7 +3322,7 @@ transform = Transform3D(-0.8454433, 0, 0.5340651, 0, 1, 0, -0.5340651, 0, -0.845
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6722193, 0)
 shape = SubResource("BoxShape3D_1q8gw")
 
-[node name="Model" parent="Geometry/Trees/Tree10" unique_id=1441714460 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree10" unique_id=1441714460 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.57554, 0, 0, 0, 9.57554, 0, 0, 0, 9.57554, 0, 0, 0)
 
 [node name="Tree11" type="StaticBody3D" parent="Geometry/Trees" unique_id=109768425]
@@ -3324,7 +3332,7 @@ transform = Transform3D(-0.67205316, 0, 0.7405029, 0, 1, 0, -0.7405029, 0, -0.67
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3645914, 0)
 shape = SubResource("BoxShape3D_sa373")
 
-[node name="Model" parent="Geometry/Trees/Tree11" unique_id=1453256497 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree11" unique_id=1453256497 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.34071, 0, 0, 0, 8.34071, 0, 0, 0, 8.34071, 0, 0, 0)
 
 [node name="Tree12" type="StaticBody3D" parent="Geometry/Trees" unique_id=718989543]
@@ -3334,7 +3342,7 @@ transform = Transform3D(0.6657534, 0, 0.74617183, 0, 1, 0, -0.74617183, 0, 0.665
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.778529, 0)
 shape = SubResource("BoxShape3D_i3ckv")
 
-[node name="Model" parent="Geometry/Trees/Tree12" unique_id=1749823340 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree12" unique_id=1749823340 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.852749, 0, 0, 0, 9.852749, 0, 0, 0, 9.852749, 0, 0, 0)
 
 [node name="Tree13" type="StaticBody3D" parent="Geometry/Trees" unique_id=631146459]
@@ -3344,7 +3352,7 @@ transform = Transform3D(-0.053219423, 0, -0.99858284, 0, 1, 0, 0.99858284, 0, -0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9362986, 0)
 shape = SubResource("BoxShape3D_p7jt8")
 
-[node name="Model" parent="Geometry/Trees/Tree13" unique_id=1189667667 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree13" unique_id=1189667667 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(10.264143, 0, 0, 0, 10.264143, 0, 0, 0, 10.264143, 0, 0, 0)
 
 [node name="Tree14" type="StaticBody3D" parent="Geometry/Trees" unique_id=636512832]
@@ -3354,7 +3362,7 @@ transform = Transform3D(0.87586594, 0, -0.48255453, 0, 1, 0, 0.48255453, 0, 0.87
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4865677, 0)
 shape = SubResource("BoxShape3D_n7eyf")
 
-[node name="Model" parent="Geometry/Trees/Tree14" unique_id=1069702703 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree14" unique_id=1069702703 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.770962, 0, 0, 0, 8.770962, 0, 0, 0, 8.770962, 0, 0, 0)
 
 [node name="Tree15" type="StaticBody3D" parent="Geometry/Trees" unique_id=1110508835]
@@ -3364,7 +3372,7 @@ transform = Transform3D(-0.19055122, 0, 0.98167723, 0, 1, 0, -0.98167723, 0, -0.
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6283708, 0)
 shape = SubResource("BoxShape3D_kah4r")
 
-[node name="Model" parent="Geometry/Trees/Tree15" unique_id=83351963 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree15" unique_id=83351963 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.461202, 0, 0, 0, 9.461202, 0, 0, 0, 9.461202, 0, 0, 0)
 
 [node name="Tree16" type="StaticBody3D" parent="Geometry/Trees" unique_id=1888529847]
@@ -3374,7 +3382,7 @@ transform = Transform3D(-0.21970192, 0, 0.97556704, 0, 1, 0, -0.97556704, 0, -0.
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5413775, 0)
 shape = SubResource("BoxShape3D_o1wfk")
 
-[node name="Model" parent="Geometry/Trees/Tree16" unique_id=2127820588 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree16" unique_id=2127820588 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.234362, 0, 0, 0, 9.234362, 0, 0, 0, 9.234362, 0, 0, 0)
 
 [node name="Tree17" type="StaticBody3D" parent="Geometry/Trees" unique_id=1557963858]
@@ -3384,7 +3392,7 @@ transform = Transform3D(-0.95520914, 0, 0.29593164, 0, 1, 0, -0.29593164, 0, -0.
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5717528, 0)
 shape = SubResource("BoxShape3D_5x508")
 
-[node name="Model" parent="Geometry/Trees/Tree17" unique_id=1534313884 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree17" unique_id=1534313884 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(9.071438, 0, 0, 0, 9.071438, 0, 0, 0, 9.071438, 0, 0, 0)
 
 [node name="Tree18" type="StaticBody3D" parent="Geometry/Trees" unique_id=1963931347]
@@ -3394,7 +3402,7 @@ transform = Transform3D(-0.81729645, 0, 0.5762175, 0, 1, 0, -0.5762175, 0, -0.81
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.7067907, 0)
 shape = SubResource("BoxShape3D_xht5q")
 
-[node name="Model" parent="Geometry/Trees/Tree18" unique_id=210202939 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree18" unique_id=210202939 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.665687, 0, 0, 0, 9.665687, 0, 0, 0, 9.665687, 0, 0, 0)
 
 [node name="Tree19" type="StaticBody3D" parent="Geometry/Trees" unique_id=1441905319]
@@ -3404,7 +3412,7 @@ transform = Transform3D(0.5956759, 0, -0.8032249, 0, 1, 0, 0.8032249, 0, 0.59567
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4238598, 0)
 shape = SubResource("BoxShape3D_fwqdr")
 
-[node name="Model" parent="Geometry/Trees/Tree19" unique_id=1417977878 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree19" unique_id=1417977878 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.927927, 0, 0, 0, 8.927927, 0, 0, 0, 8.927927, 0, 0, 0)
 
 [node name="Tree20" type="StaticBody3D" parent="Geometry/Trees" unique_id=1428570008]
@@ -3414,7 +3422,7 @@ transform = Transform3D(0.62487787, 0, 0.78072256, 0, 1, 0, -0.78072256, 0, 0.62
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.9379416, 0)
 shape = SubResource("BoxShape3D_mmhxt")
 
-[node name="Model" parent="Geometry/Trees/Tree20" unique_id=706471919 instance=ExtResource("31_4wmu0")]
+[node name="Model" parent="Geometry/Trees/Tree20" unique_id=706471919 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.363109, 0, 0, 0, 10.363109, 0, 0, 0, 10.363109, 0, 0, 0)
 
 [node name="Tree21" type="StaticBody3D" parent="Geometry/Trees" unique_id=337374122]
@@ -3424,7 +3432,7 @@ transform = Transform3D(0.85380477, 0, -0.52059335, 0, 1, 0, 0.52059335, 0, 0.85
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.656081, 0)
 shape = SubResource("BoxShape3D_swuvr")
 
-[node name="Model" parent="Geometry/Trees/Tree21" unique_id=922424972 instance=ExtResource("13_pffgw")]
+[node name="Model" parent="Geometry/Trees/Tree21" unique_id=922424972 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.533458, 0, 0, 0, 9.533458, 0, 0, 0, 9.533458, 0, 0, 0)
 
 [node name="Street" type="Node3D" parent="Geometry" unique_id=950596231]
@@ -3827,7 +3835,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -60,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_w2kqn")
 
-[node name="Model" parent="Geometry/Street/BarrierW10" unique_id=2090877908 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierW10" unique_id=2090877908 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="BarrierW35" type="StaticBody3D" parent="Geometry/Street" unique_id=1239626017]
@@ -3837,7 +3845,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -60,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_l7cer")
 
-[node name="Model" parent="Geometry/Street/BarrierW35" unique_id=107796239 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierW35" unique_id=107796239 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="BarrierW60" type="StaticBody3D" parent="Geometry/Street" unique_id=210251556]
@@ -3847,7 +3855,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -60,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_4eqj6")
 
-[node name="Model" parent="Geometry/Street/BarrierW60" unique_id=784340475 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierW60" unique_id=784340475 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="ConeW-65" type="Node3D" parent="Geometry/Street" unique_id=1171308980]
@@ -3862,7 +3870,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, 0, 7)
 [node name="Model" parent="Geometry/Street/ConeW70" unique_id=1439325540 instance=ExtResource("37_nmfdf")]
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)
 
-[node name="QuarantineSignW" type="Label3D" parent="Geometry/Street" unique_id=1014295886]
+[node name="QuarantineSignW" type="Label3D" parent="Geometry/Street" unique_id=1014295886 groups=["wind_sway"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -59.5, 2.6, -6.8)
 pixel_size = 0.012
 modulate = Color(1, 0.9, 0.3, 1)
@@ -3890,7 +3898,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 60, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_lfvik")
 
-[node name="Model" parent="Geometry/Street/BarrierE10" unique_id=1521553750 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierE10" unique_id=1521553750 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="BarrierE35" type="StaticBody3D" parent="Geometry/Street" unique_id=2065476804]
@@ -3900,7 +3908,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 60, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_2jdpx")
 
-[node name="Model" parent="Geometry/Street/BarrierE35" unique_id=1414031612 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierE35" unique_id=1414031612 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="BarrierE60" type="StaticBody3D" parent="Geometry/Street" unique_id=655382110]
@@ -3910,7 +3918,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 60, 
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45499998, 0)
 shape = SubResource("BoxShape3D_1lf84")
 
-[node name="Model" parent="Geometry/Street/BarrierE60" unique_id=1978176284 instance=ExtResource("36_oim4q")]
+[node name="Model" parent="Geometry/Street/BarrierE60" unique_id=1978176284 groups=["wind_sway"] instance=ExtResource("36_oim4q")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
 
 [node name="ConeE-65" type="Node3D" parent="Geometry/Street" unique_id=956579078]
@@ -3925,7 +3933,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63, 0, 7)
 [node name="Model" parent="Geometry/Street/ConeE70" unique_id=1650037287 instance=ExtResource("37_nmfdf")]
 transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)
 
-[node name="QuarantineSignE" type="Label3D" parent="Geometry/Street" unique_id=1745956858]
+[node name="QuarantineSignE" type="Label3D" parent="Geometry/Street" unique_id=1745956858 groups=["wind_sway"]]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 59.5, 2.6, -6.8)
 pixel_size = 0.012
 modulate = Color(1, 0.9, 0.3, 1)

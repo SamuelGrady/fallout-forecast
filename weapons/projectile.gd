@@ -57,7 +57,8 @@ static func bounce(weapon: WeaponData, hit: Dictionary, motion: Vector3, elapsed
 	var normal: Vector3 = hit.normal
 	if weapon.kind == WeaponData.Kind.GRENADE:
 		return motion.bounce(normal) * 0.4
-	if weapon.kind == WeaponData.Kind.FLARE and normal.y < 0.6 and elapsed < 3.0 			and (weapon.mechanic != "burn" or not WeaponCombat.is_damageable(hit.collider)):
+	if weapon.kind == WeaponData.Kind.FLARE and normal.y < 0.6 and elapsed < 3.0 \
+			and (weapon.mechanic != "burn" or not WeaponCombat.is_damageable(hit.collider)):
 		return motion.bounce(normal) * 0.35
 	return Vector3.ZERO
 
@@ -75,6 +76,8 @@ func _physics_process(delta: float) -> void:
 	if deployed:
 		if not Net.is_host():
 			return
+		if id == "shield_dome":
+			_hold_out_enemies()
 		if data.effect_time > 0.0:
 			left -= delta
 			if left <= 0.0:
@@ -201,9 +204,11 @@ func _build_zone(announce: bool) -> void:
 		return
 	if id in ["bait_radio", "lightning_rod", "flare_launcher"]:
 		_visual.show()
-		_visual.position.y = 0.25
 		if id == "lightning_rod":
-			_visual.rotation.x = PI * 0.5
+			_visual.position = Vector3.ZERO
+			_visual.rotation = Vector3.ZERO
+		else:
+			_visual.position.y = 0.25
 	if id == "bait_radio":
 		var audio := AudioStreamPlayer3D.new()
 		var tune := load("res://assets/audio/sfx/gun_bait_loop.wav").duplicate() as AudioStreamWAV
@@ -215,6 +220,7 @@ func _build_zone(announce: bool) -> void:
 		add_child(audio)
 		audio.play()
 	if announce and id == "shield_dome":
+		Perf.mark("shield dome deploy")
 		Sound.play_at("dome_deploy", global_position, -7.0)
 	elif announce:
 		Sound.play_at("gun_field_deploy", global_position, -13.0)
@@ -233,11 +239,14 @@ func _build_zone(announce: bool) -> void:
 	rim.scale = Vector3(data.effect_radius, 1.0, data.effect_radius)
 	rim.position.y = 0.055
 	add_child(rim)
+	var canopy_missing := false
 	if id == "umbrella":
 		var custom_umbrella := ItemCatalog.prop_model("umbrella_open")
 		if custom_umbrella:
 			add_child(custom_umbrella)
-	if id in ["shield_dome", "umbrella", "bleach_bomb", "disruptor"]:
+		else:
+			canopy_missing = true
+	if id in ["shield_dome", "bleach_bomb", "disruptor"] or canopy_missing:
 		if _hemisphere == null:
 			_hemisphere = SphereMesh.new()
 			_hemisphere.radius = 1.0
@@ -251,7 +260,7 @@ func _build_zone(announce: bool) -> void:
 		dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		dome.scale = Vector3(data.effect_radius, 2.4 if id == "umbrella" else data.effect_radius, data.effect_radius)
 		add_child(dome)
-	if not OS.has_feature("web") and id in ["shield_dome", "flare_launcher"]:
+	if not OS.has_feature("web") and not Net.dedicated and id in ["shield_dome", "flare_launcher"]:
 		_light = OmniLight3D.new()
 		_light.light_color = color
 		_light.light_energy = 1.8
@@ -318,6 +327,7 @@ func _strike_rod(at: Vector3, _seed: int) -> void:
 func explode() -> void:
 	if not Net.is_host() or is_queued_for_deletion():
 		return
+	Perf.mark("explosion " + data.display_name)
 	var at := global_position
 	var eye := at + Vector3.UP * 0.32
 	var radius: float = data.effect_radius * GameManager.explosive_radius_scale()
@@ -371,6 +381,30 @@ func finish(at: Vector3, blast: bool) -> void:
 			Sound.play_at("dome_collapse", at, -10.0)
 	queue_free()
 
+
+## Host: the dome is a wall for infected. Anything inside (except the boss)
+## is put back just outside the shell, so they can't walk in or be spawned in.
+func _hold_out_enemies() -> void:
+	var wall: float = data.effect_radius + 0.35
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or enemy.is_in_group("boss") or enemy.is_queued_for_deletion():
+			continue
+		var offset := enemy.global_position - global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance >= wall:
+			continue
+		var out := offset / distance if distance > 0.01 else Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU)
+		enemy.global_position += out * (wall - distance)
+		if enemy is CharacterBody3D:
+			var body := enemy as CharacterBody3D
+			var inward := body.velocity.dot(-out)
+			if inward > 0.0:
+				body.velocity += out * inward
+
+
+## True if `point` is under an active Shield Dome or Umbrella Stand.
 static func protects(point: Vector3, tree: SceneTree) -> bool:
 	for dome: WeaponProjectile in tree.get_nodes_in_group("active_flares"):
 		var offset := point - dome.global_position

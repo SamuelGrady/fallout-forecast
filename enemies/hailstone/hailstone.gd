@@ -3,6 +3,17 @@ extends "res://enemies/weather_enemy.gd"
 
 var _charge_left := 0.0
 var _charge_direction := Vector3.ZERO
+var _taking_bullet := false
+## Radians per second: about 63 degrees. A player circling at a few meters
+## outpaces it, so the glowing back core can be reached.
+const TURN_RATE := 1.1
+## The charge commits along its facing, bent toward the victim by at most this.
+const CHARGE_AIM := 0.45
+
+
+func _ready() -> void:
+	super._ready()
+	turn_rate = TURN_RATE
 
 
 func _physics_process(delta: float) -> void:
@@ -32,8 +43,15 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 	_attack_victim = victim
 	_attack_amount = amount
 	_windup_left = .9
-	_charge_direction = flat_direction(victim.global_position)
-	_face(_charge_direction)
+	# Charges where it is facing (bent a little toward the victim), not
+	# straight at them: a flanking player is safe from the charge.
+	var facing := -global_basis.z
+	facing.y = 0.0
+	facing = facing.normalized()
+	var to_victim := flat_direction(victim.global_position)
+	var bend := clampf(facing.signed_angle_to(to_victim, Vector3.UP), -CHARGE_AIM, CHARGE_AIM)
+	_charge_direction = facing.rotated(Vector3.UP, bend)
+	_face(_charge_direction, true)
 	announce_tell("hailstone_charge", _windup_left, -7.0)
 
 
@@ -72,12 +90,18 @@ func is_critical_hit(height: float, source: Node) -> bool:
 	return height >= .94 and height <= 1.94 and source is Node3D and _facing_source(source) < -.35
 
 
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:
+	_taking_bullet = true
+	super.take_bullet(amount, point, source, rewound_pos, critical_bonus)
+	_taking_bullet = false
+
+
 func take_damage(amount: float, source: Node = null) -> void:
 	var origin := _blast_origin
-	if origin == Vector3.INF and is_instance_valid(source) and source is Node3D:
+	if origin == Vector3.INF and _taking_bullet and is_instance_valid(source) and source is Node3D:
 		origin = source.global_position
 	if Net.is_host() and health > 0.0 and origin != Vector3.INF and blocks_impact(origin):
-		amount *= .22
+		amount *= .36
 		var at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.4
 		ShotFX.sparks(get_parent(), at, -global_basis.z, 5)
 		Sound.play_at("hailstone_crash", at, -20.0, 1.5)

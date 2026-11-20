@@ -159,7 +159,7 @@ func _handle_input() -> void:
 			start_reload()
 
 func fire() -> void:
-	if selected() == null:
+	if not Net.can_send_run_rpc() or selected() == null:
 		return
 	_fire_buffer = 0.0
 	var dir := -camera.global_basis.z

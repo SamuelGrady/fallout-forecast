@@ -33,7 +33,8 @@ func _ready() -> void:
 	heading.add_theme_color_override("font_color", BroadcastUI.CYAN)
 	box.add_child(heading)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_prompt.add_theme_font_size_override("font_size", 23)
+	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	BroadcastUI.text(_prompt, 23, BroadcastUI.MUTED)
 	box.add_child(_prompt)
 
 	var row := HBoxContainer.new()
@@ -53,9 +54,7 @@ func _add_button(row: Control, button: Button, caption: String, keep_playing: bo
 	button.text = caption
 	button.custom_minimum_size = Vector2(195, 54)
 	BroadcastUI.animate_button(button)
-	button.pressed.connect(func():
-		Sound.play("ui_click")
-		GameManager.choose_tape(keep_playing))
+	button.pressed.connect(GameManager.choose_tape.bind(keep_playing))
 	row.add_child(button)
 
 

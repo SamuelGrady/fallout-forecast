@@ -57,6 +57,8 @@ func _ready() -> void:
 
 
 func set_active(value: bool) -> void:
+	if value and not active:
+		Perf.mark("objective active " + site)
 	active = value
 	if _beacon:
 		_beacon.visible = value

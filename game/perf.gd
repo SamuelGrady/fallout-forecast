@@ -10,7 +10,7 @@ extends CanvasLayer
 
 const SPIKE_MS := 100.0
 const MAX_SPIKES := 200
-const MAX_EVENTS := 40
+const MAX_EVENTS := 80
 ## Histogram buckets (upper bounds, ms) for frame-time percentiles.
 const BUCKETS := [8, 12, 17, 25, 33, 50, 75, 100, 150, 250, 500, 1000, 2500, 5000, 1000000]
 
@@ -26,6 +26,8 @@ var _overlay := Label.new()
 var _recent_worst := 0.0
 var _recent_clock := 0.0
 var _scene := ""
+## Monotonic spike counter, so Telemetry can send only new spikes.
+var spike_seq := 0
 
 
 func _ready() -> void:
@@ -83,7 +85,8 @@ func _process(delta: float) -> void:
 		for e in _events:
 			if t - float(e[0]) <= 2.0 + ms / 1000.0:
 				before.append(e[1])
-		_spikes.append({"t": t, "ms": ms, "scene": _scene.get_file(), "before": before,
+		spike_seq += 1
+		_spikes.append({"id": spike_seq, "t": t, "ms": ms, "scene": _scene.get_file(), "before": before,
 			"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 			"draws": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))})
 		if _spikes.size() > MAX_SPIKES:
@@ -135,6 +138,18 @@ func report() -> String:
 	for e in _events:
 		lines.append("  %7.1fs  %s" % [e[0], e[1]])
 	return "\n".join(lines)
+
+
+## Cumulative counters for Telemetry (it sends deltas).
+func snapshot() -> Dictionary:
+	return {"frames": _frames, "total_ms": _total_ms, "worst_ms": _worst_ms, "hist": _hist.duplicate(), "seconds": _seconds(),
+		"scene": _scene.get_file(), "nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"draws": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		"mem_mb": snappedf(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0, 0.1)}
+
+
+func spikes_since(id: int) -> Array:
+	return _spikes.filter(func(s: Dictionary) -> bool: return int(s.id) > id)
 
 
 ## Download (web) or save (desktop) the report, and copy it to the clipboard.

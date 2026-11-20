@@ -1415,49 +1415,49 @@ shape = SubResource("BoxShape3D_6qa2m")
 [node name="PineCrooked" type="Node3D" parent="Geometry/MillCreek" unique_id=445034239]
 transform = Transform3D(-0.6691307, 0, 0.74314475, 0, 1, 0, -0.74314475, 0, -0.6691307, -61, 0, -57)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked" unique_id=1889072361 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked" unique_id=1889072361 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked2" type="Node3D" parent="Geometry/MillCreek" unique_id=296740555]
 transform = Transform3D(-0.43837112, 0, -0.89879405, 0, 1, 0, 0.89879405, 0, -0.43837112, -61, 0, -29)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked2" unique_id=714484128 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked2" unique_id=714484128 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked3" type="Node3D" parent="Geometry/MillCreek" unique_id=1098012001]
 transform = Transform3D(0.49999997, 0, -0.86602545, 0, 1, 0, 0.86602545, 0, 0.49999997, -61, 0, -15)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked3" unique_id=2130372308 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked3" unique_id=2130372308 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked4" type="Node3D" parent="Geometry/MillCreek" unique_id=147365299]
 transform = Transform3D(0.9975641, 0, -0.06975647, 0, 1, 0, 0.06975647, 0, 0.9975641, -61, 0, -1)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked4" unique_id=1005323471 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked4" unique_id=1005323471 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked5" type="Node3D" parent="Geometry/MillCreek" unique_id=2065678463]
 transform = Transform3D(0.6156615, 0, 0.7880107, 0, 1, 0, -0.7880107, 0, 0.6156615, -61, 0, 13)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked5" unique_id=886462381 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked5" unique_id=886462381 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked6" type="Node3D" parent="Geometry/MillCreek" unique_id=800225367]
 transform = Transform3D(-0.30901694, 0, 0.95105654, 0, 1, 0, -0.95105654, 0, -0.30901694, -61, 0, 27)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked6" unique_id=898869241 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked6" unique_id=898869241 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked7" type="Node3D" parent="Geometry/MillCreek" unique_id=592063083]
 transform = Transform3D(-0.9612617, 0, 0.27563736, 0, 1, 0, -0.27563736, 0, -0.9612617, -61, 0, 41)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked7" unique_id=957730569 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked7" unique_id=957730569 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="PineCrooked8" type="Node3D" parent="Geometry/MillCreek" unique_id=876642368]
 transform = Transform3D(-0.7660445, 0, -0.6427876, 0, 1, 0, 0.6427876, 0, -0.7660445, -61, 0, 55)
 
-[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked8" unique_id=930440428 instance=ExtResource("5_mvefq")]
+[node name="Model" type="Node3D" parent="Geometry/MillCreek/PineCrooked8" unique_id=930440428 groups=["wind_sway"] instance=ExtResource("5_mvefq")]
 transform = Transform3D(3.5217671, 0, 0, 0, 3.5217671, 0, 0, 0, 3.5217671, -0.06308368, 0.35217673, 0)
 
 [node name="MunicipalTank" type="Node3D" parent="Geometry/MillCreek" unique_id=309729837 instance=ExtResource("6_d2hus")]
@@ -2336,25 +2336,25 @@ transform = Transform3D(3.1864276, 0, 0, 0, 3.1864276, 0, 0, 0, 3.1864276, 0, 0,
 [node name="PineFallCrooked" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1630137215]
 transform = Transform3D(-0.40673658, 0, -0.9135455, 0, 1, 0, 0.9135455, 0, -0.40673658, 21, 0, -57)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked" unique_id=1818510239 instance=ExtResource("28_heeoc")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked" unique_id=1818510239 groups=["wind_sway"] instance=ExtResource("28_heeoc")]
 transform = Transform3D(3.6716297, 0, 0, 0, 3.6716297, 0, 0, 0, 3.6716297, -0.06576809, 0.36716297, 0)
 
 [node name="PineFallCrooked2" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2138652634]
 transform = Transform3D(0.9781476, 0, -0.2079117, 0, 1, 0, 0.2079117, 0, 0.9781476, 21, 0, -6)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked2" unique_id=965459269 instance=ExtResource("28_heeoc")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked2" unique_id=965459269 groups=["wind_sway"] instance=ExtResource("28_heeoc")]
 transform = Transform3D(3.6716297, 0, 0, 0, 3.6716297, 0, 0, 0, 3.6716297, -0.06576809, 0.36716297, 0)
 
 [node name="PineFallCrooked3" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1029142849]
 transform = Transform3D(-0.40673658, 0, -0.9135455, 0, 1, 0, 0.9135455, 0, -0.40673658, 60, 0, -57)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked3" unique_id=1161448273 instance=ExtResource("28_heeoc")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked3" unique_id=1161448273 groups=["wind_sway"] instance=ExtResource("28_heeoc")]
 transform = Transform3D(3.6716297, 0, 0, 0, 3.6716297, 0, 0, 0, 3.6716297, -0.06576809, 0.36716297, 0)
 
 [node name="PineFallCrooked4" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=2052204744]
 transform = Transform3D(0.9781476, 0, -0.2079117, 0, 1, 0, 0.2079117, 0, 0.9781476, 60, 0, -6)
 
-[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked4" unique_id=573812929 instance=ExtResource("28_heeoc")]
+[node name="Model" type="Node3D" parent="Geometry/WaysideGrounds/PineFallCrooked4" unique_id=573812929 groups=["wind_sway"] instance=ExtResource("28_heeoc")]
 transform = Transform3D(3.6716297, 0, 0, 0, 3.6716297, 0, 0, 0, 3.6716297, -0.06576809, 0.36716297, 0)
 
 [node name="IronFenceBorder" type="Node3D" parent="Geometry/WaysideGrounds" unique_id=1697729529]
@@ -2704,7 +2704,7 @@ shape = SubResource("BoxShape3D_c24ev")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.1, 3.32, 21.5)
 shape = SubResource("BoxShape3D_u73pf")
 
-[node name="Lettering" type="Label3D" parent="Geometry/TownLimits" unique_id=1180144145]
+[node name="Lettering" type="Label3D" parent="Geometry/TownLimits" unique_id=1180144145 groups=["wind_sway"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.1, 2.39, 21.69)
 pixel_size = 0.013076923
 double_sided = false
@@ -2714,7 +2714,7 @@ font = ExtResource("32_iqs5i")
 font_size = 80
 outline_size = 0
 
-[node name="Lettering2" type="Label3D" parent="Geometry/TownLimits" unique_id=957073946]
+[node name="Lettering2" type="Label3D" parent="Geometry/TownLimits" unique_id=957073946 groups=["wind_sway"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.1, 1.6, 21.69)
 pixel_size = 0.0076923077
 double_sided = false
@@ -2771,7 +2771,7 @@ mesh = SubResource("ArrayMesh_y0650")
 [node name="ConstructionBarrier" type="Node3D" parent="Geometry/OutlyingWoodland" unique_id=927245698]
 transform = Transform3D(0.06975651, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, 0.06975651, -62, 0.08, 31.2)
 
-[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier" unique_id=919870284 instance=ExtResource("42_gffsa")]
+[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier" unique_id=919870284 groups=["wind_sway"] instance=ExtResource("42_gffsa")]
 transform = Transform3D(18.222223, 0, 0, 0, 18.222223, 0, 0, 0, 18.222223, 0, 0, 0)
 
 [node name="WorldCollision" type="StaticBody3D" parent="Geometry/OutlyingWoodland" unique_id=630573022]
@@ -2795,19 +2795,19 @@ shape = SubResource("BoxShape3D_p32ip")
 [node name="ConstructionBarrier2" type="Node3D" parent="Geometry/OutlyingWoodland" unique_id=1893639303]
 transform = Transform3D(-0.10452851, 0, 0.9945219, 0, 1, 0, -0.9945219, 0, -0.10452851, -61, 0.08, 35.5)
 
-[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier2" unique_id=644784501 instance=ExtResource("42_gffsa")]
+[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier2" unique_id=644784501 groups=["wind_sway"] instance=ExtResource("42_gffsa")]
 transform = Transform3D(16.88889, 0, 0, 0, 16.88889, 0, 0, 0, 16.88889, 0, 0, 0)
 
 [node name="ConstructionBarrier3" type="Node3D" parent="Geometry/OutlyingWoodland" unique_id=1180117449]
 transform = Transform3D(0.06975651, 0, 0.9975641, 0, 1, 0, -0.9975641, 0, 0.06975651, 62, 0.08, 31.2)
 
-[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier3" unique_id=319073471 instance=ExtResource("42_gffsa")]
+[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier3" unique_id=319073471 groups=["wind_sway"] instance=ExtResource("42_gffsa")]
 transform = Transform3D(18.222223, 0, 0, 0, 18.222223, 0, 0, 0, 18.222223, 0, 0, 0)
 
 [node name="ConstructionBarrier4" type="Node3D" parent="Geometry/OutlyingWoodland" unique_id=1850389274]
 transform = Transform3D(-0.10452851, 0, 0.9945219, 0, 1, 0, -0.9945219, 0, -0.10452851, 61, 0.08, 35.5)
 
-[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier4" unique_id=1037218363 instance=ExtResource("42_gffsa")]
+[node name="Model" type="Node3D" parent="Geometry/OutlyingWoodland/ConstructionBarrier4" unique_id=1037218363 groups=["wind_sway"] instance=ExtResource("42_gffsa")]
 transform = Transform3D(16.88889, 0, 0, 0, 16.88889, 0, 0, 0, 16.88889, 0, 0, 0)
 
 [node name="Finish" type="MeshInstance3D" parent="Geometry/OutlyingWoodland" unique_id=574445719]
@@ -2956,7 +2956,7 @@ mesh = SubResource("BoxMesh_gkuu5")
 material_override = SubResource("StandardMaterial3D_8bqfg")
 mesh = SubResource("ArrayMesh_coe1k")
 
-[node name="Grate3" type="Marker3D" parent="StormDrains" unique_id=1083893877 groups=["drain_spawn"]]
+[node name="Grate3" type="Marker3D" parent="StormDrains" unique_id=1083893877 groups=["drain_spawn", "district_objective_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0.09, 30)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate3" unique_id=476222213]
@@ -2980,7 +2980,7 @@ mesh = SubResource("BoxMesh_gkuu5")
 material_override = SubResource("StandardMaterial3D_8bqfg")
 mesh = SubResource("ArrayMesh_86hc1")
 
-[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=1683362999 groups=["drain_spawn"]]
+[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=1683362999 groups=["drain_spawn", "district_objective_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, 0.09, -25)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=557917519]
@@ -2992,7 +2992,7 @@ mesh = SubResource("BoxMesh_gkuu5")
 material_override = SubResource("StandardMaterial3D_8bqfg")
 mesh = SubResource("ArrayMesh_6iapl")
 
-[node name="Grate6" type="Marker3D" parent="StormDrains" unique_id=1100097471 groups=["drain_spawn"]]
+[node name="Grate6" type="Marker3D" parent="StormDrains" unique_id=1100097471 groups=["drain_spawn", "district_objective_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.09, 30)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate6" unique_id=406323604]
@@ -3175,7 +3175,7 @@ script = ExtResource("43_pi5rq")
 max_radius = 2.7
 
 [node name="Pool2" type="Area3D" parent="Puddles" unique_id=1935651733]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27, 0.04, 40)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29, 0.04, 44)
 collision_layer = 16
 collision_mask = 0
 monitoring = false
@@ -3276,6 +3276,20 @@ collision_mask = 0
 monitoring = false
 script = ExtResource("43_pi5rq")
 max_radius = 2.0
+
+[node name="StreetSupplySpawns" type="Node3D" parent="."]
+
+[node name="Supply1" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(-36, 0.06, 27)
+
+[node name="Supply2" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(-14, 0.06, -27)
+
+[node name="Supply3" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(37, 0.06, -19)
+
+[node name="Supply4" type="Marker3D" parent="StreetSupplySpawns" groups=["street_supply_spawn"]]
+position = Vector3(35, 0.06, 30)
 
 [node name="BossAnchor" type="Marker3D" parent="." unique_id=124684992 groups=["boss_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 18, -32)

@@ -159,7 +159,7 @@ func flush() -> void:
 	batches.clear()
 
 
-func label(words: String, at: Vector3, height: float, color: String, yaw := 0.0) -> void:
+func label(words: String, at: Vector3, height: float, color: String, yaw := 0.0, wind := false) -> void:
 	var sign := add(part, Label3D.new(), "Lettering") as Label3D
 	sign.font = FONT
 	sign.font_size = 80
@@ -170,6 +170,8 @@ func label(words: String, at: Vector3, height: float, color: String, yaw := 0.0)
 	sign.position = at
 	sign.rotation_degrees.y = yaw
 	sign.double_sided = false
+	if wind:
+		sign.add_to_group("wind_sway", true)
 
 
 func shelter(title: String, center: Vector3, size: Vector3) -> void:
@@ -206,8 +208,14 @@ func save(path: String) -> PackedScene:
 	return load(path) as PackedScene
 
 
-func finish_prop(id: String) -> void:
+func finish_prop(id: String, wind := false) -> void:
 	flush()
+	if wind:
+		var visual := add(scene, Node3D.new(), "WindVisuals")
+		visual.add_to_group("wind_sway", true)
+		for child in scene.get_children():
+			if child is MeshInstance3D:
+				child.reparent(visual, false)
 	props[id] = save("res://props/%s/%s.tscn" % [district, id])
 	scene.free()
 
@@ -230,6 +238,8 @@ func model(kit: String, id: String, at: Vector3, length: float, yaw := 0.0, bloc
 		item.set("texture",load("res://assets/kenney/%s/Textures/colormap.png" % kit))
 		item.set("tint",Color(tint))
 	add(holder, item, "Model")
+	if id.begins_with("pine-") or id == "construction-barrier":
+		item.add_to_group("wind_sway", true)
 	var instances := item.find_children("*", "MeshInstance3D", true, false)
 	if item is MeshInstance3D:
 		instances.append(item)
@@ -285,7 +295,7 @@ func begin_map(title: String, harbor: bool) -> void:
 	geometry = add(scene, Node3D.new(), "Geometry") as Node3D
 	geometry.add_to_group("navigation_geometry", true)
 	part = geometry
-	for title_key in ["PlayerSpawns","EnemySpawns","StormDrains","CrateSpawns","DeconShowers","Puddles"]:
+	for title_key in ["PlayerSpawns","EnemySpawns","StormDrains","CrateSpawns","DeconShowers","Puddles","StreetSupplySpawns"]:
 		directories[title_key] = add(scene, Node3D.new(), title_key)
 
 

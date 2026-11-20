@@ -15,7 +15,8 @@ static var _ripple_material: StandardMaterial3D
 
 func bind_puddle(puddle: Node3D) -> void:
 	_puddle = puddle
-	_lurk_left = 18.0
+	_puddle.set_meta("undertow", true)
+	_lurk_left = 14.0
 	global_position = _puddle.global_position + Vector3.UP * .09
 	announce_tell("undertow_lurk", 0.0, -15.0)
 
@@ -79,9 +80,19 @@ func harpoon_surface() -> void:
 
 
 func expose_for_cleanup() -> void:
-	_puddle = null
+	_release_puddle()
 	if _submerged:
 		_emerge(null)
+
+
+func _exit_tree() -> void:
+	_release_puddle()
+
+
+func _release_puddle() -> void:
+	if is_instance_valid(_puddle):
+		_puddle.remove_meta("undertow")
+	_puddle = null
 
 
 func sync_tells(peer: int) -> void:

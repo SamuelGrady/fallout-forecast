@@ -361,7 +361,7 @@ func october_maple() -> void:
 		tube(tip+Vector3.UP*0.63,0.97,1.6,leaf,2.12)
 		tube(tip+Vector3.UP*2.24,2.06,1.65,leaf,0.34)
 	tube(Vector3(0,5.8,0),2.1,2.3,paint("#cf9165"),0.54)
-	finish_prop("october_maple")
+	finish_prop("october_maple", true)
 
 
 func town_details() -> void:
@@ -371,8 +371,8 @@ func town_details() -> void:
 		box(Vector3(x,1.5,21.5),Vector3(0.26,3,0.26),timber)
 	box(Vector3(22.1,2.1,21.5),Vector3(7.6,2.35,0.32),paint("#475b61"))
 	box(Vector3(22.1,3.32,21.5),Vector3(7.9,0.17,0.49),paint("#e1c89d"))
-	label("MAPLE HOLLOW",Vector3(22.1,2.39,21.69),0.68,"#f5d3a6")
-	label("EST.  1891",Vector3(22.1,1.60,21.69),0.40,"#e6bc8f")
+	label("MAPLE HOLLOW",Vector3(22.1,2.39,21.69),0.68,"#f5d3a6",0.0,true)
+	label("EST.  1891",Vector3(22.1,1.60,21.69),0.40,"#e6bc8f",0.0,true)
 	section("TelephoneLine")
 	for x in [-36,-8,20,48]:
 		box(Vector3(x,3.9,37.6),Vector3(0.27,7.8,0.27),timber)
@@ -417,8 +417,12 @@ func markers() -> void:
 	shower("CloverFoods",Vector3(-21,0.06,45.5))
 	shower("ChapelPorch",Vector3(31,0,-36.5))
 	shower("JuniperPorch",Vector3(-24,0,-24))
+	var grates := (directories.StormDrains as Node3D).get_children()
+	for i: int in [2, 4, 5]:
+		grates[i].add_to_group("district_objective_spawn", true)
+	points("StreetSupplySpawns","street_supply_spawn",[Vector2(-36,27), Vector2(-14,-27), Vector2(37,-19), Vector2(35,30)],0.06)
 	marker("","boss_anchor","BossAnchor",Vector3(46,18,-32))
-	puddles([Vector3(-37,2.7,32),Vector3(-27,2,40),Vector3(11,2.4,40),Vector3(25,3.2,31),Vector3(-9,2.4,15),Vector3(-12,2,-5),Vector3(-21,2.2,-20),Vector3(-3,2.2,-28),Vector3(-37,2,-34),Vector3(-57,2.2,-12),Vector3(38,3,-27),Vector3(56,2.5,-39),Vector3(25,2.2,5),Vector3(50,2,19)])
+	puddles([Vector3(-37,2.7,32),Vector3(-29,2,44),Vector3(11,2.4,40),Vector3(25,3.2,31),Vector3(-9,2.4,15),Vector3(-12,2,-5),Vector3(-21,2.2,-20),Vector3(-3,2.2,-28),Vector3(-37,2,-34),Vector3(-57,2.2,-12),Vector3(38,3,-27),Vector3(56,2.5,-39),Vector3(25,2.2,5),Vector3(50,2,19)])
 	for pool: Area3D in directories.Puddles.get_children():
 		if Vector2(pool.position.x+9,pool.position.z+16).length() < 14.8:
 			pool.position.y = 0.12

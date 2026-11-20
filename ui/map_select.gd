@@ -61,7 +61,7 @@ func _ready() -> void:
 	box.add_child(actions)
 	_back = _action(actions, "BACK" if mode == Mode.SOLO else "BACK TO LOBBY", _on_back)
 	if mode != Mode.VOTE:
-		_deploy = _action(actions, "PLAY" if mode == Mode.SOLO else "SELECT MAP", _confirm)
+		_deploy = _action(actions, "PLAY" if mode == Mode.SOLO else "SET DISTRICT", _confirm)
 		BroadcastUI.button_role(_deploy, true)
 	if mode == Mode.SOLO:
 		_error = _label(box, "", 20, BroadcastUI.PINK)
@@ -83,7 +83,7 @@ func _ready() -> void:
 
 func _build_card(parent: Control, map: Dictionary) -> void:
 	var card := Button.new()
-	card.custom_minimum_size = Vector2(205, 258)
+	card.custom_minimum_size = Vector2(205, 248)
 	card.pressed.connect(_pick.bind(map.id))
 	BroadcastUI.animate_button(card)
 	parent.add_child(card)
@@ -102,6 +102,7 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 
 	_label(content, "CHANNEL " + str(map.channel), 19, map.accent)
 	var monitor := ColorRect.new()
+	monitor.clip_contents = true
 	monitor.custom_minimum_size.y = 94
 	monitor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(monitor)
@@ -114,14 +115,12 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 		preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		monitor.add_child(preview)
 	else:
-		var shader := Shader.new()
-		shader.code = MONITOR_SHADER
 		var material := ShaderMaterial.new()
-		material.shader = shader
+		material.shader = _shared_monitor_shader()
 		material.set_shader_parameter("tint", map.accent)
 		monitor.material = material
 	_label(content, map.name, 28, BroadcastUI.PAPER)
-	var blurb := _label(content, map.blurb, 20, Color("#aabac7"))
+	var blurb := _label(content, map.blurb, 20, BroadcastUI.MUTED)
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_states.append(_label(content, "", 19, map.accent))
@@ -151,7 +150,6 @@ func _refresh() -> void:
 func _pick(id: String) -> void:
 	if _starting:
 		return
-	Sound.play("ui_click")
 	if mode == Mode.VOTE:
 		Net.vote_for_map(id)
 	else:
@@ -187,15 +185,16 @@ func _on_back() -> void:
 	if _starting:
 		return
 	if mode == Mode.SOLO:
-		get_tree().change_scene_to_file(TITLE_SCENE)
+		SceneLoader.cut_to(TITLE_SCENE)
 	else:
 		dismissed.emit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_action_pressed("ui_cancel"):
-		_on_back()
+	if is_visible_in_tree() and event.is_action_pressed("ui_cancel") and not event.is_echo():
 		get_viewport().set_input_as_handled()
+		Sound.play("ui_click")
+		_on_back()
 
 
 func _link_focus() -> void:
@@ -234,8 +233,16 @@ func _action(parent: Control, value: String, action: Callable) -> Button:
 	button.custom_minimum_size = Vector2(188, 52)
 	BroadcastUI.button_role(button)
 	BroadcastUI.animate_button(button)
-	button.pressed.connect(func():
-		Sound.play("ui_click")
-		action.call())
+	button.pressed.connect(action)
 	parent.add_child(button)
 	return button
+
+
+static var _monitor_shader: Shader
+
+
+static func _shared_monitor_shader() -> Shader:
+	if _monitor_shader == null:
+		_monitor_shader = Shader.new()
+		_monitor_shader.code = MONITOR_SHADER
+	return _monitor_shader

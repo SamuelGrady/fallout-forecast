@@ -4,7 +4,7 @@ shader_type spatial;
 // opaque StandardMaterial3Ds for this at runtime, copying their colour and
 // texture (including world triplanar for the graybox grid).
 
-render_mode diffuse_lambert, specular_disabled;
+render_mode diffuse_lambert, specular_schlick_ggx;
 
 uniform vec4 albedo : source_color = vec4(1.0);
 uniform sampler2D albedo_texture : source_color, filter_nearest_mipmap, repeat_enable;
@@ -16,6 +16,8 @@ uniform vec3 uv_offset = vec3(0.0);
 uniform float snap = 120.0;
 uniform bool affine = false;
 uniform bool use_vertex_color = false;
+uniform float dry_roughness = 1.0;
+uniform float wetness = 0.0;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -56,5 +58,7 @@ void fragment() {
 			c *= texture(albedo_texture, uv);
 		}
 	}
-	ALBEDO = c.rgb;
+	ALBEDO = c.rgb * (1.0 - 0.42 * wetness);
+	ROUGHNESS = mix(dry_roughness, 0.25, wetness);
+	SPECULAR = 0.48 * wetness;
 }

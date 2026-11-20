@@ -14,7 +14,7 @@ var _player: Node
 
 
 func _ready() -> void:
-	layer = 3
+	layer = 7
 	_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_hits)
@@ -61,6 +61,7 @@ func _draw_hits() -> void:
 		# 0 = straight ahead (top of the ring), clockwise positive.
 		var angle := atan2(to.dot(right), to.dot(forward)) - PI * 0.5
 		var alpha := clampf(float(h[1]) / LIFE, 0.0, 1.0)
-		var color := Color(1.0, 0.18, 0.15, 0.85 * alpha)
+		var color := Color(BroadcastUI.PINK, (0.52 if Settings.reduced_flash else 0.85) * alpha)
+		_canvas.draw_arc(center, RADIUS, angle - 0.42, angle + 0.42, 18, Color(BroadcastUI.INK, alpha), 12.0, true)
 		_canvas.draw_arc(center, RADIUS, angle - 0.42, angle + 0.42, 18, color, 9.0, true)
 		_canvas.draw_arc(center, RADIUS + 9.0, angle - 0.2, angle + 0.2, 10, Color(color, color.a * 0.6), 5.0, true)

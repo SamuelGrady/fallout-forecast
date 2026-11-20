@@ -30,9 +30,13 @@ const WEATHER_SCENES := [
 
 ## Position broadcasts per second when the host is relaying to clients.
 const NET_HZ := 20.0
+const MIN_ARRIVAL_DISTANCE := 12.0
+const PREFERRED_ARRIVAL_DISTANCE := 45.0
 
 var _timer := 0.0
 var _next_net_id := 1
+var _enemies_by_id: Dictionary[int, EnemyBase] = {}
+var _seen_types: Dictionary[String, bool] = {}
 var _net_sync := 0.0
 var _wave := 0
 var _budget := 0
@@ -88,7 +92,7 @@ func _on_phase(phase: int, wave: int) -> void:
 		_false_clearing_done = false
 		_miniboss_spawned = false
 	if phase == WeatherManager.Phase.DRIZZLE or fresh_wave:
-		_budget = roundi((18 + wave * 8) * GameManager.enemy_spawn_scale())
+		_budget = _wave_budget(wave, GameManager.enemy_spawn_scale())
 	_group.clear()
 	_opening_group = true
 	_lightning_left = 0.0
@@ -121,7 +125,7 @@ func _physics_process(delta: float) -> void:
 	var spawn_scale := GameManager.enemy_spawn_scale()
 	# Preserve the current group's composition when the roster changes.
 	if _group.is_empty():
-		_budget = maxi(_spawned, roundi((18 + _wave * 8) * spawn_scale))
+		_budget = maxi(_spawned, _wave_budget(_wave, spawn_scale))
 	var downpour := _phase == WeatherManager.Phase.DOWNPOUR
 	var limit := _budget if downpour else ceili(_budget * .35)
 	_lightning_left -= delta
@@ -146,6 +150,12 @@ func _physics_process(delta: float) -> void:
 			enemy.reveal(1.2)
 
 
+func _wave_budget(wave: int, spawn_scale: float) -> int:
+	var campaign := 18 + 8 * mini(wave, WeatherManager.FINAL_WAVE)
+	var endless := clampi(wave - WeatherManager.FINAL_WAVE, 0, 6) * 6
+	return roundi((campaign + endless) * spawn_scale)
+
+
 func _spawn_group_member(limit: int, downpour: bool) -> void:
 	if _group.is_empty() and not _plan_group(limit - _spawned, downpour):
 		_timer = 1.0
@@ -161,7 +171,7 @@ func _spawn_group_member(limit: int, downpour: bool) -> void:
 			point = drain
 			_group_origin = drain
 	var is_elite_roll := kind >= Kind.SLEET and _wave >= 3 and RNG.rng.randf() < minf(.34, .065 + (_wave - 3) * .025)
-	var enemy := _spawn_near(_scene_of(kind), point, .25 if puddle else 2.6, is_elite_roll)
+	var enemy := _spawn_near(_scene_of(kind), point, 0.0 if puddle else 1.8, is_elite_roll)
 	if enemy:
 		_spawned += 1
 		if not _group_warned:
@@ -188,16 +198,18 @@ func _plan_group(slots: int, downpour: bool) -> bool:
 		_group.resize(mini(slots, _group.size()))
 		_opening_group = false
 		return true
-	var size := mini(slots, clampi(4 + _wave, 5, 12))
+	# Squads clear more per burst. Give them more bodies in each arrival
+	# instead of stretching the same small groups over a much longer wave.
+	var squad_slots := ceili((GameManager.player_count() - 1) * 1.5)
+	var size := mini(slots, clampi(4 + _wave + squad_slots, 5, 12 + squad_slots))
 	var mix := WavePlan.weights(_wave, downpour)
 	if _lightning_left > 0.0:
 		var map := get_world_3d().navigation_map
 		var site := NavigationServer3D.map_get_closest_point(map, _lightning_site)
-		if site.distance_to(_lightning_site) < 12.0 and _safe_spawn(site, 9.0):
-			_group_origin = site
+		if site.distance_to(_lightning_site) < 12.0 and _safe_spawn(site, MIN_ARRIVAL_DISTANCE):
+			if _is_connected(site, _group_origin) and _hidden_from_players(site, _living_players()):
+				_group_origin = site
 			_group.append(Kind.THUNDERHEAD)
-			if size > 1:
-				_group.append(Kind.THUNDERHEAD)
 		_lightning_left = 0.0
 	while _group.size() < size:
 		mix[Kind.SLEET] = 0 if size - _group.size() < 3 else mix[Kind.SLEET]
@@ -270,10 +282,16 @@ func _run_beat(wave: int) -> void:
 				if d < best:
 					best = d
 					at = pack.global_position
+			# Announce at the cache, but emerge from a drain the squad isn't camping.
+			var origin: Variant = _gutter_spawn_point()
+			if origin == null:
+				origin = _marker_position("enemy_spawn")
+			if origin == null:
+				return
 			GameManager.show_banner("SUPPLY AMBUSH", Color("ff8a4c"), 2.0)
 			_warn_group(at)
 			for i in 3 + GameManager.player_count():
-				_spawn_extra(gutter_scene, at, 6.0)
+				_spawn_extra(gutter_scene, origin, 2.0)
 		3:
 			# Street push: a wall of Drips from one direction at once.
 			var origin: Variant = _marker_position("enemy_spawn")
@@ -315,8 +333,14 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float, elite := fa
 	var map := get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) > 0:
 		point = NavigationServer3D.map_get_closest_point(map, point)
+		if spread > 0.0:
+			var origin := NavigationServer3D.map_get_closest_point(map, center)
+			var players := _living_players()
+			# The jitter must preserve cover and can't jump to another floor.
+			if absf(point.y - origin.y) > 1.0 or not _safe_spawn(point, 7.5) \
+					or (_hidden_from_players(origin, players) and not _hidden_from_players(point, players)):
+				point = origin
 	var where := point + Vector3(0, 0.15, 0)
-	Perf.mark("spawn " + scene.resource_path.get_file().get_basename())
 	var enemy := _make(scene, where, false, 0, elite)
 	if Net.is_online():
 		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, elite])
@@ -337,10 +361,7 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 			scene = drip_scene
 	var at: Variant = _marker_position("enemy_spawn")
 	if at == null:
-		var markers := get_tree().get_nodes_in_group("enemy_spawn")
-		if markers.is_empty():
-			return null
-		at = (markers.pick_random() as Node3D).global_position
+		return null
 	var point: Vector3 = at
 	var map := get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) > 0:
@@ -467,6 +488,9 @@ func _add_copy(scene: PackedScene, at: Vector3, small: bool) -> void:
 	_pending_copies -= 1
 	if GameManager.victory_locked or GameManager.finished:
 		return
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) > 0:
+		at = NavigationServer3D.map_get_closest_point(map, at) + Vector3.UP * 0.15
 	var copy := _make(scene, at, small)
 	_extras += 1
 	if Net.is_online():
@@ -476,6 +500,14 @@ func _add_copy(scene: PackedScene, at: Vector3, small: bool) -> void:
 ## Build one enemy on this peer. `is_small`, `is_elite`, `miniboss_wave` and net_id
 ## are set before add_child because EnemyBase._ready() reads them.
 func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite := false, miniboss_wave := 0) -> EnemyBase:
+	var kind_name := scene.resource_path.get_file().get_basename()
+	if not _seen_types.has(kind_name):
+		_seen_types[kind_name] = true
+		Perf.mark("first spawn " + kind_name)
+	elif miniboss_wave > 0:
+		Perf.mark("spawn miniboss " + kind_name)
+	elif elite:
+		Perf.mark("spawn elite " + kind_name)
 	var enemy := scene.instantiate() as EnemyBase
 	enemy.is_small = small
 	enemy.is_elite = elite
@@ -485,8 +517,11 @@ func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite :
 	else:
 		enemy.net_id = _next_net_id
 		_next_net_id += 1
+	enemy.position = to_local(at)
 	add_child(enemy, true)
-	enemy.global_position = at
+	_enemies_by_id[enemy.net_id] = enemy
+	var id := enemy.net_id
+	enemy.tree_exiting.connect(func(): _enemies_by_id.erase(id))
 	if elite or miniboss_wave > 0:
 		enemy.reveal(10.0)
 	return enemy
@@ -514,19 +549,53 @@ func _scene_of(kind: int) -> PackedScene:
 
 
 func _wet_puddle() -> Node3D:
+	var players := _living_players()
+	if players.is_empty():
+		return null
 	var candidates: Array[Node3D] = []
+	var map := get_world_3d().navigation_map
 	for node in get_tree().get_nodes_in_group("puddles"):
 		var puddle := node as Node3D
-		if puddle and puddle.has_method("radius") and float(puddle.call("radius")) > .25 and _safe_spawn(puddle.global_position, 5.0):
+		if puddle == null or not puddle.has_method("radius") or float(puddle.call("radius")) <= .25:
+			continue
+		if puddle.has_meta("undertow") or _distance_to_players(puddle.global_position, players) < 6.5:
+			continue
+		var floor_point := NavigationServer3D.map_get_closest_point(map, puddle.global_position)
+		var near := _distance_to_players(puddle.global_position, players)
+		if floor_point.distance_to(puddle.global_position) <= 1.05 and near <= 42.0:
 			candidates.append(puddle)
 	return candidates.pick_random() if not candidates.is_empty() else null
 
 
 func _safe_spawn(point: Vector3, distance: float) -> bool:
-	for player in GameManager.players():
-		if player.state == "ok" and player.global_position.distance_to(point) < distance:
+	return _distance_to_players(point, _living_players()) >= distance
+
+
+func _living_players() -> Array:
+	return GameManager.players().filter(func(p): return p.state == "ok")
+
+
+func _distance_to_players(point: Vector3, players: Array) -> float:
+	var distance := INF
+	for player: Node3D in players:
+		distance = minf(distance, player.global_position.distance_to(point))
+	return distance
+
+
+func _hidden_from_players(point: Vector3, players: Array) -> bool:
+	var space := get_world_3d().direct_space_state
+	for player: Player in players:
+		var sight := PhysicsRayQueryParameters3D.create(player.head.global_position, point + Vector3.UP * 1.0, 1)
+		if space.intersect_ray(sight).is_empty():
 			return false
 	return true
+
+
+func _is_connected(from: Vector3, to: Vector3) -> bool:
+	var map := get_world_3d().navigation_map
+	var end := NavigationServer3D.map_get_closest_point(map, to)
+	var path := NavigationServer3D.map_get_path(map, from, end, true)
+	return not path.is_empty() and path[-1].distance_squared_to(end) < 1.0
 
 
 ## Gutters crawl out of storm drains, or out of any puddle big enough.
@@ -548,29 +617,27 @@ func _marker_position(group: String) -> Variant:
 
 
 func _near_players(points: Array) -> Variant:
-	var players := GameManager.players().filter(func(p): return p.state == "ok")
+	var players := _living_players()
 	if points.is_empty() or players.is_empty():
 		return null
-	var candidates: Array = []
-	for point in points:
-		var distance := INF
-		for player in players:
-			distance = minf(distance, player.global_position.distance_to(point))
-		if distance >= 12.0 and distance <= 45.0:
-			candidates.append(point)
-	if not candidates.is_empty():
-		return candidates.pick_random()
-	# Small maps may have every marker close to a player. Use the furthest
-	# open one before moving out along the navigation mesh around those markers.
-	var furthest := 7.0
+	var preferred: Array[Vector3] = []
+	var distant_cover: Array[Vector3] = []
+	var furthest := MIN_ARRIVAL_DISTANCE
 	var fallback: Variant = null
-	for point in points:
-		var distance := INF
-		for player in players:
-			distance = minf(distance, player.global_position.distance_to(point))
+	for point: Vector3 in points:
+		var distance := _distance_to_players(point, players)
+		if distance >= MIN_ARRIVAL_DISTANCE and _hidden_from_players(point, players):
+			if distance <= PREFERRED_ARRIVAL_DISTANCE:
+				preferred.append(point)
+			else:
+				distant_cover.append(point)
 		if distance > furthest:
 			furthest = distance
 			fallback = point
+	if not preferred.is_empty():
+		return preferred.pick_random()
+	if not distant_cover.is_empty():
+		return distant_cover.pick_random()
 	if fallback != null:
 		return fallback
 	var map := get_world_3d().navigation_map
@@ -580,9 +647,13 @@ func _near_players(points: Array) -> Variant:
 		for i in 8:
 			var probe := origin + Vector3.FORWARD.rotated(Vector3.UP, TAU * i / 8.0) * 10.0
 			var point := NavigationServer3D.map_get_closest_point(map, probe)
-			if probe.distance_to(point) < 2.0 and _safe_spawn(point, 7.5):
+			if probe.distance_to(point) >= 2.0 or _distance_to_players(point, players) < 7.5:
+				continue
+			if _hidden_from_players(point, players):
 				return point
-	return null
+			if fallback == null:
+				fallback = point
+	return fallback
 
 
 # ------------------------------------------------------------------ network
@@ -692,7 +763,4 @@ func _sync_enemies(ids: PackedInt32Array, places: PackedVector3Array, yaws: Pack
 
 
 func _find_net(net_id: int) -> EnemyBase:
-	for node in get_tree().get_nodes_in_group("enemies"):
-		if int(node.get("net_id")) == net_id:
-			return node as EnemyBase
-	return null
+	return _enemies_by_id.get(net_id)

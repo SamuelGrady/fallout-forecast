@@ -1,6 +1,7 @@
 extends Node
 ## A stack gives pause and developer menus one owner for time and mouse state.
 var stack: Array[Node] = []
+var title_played := false
 
 
 func open(menu: Node) -> void:
