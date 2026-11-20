@@ -234,10 +234,16 @@ void fragment() {
 
 
 func _find_scene_lighting() -> void:
-	for node in get_tree().root.find_children("*", "WorldEnvironment", true, false):
-		_environment = (node as WorldEnvironment).environment
+	var level := get_parent().get_node_or_null("Level")
+	if level == null:
+		return
+	for node in level.find_children("*", "WorldEnvironment", true, false):
+		var world_env := node as WorldEnvironment
+		if world_env.environment:
+			_environment = world_env.environment.duplicate() as Environment
+			world_env.environment = _environment
 		break
-	for node in get_tree().root.find_children("*", "DirectionalLight3D", true, false):
+	for node in level.find_children("*", "DirectionalLight3D", true, false):
 		_sun = node
 		break
 	if _environment:
@@ -258,7 +264,7 @@ func _find_scene_lighting() -> void:
 	if _web_rain:
 		# Aggressively fade distant streetlamps so WebGL2 forward shaders only
 		# evaluate nearby lights.
-		for light in get_tree().root.find_children("*", "OmniLight3D", true, false):
+		for light in level.find_children("*", "OmniLight3D", true, false):
 			var omni := light as OmniLight3D
 			if omni:
 				omni.shadow_enabled = false

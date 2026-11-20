@@ -17,6 +17,8 @@ var suit_color := 0
 var suit_skin := 0
 ## Custom callsign shown in lobbies, teammate cards, and end-of-run results.
 var player_name := ""
+## The last district played in solo.
+var solo_map_id := Maps.DEFAULT_ID
 ## Server JOIN GAME connects to. Empty = Net.CLOUD_URL (wss://fallout.drew.place/).
 var server_url := ""
 ## Show the live performance overlay (Perf autoload). Recording is always on.
@@ -40,6 +42,7 @@ func _ready() -> void:
 		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
 		player_name = str(cfg.get_value("profile", "name", player_name)).strip_edges().left(18)
+		solo_map_id = Maps.fallback(str(cfg.get_value("profile", "solo_map", solo_map_id)))
 		server_url = str(cfg.get_value("network", "server_url", server_url)).strip_edges()
 		perf_overlay = bool(cfg.get_value("debug", "perf_overlay", perf_overlay))
 	apply()
@@ -60,6 +63,7 @@ func save() -> void:
 	cfg.set_value("cosmetic", "color", suit_color)
 	cfg.set_value("cosmetic", "skin", suit_skin)
 	cfg.set_value("profile", "name", player_name.strip_edges().left(18))
+	cfg.set_value("profile", "solo_map", solo_map_id)
 	cfg.set_value("network", "server_url", server_url.strip_edges())
 	cfg.set_value("debug", "perf_overlay", perf_overlay)
 	cfg.save(PATH)

@@ -2,7 +2,7 @@ extends Node
 ## Headless dedicated server. Net adds this as its child when the game is
 ## launched with `-- --server` (see server/README.md):
 ##
-##   godot --headless --path . --audio-driver Dummy -- --server [--port=7777] [--heartbeat=/tmp/fallout-heartbeat]
+##   godot --headless --path . --audio-driver Dummy -- --server [--port=7777] [--map pinecrest] [--heartbeat=/tmp/fallout-heartbeat]
 ##
 ## The server is peer 1 but not a player: Net.host(port, false) leaves it out
 ## of the roster, so players(), player_count() and the lose check only see the
@@ -11,13 +11,13 @@ extends Node
 ## after the results (or when everyone leaves) the server unloads the run and
 ## waits again.
 
-const RUN_SCENE := "res://main.tscn"
 ## After run_finished: main.gd shows clients the results 4.5 s later.
 const RESULTS_DELAY := 5.0
 const HEARTBEAT_EVERY := 15.0
 const STATUS_EVERY := 300.0
 
 var _port := 7777
+var _default_map := Maps.DEFAULT_ID
 var _heartbeat_path := ""
 var _heartbeat_left := 0.0
 var _status_left := STATUS_EVERY
@@ -27,18 +27,27 @@ var _run_serial := 0
 
 func _ready() -> void:
 	_port = Net.PORT
-	for arg in OS.get_cmdline_user_args():
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		var arg: String = args[i]
 		if arg.begins_with("--port="):
 			_port = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--heartbeat="):
 			_heartbeat_path = arg.get_slice("=", 1)
+		elif arg == "--map" and i + 1 < args.size():
+			_default_map = args[i + 1]
+		elif arg.begins_with("--map="):
+			_default_map = arg.get_slice("=", 1)
+	if not Maps.is_available(_default_map):
+		_log("map %s unavailable, defaulting to %s" % [_default_map, Maps.DEFAULT_ID])
+		_default_map = Maps.DEFAULT_ID
 	# Keep simulating with no window focus and no frame-rate cap from vsync.
 	Engine.max_fps = 60
 	_start.call_deferred()
 
 
 func _start() -> void:
-	var err := Net.host(_port, false)
+	var err := Net.host(_port, false, _default_map)
 	if err != OK:
 		_log("ERROR could not open WebSocket port %d (error %d)" % [_port, err])
 		get_tree().quit(1)
@@ -53,6 +62,7 @@ func _start() -> void:
 	Net.force_start_requested.connect(_on_force_start)
 	GameManager.run_finished.connect(_on_run_finished)
 	_log("listening for WebSocket (ws://) on TCP %d (protocol v%d, max %d players)" % [_port, Net.PROTOCOL, Net.MAX_PLAYERS])
+	_log("default map: %s" % _default_map)
 	_beat()
 
 
@@ -104,10 +114,16 @@ func _start_run() -> void:
 	# Everyone is un-READY afterwards, so the next run waits for the lobby.
 	for peer_id in Net.roster:
 		Net.roster[peer_id]["ready"] = false
-	Net._push_roster.rpc(Net.roster)
-	_log("run %d starting with %d player(s): %s" % [_run_serial, Net.roster.size(), ", ".join(_names())])
+	Net._broadcast_roster()
 	Net.request_start()
-	get_tree().change_scene_to_file(RUN_SCENE)
+	_log("run %d starting on %s with %d player(s): %s" % [_run_serial, Net.run_map_id, Net.roster.size(), ", ".join(_names())])
+	var serial := _run_serial
+	await get_tree().create_timer(SceneLoader.MAP_REVEAL_SECONDS).timeout
+	if _in_run and serial == _run_serial:
+		var err := get_tree().change_scene_to_file(Maps.RUN_SCENE)
+		if err != OK:
+			_log("ERROR could not start run %d (error %d)" % [serial, err])
+			_reset()
 
 
 func _on_run_finished(won: bool, results: Dictionary) -> void:

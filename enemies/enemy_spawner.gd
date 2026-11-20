@@ -129,7 +129,7 @@ func _trigger_false_clearing() -> void:
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(elite_scene, where, false, 0, true)
 	if enemy and Net.is_online():
-		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(elite_scene), where, false, true])
+		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(elite_scene.resource_path), where, false, true])
 
 
 ## Memorable mid-wave encounters on top of the count-based horde. Beat
@@ -185,7 +185,7 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBas
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(scene, where, false)
 	if enemy and Net.is_online():
-		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false])
+		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false])
 	return enemy
 
 
@@ -216,7 +216,7 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 	if enemy:
 		enemy.reveal(8.0)
 		if Net.is_online():
-			Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false, wave])
+			Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false, wave])
 		Sound.play("storm_arrival", -6.0, 0.72)
 		GameManager.show_banner("MINI-BOSS: %s" % enemy.miniboss_name, Color("ff5689"), 3.2)
 	return enemy
@@ -246,12 +246,23 @@ func _spawn_street_supplies() -> void:
 	for old in get_tree().get_nodes_in_group("street_supplies"):
 		old.queue_free()
 	if Net.is_online():
-		Net.rpc_to_all(_clear_supplies)
-	# Main Street, parking lot and park: open approaches with multiple exits.
-	for point in [Vector3(-30, 0.12, 2.5), Vector3(28, 0.12, -2.5), Vector3(4, 0.12, 42), Vector3(46, 0.12, 34)]:
+		Net.rpc_to_run(_clear_supplies, [])
+	for point in _supply_points():
 		spawn_drop(point, "supply", 600.0)
 		if Net.is_online():
-			Net.rpc_to_all(_spawn_supply, [point])
+			Net.rpc_to_run(_spawn_supply, [point])
+
+
+func _supply_points() -> Array[Vector3]:
+	if GameManager.map_id == Maps.DEFAULT_ID:
+		# Pinecrest's authored approaches on Main Street, the lot and the park.
+		return [Vector3(-30, 0.12, 2.5), Vector3(28, 0.12, -2.5), Vector3(4, 0.12, 42), Vector3(46, 0.12, 34)]
+	var points: Array[Vector3] = []
+	var markers := get_tree().get_nodes_in_group("enemy_spawn")
+	for i in mini(4, markers.size()):
+		var marker := markers[i] as Node3D
+		points.append(marker.global_position + Vector3.UP * 0.12)
+	return points
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -287,7 +298,7 @@ func spawn(scene: PackedScene) -> EnemyBase:
 	var where := point + Vector3(0, 0.15, 0)
 	var enemy := _make(scene, where, false)
 	if enemy and Net.is_online():
-		Net.rpc_to_all(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false])
+		Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene.resource_path), where, false, false])
 	return enemy
 
 
@@ -304,7 +315,7 @@ func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
 	add_child.call_deferred(copy, true)
 	copy.set_deferred("global_position", at)
 	if Net.is_online():
-		Net.rpc_to_all(_spawn_enemy, [copy.net_id, _kind_of(scene), at, small, false])
+		Net.rpc_to_run(_spawn_enemy, [copy.net_id, _kind_of(scene.resource_path), at, small, false])
 
 
 ## Build one enemy on this peer. `is_small`, `is_elite`, `miniboss_wave` and net_id
@@ -328,8 +339,7 @@ func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0, elite :
 
 ## Which kind of enemy this is, for the wire. Compares resource paths rather
 ## than instances, because splitters reload the scene by path.
-func _kind_of(scene: PackedScene) -> int:
-	var path := scene.resource_path
+func _kind_of(path: String) -> int:
 	if path == gutter_scene.resource_path:
 		return 1
 	if path == mister_scene.resource_path:
@@ -402,6 +412,17 @@ func _near_players(points: Array) -> Variant:
 
 
 # ------------------------------------------------------------------ network
+func sync_to_peer(peer_id: int) -> void:
+	for drop in get_tree().get_nodes_in_group("street_supplies"):
+		if not drop.is_queued_for_deletion():
+			_spawn_supply.rpc_id(peer_id, drop.global_position)
+	for child in get_children():
+		var enemy := child as EnemyBase
+		if enemy and enemy.is_in_group("enemies") and not enemy.is_queued_for_deletion():
+			_spawn_enemy.rpc_id(peer_id, enemy.net_id, _kind_of(enemy.scene_file_path),
+				enemy.global_position, enemy.is_small, enemy.is_elite, enemy.miniboss_wave)
+
+
 ## A drop every peer will see: it is collected locally by whoever walks over
 ## it, so the node has to exist on every machine.
 func spawn_drop(at: Vector3, kind := "ammo", expires := 35.0) -> void:
@@ -471,7 +492,7 @@ func _play_enemy_molt(net_id: int) -> void:
 ## Host: one enemy died. Tell clients which one, its drops, and death fragment launch.
 func notify_despawn(enemy: EnemyBase, drops: Array, throw_vec := Vector3.ZERO, critical := false) -> void:
 	if Net.is_host() and Net.is_online():
-		Net.rpc_to_all(_despawn_enemy, [enemy.net_id, drops, enemy.global_position, throw_vec, critical])
+		Net.rpc_to_run(_despawn_enemy, [enemy.net_id, drops, enemy.global_position, throw_vec, critical])
 
 
 @rpc("authority", "call_remote", "reliable")

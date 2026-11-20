@@ -20,6 +20,7 @@ extends Node
 signal roster_changed
 signal servers_changed
 signal peer_joined(peer_id: int)
+signal run_peer_ready(peer_id: int)
 signal run_started
 signal connection_failed
 signal server_closed
@@ -31,7 +32,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 7
+const PROTOCOL := 8
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -53,6 +54,14 @@ var local_name := ""
 ## peer id -> {"name": String, "ready": bool, "color": int, "skin": int}
 ## color / skin index Cosmetics.COLORS / SKINS; the host keeps colours unique.
 var roster := {}
+## Lobby choice can be RANDOM. The run id always names an actual level.
+var lobby_map_id := Maps.DEFAULT_ID
+var run_map_id := Maps.DEFAULT_ID
+var lobby_votes_enabled := false
+var lobby_vote_counts := {}
+var lobby_my_vote := ""
+## Host only. Remote peers get the counts and their own confirmed choice.
+var _map_votes := {}
 ## ip -> {"name": String, "players": int, "max": int, "port": int}
 var servers := {}
 ## True between the lobby's START and the results screen.
@@ -145,7 +154,7 @@ func can_host() -> bool:
 
 ## Open a session. Returns OK, or an error the lobby can show.
 ## as_player = false is the dedicated server: no roster entry for peer 1.
-func host(port := PORT, as_player := true) -> Error:
+func host(port := PORT, as_player := true, default_map := Maps.DEFAULT_ID) -> Error:
 	leave()
 	if not can_host():
 		return ERR_UNAVAILABLE
@@ -156,6 +165,8 @@ func host(port := PORT, as_player := true) -> Error:
 	multiplayer.multiplayer_peer = peer
 	_host_port = port
 	mode = Mode.HOST
+	lobby_map_id = Maps.fallback(default_map)
+	lobby_votes_enabled = not as_player
 	var custom := Settings.player_name.strip_edges().left(18)
 	local_name = (custom if custom != "" else "HOST") if as_player else "CLOUD SERVER"
 	roster.clear()
@@ -215,6 +226,13 @@ func leave() -> void:
 	stop_scanning()
 	mode = Mode.OFFLINE
 	run_active = false
+	lobby_map_id = Maps.DEFAULT_ID
+	run_map_id = Maps.DEFAULT_ID
+	lobby_votes_enabled = false
+	lobby_vote_counts.clear()
+	lobby_my_vote = ""
+	_map_votes.clear()
+	run_peers.clear()
 	_connect_left = 0.0
 	roster.clear()
 	peer_rtt_ms.clear()
@@ -266,6 +284,32 @@ func set_ready(value: bool) -> void:
 		roster_changed.emit()
 	elif is_online():
 		_request_ready.rpc_id(1, value)
+
+
+func set_lobby_map(id: String) -> void:
+	if not is_host() or not is_online() or run_active or lobby_votes_enabled:
+		return
+	if id == Maps.RANDOM_ID or Maps.is_available(id):
+		lobby_map_id = id
+		_broadcast_roster()
+		roster_changed.emit()
+
+
+func vote_for_map(id: String) -> void:
+	if not is_host() and is_online() and lobby_votes_enabled and not run_active:
+		_request_map_vote.rpc_id(1, id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_map_vote(id: String) -> void:
+	if not is_host() or run_active or not lobby_votes_enabled:
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	if not roster.has(peer) or (id != Maps.RANDOM_ID and not Maps.is_available(id)):
+		return
+	_map_votes[peer] = id
+	_broadcast_roster()
+	roster_changed.emit()
 
 
 ## Change our suit colour / skin. The host may hand back a different colour
@@ -376,17 +420,40 @@ func _assign_cosmetic(peer_id: int, color: int, skin: int) -> void:
 
 ## Host: send everyone into the run.
 func request_start() -> void:
-	if not is_host():
+	if not is_host() or run_active or roster.is_empty():
 		return
+	run_map_id = _resolve_lobby_map()
 	run_active = true
-	for peer in _open_peers():
-		_start_run.rpc_id(peer)
+	for peer in roster:
+		if _is_peer_open(peer):
+			_start_run.rpc_id(peer, run_map_id)
 	run_started.emit()
+
+
+func _resolve_lobby_map() -> String:
+	if not lobby_votes_enabled or lobby_vote_counts.is_empty():
+		return Maps.resolve(lobby_map_id)
+	var most := 0
+	var leaders: Array[String] = []
+	for id: String in lobby_vote_counts:
+		var count: int = lobby_vote_counts[id]
+		if count > most:
+			most = count
+			leaders.clear()
+		if count == most:
+			leaders.append(id)
+	var winner: String = leaders.pick_random()
+	return Maps.resolve(winner)
 
 
 ## The run is over (results screen): late joiners should go to the lobby.
 func end_run() -> void:
+	var was_active := run_active
 	run_active = false
+	run_peers.clear()
+	if was_active and is_host() and lobby_votes_enabled:
+		_map_votes.clear()
+		_broadcast_roster()
 
 
 # ------------------------------------------------------------------ roster
@@ -435,8 +502,13 @@ func _open_peers(exclude_peer := 0) -> PackedInt32Array:
 
 
 func _broadcast_roster(exclude_peer := 0) -> void:
-	for peer in _open_peers(exclude_peer):
-		_push_roster.rpc_id(peer, roster)
+	lobby_vote_counts.clear()
+	for id: String in _map_votes.values():
+		lobby_vote_counts[id] = int(lobby_vote_counts.get(id, 0)) + 1
+	for peer in roster:
+		if peer != exclude_peer and _is_peer_open(peer):
+			_push_roster.rpc_id(peer, roster, lobby_map_id, lobby_votes_enabled,
+				lobby_vote_counts, str(_map_votes.get(peer, "")))
 
 
 ## Host: send `method` to every connected peer whose WebSocket is still OPEN.
@@ -460,7 +532,10 @@ func _report_in_run(value: bool) -> void:
 		return
 	var peer := multiplayer.get_remote_sender_id()
 	if value:
+		if not run_active or not roster.has(peer) or run_peers.has(peer):
+			return
 		run_peers[peer] = true
+		run_peer_ready.emit(peer)
 	else:
 		run_peers.erase(peer)
 
@@ -479,6 +554,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	if not is_host():
 		return
 	roster.erase(peer_id)
+	_map_votes.erase(peer_id)
 	_broadcast_roster(peer_id)
 	roster_changed.emit()
 
@@ -573,7 +649,7 @@ func _hello(hello: String, protocol := 0) -> void:
 	roster_changed.emit()
 	# A run already in progress: send them in, and let GameManager catch up.
 	if run_active and _is_peer_open(peer_id):
-		_start_run.rpc_id(peer_id)
+		_start_run.rpc_id(peer_id, run_map_id)
 	peer_joined.emit(peer_id)
 
 
@@ -588,8 +664,12 @@ func _reject(reason: String) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _push_roster(new_roster: Dictionary) -> void:
+func _push_roster(new_roster: Dictionary, map_id: String, voting: bool, counts: Dictionary, my_vote: String) -> void:
 	roster = new_roster
+	lobby_map_id = map_id
+	lobby_votes_enabled = voting
+	lobby_vote_counts = counts
+	lobby_my_vote = my_vote
 	roster_changed.emit()
 
 
@@ -628,7 +708,12 @@ func _request_name(new_name: String) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _start_run() -> void:
+func _start_run(map_id: String) -> void:
+	if not Maps.is_available(map_id):
+		_reject("THIS BUILD IS MISSING %s. UPDATE THE GAME." % Maps.display_name(map_id))
+		return
+	run_map_id = map_id
+	run_active = true
 	run_started.emit()
 
 

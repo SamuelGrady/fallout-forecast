@@ -181,6 +181,11 @@ func strike_lightning(at: Variant = null) -> void:
 		position = at
 	else:
 		position = Vector3(randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
+		if GameManager.map_id != Maps.DEFAULT_ID:
+			var markers := get_tree().get_nodes_in_group("enemy_spawn")
+			if not markers.is_empty():
+				var marker := markers.pick_random() as Node3D
+				position = marker.global_position + Vector3(randf_range(-3.5, 3.5), 0.0, randf_range(-3.5, 3.5))
 		# Conductors mutation: pull most strikes near an infected so the chain jump matters.
 		if GameManager.has_mutation("conductors") and randf() < 0.65:
 			var enemies := get_tree().get_nodes_in_group("enemies")

@@ -1,5 +1,5 @@
 extends Node3D
-## Boss_Cumulus (wave 5): a bloated spore cloud over Main Street that makes its
+## Boss_Cumulus (wave 5): a bloated spore cloud over the district that makes its
 ## own Acid Storm.
 ## - Three glowing sacs. Each one destroyed lowers storm_intensity a step
 ##   (1.0 -> 0.7 -> 0.3 -> 0.0) and drops the boss 4 m lower.
@@ -21,7 +21,6 @@ const STORM_STEPS := [0.7, 0.3, 0.0]
 @export var spore_interval := 2.6
 @export var summon_interval := 14.0
 @export var drift_radius := 10.0
-@export var start_height := 18.0
 @export var drop_per_sac := 4.0
 
 var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
@@ -30,7 +29,7 @@ var sacs_left := 3
 var dead := false
 
 var _anchor := Vector3.ZERO
-var _height := 18.0
+var _height := 0.0
 var _t := 0.0
 var _burn_left := 0.0
 var _net_left := 0.0
@@ -50,7 +49,7 @@ var _entrance_left := 1.8
 func _ready() -> void:
 	add_to_group("boss")
 	_anchor = global_position
-	_height = start_height + 16.0
+	_height = _anchor.y + 16.0
 	var scale_hp := GameManager.enemy_health_scale() if GameManager.has_method("enemy_health_scale") else 1.0
 	for i in 3:
 		part_max[i] = sac_health * scale_hp
@@ -196,13 +195,13 @@ func _process(delta: float) -> void:
 		_net_left -= delta
 		if _net_left <= 0.0:
 			_net_left = 0.1
-			_sync.rpc(global_position, part_health, sacs_left, _burn_left)
+			Net.rpc_to_run(_sync, [global_position, part_health, sacs_left, _burn_left])
 	if not Net.is_host() or dead:
 		return
 	if _entrance_left > 0.0:
 		_entrance_left = maxf(0.0, _entrance_left - delta)
-	# Drift in a slow circle over Main Street and sink as sacs pop.
-	var goal_height := start_height - drop_per_sac * (3 - sacs_left)
+	# Drift around the map's anchor and sink as sacs pop.
+	var goal_height := _anchor.y - drop_per_sac * (3 - sacs_left)
 	var descend_rate := 10.0 if _entrance_left > 0.0 else 2.2
 	_height = move_toward(_height, goal_height, delta * descend_rate)
 	var drift := Vector3(cos(_t * 0.12), 0, sin(_t * 0.12)) * drift_radius
@@ -333,7 +332,7 @@ func _die() -> void:
 	defeated.emit()
 	GameManager.boss_defeated()
 	if Net.is_online():
-		_died.rpc()
+		Net.rpc_to_run(_died, [])
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
 	t.tween_callback(queue_free)

@@ -1,5 +1,4 @@
 extends Control
-const RUN_SCENE := "res://main.tscn"
 const TITLE_SCENE := "res://ui/title.tscn"
 const LOBBY_SCENE := "res://ui/lobby.tscn"
 
@@ -20,6 +19,8 @@ func _ready() -> void:
 
 	var result: Dictionary = GameManager.last_results if GameManager.last_results is Dictionary else {}
 	var won: bool = bool(result.get("won", false))
+	var map_id := str(result.get("map_id", Maps.DEFAULT_ID))
+	var district := Maps.display_name(map_id)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -29,7 +30,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 20)
 	center.add_child(box)
 
-	_label(box, "PINECREST IS SAFE" if won else "PINECREST IS LOST", 52, BroadcastUI.CYAN if won else BroadcastUI.PINK)
+	_label(box, district + (" IS SAFE" if won else " IS LOST"), 52, BroadcastUI.CYAN if won else BroadcastUI.PINK)
 	_label(box, _epilogue(won, int(result.get("wave_reached", result.get("waves", 0)))), 20, Color(0.85, 0.86, 0.8))
 	var waves := HBoxContainer.new()
 	waves.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -104,7 +105,7 @@ func _ready() -> void:
 	if Net.is_online():
 		play = _button(actions, "BACK TO LOBBY", func(): get_tree().change_scene_to_file(LOBBY_SCENE))
 	else:
-		play = _button(actions, "PLAY AGAIN", func(): SceneLoader.goto(RUN_SCENE))
+		play = _button(actions, "PLAY AGAIN", func(): SceneLoader.goto(Maps.RUN_SCENE, map_id))
 	BroadcastUI.button_role(play, true)
 	_button(actions, "MAIN MENU", _on_menu)
 	play.grab_focus()
@@ -129,12 +130,12 @@ func _ready() -> void:
 ## One line of epilogue, by how the run went.
 func _epilogue(won: bool, wave: int) -> String:
 	if won:
-		return "The acid storm broke over Pinecrest at dawn. Cumulus is gone, and the sirens finally stopped."
+		return "The acid storm broke at dawn. Cumulus is gone, and the sirens finally stopped."
 	match wave:
 		0, 1:
 			return "The first rain was enough. Nobody made it past the drizzle."
 		2, 3:
-			return "The squad held Main Street for a while. Then the downpour took the rest."
+			return "The squad held the district for a while. Then the downpour took the rest."
 		4:
 			return "So close. One more storm and the quarantine would have lifted."
 		_:

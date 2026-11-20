@@ -1,24 +1,56 @@
 extends Node3D
 ## Run entry point.
 ##
-## Solo (and when main.tscn is run straight from the editor) the Player baked
-## into the scene is the player. In a session the roster owns the players
-## instead: every peer builds the same set of nodes from Net.roster, names them
-## P_<peer id> so the paths match for RPCs, and hands each one its owner's
-## authority. The baked-in Player is dropped in that case.
+## Load the district before setting up the player or any marker-driven systems.
+## In a session every peer builds the same Players/P_<peer id> nodes from
+## Net.roster and gives each one to its owner.
 ##
 ## Also puts the level's decon showers in play and starts the run on the host.
 
 const DeconShower := preload("res://props/decon_shower.gd")
 const PlayerScene := preload("res://player/player.tscn")
+const DistrictObjective := preload("res://props/district_objective.gd")
+
+var map_id := ""
+var map_scene: PackedScene
+var loading_map := true
+var _level: Node3D
 
 
 func _ready() -> void:
+	if map_id.is_empty():
+		map_id = Net.run_map_id if Net.is_online() else Maps.fallback(Settings.solo_map_id)
+	if map_scene == null:
+		var path := str(Maps.entry(map_id).get("scene", ""))
+		if not path.is_empty():
+			map_scene = load(path) as PackedScene
+	var level_root := map_scene.instantiate() if map_scene else null
+	_level = level_root as Node3D
+	if _level == null:
+		if level_root:
+			level_root.free()
+		push_error("Could not instantiate map " + map_id)
+		loading_map = false
+		if Net.dedicated:
+			get_tree().quit(1)
+		else:
+			_leave_to_title.call_deferred()
+		return
+	_level.name = "Level"
+	add_child(_level)
+	GameManager.map_id = map_id
+	if map_id == Maps.DEFAULT_ID and not Net.dedicated:
+		preload("res://props/building_restyle.gd").apply(_level)
+		var signs := Node.new()
+		signs.set_script(preload("res://props/map_signs.gd"))
+		_level.add_child(signs)
+	_setup_decon_showers()
+	_setup_objectives()
+	_setup_players()
+
 	if OS.has_feature("web"):
 		Engine.max_physics_steps_per_frame = 2
 	Sound.start_run()
-	# Tell the host this client can now take per-frame player relays.
-	Net.report_in_run.call_deferred(true)
 	var pause_menu := CanvasLayer.new()
 	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
 	add_child(pause_menu)
@@ -55,19 +87,6 @@ func _ready() -> void:
 		var dev_menu := CanvasLayer.new()
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
 		add_child(dev_menu)
-	_setup_decon_showers()
-	_setup_objectives()
-	preload("res://props/building_restyle.gd").apply($Level)
-	var signs := Node.new()
-	signs.set_script(preload("res://props/map_signs.gd"))
-	$Level.add_child(signs)
-	if OS.has_feature("web") and not Net.dedicated:
-		# Web only: merge static props per material once everything above is
-		# built (WebGL pays heavily per draw call; desktop keeps culling).
-		(func():
-			var merged := StaticBatcher.batch($Level)
-			Perf.mark("static batch merged %d meshes" % merged)).call_deferred()
-	_setup_players()
 	var pings := PingSystem.new()
 	pings.name = "Pings"
 	add_child(pings)
@@ -77,27 +96,69 @@ func _ready() -> void:
 		$HUD.add_child(ping_hud)
 	Net.roster_changed.connect(_sync_players)
 	Net.server_closed.connect(_leave_to_title)
-	if GameManager.is_host():
-		GameManager.start_run.call_deferred()
 	GameManager.run_finished.connect(_on_run_finished)
+	_prepare_navigation.call_deferred()
 
 
-## Solo: place the scene's Player. Session: replace it with the roster's set.
-func _setup_players() -> void:
-	if not Net.is_online():
-		var spawns := get_tree().get_nodes_in_group("player_spawn")
-		if has_node("Player") and not spawns.is_empty():
-			$Player.global_transform = (spawns[0] as Node3D).global_transform
-		if has_node("Player"):
-			_apply_look($Player, Settings.suit_color, Settings.suit_skin)
+func _prepare_navigation() -> void:
+	# CSG updates its collision on a deferred turn. Parse scene geometry on
+	# the main thread and let Godot bake it on a worker where supported.
+	await get_tree().physics_frame
+	for node in _level.find_children("*", "NavigationRegion3D", true, false):
+		var region := node as NavigationRegion3D
+		var mesh := region.navigation_mesh
+		if mesh and mesh.get_polygon_count() > 0:
+			continue
+		if mesh == null:
+			mesh = NavigationMesh.new()
+			mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+			mesh.agent_height = 1.75
+		else:
+			mesh = mesh.duplicate() as NavigationMesh
+		region.navigation_mesh = mesh
+		# A region without an authored source group bakes its own subtree by
+		# default. Include sibling geometry in the level as well.
+		var whole_level := mesh.geometry_source_geometry_mode == NavigationMesh.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
+		var bake_group := "map_bake_%d" % _level.get_instance_id()
+		if whole_level:
+			_level.add_to_group(bake_group)
+			mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
+			mesh.geometry_source_group_name = bake_group
+		region.bake_navigation_mesh(not OS.has_feature("web"))
+		if region.is_baking():
+			await region.bake_finished
+		if whole_level:
+			_level.remove_from_group(bake_group)
+			mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
+			mesh.geometry_source_group_name = &""
+		if region.navigation_mesh.get_polygon_count() == 0:
+			push_warning("No walkable navigation geometry for %s in %s" % [region.name, map_id])
+	# NavigationServer syncs region changes on a physics tick.
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	if _finishing:
 		return
-	_sync_players()
-	if has_node("Player"):
-		var baked := $Player as Player
-		# Groups outlive queue_free for a frame, so drop it from both by hand.
-		baked.remove_from_group("players")
-		baked.remove_from_group("local_player")
-		baked.queue_free()
+	if OS.has_feature("web") and not Net.dedicated:
+		var merged := StaticBatcher.batch(_level)
+		Perf.mark("static batch merged %d meshes" % merged)
+	loading_map = false
+	if GameManager.is_host():
+		GameManager.start_run()
+	else:
+		Net.report_in_run(true)
+
+
+func _setup_players() -> void:
+	if Net.is_online():
+		_sync_players()
+		return
+	var player := PlayerScene.instantiate() as Player
+	player.name = "Player"
+	_apply_look(player, Settings.suit_color, Settings.suit_skin)
+	var spawn := get_tree().get_first_node_in_group("player_spawn") as Node3D
+	if spawn:
+		player.transform = global_transform.affine_inverse() * spawn.global_transform
+	add_child(player)
 
 
 ## Every peer runs this on join and on every roster change, building the same
@@ -128,10 +189,11 @@ func _sync_players() -> void:
 		# Authority before add_child: player.gd._ready() checks it to decide
 		# whether to take the camera and capture the mouse.
 		player.set_multiplayer_authority(peer_id)
+		if not spawns.is_empty():
+			var spawn := spawns[i % spawns.size()] as Node3D
+			player.transform = container.global_transform.affine_inverse() * spawn.global_transform
 		container.add_child(player)
 		player.display_name = _peer_name(peer_id)
-		if not spawns.is_empty():
-			player.global_position = (spawns[i % spawns.size()] as Node3D).global_position
 	# Anyone who left.
 	for child in container.get_children():
 		var peer_id := _peer_of(str(child.name))
@@ -171,19 +233,30 @@ func _peer_of(node_name: String) -> int:
 	return int(node_name.substr(2))
 
 
-## Same three district objectives on every peer; the host picks the live one.
+## Same objective paths on every peer. New districts use their drain markers.
 func _setup_objectives() -> void:
 	var root := Node3D.new()
 	root.name = "DistrictObjectives"
-	$Level.add_child(root)
-	for site in preload("res://props/district_objective.gd").SITES:
-		var objective := Node3D.new()
-		objective.set_script(preload("res://props/district_objective.gd"))
-		objective.name = site
-		objective.site = site
-		root.add_child(objective)
-		# Lift the use point off the ground so the interact ray reaches it.
-		objective.global_position = objective.SITES[site].at + Vector3.UP
+	_level.add_child(root)
+	if map_id == Maps.DEFAULT_ID:
+		for site: String in DistrictObjective.PINECREST_SITES:
+			var data: Dictionary = DistrictObjective.PINECREST_SITES[site]
+			_add_objective(root, site, data.label, _level.to_global(data.at))
+	else:
+		var markers := get_tree().get_nodes_in_group("drain_spawn")
+		for i in mini(3, markers.size()):
+			var marker := markers[i] as Node3D
+			_add_objective(root, "drain_%d" % (i + 1), "SEAL DRAIN %d" % (i + 1), marker.global_position)
+
+
+func _add_objective(root: Node3D, site: String, label: String, at: Vector3) -> void:
+	var objective := DistrictObjective.new()
+	objective.name = site
+	objective.site = site
+	objective.site_label = label
+	root.add_child(objective)
+	# Lift the use point off the ground so the interact ray reaches it.
+	objective.global_position = at + Vector3.UP
 
 
 var _finishing := false
@@ -269,6 +342,7 @@ func _leave_to_title() -> void:
 ## goes back to the lobby to play again.
 func _end() -> void:
 	Net.end_run()
+	GameManager.run_active = false
 	GameManager.mutations.clear()
 	WeatherManager.stop()
 

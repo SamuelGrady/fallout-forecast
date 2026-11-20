@@ -5,10 +5,12 @@ All multiplayer uses WebSockets (`WebSocketMultiplayerPeer`), so desktop and web
 ## Run locally
 
 ```
-godot --headless --path . --audio-driver Dummy -- --server [--port=7777] [--heartbeat=/tmp/fallout-heartbeat]
+godot --headless --path . --audio-driver Dummy -- --server [--port=7777] [--map pinecrest] [--heartbeat=/tmp/fallout-heartbeat]
 ```
 
 The server is peer 1 but is not a player. It logs joins, leaves and runs to stdout. A run starts once every connected player is READY in the lobby. After the results screen, or when everyone leaves, it unloads the run and waits for the next one. Code: `game/dedicated_server.gd`.
+
+Players vote for a map or RANDOM before starting. The server chooses the winner and breaks ties at random. With no votes, it uses `--map <id>`. The default is Pinecrest, including when the supplied map is unavailable.
 
 Clients join from JOIN GAME. Use CLOUD SERVER, or type `127.0.0.1:7777`, `ws://host:port/` or `wss://host/`.
 

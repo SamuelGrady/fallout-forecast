@@ -33,6 +33,7 @@ var finished := false
 var victory_locked := false
 var _run_id := 0
 var last_results := {}
+var map_id := Maps.DEFAULT_ID
 
 var _lose_check := 0.0
 var mutations: Node
@@ -42,7 +43,7 @@ var crates: Node
 func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
-	Net.peer_joined.connect(_on_peer_joined)
+	Net.run_peer_ready.connect(_sync_run_to_peer)
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
 	add_child(mutations)
@@ -70,6 +71,7 @@ func start_run() -> void:
 	_run_id += 1
 	_run_started_ms = Time.get_ticks_msec()
 	run_active = true
+	_active_objective = ""
 	stats.clear()
 	if mutations:
 		mutations.reset_run()
@@ -82,15 +84,24 @@ func start_run() -> void:
 	WeatherManager.start_run()
 
 
-## Host: someone joined while a run was going. Bring them up to date; Net has
-## already sent them into the run scene.
-func _on_peer_joined(peer_id: int) -> void:
+## Host: send the current state once the peer has finished loading the map.
+func _sync_run_to_peer(peer_id: int) -> void:
 	if not is_host() or not run_active:
 		return
 	WeatherManager.sync_to_peer(peer_id)
 	_sync_decon.rpc_id(peer_id, decon_charges)
 	if mutations:
 		mutations.sync_to_peer(peer_id)
+	if crates:
+		crates.sync_to_peer(peer_id)
+	var world := _world()
+	var spawner := world.get_node_or_null("Enemies") if world else null
+	if spawner:
+		spawner.sync_to_peer(peer_id)
+	_sync_objective.rpc_id(peer_id, _active_objective)
+	var boss := get_tree().get_first_node_in_group("boss") as Node3D
+	if boss:
+		_spawn_boss.rpc_id(peer_id, boss.global_position)
 
 
 func players() -> Array:
@@ -279,10 +290,11 @@ func player_for_peer(peer: int) -> Node:
 
 
 # ------------------------------------------------------------------ objectives
-const OBJECTIVE_ORDER := ["pharmacy", "water_tower", "gas_pumps"]
+var _active_objective := ""
 
 
 func _set_objective(site: String) -> void:
+	_active_objective = site
 	if _online():
 		_sync_objective.rpc(site)
 	_sync_objective(site)
@@ -310,9 +322,9 @@ func complete_objective(objective: Node, player: Node) -> void:
 	if spawner and spawner.has_method("spawn_drop"):
 		spawner.spawn_drop(at, "supply", 600.0)
 		if _online():
-			spawner._spawn_supply.rpc(at)
+			Net.rpc_to_run(spawner._spawn_supply, [at])
 	Sound.play("reel_land", -6.0, 1.2)
-	show_banner("%s: +1 DECON, SUPPLIES" % str(objective.SITES[objective.site].label), Color("ffd56a"), 2.4)
+	show_banner("%s: +1 DECON, SUPPLIES" % str(objective.site_label), Color("ffd56a"), 2.4)
 	var s := _stat(player)
 	s["objectives"] = int(s.get("objectives", 0)) + 1
 
@@ -413,9 +425,11 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 		return
 	match phase:
 		WeatherManager.Phase.DRIZZLE:
-			var site: String = OBJECTIVE_ORDER[(_wave - 1) % OBJECTIVE_ORDER.size()]
-			_set_objective(site)
-			show_banner("OBJECTIVE: %s" % site.replace("_", " ").to_upper(), Color("ffd56a"), 2.2)
+			var objectives := get_tree().get_nodes_in_group("district_objectives")
+			if not objectives.is_empty():
+				var objective: Node = objectives[(_wave - 1) % objectives.size()]
+				_set_objective(objective.site)
+				show_banner("OBJECTIVE: %s" % objective.site_label, Color("ffd56a"), 2.2)
 		WeatherManager.Phase.CALM:
 			crates.spawn_for_calm()
 			# Clear weather: showers refill one charge.
@@ -640,7 +654,7 @@ func record_cursed(player: Node, weapon_name: String) -> void:
 
 
 # ------------------------------------------------------------------ boss
-## Host: Cumulus rolls in over Main Street; the Acid Storm won't end until it dies.
+## Host: Cumulus rolls in over the district. The Acid Storm lasts until it dies.
 func spawn_boss() -> void:
 	if not get_tree().get_nodes_in_group("boss").is_empty():
 		return
@@ -649,20 +663,23 @@ func spawn_boss() -> void:
 	var anchor := get_tree().get_first_node_in_group("boss_anchor") as Node3D
 	if spawner == null:
 		return
-	var at: Vector3 = anchor.global_position if anchor else Vector3(0, 18, 0)
+	if anchor == null:
+		push_warning("No boss_anchor in %s" % map_id)
+		return
+	var at := anchor.global_position
 	_spawn_boss_node(spawner, at)
 	if _online():
-		Net.rpc_to_all(_spawn_boss, [at])
+		Net.rpc_to_run(_spawn_boss, [at])
 	WeatherManager.hold = true
 	WeatherManager.set_intensity_override(1.0)
 	show_banner("CUMULUS", Color("8FD65A"), 2.2)
 
 
-func _spawn_boss_node(parent: Node, at: Vector3) -> void:
-	var boss := (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
+func _spawn_boss_node(parent: Node3D, at: Vector3) -> void:
+	var boss := (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate() as Node3D
 	boss.name = "BossCumulus"
+	boss.position = parent.to_local(at)
 	parent.add_child(boss, true)
-	boss.global_position = at
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -732,6 +749,7 @@ func finish(won: bool) -> void:
 				squad.append(str(PLAYER_MUTATIONS[id].name))
 	var results := {
 		"won": won,
+		"map_id": map_id,
 		"waves": WeatherManager.wave if won else WeatherManager.wave - 1,
 		"wave_reached": WeatherManager.wave,
 		"seconds": int((Time.get_ticks_msec() - _run_started_ms) / 1000.0) if _run_started_ms > 0 else 0,
@@ -759,7 +777,8 @@ func _finish(won: bool, results: Dictionary) -> void:
 	finished = true
 	run_active = false
 	last_results = results
-	banner.emit("PINECREST IS SAFE" if won else "PINECREST IS LOST", Color(0.4, 1, 0.6) if won else Color(1, 0.3, 0.3), 4.0)
+	var district := Maps.display_name(str(results.get("map_id", Maps.DEFAULT_ID)))
+	banner.emit(district + (" IS SAFE" if won else " IS LOST"), Color(0.4, 1, 0.6) if won else Color(1, 0.3, 0.3), 4.0)
 	run_finished.emit(won, results)
 
 

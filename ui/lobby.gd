@@ -5,15 +5,20 @@ extends Control
 ## Both the host and every client sit here until Net.run_started fires, then
 ## all of them change to the run scene together.
 
-const RUN_SCENE := "res://main.tscn"
 const TITLE_SCENE := "res://ui/title.tscn"
 
+var _content: VBoxContainer
+var _chat_panel: PanelContainer
 var _roster: VBoxContainer
 var _status: Label
 var _name_edit: LineEdit
 var _ready_button: Button
 var _force_button: Button
 var _start_button: Button
+var _map_button: Button
+var _map_status: Label
+var _map_picker: MapSelect
+var _leave_button: Button
 var _picker: SuitPicker
 var _leaving := false
 
@@ -25,12 +30,11 @@ func _ready() -> void:
 	BroadcastUI.backdrop(self)
 
 	var box := VBoxContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.offset_left = -440
-	box.offset_right = 440
-	box.offset_top = -330
+	_content = box
+	box.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	box.offset_left = 40
+	box.offset_right = -40
+	box.offset_top = 24
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -57,7 +61,7 @@ func _ready() -> void:
 	columns.add_child(_picker)
 	var side := VBoxContainer.new()
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	side.add_theme_constant_override("separation", 14)
+	side.add_theme_constant_override("separation", 10)
 	columns.add_child(side)
 
 	var name_row := HBoxContainer.new()
@@ -81,13 +85,24 @@ func _ready() -> void:
 
 	_roster = VBoxContainer.new()
 	_roster.add_theme_constant_override("separation", 6)
-	_roster.custom_minimum_size.y = 180
+	_roster.custom_minimum_size.y = 114
 	side.add_child(_roster)
 
+	var map_row := HBoxContainer.new()
+	map_row.add_theme_constant_override("separation", 12)
+	side.add_child(map_row)
+	_map_status = Label.new()
+	_map_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map_status.add_theme_font_size_override("font_size", 22)
+	_map_status.add_theme_color_override("font_color", BroadcastUI.CYAN)
+	map_row.add_child(_map_status)
+	_map_button = _button(map_row, "CHANGE MAP", _open_maps)
+	_map_button.custom_minimum_size = Vector2(148, 40)
+	BroadcastUI.button_role(_map_button, false, true)
 	_start_button = _button(side, "START RUN", _on_start)
 	_ready_button = _button(side, "READY", _on_ready)
 	_force_button = _button(side, "FORCE START", _on_force)
-	_button(side, "LEAVE", _on_leave)
+	_leave_button = _button(side, "LEAVE", _on_leave)
 
 	_build_chat()
 	Net.chat_received.connect(_on_chat)
@@ -95,7 +110,8 @@ func _ready() -> void:
 	Net.roster_changed.connect(_refresh)
 	Net.run_started.connect(_on_run_started)
 	Net.server_closed.connect(_on_server_closed)
-	Net.connection_failed.connect(_on_server_closed)
+	Net.connection_failed.connect(_on_connection_failed)
+	SceneLoader.load_failed.connect(_on_load_failed)
 	_refresh()
 	var primary := _start_button if Net.is_host() else _ready_button
 	primary.grab_focus()
@@ -125,9 +141,16 @@ func _refresh() -> void:
 	_force_button.visible = not hosting and Net.is_online() and not all_ready
 	_ready_button.text = "READY" if _is_ready(Net.local_id()) else "NOT READY"
 	if Net.is_offline():
-		_status.text = "No session. Go back and pick HOST GAME or JOIN GAME."
+		_status.text = Net.last_error if Net.last_error != "" else "No session. Go back and pick HOST GAME or JOIN GAME."
+		_start_button.hide()
 	else:
 		_status.text = _host_line()
+	_map_button.visible = Net.is_online() and (hosting or Net.lobby_votes_enabled)
+	_map_button.text = "VOTE MAP" if Net.lobby_votes_enabled else "CHANGE MAP"
+	if Net.lobby_votes_enabled:
+		_map_status.text = "VOTED  " + Maps.display_name(Net.lobby_my_vote) if Net.lobby_my_vote != "" else "CAST A MAP VOTE"
+	else:
+		_map_status.text = "MAP  " + Maps.display_name(Net.lobby_map_id) if Net.is_online() else ""
 	# Out of the tree now, so the rebuilt list doesn't double up for a frame.
 	for child in _roster.get_children():
 		_roster.remove_child(child)
@@ -161,6 +184,29 @@ func _host_line() -> String:
 		lan = text
 		break
 	return "HOSTING ON PORT %d   |   LAN ADDRESS %s" % [Net.PORT, lan]
+
+
+func _open_maps() -> void:
+	if _leaving or _map_picker:
+		return
+	var scene := load(Maps.SELECT_SCENE) as PackedScene
+	_map_picker = scene.instantiate() as MapSelect
+	_map_picker.mode = MapSelect.Mode.VOTE if Net.lobby_votes_enabled else MapSelect.Mode.HOST_PICK
+	_map_picker.dismissed.connect(_close_maps)
+	_content.hide()
+	_chat_panel.hide()
+	add_child(_map_picker)
+
+
+func _close_maps() -> void:
+	if _map_picker:
+		_map_picker.hide()
+		_map_picker.queue_free()
+		_map_picker = null
+	_content.show()
+	_chat_panel.visible = Net.is_online()
+	if _map_button.visible:
+		_map_button.grab_focus()
 
 
 func _row(peer_id: int, info: Dictionary) -> Control:
@@ -239,6 +285,7 @@ var _chat_edit := LineEdit.new()
 ## Chat strip along the bottom: recent lines, a text box, quick phrases.
 func _build_chat() -> void:
 	var panel := PanelContainer.new()
+	_chat_panel = panel
 	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	panel.offset_top = -168
 	panel.offset_left = 40
@@ -308,12 +355,29 @@ func _on_run_started() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	SceneLoader.goto(RUN_SCENE)
+	hide()
+	SceneLoader.goto(Maps.RUN_SCENE)
 
 
 func _on_server_closed() -> void:
-	if _leaving:
-		return
 	_leaving = true
 	Net.leave()
 	get_tree().change_scene_to_file(TITLE_SCENE)
+
+
+func _on_connection_failed() -> void:
+	if Net.last_error == "":
+		_on_server_closed()
+		return
+	_leaving = false
+	show()
+	_close_maps()
+	_refresh()
+	_leave_button.grab_focus()
+
+
+func _on_load_failed(message: String) -> void:
+	if _leaving:
+		Net.leave()
+		Net.last_error = message
+		_on_connection_failed()

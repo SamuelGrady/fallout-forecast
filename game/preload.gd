@@ -70,7 +70,7 @@ func _process(_delta: float) -> void:
 		return
 	# Only on the menus; never stall a frame mid-run, and never while a
 	# background scene prefetch is loading the same dependencies.
-	if GameManager.run_active or SceneLoader.busy():
+	if GameManager.run_active or Net.run_active or SceneLoader.busy():
 		return
 	if not _queue.is_empty():
 		var res := load(_queue.pop_front())

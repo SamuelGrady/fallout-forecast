@@ -1,7 +1,6 @@
 extends Control
 ## Cold open on the tape loader, then switch to the VCR's playback menu.
 
-const RUN_SCENE := "res://main.tscn"
 const LOBBY_SCENE := "res://ui/lobby.tscn"
 const BROWSER_SCENE := "res://ui/server_browser.tscn"
 const RETRO_SCREEN := preload("res://retro/retro_screen.tscn")
@@ -325,7 +324,7 @@ func _set_volume(value: float) -> void:
 func _on_play() -> void:
 	Settings.save()
 	Net.leave()
-	SceneLoader.goto(RUN_SCENE)
+	get_tree().change_scene_to_file(Maps.SELECT_SCENE)
 
 
 func _on_host() -> void:
@@ -489,7 +488,9 @@ void fragment() {
 
 
 func _build_street_3d(viewport: SubViewport) -> void:
-	var level := (load("res://levels/pinecrest/level_pinecrest.tscn") as PackedScene).instantiate() as Node3D
+	# The VCR cover always depicts Pinecrest, independently of the run map.
+	var scene := load(Maps.entry(Maps.DEFAULT_ID).scene) as PackedScene
+	var level := scene.instantiate() as Node3D
 	viewport.add_child(level)
 	preload("res://props/building_restyle.gd").apply(level)
 	var signs := Node.new()
@@ -502,7 +503,7 @@ func _build_street_3d(viewport: SubViewport) -> void:
 
 
 func _build_street_backdrop() -> void:
-	if OS.has_feature("web"):
+	if OS.has_feature("web") or Net.dedicated:
 		# Building the whole map just for a backdrop froze the browser on the
 		# VHS screen; web shows a pre-rendered still of the same view instead
 		# (assets/ui/title_street.png, re-bake if the street changes).

@@ -1,19 +1,18 @@
 extends Interactable
-## A rotating district objective out in the open streets: the pharmacy
-## generator, the water tower filter, the gas pumps. GameManager activates one
-## per wave during the storm; holding E at it pays out a decon charge and a
-## supply pack, so there's a reason to leave the awnings.
+## A rotating district objective. GameManager activates one per storm,
+## and completing it pays out a decon charge and a supply pack.
 ##
-## Every peer builds the same three objectives (main.gd); the host chooses
+## Every peer builds the same objectives (main.gd); the host chooses
 ## the active one and syncs it through GameManager.
 
-const SITES := {
+const PINECREST_SITES := {
 	"pharmacy": {"label": "RESTART GENERATOR", "at": Vector3(9, 0, 20)},
 	"water_tower": {"label": "SWAP WATER FILTER", "at": Vector3(-52, 0, -43)},
 	"gas_pumps": {"label": "SEAL GAS PUMPS", "at": Vector3(45, 0, 16)},
 }
 
-var site := "pharmacy"
+var site := ""
+var site_label := ""
 var active := false
 var _beacon: MeshInstance3D
 var _clock := 0.0
@@ -27,7 +26,7 @@ func _init() -> void:
 func _ready() -> void:
 	super._ready()
 	add_to_group("district_objectives")
-	prompt = SITES[site].label.capitalize()
+	prompt = site_label.capitalize()
 	var pole := MeshInstance3D.new()
 	var cylinder := CylinderMesh.new()
 	cylinder.top_radius = 0.12
@@ -71,10 +70,6 @@ func _process(delta: float) -> void:
 
 func can_interact(player: Node) -> bool:
 	return active and player.get("state") == "ok"
-
-
-func get_prompt(_player: Node) -> String:
-	return SITES[site].label.capitalize()
 
 
 func interact(player: Node) -> void:
