@@ -81,7 +81,9 @@ func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, label: String, di
 	var center := view * 0.5
 	var dir := screen - center
 	if behind:
+		# Behind you: point from the bottom edge, toward the side they're on.
 		dir = -dir
+		dir.y = absf(dir.y) + 0.6
 	if dir.length_squared() < 1.0:
 		dir = Vector2.DOWN
 	dir = dir.normalized()
