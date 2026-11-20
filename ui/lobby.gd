@@ -147,7 +147,7 @@ func _refresh() -> void:
 	_force_button.visible = not hosting and Net.is_online() and not all_ready
 	_ready_button.text = "CANCEL READY" if _is_ready(Net.local_id()) else "READY UP"
 	if Net.is_offline():
-		_status.text = Net.last_error if Net.last_error != "" else "No session. Go back and pick HOST GAME or JOIN GAME."
+		_status.text = Net.last_error if Net.last_error != "" else "No session. Go back and pick CLOUD PLAY."
 		_start_button.hide()
 	else:
 		_status.text = _host_line()

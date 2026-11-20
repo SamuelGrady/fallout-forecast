@@ -2,7 +2,6 @@ extends Control
 ## Cold open on the tape loader, then switch to the VCR's playback menu.
 
 const LOBBY_SCENE := "res://ui/lobby.tscn"
-const BROWSER_SCENE := "res://ui/server_browser.tscn"
 const RETRO_SCREEN := preload("res://retro/retro_screen.tscn")
 const INSERT := preload("res://assets/audio/sfx/vcr_insert.wav")
 const WHIRR := preload("res://assets/audio/sfx/vcr_whirr.wav")
@@ -33,7 +32,6 @@ var _counter: Label
 var _settings_button: Button
 var _suit_button: Button
 var _suit_picker: SuitPicker
-var _host_button: Button
 var _t := 0.0
 var _menu_ready := false
 var _ejecting := false
@@ -134,10 +132,7 @@ func _build_playback_menu() -> void:
 		download.tooltip_text = "Get the desktop build (Windows / Linux)"
 	else:
 		BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
-	# Browsers can join a session, but cannot listen for incoming connections.
-	_host_button = _button(_menu, "HOST GAME", _on_host)
-	_host_button.visible = Net.can_host()
-	_button(_menu, "JOIN GAME", _on_join)
+	_button(_menu, "CLOUD PLAY", _on_join)
 	_suit_button = _button(_menu, "SUIT", _on_suit)
 	_settings_button = _button(_menu, "SETTINGS", _on_settings)
 	_button(_menu, "QUIT", _on_quit).visible = not OS.has_feature("web")
@@ -182,8 +177,6 @@ func _build_playback_menu() -> void:
 	export.pressed.connect(func():
 		Perf.export_report()
 		export.text = "PERF REPORT DOWNLOADED" if OS.has_feature("web") else "PERF REPORT SAVED")
-	if Net.can_host():
-		_button(_settings, "BROWSE LAN GAMES", _on_browse_lan)
 	_button(_settings, "BACK", _on_back)
 
 	_suit.position = Vector2(510, 110)
@@ -345,16 +338,7 @@ func _on_play() -> void:
 	SceneLoader.cut_to(Maps.SELECT_SCENE)
 
 
-func _on_host() -> void:
-	Settings.save()
-	var err := Net.host()
-	if err != OK:
-		_show_error("Could not open port %d (error %d). Another copy running?" % [Net.PORT, err])
-		return
-	SceneLoader.cut_to(LOBBY_SCENE)
-
-
-## JOIN GAME goes straight to the cloud server (or the address in Settings).
+## CLOUD PLAY goes straight to the cloud server (or the address in Settings).
 func _on_join() -> void:
 	Settings.save()
 	var err := Net.join_cloud()
@@ -382,12 +366,6 @@ func _on_join_failed() -> void:
 	_set_menu_enabled(true)
 	var why: String = Net.last_error if Net.last_error != "" else "No answer from the server."
 	_show_error("Could not join %s. %s" % [Net.cloud_url(), why])
-
-
-func _on_browse_lan() -> void:
-	Settings.save()
-	Net.leave()
-	SceneLoader.cut_to(BROWSER_SCENE)
 
 
 var _status_label: Label
@@ -477,7 +455,7 @@ func _show_error(text: String) -> void:
 	var back := _button(row, "BACK", func():
 		row.queue_free()
 		_menu.show()
-		_host_button.grab_focus())
+		_menu_buttons()[0].grab_focus())
 	back.grab_focus()
 	BroadcastUI.reveal(row)
 

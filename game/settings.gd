@@ -21,7 +21,7 @@ var suit_skin := 0
 var player_name := ""
 ## The last district played in solo.
 var solo_map_id := Maps.DEFAULT_ID
-## Server JOIN GAME connects to. Empty = Net.CLOUD_URL (wss://fallout.drew.place/).
+## Server CLOUD PLAY connects to. Empty = Net.CLOUD_URL (wss://fallout.drew.place/).
 var server_url := ""
 ## Show the live performance overlay (Perf autoload). Recording is always on.
 var perf_overlay := false

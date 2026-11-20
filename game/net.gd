@@ -1,24 +1,19 @@
 extends Node
-## Autoload "Net": the session, the lobby roster and LAN discovery.
+## Autoload "Net": the session and the lobby roster.
 ##
 ## One place answers "am I the host?". Every script used to carry its own copy
 ## of that check; now they all ask Net. Offline counts as host, exactly as
 ## before, so solo play runs the same code path as a hosted game.
 ##
 ## Transport is WebSocketMultiplayerPeer everywhere (so browser builds can
-## play): a LAN host listens for ws:// on TCP PORT, and the cloud server sits
-## behind Caddy's TLS at CLOUD_URL (wss://). Topology is client/server.
+## play). Multiplayer is CLOUD PLAY only: the dedicated server listens for ws://
+## on TCP PORT behind Caddy's TLS at CLOUD_URL (wss://). There is no player
+## hosting or LAN discovery any more. Topology is client/server.
 ## Clients can only talk to the host, never to each other, so every
 ## client-to-client message goes client -> host -> clients: see the
 ## "_push_* / _apply_*" pairs on Player and MutationRoll.
-##
-## Discovery (desktop only; browsers have no UDP): the host answers UDP probes
-## on DISCOVERY_PORT; the join screen broadcasts a probe to 255.255.255.255
-## (and 127.0.0.1, so a second window on the same machine shows up) and lists
-## whatever answers. The reply advertises the host's ws port.
 
 signal roster_changed
-signal servers_changed
 signal peer_joined(peer_id: int)
 signal run_started
 signal connection_failed
@@ -37,13 +32,7 @@ const CONNECT_TIMEOUT := 8.0
 
 ## WebSocket (TCP) port a host listens on; the cloud container uses it too.
 const PORT := 7777
-const DISCOVERY_PORT := 7778
 const MAX_PLAYERS := 4
-const GAME_ID := "acidrain"
-const PROBE := "acidrain:probe"
-const SCAN_INTERVAL := 1.0
-## A server not seen for this long drops off the list.
-const SERVER_TIMEOUT := 3.0
 const PING_INTERVAL := 1.0
 
 enum Mode { OFFLINE, HOST, CLIENT }
@@ -61,8 +50,6 @@ var lobby_vote_counts := {}
 var lobby_my_vote := ""
 ## Host only. Remote peers get the counts and their own confirmed choice.
 var _map_votes := {}
-## ip -> {"name": String, "players": int, "max": int, "port": int}
-var servers := {}
 ## True between the lobby's START and the results screen.
 var run_active := false
 ## Headless dedicated server (`-- --server`): hosts with no local player, so
@@ -80,12 +67,6 @@ var _host_port := PORT
 var _ping_timer := 0.0
 var _ping_seq := 0
 var _ping_sent_ms := {}  # peer_id -> {"seq": int, "ms": int}
-
-var _beacon: PacketPeerUDP
-var _scout: PacketPeerUDP
-var _scanning := false
-var _scan_timer := 0.0
-var _seen := {}
 
 
 func _ready() -> void:
@@ -112,15 +93,6 @@ func _process(delta: float) -> void:
 		if _ping_timer <= 0.0:
 			_ping_timer = PING_INTERVAL
 			_send_rtt_pings()
-	if _beacon:
-		_pump_beacon()
-	if _scanning:
-		_scan_timer -= delta
-		if _scan_timer <= 0.0:
-			_scan_timer = SCAN_INTERVAL
-			_send_probe()
-		_pump_scout()
-		_expire_servers()
 
 
 # ------------------------------------------------------------------ session
@@ -146,7 +118,7 @@ func peer_count() -> int:
 	return maxi(roster.size(), 1)
 
 
-## Browsers can't host or listen for LAN probes; they only join.
+## Only the dedicated server hosts (players use CLOUD PLAY). Browsers can't listen at all.
 func can_host() -> bool:
 	return not OS.has_feature("web")
 
@@ -172,7 +144,6 @@ func host(port := PORT, as_player := true, default_map := Maps.DEFAULT_ID) -> Er
 	if as_player:
 		roster[1] = {"name": local_name, "ready": false}
 		_assign_cosmetic(1, Settings.suit_color, Settings.suit_skin)
-	start_beacon()
 	roster_changed.emit()
 	return OK
 
@@ -182,7 +153,7 @@ func join_cloud() -> Error:
 	return join(cloud_url())
 
 
-## The server JOIN GAME uses: Settings' custom address, or the public one.
+## The server CLOUD PLAY uses: Settings' custom address, or the public one.
 func cloud_url() -> String:
 	var custom := Settings.server_url.strip_edges()
 	return to_url(custom) if custom != "" else CLOUD_URL
@@ -221,8 +192,6 @@ func join(address: String, port := PORT) -> Error:
 ## Drop the session. Safe to call when there isn't one.
 func leave() -> void:
 	chat_log.clear()
-	stop_beacon()
-	stop_scanning()
 	mode = Mode.OFFLINE
 	run_active = false
 	lobby_map_id = Maps.DEFAULT_ID
@@ -717,166 +686,3 @@ func _start_run(map_id: String) -> void:
 	run_map_id = map_id
 	run_active = true
 	run_started.emit()
-
-
-# ------------------------------------------------------------------ discovery
-func start_beacon() -> void:
-	stop_beacon()
-	if not can_host():
-		return
-	_beacon = PacketPeerUDP.new()
-	if _beacon.bind(DISCOVERY_PORT) != OK:
-		_beacon = null
-		push_warning("Net: discovery port %d is busy; the host won't be listed" % DISCOVERY_PORT)
-		return
-	_beacon.set_broadcast_enabled(true)
-	# Also listen on a multicast group on every interface: limited broadcast
-	# often leaves Windows through only one adapter (VPNs, virtual NICs).
-	for iface in _lan_interfaces():
-		_beacon.join_multicast_group(DISCOVERY_GROUP, iface)
-
-
-func stop_beacon() -> void:
-	if _beacon:
-		_beacon.close()
-		_beacon = null
-
-
-## Host: answer probes so the join screen can find us without an IP.
-func _pump_beacon() -> void:
-	while _beacon.get_available_packet_count() > 0:
-		var packet := _beacon.get_packet()
-		var from_ip := _beacon.get_packet_ip()
-		var from_port := _beacon.get_packet_port()
-		if packet.get_string_from_utf8() != PROBE:
-			continue
-		var reply := "%s|%s|%d|%d|%d|%s" % [GAME_ID, local_name, roster.size(), MAX_PLAYERS, _host_port, _instance_id]
-		_beacon.set_dest_address(from_ip, from_port)
-		_beacon.put_packet(reply.to_utf8_buffer())
-
-
-func start_scanning() -> void:
-	stop_scanning()
-	if not can_host():
-		return
-	_scout = PacketPeerUDP.new()
-	if _scout.bind(0) != OK:
-		_scout = null
-		return
-	_scout.set_broadcast_enabled(true)
-	_scanning = true
-	_scan_timer = 0.0
-
-
-func stop_scanning() -> void:
-	_scanning = false
-	if _scout:
-		_scout.close()
-		_scout = null
-	servers.clear()
-	_seen.clear()
-
-
-func _send_probe() -> void:
-	var data := PROBE.to_utf8_buffer()
-	_scout.set_dest_address("255.255.255.255", DISCOVERY_PORT)
-	_scout.put_packet(data)
-	# Directed broadcast on every LAN interface (assumes a /24, the norm for
-	# home and lab networks) plus the multicast group, so hosts behind a
-	# different adapter than the default route still answer.
-	var sent := {}
-	for ip in _lan_addresses():
-		var parts: PackedStringArray = ip.split(".")
-		var directed := "%s.%s.%s.255" % [parts[0], parts[1], parts[2]]
-		if sent.has(directed):
-			continue
-		sent[directed] = true
-		_scout.set_dest_address(directed, DISCOVERY_PORT)
-		_scout.put_packet(data)
-	_scout.set_dest_address(DISCOVERY_GROUP, DISCOVERY_PORT)
-	_scout.put_packet(data)
-	# Loopback as well, so two windows on one machine can find each other.
-	_scout.set_dest_address("127.0.0.1", DISCOVERY_PORT)
-	_scout.put_packet(data)
-
-
-const DISCOVERY_GROUP := "239.255.77.77"
-## Random per-process id in beacon replies, for de-duplicating hosts.
-var _instance_id := "%08x" % randi()
-
-
-## Lower is better: private LAN, then this machine, then VPN/CGNAT ranges.
-func _address_rank(ip: String) -> int:
-	if ip.begins_with("10.") or ip.begins_with("192.168.") or ip.begins_with("172."):
-		return 0
-	if ip.begins_with("127."):
-		return 1
-	return 2
-
-
-## Private IPv4 addresses of this machine (no loopback or link-local).
-func _lan_addresses() -> Array:
-	var out := []
-	for ip in IP.get_local_addresses():
-		if ip.contains(":") or ip.begins_with("127.") or ip.begins_with("169.254."):
-			continue
-		out.append(ip)
-	return out
-
-
-## Interface names that carry one of those addresses, for multicast joins.
-func _lan_interfaces() -> Array:
-	var out := []
-	for info in IP.get_local_interfaces():
-		for ip in info.addresses:
-			if not ip.contains(":") and not ip.begins_with("127.") and not ip.begins_with("169.254."):
-				out.append(info.name)
-				break
-	return out
-
-
-func _pump_scout() -> void:
-	var changed := false
-	while _scout.get_available_packet_count() > 0:
-		var packet := _scout.get_packet()
-		var ip := _scout.get_packet_ip()
-		var parts := packet.get_string_from_utf8().split("|")
-		if parts.size() < 4 or parts[0] != GAME_ID:
-			continue
-		# One host answers on every path (LAN, loopback, VPN); keep one entry
-		# per host instance, on the most useful address.
-		var instance := parts[5] if parts.size() > 5 else ip
-		var duplicate := ""
-		for other_ip in servers:
-			if other_ip != ip and str(servers[other_ip].get("instance", "")) == instance:
-				duplicate = other_ip
-		if duplicate != "":
-			if _address_rank(duplicate) <= _address_rank(ip):
-				_seen[duplicate] = Time.get_ticks_msec() / 1000.0
-				continue
-			servers.erase(duplicate)
-			_seen.erase(duplicate)
-			changed = true
-		var existing: Dictionary = servers.get(ip, {})
-		var count := int(parts[2])
-		if str(existing.get("name", "")) != parts[1] or int(existing.get("players", -1)) != count:
-			changed = true
-		servers[ip] = {"name": parts[1], "players": count, "max": int(parts[3]),
-			"port": int(parts[4]) if parts.size() > 4 else PORT, "instance": instance}
-		_seen[ip] = Time.get_ticks_msec() / 1000.0
-	if changed:
-		servers_changed.emit()
-
-
-func _expire_servers() -> void:
-	var now := Time.get_ticks_msec() / 1000.0
-	var stale: Array = []
-	for ip in servers:
-		if now - float(_seen.get(ip, 0.0)) > SERVER_TIMEOUT:
-			stale.append(ip)
-	if stale.is_empty():
-		return
-	for ip in stale:
-		servers.erase(ip)
-		_seen.erase(ip)
-	servers_changed.emit()

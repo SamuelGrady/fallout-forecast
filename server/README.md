@@ -12,7 +12,7 @@ The server is peer 1 but is not a player. It logs joins, leaves and runs to stdo
 
 Players vote for a map or RANDOM before starting. The server chooses the winner and breaks ties at random. With no votes, it uses `--map <id>`. The default is Pinecrest, including when the supplied map is unavailable.
 
-Clients join from JOIN GAME. Use CLOUD SERVER, or type `127.0.0.1:7777`, `ws://host:port/` or `wss://host/`.
+Clients join from CLOUD PLAY on the title screen. Settings > SERVER (WSS) can point it at another server, e.g. `ws://127.0.0.1:7777/` for a local one.
 
 ## Docker (ballista, arm64)
 
