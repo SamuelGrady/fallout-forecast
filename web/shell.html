@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>$GODOT_PROJECT_NAME</title>
   $GODOT_HEAD_INCLUDE
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; font-family: system-ui, -apple-system, sans-serif; background: #0c1422; color: #e8e9d5; }
+    :root { color-scheme: dark; font-family: "VT323", ui-monospace, monospace; background: #0c1422; color: #e8e9d5; }
     body { margin: 0; overflow: hidden; background: #0c1422; }
     canvas { position: fixed; inset: 0; display: block; outline: 0; }
     #launch {
@@ -16,9 +19,40 @@
       background: radial-gradient(circle at 50% 45%, #162a3a 0%, #0c1422 72%);
     }
     #launch[hidden], #fullscreen[hidden] { display: none; }
+    /* VHS overlay: scanlines and a soft vignette, like the in-game title. */
+    #launch::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0,0,0,.22) 0 2px, transparent 2px 4px);
+      animation: roll 9s linear infinite;
+    }
+    #launch::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+    }
+    @keyframes roll { from { background-position-y: 0; } to { background-position-y: 120px; } }
+    .osd { position: absolute; top: 1.4rem; font-size: 2rem; letter-spacing: .08em; color: #e8e9d5; text-shadow: 2px 2px 0 #000; }
+    .osd.left { left: 1.8rem; }
+    .osd.right { right: 1.8rem; }
+    .rec::before { content: ""; display: inline-block; width: .6em; height: .6em; margin-right: .35em; border-radius: 50%; background: #ff5689; animation: blink 1.2s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    #title { margin: 0; line-height: .82; font-weight: 400; font-size: clamp(4.5rem, 15vw, 10.5rem); letter-spacing: .02em; user-select: none; }
+    #title span { display: block; text-shadow: .03em .03em 0 #267e75; }
+    #title .a { color: #e6eee2; }
+    #title .b { color: #a9e9d9; }
+    #tagline { margin: -.4rem 0 .4rem; font-size: clamp(1.1rem, 2.6vw, 1.6rem); letter-spacing: .22em; color: #66dfda; }
+    #actions { display: flex; gap: .9rem; flex-wrap: wrap; justify-content: center; }
+    #download {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 5.5rem; padding: 1.25rem 2rem; box-sizing: border-box;
+      font: inherit; font-size: 2.2rem; letter-spacing: .12em; text-decoration: none;
+      color: #e8e9d5; background: rgba(20, 35, 45, .88);
+      border: 3px solid #e8e9d5; border-radius: .35rem; transition: transform .12s ease, background .12s ease;
+    }
+    #download:hover { background: #29545d; transform: scale(1.04); }
+    #download:focus-visible { outline: 3px solid #ff5689; outline-offset: 4px; }
     #start {
       min-width: 18rem; min-height: 5.5rem; padding: 1.25rem 3.5rem;
-      font-size: 2.5rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+      font: inherit; font-size: 2.6rem; letter-spacing: .14em; text-transform: uppercase;
       color: #e8e9d5; background: #1d3c4a;
       border: 3px solid #66dfda; border-radius: .35rem;
       box-shadow: 0 0 36px rgba(102, 223, 218, .28), inset 0 0 18px rgba(102, 223, 218, .12);
@@ -31,7 +65,8 @@
     #start:active:not(:disabled) { transform: scale(.98); }
     #start:disabled { opacity: .75; cursor: wait; }
     #start:focus-visible, #fullscreen:focus-visible { outline: 3px solid #ff5689; outline-offset: 4px; }
-    #status { min-height: 1.4rem; margin: 0; font-size: 1.05rem; letter-spacing: .06em; color: #66dfda; }
+    #status { min-height: 1.4rem; margin: 0; font-size: 1.5rem; letter-spacing: .08em; color: #66dfda; }
+    @media (max-width: 560px) { .osd { font-size: 1.4rem; } #start, #download { min-width: 0; width: 100%; } #actions { width: 100%; } }
     #fullscreen {
       position: fixed; bottom: .75rem; left: 50%; transform: translateX(-50%);
       color: #e8e9d5; background: rgba(20, 35, 45, .88); border: 1px solid #66dfda;
@@ -44,7 +79,14 @@
 <body>
   <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
   <main id="launch">
-    <button id="start" type="button">PLAY</button>
+    <div class="osd left rec">REC</div>
+    <div class="osd right">SP  OCT 31 1987</div>
+    <h1 id="title" aria-label="Fallout Forecast"><span class="a">FALLOUT</span><span class="b">FORECAST</span></h1>
+    <p id="tagline">CO-OP SURVIVAL UNDER THE ACID RAIN</p>
+    <div id="actions">
+      <button id="start" type="button">&#9654; PLAY</button>
+      <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
+    </div>
     <p id="status" role="status"></p>
   </main>
   <button id="fullscreen" type="button" hidden>Fullscreen</button>
@@ -82,6 +124,14 @@
     const start = document.getElementById("start");
     const status = document.getElementById("status");
     const fullscreen = document.getElementById("fullscreen");
+    // DOWNLOAD: point straight at the matching desktop build when we can tell the OS.
+    (function () {
+      const agent = navigator.userAgent.toLowerCase();
+      const base = "https://github.com/kickofline/fallout-forecast/releases/download/nightly/";
+      const link = document.getElementById("download");
+      if (agent.includes("windows")) link.href = base + "FalloutForecast-windows-x86_64.zip";
+      else if (agent.includes("linux") && !agent.includes("android")) link.href = base + "FalloutForecast-linux-x86_64.tar.gz";
+    })();
     let gameRunning = false;
 
     async function lockGameKeys() {
