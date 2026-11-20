@@ -34,7 +34,7 @@ static var _hit_frame := {}
 ## the spot, or null if a Shield Dome kept it out. Runs the same way on every
 ## peer, so all copies merge alike.
 static func spawn(parent: Node, at: Vector3, is_acid: bool, cloud_radius: float, cloud_lifetime: float,
-		dps: float, cloud_source: Node = null) -> Node:
+		dps: float, cloud_source: Variant = null) -> Node:
 	var tree := parent.get_tree()
 	if _in_dome(at, tree, cloud_radius * 0.35):
 		if not Net.dedicated:
