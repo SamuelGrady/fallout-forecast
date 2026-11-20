@@ -633,9 +633,9 @@ func _eject_casing(heavy: bool) -> void:
 
 
 func _animate(delta: float) -> void:
-	if _model == null:
-		return
 	var data := selected_weapon()
+	if _model == null or data == null:
+		return
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
 	var aiming: bool = can_act() and not player.get("tarp_raised") \
