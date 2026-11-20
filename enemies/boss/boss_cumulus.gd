@@ -22,13 +22,17 @@ const STORM_STEPS := [0.7, 0.3, 0.0]
 @export var summon_interval := 14.0
 @export var drift_radius := 10.0
 ## Cumulus hunts: it drifts to hang roughly above a player (offset by
-## HOVER_OFFSET so it isn't straight overhead), switching focus every
-## FOCUS_TIME s in co-op. It moves at FOLLOW_SPEED and never strays more than
-## LEASH m from the map's boss_anchor.
+## HOVER_OFFSET so it isn't straight overhead). In co-op it moves on to the
+## next player after hanging FOCUS_TIME s over the current one; travel time
+## does not count. It eases up to FOLLOW_SPEED * CATCH_UP when far away, slows
+## as it arrives, and never strays more than LEASH m from the boss_anchor.
 @export var follow_speed := 6.5
 @export var hover_offset := 5.0
 @export var leash := 150.0
 const FOCUS_TIME := 10.0
+const CATCH_UP := 1.6
+const ACCEL := 4.5
+const ARRIVED := 8.0
 @export var drop_per_sac := 4.0
 
 var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
@@ -56,6 +60,8 @@ var _entrance_left := 1.8
 var _center := Vector3.ZERO
 var _focus: Node3D
 var _focus_left := 0.0
+var _velocity := Vector3.ZERO
+var _net_pos := Vector3.INF
 static var _cloud_mesh: ArrayMesh
 static var _part_meshes: Dictionary[float, SphereMesh] = {}
 static var _rings: Dictionary[float, TorusMesh] = {}
@@ -230,7 +236,12 @@ func _process(delta: float) -> void:
 		if _net_left <= 0.0:
 			_net_left = 0.1
 			Net.rpc_to_run(_sync, [global_position, part_health, sacs_left, _burn_left])
-	if not Net.is_host() or dead:
+	if not Net.is_host():
+		# Ease toward the last synced position so the 10 Hz updates glide.
+		if _net_pos != Vector3.INF and not dead:
+			global_position = global_position.lerp(_net_pos, 1.0 - exp(-10.0 * delta))
+		return
+	if dead:
 		return
 	if _entrance_left > 0.0:
 		_entrance_left = maxf(0.0, _entrance_left - delta)
@@ -379,7 +390,6 @@ func _die() -> void:
 ## Host: pick a player to hang over (rotating in co-op) and glide the hover
 ## center toward them, leashed to the boss anchor.
 func _follow_focus(delta: float) -> void:
-	_focus_left -= delta
 	if _focus == null or not is_instance_valid(_focus) or str(_focus.get("state")) != "ok" or _focus_left <= 0.0:
 		_focus_left = FOCUS_TIME
 		var alive: Array = GameManager.players().filter(func(p): return p is Node3D and str(p.get("state")) == "ok")
@@ -389,19 +399,33 @@ func _follow_focus(delta: float) -> void:
 			var index := (alive.find(_focus) + 1) % alive.size() if _focus in alive else randi() % alive.size()
 			_focus = alive[index] as Node3D
 	if _focus == null or _entrance_left > 0.0:
+		_velocity = _velocity.move_toward(Vector3.ZERO, ACCEL * delta)
+		_center += _velocity * delta
 		return
 	var want := Vector3(_focus.global_position.x, 0.0, _focus.global_position.z)
 	var home := Vector3(_anchor.x, 0.0, _anchor.z)
 	if want.distance_to(home) > leash:
 		want = home + (want - home).normalized() * leash
-	_center = _center.move_toward(want, follow_speed * delta)
+	var to_want := want - _center
+	var distance := to_want.length()
+	# Only time spent hanging over this player counts toward switching focus.
+	if distance < ARRIVED:
+		_focus_left -= delta
+	# Cruise fast when far, ease off over the last stretch so it settles in
+	# instead of overshooting.
+	var speed := minf(follow_speed * CATCH_UP, distance * 0.7)
+	var desired := to_want / distance * speed if distance > 0.01 else Vector3.ZERO
+	_velocity = _velocity.move_toward(desired, ACCEL * delta)
+	_center += _velocity * delta
 
 
 @rpc("authority", "call_remote", "reliable")
 func _sync(pos: Vector3, parts: Array, sacs: int, burn: float) -> void:
 	if Net.is_host():
 		return
-	global_position = pos
+	if _net_pos == Vector3.INF or global_position.distance_to(pos) > 25.0:
+		global_position = pos
+	_net_pos = pos
 	for i in mini(parts.size(), part_health.size()):
 		part_health[i] = float(parts[i])
 		if i < 3 and part_health[i] <= 0.0 and i < _parts.size():
