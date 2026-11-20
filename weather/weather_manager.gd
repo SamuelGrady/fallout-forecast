@@ -117,7 +117,8 @@ func _override(value: float) -> void:
 ## Host: start wave 1 at Calm.
 func start_run() -> void:
 	hold = false
-	intensity_override = -1.0
+	# Through the setter so clients drop any override left by the last boss.
+	set_intensity_override(-1.0)
 	set_phase(Phase.CALM, 1)
 
 

@@ -72,6 +72,10 @@ func alive_count() -> int:
 
 
 func spawn(scene: PackedScene) -> EnemyBase:
+	# The host owns spawns; a client asking would make an enemy that never
+	# thinks and never replicates.
+	if not Net.is_host():
+		return null
 	var at: Variant = _gutter_spawn_point() if scene == gutter_scene else _marker_position("enemy_spawn")
 	if at == null:
 		push_warning("No spawn point for %s" % scene.resource_path)

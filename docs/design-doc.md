@@ -204,7 +204,7 @@ The host is the server and decides everything that matters; each client controls
 
 | Autoload | Job |
 | --- | --- |
-| `Net` | Host or join with `ENetMultiplayerPeer`, peer list, player names and colors, disconnect handling |
+| `Net` | Host or join with `ENetMultiplayerPeer` (port 7777), the lobby roster, LAN discovery on port 7778, disconnect handling, and the one `is_host()` / `is_online()` the rest of the code asks |
 | `GameManager` | Wave and phase timers, enemy scaling by player count, win and lose checks |
 | `WeatherManager` | Weather state machine and `storm_intensity`; emits `storm_changed`; host only, synced to clients |
 | `RNG` | Weighted rolls from table resources; host only, results sent to clients by RPC |
@@ -215,16 +215,22 @@ The host is the server and decides everything that matters; each client controls
 
 **Who has authority**
 
-| Thing | Owner | How it syncs |
+| Thing | Owner | How it syncs (as built) |
 | --- | --- | --- |
-| Player movement and aim | That player's client (`set_multiplayer_authority`) | `MultiplayerSynchronizer` on position, rotation, aim |
-| Shooting and damage | Host | Client plays effects at once and sends `request_shot(origin, dir)`; host raycasts and applies damage |
-| Enemies and AI | Host | `MultiplayerSpawner` plus a synchronizer on position and state; `NavigationAgent3D` runs on the host only |
-| Crates, loot and mutations | Host | Host rolls; one RPC sends the result; every client plays the reel landing on it |
-| Weather | Host | Synchronizer on state, intensity and timer; each client draws rain, fog and music locally |
+| Player movement and aim | That player's client (`set_multiplayer_authority`) | Manual RPC: the owner sends its transform to the host at 20 Hz and the host relays it to the other clients |
+| Player health, suit and state | Host | One RPC per player every 0.2 s with health, suit, state, bleed timer and tarp |
+| Shooting and damage | Host | Client plays effects at once and sends `request_shot(weapon path, origin, dir, seed)`; the host validates, raycasts and applies damage, then relays the effects |
+| Enemies and AI | Host | Reliable spawn and despawn by net id, one unreliable packet per tick with every enemy's position and yaw; `NavigationAgent3D` runs on the host only |
+| Crates, loot and mutations | Host | Crates spawn by unique name so paths match; the host rolls, owns the reels and the vote tally, and every client plays the same landing |
+| Boss | Host | Reliable spawn and death; position, part health and burn at 10 Hz |
+| Weather | Host | Phase changes by RPC; each client eases `storm_intensity` locally. The boss's sacs send an intensity override |
 | Lightning | Host | One RPC with position and a seed so flash, outlines and thunder line up |
 | Suit integrity | Host | Each client reports its exposed state; host does the math |
 | Downed, revive, Turned | Host | Host flips the state; a Turned player gets authority over their Drip |
+
+**Why manual RPC instead of MultiplayerSynchronizer and MultiplayerSpawner:** the whole project already talks in `@rpc` (weather, shots, effects, decon), the node paths are deterministic, and a hand-written `SceneReplicationConfig` per node is one more thing to get wrong without an editor open. So player transforms, vitals and enemies each have a small `_push_*` / `_apply_*` pair instead. Revisit if the sync code starts growing.
+
+ENet is client/server: **clients cannot address each other.** Every "broadcast" is therefore client → host → clients, and the host relays. That is why the player RPCs are `any_peer` with an explicit sender check rather than `authority` — a player node's authority is its owner, so an authority-checked RPC on it would reject the host relaying on a client's behalf.
 
 **Notes**
 
@@ -236,7 +242,7 @@ The host is the server and decides everything that matters; each client controls
 
 ## As built
 
-Drew's week 1 and week 2 tasks are done and pushed to `master` (as of Nov 19, 2026). The game runs single-player from `main.tscn`, starts fullscreen (F11 toggles), and is wired so Sam's networking can plug in. Graybox numbers below are starting values for tuning.
+Drew's week 1 and week 2 tasks are done and pushed to `master` (as of Nov 19, 2026). The game starts fullscreen (F11 toggles) and plays solo from the title screen, or 1–4 player co-op over the LAN or a typed IP. Graybox numbers below are starting values for tuning.
 
 | Piece | Where | What it does now | Hook for the rest of the game |
 | --- | --- | --- | --- |
@@ -255,6 +261,23 @@ Drew's week 1 and week 2 tasks are done and pushed to `master` (as of Nov 19, 20
 Physics layers: 1 world, 2 player, 3 enemy, 4 shelter. Debug keys (debug builds, host): F1 next phase, F2 jump to wave 5, F3, F4, F5 spawn a Drip, Gutter, Mister. Enemies follow the agent's path themselves and repath every 1.5 s. The center island is now a 0.5 m planter so enemies path around it. Mister spores and clouds are plain script nodes under Enemies; replicating them needs a spawn function on the MultiplayerSpawner.
 
 Done in week 2: remote players report their exposure to the host (see Player above), so the host no longer needs a synced `sheltered` on the player's `MultiplayerSynchronizer` for it. Sam's suit-integrity math reads player.exposed × WeatherManager.suit\_loss\_per\_second().
+
+### Networking and lobby (November 19, 2026)
+
+The title screen has **PLAY SOLO**, **HOST GAME** and **JOIN GAME**.
+
+| Piece | Where | What it does now |
+| --- | --- | --- |
+| Session | `game/net.gd` (autoload `Net`) | `ENetMultiplayerPeer` host on port 7777, up to 4 players. `is_host()` means "no peer, or we are the server", so offline is the host of a game of one and solo runs the same code path as a hosted game. `is_online()` guards every RPC that needs a peer |
+| Lobby | `ui/lobby.tscn` + `ui/lobby.gd` | Roster with ready flags (kept by the host, pushed by RPC), START RUN on the host, LEAVE. The host shows its LAN address so the other player can type it in |
+| Finding games | `ui/server_browser.tscn` + `ui/server_browser.gd` | The host answers UDP probes on port 7778; the join screen broadcasts to `255.255.255.255` **and** `127.0.0.1` (so two windows on one machine find each other) once a second and lists whatever answers with name, players and IP. A manual address box covers blocked discovery. Servers not seen for 3 s drop off |
+| Player nodes | `main.gd` | Solo keeps the Player baked into `main.tscn`. In a session every peer builds the same set from the roster: `Players/P_<peer id>`, authority set before `add_child`, spawn point by roster index so a newcomer never moves anyone |
+| Late joiners | `Net._hello`, `GameManager._on_peer_joined` | Sent into the run scene, then handed the phase, the decon pool and the active mutations |
+| Disconnects | `main.gd`, `ui/pause_menu.gd` | A client leaving is removed from the roster and its player node; losing the host returns everyone to the title instead of leaving them in a dead run |
+
+What still crosses the network only as visuals: rain, fog, puddles, the retro shader, music and the HUD all run locally.
+
+Known gaps: death particles and spore clouds spawned by a death only appear on the host until they are broadcast the same way ammo drops are; the decon shower sound plays on the host only; there is no lag compensation and no interpolation, so remote players move at 20 Hz steps.
 
 ## Team, milestones and risks
 
@@ -283,15 +306,21 @@ Each week ends with both of you playing the gate together in 2+ instances.
 
 **Week 1**
 
-- [ ] Net autoload: host and join with ENetMultiplayerPeer, peer list, names and colors
-- [ ] Lobby scene with direct IP or LAN join
-- [ ] Player controller with a MultiplayerSynchronizer on position, rotation and aim
+- [x] Net autoload: host and join with ENetMultiplayerPeer, peer list, names and colors
+
+  Nov 19: `game/net.gd`. Names are `HOST` and `PLAYER <peer id>`; per-player colours are not used yet. Also owns LAN discovery and is the single `is_host()`.
+- [x] Lobby scene with direct IP or LAN join
+- [x] Player controller with a MultiplayerSynchronizer on position, rotation and aim
+
+  Nov 19: same authority split, but position and aim travel as a manual RPC rather than a `MultiplayerSynchronizer` — see the note under Technical design.
 - [x] Shooting: client effects plus request\_shot RPC; host raycast and damage
 
   Built by Drew (Nov 19) along with all 4 base weapons; Sam can take it from here for networking tests.
 - [x] One base weapon from WeaponData.tres
 - [x] GameManager: wave and phase timers
-- [ ] Enemy sync: MultiplayerSpawner and synchronizer for Drew's Drip
+- [x] Enemy sync: MultiplayerSpawner and synchronizer for Drew's Drip
+
+  Nov 19: spawn and despawn by net id plus one batched position packet per tick; no spawner or synchronizer nodes.
 
 **Week 2**
 
@@ -310,7 +339,9 @@ Each week ends with both of you playing the gate together in 2+ instances.
 - [x] Double-or-nothing crate
 - [ ] Ping wheel (enemy, crate, shelter, revive me)
 - [x] Win and lose checks
-- [ ] Disconnect handling: a dropped player does not break the run
+- [x] Disconnect handling: a dropped player does not break the run
+
+  Nov 19: the roster is the list of players, so a drop re-scales the run and frees that player's node; losing the host sends the clients back to the title.
 - [x] Results screen stats (kills, revives, times Turned)
 - [ ] Export builds for the demo machines
 

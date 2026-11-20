@@ -215,8 +215,9 @@ func _show_error(text: String) -> void:
 	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	row.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	row.grow_vertical = Control.GROW_DIRECTION_BOTH
-	row.offset_top = 340
-	row.offset_bottom = 340
+	row.offset_left = -320
+	row.offset_right = 320
+	row.offset_top = 40
 	row.add_theme_constant_override("separation", 16)
 	add_child(row)
 	var label := Label.new()

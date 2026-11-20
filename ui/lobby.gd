@@ -28,7 +28,6 @@ func _ready() -> void:
 	box.offset_left = -300
 	box.offset_right = 300
 	box.offset_top = -220
-	box.offset_bottom = -220
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -74,7 +73,9 @@ func _refresh() -> void:
 		_status.text = "No session. Go back and pick HOST GAME or JOIN GAME."
 	else:
 		_status.text = _host_line()
+	# Out of the tree now, so the rebuilt list doesn't double up for a frame.
 	for child in _roster.get_children():
+		_roster.remove_child(child)
 		child.queue_free()
 	var ids := Net.roster.keys()
 	ids.sort()
@@ -92,8 +93,14 @@ func _refresh() -> void:
 func _host_line() -> String:
 	if not Net.is_host():
 		return "CONNECTED TO HOST"
-	var ips := IP.get_local_addresses().filter(func(a): return not str(a).begins_with("127.") and not str(a).contains(":"))
-	var lan := str(ips[0]) if not ips.is_empty() else "no LAN address"
+	# Shown so the other player can type it in when discovery is blocked.
+	var lan := "no LAN address"
+	for address in IP.get_local_addresses():
+		var text := str(address)
+		if text.begins_with("127.") or text.contains(":"):
+			continue
+		lan = text
+		break
 	return "HOSTING ON PORT %d   ·   LAN ADDRESS %s" % [Net.PORT, lan]
 
 

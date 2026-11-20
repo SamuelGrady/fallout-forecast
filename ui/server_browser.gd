@@ -29,7 +29,6 @@ func _ready() -> void:
 	box.offset_left = -340
 	box.offset_right = 340
 	box.offset_top = -240
-	box.offset_bottom = -240
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -88,6 +87,7 @@ func _refresh() -> void:
 	if _leaving:
 		return
 	for child in _list.get_children():
+		_list.remove_child(child)
 		child.queue_free()
 	if Net.servers.is_empty():
 		var none := Label.new()
