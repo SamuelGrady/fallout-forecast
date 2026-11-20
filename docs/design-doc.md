@@ -293,10 +293,10 @@ Remote players interpolate host-relayed movement. Infected windup and death audi
 | Pacing | Ready-up (G) skips Calm and Clearing, a 12 s first Calm with a storm countdown, a crate near each player at Calm, authored wave beats, rotating district objectives. | `game/game_manager.gd`, `enemies/enemy_spawner.gd` |
 | Mutations | The roll explains itself, auto-pulls in solo, and every mutation grants a matching player perk. | `ui/slot_reel.gd`, `game/game_manager.gd` |
 | Multiplayer | All transport is WebSocket. LAN discovery uses broadcast, per-interface broadcast and multicast. Global pause. Dedicated headless server at `wss://fallout.drew.place`. | `game/net.gd`, `game/dedicated_server.gd`, `server/` |
-| Web and deployment | Godot Web export runs in Compatibility mode. GitHub Actions verifies the browser and dedicated server images. Coolify follows `master` for both apps. | `web/`, `server/`, `.github/workflows/` |
+| Web and deployment | Godot Web export runs in Compatibility mode at `https://drewdettmer.com/fallout/`. GitHub Actions verifies both images, and Coolify on `ballista` auto-deploys both **Fallout Forecast Web** and **Fallout Forecast Server** (`wss://fallout.drew.place/`) from `master`. | `web/`, `server/`, `.github/workflows/` |
 | Team pings | Contextual tap and six-command wheel, with host-checked relay, suit-colored markers, distance and radio cues. Infected and revive markers follow their targets. | `game/ping_system.gd`, `ui/ping_hud.gd` |
 | Title and sound | Cassette transport and VCR playback menu, gated Downpour drums, storm bulletins, shelter-responsive wind and spatial hazard cues. | `ui/title.gd`, `ui/vcr_deck.gd`, `game/sound.gd` |
-| Fixes | Decon repair hold no longer resets near the shower; HUD vitals readable; lightning reveal is announced; solo play no longer errors after leaving a session. | `player/player.gd`, `ui/hud.gd`, `game/net.gd` |
+| Fixes | Decon repair hold no longer resets near the shower; HUD vitals readable; lightning reveal is announced; solo play no longer errors after leaving a session; host skips closing WebSockets during disconnect broadcasts; `AmmoDrop` caches shared materials; Dev Menu labels match Shield Dome and Frag Grenade. | `player/player.gd`, `ui/hud.gd`, `game/net.gd`, `weapons/ammo_drop.gd`, `ui/dev_menu.gd` |
 
 ## Team, milestones and risks
 

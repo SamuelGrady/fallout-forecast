@@ -41,7 +41,7 @@ func spawn_for_calm() -> void:
 		return
 	for old in get_tree().get_nodes_in_group("crates"):
 		old.queue_free()
-	_clear_crates.rpc()
+	Net.rpc_to_all(_clear_crates)
 	var markers := get_tree().get_nodes_in_group("crate_spawn").duplicate()
 	markers.shuffle()
 	var count := mini(GameManager.CRATES_PER_CALM[GameManager.player_count()], markers.size())
@@ -54,7 +54,7 @@ func spawn_for_calm() -> void:
 		var at: Vector3 = (markers[i] as Node3D).global_position
 		var yaw := randf() * TAU
 		_spawn(parent, node_name, double, at, yaw)
-		_spawn_crate.rpc(node_name, double, at, yaw)
+		Net.rpc_to_all(_spawn_crate, [node_name, double, at, yaw])
 	# Playtest: the gap between rounds felt empty. Drop one crate a few steps
 	# in front of every player so there's always something to open nearby.
 	var map: RID = parent.get_world_3d().navigation_map
@@ -71,7 +71,7 @@ func spawn_for_calm() -> void:
 		var node_name := "C_%d" % _crate_seq
 		var yaw := randf() * TAU
 		_spawn(parent, node_name, false, at, yaw)
-		_spawn_crate.rpc(node_name, false, at, yaw)
+		Net.rpc_to_all(_spawn_crate, [node_name, false, at, yaw])
 
 
 func _spawn(parent: Node, node_name: String, double: bool, at: Vector3, yaw: float) -> void:

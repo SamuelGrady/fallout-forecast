@@ -167,12 +167,12 @@ func _spawn_street_supplies() -> void:
 	for old in get_tree().get_nodes_in_group("street_supplies"):
 		old.queue_free()
 	if Net.is_online():
-		_clear_supplies.rpc()
+		Net.rpc_to_all(_clear_supplies)
 	# Main Street, parking lot and park: open approaches with multiple exits.
 	for point in [Vector3(-30, 0.12, 2.5), Vector3(28, 0.12, -2.5), Vector3(4, 0.12, 42), Vector3(46, 0.12, 34)]:
 		spawn_drop(point, "supply", 600.0)
 		if Net.is_online():
-			_spawn_supply.rpc(point)
+			Net.rpc_to_all(_spawn_supply, [point])
 
 
 func _unhandled_input(event: InputEvent) -> void:

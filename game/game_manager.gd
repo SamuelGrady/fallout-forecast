@@ -394,7 +394,7 @@ func _set_decon(value: int) -> void:
 	decon_charges = maxi(value, 0)
 	decon_changed.emit(decon_charges)
 	if _online():
-		_sync_decon.rpc(decon_charges)
+		Net.rpc_to_all(_sync_decon, [decon_charges])
 
 
 @rpc("authority", "call_remote", "reliable")

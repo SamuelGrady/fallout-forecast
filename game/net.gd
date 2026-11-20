@@ -208,7 +208,7 @@ func set_ready(value: bool) -> void:
 	if is_host():
 		if roster.has(1):
 			roster[1]["ready"] = value
-		_push_roster.rpc(roster)
+		_broadcast_roster()
 		roster_changed.emit()
 	elif is_online():
 		_request_ready.rpc_id(1, value)
@@ -222,7 +222,7 @@ func set_cosmetic(color: int, skin: int) -> void:
 	if is_host():
 		if roster.has(1):
 			_assign_cosmetic(1, color, skin)
-			_push_roster.rpc(roster)
+			_broadcast_roster()
 			roster_changed.emit()
 	else:
 		_request_cosmetic.rpc_id(1, color, skin)
@@ -243,7 +243,8 @@ func request_start() -> void:
 	if not is_host():
 		return
 	run_active = true
-	_start_run.rpc()
+	for peer in _open_peers():
+		_start_run.rpc_id(peer)
 	run_started.emit()
 
 
@@ -272,6 +273,39 @@ func _on_connected() -> void:
 var run_peers := {}
 
 
+## True when `peer_id` is connected and its underlying WebSocket is still OPEN.
+func _is_peer_open(peer_id: int) -> bool:
+	if not is_online():
+		return false
+	if peer_id not in multiplayer.get_peers():
+		return false
+	if multiplayer.multiplayer_peer is WebSocketMultiplayerPeer:
+		var ws: WebSocketPeer = multiplayer.multiplayer_peer.get_peer(peer_id)
+		return ws != null and ws.get_ready_state() == WebSocketPeer.STATE_OPEN
+	return true
+
+
+func _open_peers(exclude_peer := 0) -> PackedInt32Array:
+	var result := PackedInt32Array()
+	if not is_online():
+		return result
+	for peer in multiplayer.get_peers():
+		if peer != exclude_peer and _is_peer_open(peer):
+			result.append(peer)
+	return result
+
+
+func _broadcast_roster(exclude_peer := 0) -> void:
+	for peer in _open_peers(exclude_peer):
+		_push_roster.rpc_id(peer, roster)
+
+
+## Host: send `method` to every connected peer whose WebSocket is still OPEN.
+func rpc_to_all(method: Callable, args: Array = []) -> void:
+	for peer in _open_peers():
+		Callable.create(method, "rpc_id").callv([peer] + args)
+
+
 ## Every peer: call when the run scene is ready (true) or being left (false).
 func report_in_run(value: bool) -> void:
 	if not is_online():
@@ -294,8 +328,9 @@ func _report_in_run(value: bool) -> void:
 
 ## Host: send `method` to every peer whose run scene is loaded.
 func rpc_to_run(method: Callable, args: Array) -> void:
-	for peer in run_peers:
-		Callable.create(method, "rpc_id").callv([peer] + args)
+	for peer in run_peers.keys():
+		if _is_peer_open(peer):
+			Callable.create(method, "rpc_id").callv([peer] + args)
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
@@ -303,7 +338,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	if not is_host():
 		return
 	roster.erase(peer_id)
-	_push_roster.rpc(roster)
+	_broadcast_roster(peer_id)
 	roster_changed.emit()
 
 
@@ -332,10 +367,11 @@ func _hello(hello: String, protocol := 0) -> void:
 	elif roster.size() >= MAX_PLAYERS:
 		refusal = "THE SERVER IS FULL."
 	if refusal != "":
-		_reject.rpc_id(peer_id, refusal)
+		if _is_peer_open(peer_id):
+			_reject.rpc_id(peer_id, refusal)
 		# Let the reliable message go out before the peer is dropped.
 		get_tree().create_timer(0.5).timeout.connect(func():
-			if mode == Mode.HOST:
+			if mode == Mode.HOST and peer_id in multiplayer.get_peers():
 				multiplayer.multiplayer_peer.disconnect_peer(peer_id))
 		return
 	var data: Variant = JSON.parse_string(hello)
@@ -346,10 +382,10 @@ func _hello(hello: String, protocol := 0) -> void:
 	var skin: Variant = data.get("skin")
 	roster[peer_id] = {"name": player_name.left(32) if player_name is String else "PLAYER", "ready": false}
 	_assign_cosmetic(peer_id, int(color) if color is float else 0, int(skin) if skin is float else 0)
-	_push_roster.rpc(roster)
+	_broadcast_roster()
 	roster_changed.emit()
 	# A run already in progress: send them in, and let GameManager catch up.
-	if run_active:
+	if run_active and _is_peer_open(peer_id):
 		_start_run.rpc_id(peer_id)
 	peer_joined.emit(peer_id)
 
@@ -377,7 +413,7 @@ func _request_ready(value: bool) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	if roster.has(peer_id):
 		roster[peer_id]["ready"] = value
-		_push_roster.rpc(roster)
+		_broadcast_roster()
 		roster_changed.emit()
 
 
@@ -388,7 +424,7 @@ func _request_cosmetic(color: int, skin: int) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	if roster.has(peer_id):
 		_assign_cosmetic(peer_id, color, skin)
-		_push_roster.rpc(roster)
+		_broadcast_roster()
 		roster_changed.emit()
 
 

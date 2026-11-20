@@ -1,4 +1,4 @@
-﻿extends CanvasLayer
+extends CanvasLayer
 var _panel := PanelContainer.new()
 var _first: Button
 func _ready() -> void:
@@ -36,7 +36,9 @@ func _ready() -> void:
 	_section(box, "WEAPONS")
 	for gun in ["pump_shotgun", "spray_rifle", "flare_gun", "bug_bomb"]:
 		var selected: String = gun
-		_button(box, "GRANT " + gun.replace("_", " ").to_upper(), func():
+		var data := load("res://weapons/%s.tres" % selected) as WeaponData
+		var label_name := data.display_name if data and not data.display_name.is_empty() else selected.replace("_", " ")
+		_button(box, "GRANT " + label_name.to_upper(), func():
 			var player := get_tree().get_first_node_in_group("local_player")
 			if player:
 				player.grant("weapon:res://weapons/%s.tres" % selected))

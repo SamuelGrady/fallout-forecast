@@ -25,20 +25,11 @@ FALLOUT_TAG=<git sha> docker compose -f server/docker-compose.yml up -d
 - Liveness: the server rewrites `/tmp/fallout-heartbeat` every 15 s, and the Docker `HEALTHCHECK` fails if the file is older than a minute.
 - Networking: no host port is published. The container is on the `coolify` network, and its `caddy` labels make coolify-proxy serve `fallout.drew.place` with TLS and reverse-proxy the WebSocket to port 7777. `*.drew.place` is a DNS-only wildcard to ballista, so Caddy gets the certificate itself.
 
-### Redeploy on ballista
+### Production deployment on ballista (Coolify)
 
-GitHub Actions runs **Dedicated server build** on pushes to `master`. It builds the ARM64 image and checks Docker health and a WebSocket upgrade. Check the workflow for the revision before redeploying.
+The live server runs in Coolify on `ballista` as **Fallout Forecast Server** (`ghydxqhpmoruqs6yf4wayosl`), built from `kickofline/fallout-forecast` on `master` using Dockerfile build pack, repository root as the context, `/server/Dockerfile`, and port `7777`.
 
-On ballista, from an exported copy of the tested `master` revision:
-
-```sh
-docker build -f server/Dockerfile -t fallout-server:<git sha> .
-FALLOUT_TAG=<git sha> docker compose -p fallout -f server/docker-compose.yml up -d --wait
-docker logs --tail 20 fallout-server
-```
-
-Clients must run the same build as the server. Bump `Net.PROTOCOL` whenever an RPC or a networked scene path changes; mismatched clients are turned away with a message.
-
-### Enable Coolify push deploys
-
-Create an application from the GitHub App source for `kickofline/fallout-forecast` on `master`. Use Dockerfile build pack, repository root as the context, `/server/Dockerfile`, and port `7777`. The image checks the game loop heartbeat. Validate the staged application with a matching client before moving the `fallout.drew.place` Caddy route off the standalone container. With that route on the Coolify app, enable auto-deploy and verify that the next push queues a webhook deployment.
+- **Auto-deploy:** Enabled via the Coolify GitHub App push webhook on `master`. Every push to `master` rebuilds the ARM64 container on `ballista` and also runs the **Dedicated server build** GitHub Actions workflow (`server-build.yml`) to verify Docker health and WebSocket upgrade.
+- **Routing:** `coolify-proxy` terminates TLS for `https://fallout.drew.place` / `wss://fallout.drew.place/` and proxies WebSocket upgrades to port `7777` (while answering plain HTTP probes directly).
+- **Protocol compatibility:** Clients must run the same build as the server. Bump `Net.PROTOCOL` whenever an RPC or a networked scene path changes; mismatched clients are turned away with a message.
+- **Manual/local Docker check:** `server/docker-compose.yml` remains available if you want to build and run the image locally (`docker build -f server/Dockerfile -t fallout-server:<git sha> .`).

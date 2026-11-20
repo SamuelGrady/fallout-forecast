@@ -107,7 +107,7 @@ func skip_wait() -> void:
 	if phase_time_left > 3.0:
 		_apply_phase(phase, wave, 3.0)
 		if Net.is_online():
-			_receive_phase.rpc(phase, wave, 3.0)
+			Net.rpc_to_all(_receive_phase, [phase, wave, 3.0])
 
 
 ## Host: force storm_intensity toward `value` (-1 to go back to the phase's
@@ -118,7 +118,7 @@ func set_intensity_override(value: float) -> void:
 		return
 	intensity_override = value
 	if Net.is_online():
-		_override.rpc(value)
+		Net.rpc_to_all(_override, [value])
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -169,7 +169,7 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 		duration = first_calm_duration
 	_apply_phase(new_phase, new_wave, duration)
 	if Net.is_online():
-		_receive_phase.rpc(new_phase, new_wave, duration)
+		Net.rpc_to_all(_receive_phase, [new_phase, new_wave, duration])
 
 
 ## Host: strike lightning at a random spot (or at `at`) on every client.

@@ -68,7 +68,7 @@ func clear() -> void:
 	if not Net.is_host():
 		return
 	_apply_clear()
-	_clear_rpc.rpc()
+	Net.rpc_to_all(_clear_rpc)
 
 
 func _apply_clear() -> void:

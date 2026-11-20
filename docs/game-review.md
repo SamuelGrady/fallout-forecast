@@ -1,6 +1,8 @@
 # Whole-game review: gameplay, progression, and audiovisual feel
 
-Three subagents independently reviewed the current build across combat/feel, progression/economy/pacing, and audiovisual juice/performance on November 19, 2026. This is a prioritized recommendation backlog — none of these gameplay or systems changes have been applied yet.
+Three subagents independently reviewed the build across combat/feel, progression/economy/pacing, and audiovisual juice/performance on November 19, 2026.
+
+**Status (November 20, 2026):** The P1–P3 recommendations below were implemented on `master` (commits `5189858`, `68d95d6`, and `5f213d0`, plus `AmmoDrop` material caching in `weapons/ammo_drop.gd`). Flare Gun and Bug Bomb were subsequently redesigned into the Shield Dome and Frag Grenade. The original findings table is retained below as a record of the review.
 
 ## Combat & enemy feel
 

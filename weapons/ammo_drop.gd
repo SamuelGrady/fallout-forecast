@@ -7,6 +7,10 @@ var _root := Node3D.new()
 var _ring: MeshInstance3D
 var _taken := false
 
+static var _mat_cache := {}
+static var _ring_mats := {}
+static var _ring_mesh: TorusMesh
+
 
 func _ready() -> void:
 	add_to_group("ammo_drops")
@@ -23,17 +27,26 @@ func _ready() -> void:
 		_:
 			_build_ammo(accent)
 	_ring = MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.28
-	torus.outer_radius = 0.34
-	_ring.mesh = torus
+	if _ring_mesh == null:
+		_ring_mesh = TorusMesh.new()
+		_ring_mesh.inner_radius = 0.28
+		_ring_mesh.outer_radius = 0.34
+	_ring.mesh = _ring_mesh
+	_ring.material_override = _ring_mat(accent)
+	_ring.position.y = 0.04
+	add_child(_ring)
+
+
+static func _ring_mat(accent: Color) -> StandardMaterial3D:
+	var key := accent.to_rgba32()
+	if _ring_mats.has(key):
+		return _ring_mats[key]
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	ring_mat.albedo_color = Color(accent.r, accent.g, accent.b, 0.45)
-	_ring.material_override = ring_mat
-	_ring.position.y = 0.04
-	add_child(_ring)
+	_ring_mats[key] = ring_mat
+	return ring_mat
 
 
 func _build_ammo(accent: Color) -> void:
@@ -83,7 +96,10 @@ func _build_supply_case(accent: Color) -> void:
 	_add_cyl(_root, Vector3(0.2, 0.19, 0.02), 0.065, 0.22, Color("#66dfda"), 0.6)
 
 
-func _mat(color: Color, glow := 0.0) -> StandardMaterial3D:
+static func _mat(color: Color, glow := 0.0) -> StandardMaterial3D:
+	var key := "%d_%d" % [color.to_rgba32(), int(round(glow * 100.0))]
+	if _mat_cache.has(key):
+		return _mat_cache[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = 0.6
@@ -91,6 +107,7 @@ func _mat(color: Color, glow := 0.0) -> StandardMaterial3D:
 		m.emission_enabled = true
 		m.emission = color
 		m.emission_energy_multiplier = glow
+	_mat_cache[key] = m
 	return m
 
 

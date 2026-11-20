@@ -105,9 +105,11 @@ curl.exe -fsSI https://drewdettmer.com/fallout/
 curl.exe -fsS https://drewdettmer.com/fallout/healthz
 ```
 
-## Enable production push deploys
+## Production push deploys
 
-Run this in the same 1Password session after the production check passes. The next push to `master` starts the production build.
+**Fallout Forecast Web** (`bfgmd9eto4msw8l7dwyy7kvi`) is live on `ballista` with `is_auto_deploy_enabled = true` on `master`, so every push to `master` queues a webhook deployment (`is_webhook = true`) alongside **Fallout Forecast Server** (`ghydxqhpmoruqs6yf4wayosl`).
+
+If you ever recreate the resource from scratch using the script above, enable auto-deploy after the first production check passes:
 
 ```powershell
 Invoke-Coolify PATCH "/applications/$appId" @{
@@ -116,4 +118,4 @@ Invoke-Coolify PATCH "/applications/$appId" @{
 } | Select-Object uuid, name, git_branch
 ```
 
-On the next push, confirm the new deployment has `is_webhook` set. Repeat the live browser and homepage checks against that deployment. To take down only the game, use **Stop** on the **Fallout Forecast Web** app in Coolify.
+To take down only the browser build without affecting the main site, use **Stop** on **Fallout Forecast Web** in Coolify.
