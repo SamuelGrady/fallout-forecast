@@ -9,85 +9,248 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; font-family: "VT323", ui-monospace, monospace; background: #0c1422; color: #e8e9d5; }
-    body { margin: 0; overflow: hidden; background: #0c1422; }
-    canvas { position: fixed; inset: 0; display: block; outline: 0; }
-    #launch {
-      position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 1.5rem;
-      padding: 1.5rem; text-align: center;
-      background: radial-gradient(circle at 50% 45%, #162a3a 0%, #0c1422 72%);
+    :root {
+      color-scheme: dark;
+      --ink: #0c1422;
+      --surround: #05090f;
+      --paper: #e8e9d5;
+      --cyan: #66dfda;
+      --pink: #ff5689;
+      --amber: #ffbf68;
+      --acid: #b8e56d;
+      --muted: #aabac7;
+      --panel: #14232d;
+      --primary: #244d57;
+      --hover: #2f626e;
+      --stage-w: min(100vw, calc(100vh * 4 / 3));
+      --stage-h: min(100vh, calc(100vw * 3 / 4));
+      font-family: "VT323", ui-monospace, monospace;
+      background: var(--surround);
+      color: var(--paper);
     }
-    #launch[hidden], #fullscreen[hidden] { display: none; }
-    /* VHS overlay: scanlines and a soft vignette, like the in-game title. */
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--surround);
+    }
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      outline: 0;
+    }
+    /* Subtle 4:3 monitor frame matching Godot's fixed 960x720 keep-aspect picture. */
+    #bezel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: var(--stage-w);
+      height: var(--stage-h);
+      transform: translate(-50%, -50%);
+      box-sizing: border-box;
+      border: 1px solid rgba(102, 223, 218, .22);
+      box-shadow: 0 0 42px rgba(0, 0, 0, .75);
+      pointer-events: none;
+      z-index: 2;
+    }
+    #bezel[hidden], :fullscreen #bezel { display: none; }
+    #backdrop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surround);
+      z-index: 5;
+    }
+    #backdrop[hidden], #fullscreen[hidden] { display: none; }
+    #launch {
+      position: relative;
+      width: var(--stage-w);
+      height: var(--stage-h);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(1rem, 2.6vh, 1.8rem);
+      padding: clamp(1.2rem, 4vw, 2.8rem);
+      text-align: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 44%, #142838 0%, var(--ink) 74%);
+      border: 2px solid rgba(102, 223, 218, .35);
+      box-shadow: 0 0 60px rgba(0, 0, 0, .85);
+    }
+    /* VHS overlay inside the 4:3 broadcast frame, matching the in-game title. */
     #launch::before {
-      content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: repeating-linear-gradient(to bottom, rgba(0,0,0,.22) 0 2px, transparent 2px 4px);
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .20) 0 2px, transparent 2px 4px);
       animation: roll 9s linear infinite;
     }
     #launch::after {
-      content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, .52) 100%);
     }
     @keyframes roll { from { background-position-y: 0; } to { background-position-y: 120px; } }
-    .osd { position: absolute; top: 1.4rem; font-size: 2rem; letter-spacing: .08em; color: #e8e9d5; text-shadow: 2px 2px 0 #000; }
-    .osd.left { left: 1.8rem; }
-    .osd.right { right: 1.8rem; }
-    .rec::before { content: ""; display: inline-block; width: .6em; height: .6em; margin-right: .35em; border-radius: 50%; background: #ff5689; animation: blink 1.2s steps(1) infinite; }
+    .osd {
+      position: absolute;
+      font-size: clamp(1.25rem, 2.8vmin, 1.9rem);
+      letter-spacing: .08em;
+      color: #cceadb;
+      text-shadow: 2px 2px 0 var(--ink);
+      z-index: 1;
+    }
+    .osd.top-left { top: 4.5%; left: 5.2%; }
+    .osd.top-right { top: 4.5%; right: 5.2%; }
+    .osd.bottom-left { bottom: 4.5%; left: 5.2%; color: var(--muted); }
+    .osd.bottom-right { bottom: 4.5%; right: 5.2%; color: var(--cyan); }
+    .rec::before {
+      content: "";
+      display: inline-block;
+      width: .52em;
+      height: .52em;
+      margin-right: .35em;
+      border-radius: 50%;
+      background: var(--pink);
+      animation: blink 1.2s steps(1) infinite;
+    }
     @keyframes blink { 50% { opacity: 0; } }
-    #title { margin: 0; line-height: .82; font-weight: 400; font-size: clamp(4.5rem, 15vw, 10.5rem); letter-spacing: .02em; user-select: none; }
-    #title span { display: block; text-shadow: .03em .03em 0 #267e75; }
+    #title {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      line-height: .82;
+      font-weight: 400;
+      font-size: clamp(3.6rem, 12.5vmin, 8.6rem);
+      letter-spacing: .02em;
+      user-select: none;
+    }
+    #title span { display: block; text-shadow: .035em .035em 0 #267e75; }
     #title .a { color: #e6eee2; }
     #title .b { color: #a9e9d9; }
-    #actions { display: flex; gap: .9rem; flex-wrap: wrap; justify-content: center; }
-    #download {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-height: 5.5rem; padding: 1.25rem 2rem; box-sizing: border-box;
-      font: inherit; font-size: 2.2rem; letter-spacing: .12em; text-decoration: none;
-      color: #e8e9d5; background: rgba(20, 35, 45, .88);
-      border: 3px solid #e8e9d5; border-radius: .35rem; transition: transform .12s ease, background .12s ease;
+    #actions {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: .85rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: min(100%, 34rem);
     }
-    #download:hover { background: #29545d; transform: scale(1.04); }
-    #download:focus-visible { outline: 3px solid #ff5689; outline-offset: 4px; }
+    #start, #download {
+      font: inherit;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      box-sizing: border-box;
+      border-radius: 0;
+      cursor: pointer;
+      transition: transform .10s ease, background .10s ease, border-color .10s ease, color .10s ease;
+    }
     #start {
-      min-width: 18rem; min-height: 5.5rem; padding: 1.25rem 3.5rem;
-      font: inherit; font-size: 2.6rem; letter-spacing: .14em; text-transform: uppercase;
-      color: #e8e9d5; background: #1d3c4a;
-      border: 3px solid #66dfda; border-radius: .35rem;
-      box-shadow: 0 0 36px rgba(102, 223, 218, .28), inset 0 0 18px rgba(102, 223, 218, .12);
-      cursor: pointer; transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+      flex: 1 1 14rem;
+      min-height: clamp(3.4rem, 8.5vmin, 4.4rem);
+      padding: .75rem 2.2rem;
+      font-size: clamp(1.7rem, 4vmin, 2.3rem);
+      color: var(--paper);
+      background: var(--primary);
+      border: 1px solid rgba(102, 223, 218, .55);
+      border-left: 4px solid var(--cyan);
+      box-shadow: 0 0 28px rgba(102, 223, 218, .18);
     }
     #start:hover:not(:disabled) {
-      background: #29545d; transform: scale(1.04);
-      box-shadow: 0 0 48px rgba(102, 223, 218, .48), inset 0 0 22px rgba(102, 223, 218, .22);
+      background: var(--hover);
+      color: var(--cyan);
+      border-color: var(--cyan);
+      transform: scale(1.02);
     }
-    #start:active:not(:disabled) { transform: scale(.98); }
-    #start:disabled { opacity: .75; cursor: wait; }
-    #start:focus-visible, #fullscreen:focus-visible { outline: 3px solid #ff5689; outline-offset: 4px; }
-    #status { min-height: 1.4rem; margin: 0; font-size: 1.5rem; letter-spacing: .08em; color: #66dfda; }
-    @media (max-width: 560px) { .osd { font-size: 1.4rem; } #start, #download { min-width: 0; width: 100%; } #actions { width: 100%; } }
+    #start:active:not(:disabled) { transform: scale(.985); }
+    #start:disabled { opacity: .72; cursor: wait; }
+    #download {
+      flex: 0 1 12.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: clamp(3.4rem, 8.5vmin, 4.4rem);
+      padding: .75rem 1.6rem;
+      font-size: clamp(1.5rem, 3.6vmin, 2.0rem);
+      text-decoration: none;
+      color: var(--paper);
+      background: var(--panel);
+      border: 1px solid rgba(170, 186, 199, .38);
+      border-left: 3px solid var(--muted);
+    }
+    #download:hover {
+      background: #24424f;
+      color: var(--cyan);
+      border-color: var(--cyan);
+      transform: scale(1.02);
+    }
+    #start:focus-visible, #download:focus-visible, #fullscreen:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+    }
+    #status {
+      position: relative;
+      z-index: 1;
+      min-height: 1.5rem;
+      margin: 0;
+      font-size: clamp(1.2rem, 2.8vmin, 1.55rem);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
     #fullscreen {
-      position: fixed; bottom: .75rem; left: 50%; transform: translateX(-50%);
-      color: #e8e9d5; background: rgba(20, 35, 45, .88); border: 1px solid #66dfda;
-      border-radius: .25rem; padding: .45rem .9rem; font: inherit; font-size: .875rem; cursor: pointer;
+      position: fixed;
+      bottom: .75rem;
+      right: .9rem;
+      z-index: 4;
+      color: var(--paper);
+      background: rgba(20, 35, 45, .92);
+      border: 1px solid rgba(102, 223, 218, .55);
+      border-left: 3px solid var(--cyan);
+      border-radius: 0;
+      padding: .35rem .85rem;
+      font: inherit;
+      font-size: 1.35rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
     }
-    #fullscreen:hover { background: #29545d; }
+    #fullscreen:hover {
+      background: #24424f;
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
     :fullscreen #fullscreen, .mouse-captured #fullscreen { display: none; }
   </style>
 </head>
 <body>
   <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
-  <main id="launch">
-    <div class="osd left rec">REC</div>
-    <div class="osd right">SP  OCT 31 1987</div>
-    <h1 id="title" aria-label="Fallout Forecast"><span class="a">FALLOUT</span><span class="b">FORECAST</span></h1>
-    <div id="actions">
-      <button id="start" type="button">&#9654; PLAY</button>
-      <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
-    </div>
-    <p id="status" role="status"></p>
-  </main>
-  <button id="fullscreen" type="button" hidden>Fullscreen</button>
+  <div id="bezel" aria-hidden="true" hidden></div>
+  <div id="backdrop">
+    <main id="launch">
+      <div class="osd top-left rec">REC</div>
+      <div class="osd top-right">SP  OCT 31 1987</div>
+      <h1 id="title" aria-label="Fallout Forecast"><span class="a">FALLOUT</span><span class="b">FORECAST</span></h1>
+      <div id="actions">
+        <button id="start" type="button">&gt; PLAY</button>
+        <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
+      </div>
+      <p id="status" role="status"></p>
+      <div class="osd bottom-left">CH 03  /  4:3 BROADCAST</div>
+      <div class="osd bottom-right">HI-FI STEREO</div>
+    </main>
+  </div>
+  <button id="fullscreen" type="button" hidden>FULLSCREEN</button>
   <script>
     // Track every AudioContext Godot creates and resume on any user gesture so
     // async WASM downloads never leave WebAudio stuck in "suspended".
@@ -118,7 +281,8 @@
   <script src="$GODOT_URL"></script>
   <script>
     const canvas = document.getElementById("canvas");
-    const launch = document.getElementById("launch");
+    const backdrop = document.getElementById("backdrop");
+    const bezel = document.getElementById("bezel");
     const start = document.getElementById("start");
     const status = document.getElementById("status");
     const fullscreen = document.getElementById("fullscreen");
@@ -186,25 +350,26 @@
 
     start.addEventListener("click", async () => {
       start.disabled = true;
-      status.textContent = "Loading...";
+      status.textContent = "LOADING TAPE...";
       try {
-        if (typeof Engine === "undefined") throw new Error("The game script could not load.");
+        if (typeof Engine === "undefined") throw new Error("THE GAME SCRIPT COULD NOT LOAD.");
         const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
         if (missing.length) throw new Error(missing.join(". "));
         const engine = new Engine($GODOT_CONFIG);
         await engine.startGame({
           canvas,
           onProgress(current, total) {
-            if (total > 0) status.textContent = `Loading... ${Math.floor(100 * current / total)}%`;
+            if (total > 0) status.textContent = `LOADING TAPE... ${Math.floor(100 * current / total)}%`;
           },
         });
         gameRunning = true;
-        launch.hidden = true;
+        backdrop.hidden = true;
+        bezel.hidden = false;
         fullscreen.hidden = !document.fullscreenEnabled;
         canvas.focus();
       } catch (error) {
         start.disabled = false;
-        status.textContent = `${error.message} Reload this page to try again.`;
+        status.textContent = `${error.message} RELOAD THIS PAGE TO TRY AGAIN.`;
         console.error(error);
       }
     });

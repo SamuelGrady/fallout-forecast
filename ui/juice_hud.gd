@@ -37,9 +37,9 @@ func _ready() -> void:
 	_build_card()
 	add_child(preload("res://ui/tape_choice.gd").new())
 	_ticker.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
-	_ticker.offset_left = -260
-	_ticker.offset_right = -24
-	_ticker.offset_top = -40
+	_ticker.offset_left = -248
+	_ticker.offset_right = -20
+	_ticker.offset_top = -64
 	_ticker.alignment = BoxContainer.ALIGNMENT_END
 	_ticker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(_ticker)
@@ -134,10 +134,10 @@ void fragment(){
 
 func _build_card() -> void:
 	_card_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_card_panel.offset_left = -228
-	_card_panel.offset_right = 228
-	_card_panel.offset_top = -78
-	_card_panel.offset_bottom = -78
+	_card_panel.offset_left = -240
+	_card_panel.offset_right = 240
+	_card_panel.offset_top = -112
+	_card_panel.offset_bottom = -112
 	_card_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := BroadcastUI.panel(BroadcastUI.OVERLAY)
 	style.set_content_margin_all(12)
@@ -150,7 +150,7 @@ func _build_card() -> void:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		column.add_child(label)
 	_card_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	BroadcastUI.text(_card, roundi(52 * Settings.hud_scale))
+	BroadcastUI.text(_card, roundi(50 * Settings.hud_scale))
 	BroadcastUI.text(_card_sub, roundi(23 * Settings.hud_scale), BroadcastUI.CYAN)
 	_card_panel.hide()
 
@@ -185,11 +185,11 @@ func _on_combat_hit(killed: bool, critical: bool) -> void:
 	_kill_times.append(now)
 	_kill_times = _kill_times.filter(func(t): return now - float(t) < 1.5)
 	if _kill_times.size() >= 3:
-		Juice.popup("+MULTIKILL x%d" % _kill_times.size(), Color("#ffd56a"))
+		Juice.popup("+MULTIKILL x%d" % _kill_times.size(), BroadcastUI.AMBER)
 		Sound.play("multikill", -8.0)
 	else:
 		Sound.play("kill_confirm", -10.0)
-	Juice.popup("+HEADSHOT KILL" if critical else "+KILL", Color("#ff6a6a") if critical else BroadcastUI.PAPER)
+	Juice.popup("+HEADSHOT KILL" if critical else "+KILL", BroadcastUI.PINK if critical else BroadcastUI.PAPER)
 	Juice.hit_stop(45.0 if critical else 25.0)
 
 
@@ -197,10 +197,7 @@ func _on_popup(text: String, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_font_size_override("font_size", 22)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 5)
+	BroadcastUI.text(label, 22, color, 2)
 	_ticker.add_child(label)
 	while _ticker.get_child_count() > 5:
 		_ticker.get_child(0).queue_free()

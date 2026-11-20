@@ -77,10 +77,11 @@ func _ready() -> void:
 	if not squad.is_empty():
 		var mutations := _label(box, "SQUAD MUTATIONS  /  " + ", ".join(PackedStringArray(squad)), 20, BroadcastUI.ACID)
 		mutations.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var actions := _row(box, 16)
+	var actions := _row(box, 14)
 	var back := _button(actions, "BACK TO LOBBY", func(): SceneLoader.cut_to(LOBBY_SCENE)) if Net.is_online() else _button(actions, "PLAY AGAIN", func(): SceneLoader.goto(Maps.RUN_SCENE, map_id))
 	BroadcastUI.button_role(back, true)
-	_button(actions, "MAIN MENU", _on_menu)
+	var menu := _button(actions, "MAIN MENU", _on_menu)
+	BroadcastUI.button_role(menu, false, false)
 	back.grab_focus()
 	BroadcastUI.text(_skip, 19, BroadcastUI.MUTED)
 	_skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -130,7 +131,7 @@ func _build_players(box: Control, players: Dictionary) -> void:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 2)
 	box.add_child(grid)
-	for heading in ["PLAYER", "KILLS", "REVIVES", "TURNED"]:
+	for heading: String in ["PLAYER", "KILLS", "REVIVES", "TURNED"]:
 		var label := _label(grid, heading, 19, BroadcastUI.CYAN)
 		label.custom_minimum_size.x = 218 if heading == "PLAYER" else 68
 		if heading == "PLAYER":
@@ -142,11 +143,14 @@ func _build_players(box: Control, players: Dictionary) -> void:
 			continue
 		var callsign := str(stats.get("name", "PLAYER")).to_upper()
 		var name_label := _label(grid, callsign, 23, BroadcastUI.PAPER)
+		name_label.custom_minimum_size.x = 218
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		name_label.clip_text = true
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var kills := int(stats.get("kills", 0))
 		var revives := int(stats.get("revives", 0))
 		var turned := int(stats.get("turned", 0))
-		for value in [kills, revives, turned]:
+		for value: int in [kills, revives, turned]:
 			_tallies.append(Tally.new(_label(grid, "", 23, BroadcastUI.PAPER), value, Format.NUMBER))
 		var contribution := kills + 2 * revives
 		if contribution > best:
@@ -245,7 +249,7 @@ func _label(parent: Control, caption: String, font_size: int, color: Color) -> L
 func _button(parent: Control, caption: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = caption
-	button.custom_minimum_size = Vector2(216, 50)
+	button.custom_minimum_size = Vector2(216, 48)
 	BroadcastUI.animate_button(button)
 	button.pressed.connect(action)
 	parent.add_child(button)

@@ -4,7 +4,7 @@ extends CanvasLayer
 ## - Bottom: three PLAYER mutation cards; pick one with 1 / 2 / 3 (D-pad).
 ## Nothing covers the middle of the screen, so you keep your view.
 
-const CARD_SIZE := Vector2(222, 122)
+const CARD_SIZE := Vector2(218, 124)
 const ENEMY_RED := BroadcastUI.PINK
 
 var _enemy_bar := PanelContainer.new()
@@ -51,10 +51,10 @@ func _exit_tree() -> void:
 func _build_enemy_bar() -> void:
 	_enemy_bar.theme = BroadcastUI.theme()
 	_enemy_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_enemy_bar.offset_left = -260
-	_enemy_bar.offset_right = 260
-	_enemy_bar.offset_top = 168
-	_enemy_bar.offset_bottom = 168
+	_enemy_bar.offset_left = -250
+	_enemy_bar.offset_right = 250
+	_enemy_bar.offset_top = 214
+	_enemy_bar.offset_bottom = 214
 	_enemy_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := BroadcastUI.panel(BroadcastUI.OVERLAY, ENEMY_RED)
 	style.set_content_margin_all(8)
@@ -72,12 +72,13 @@ func _build_enemy_bar() -> void:
 
 
 func _build_strip() -> void:
+	# Below the center reticle, above the vitals/armory panels and the reserved ~360x64 bottom-center hotbar.
 	_strip.theme = BroadcastUI.theme()
 	_strip.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_strip.offset_left = -348
-	_strip.offset_right = 348
-	_strip.offset_top = -CARD_SIZE.y - 258
-	_strip.offset_bottom = -178
+	_strip.offset_left = -342
+	_strip.offset_right = 342
+	_strip.offset_top = -352
+	_strip.offset_bottom = -170
 	_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_strip)
 	var box := VBoxContainer.new()
@@ -85,7 +86,7 @@ func _build_strip() -> void:
 	box.add_theme_constant_override("separation", 6)
 	_strip.add_child(box)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(_hint, 24, BroadcastUI.PAPER)
+	BroadcastUI.text(_hint, 22, BroadcastUI.PAPER)
 	BroadcastUI.back_label(_hint)
 	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(_hint)
@@ -96,7 +97,7 @@ func _build_strip() -> void:
 	for i in 3:
 		row.add_child(_build_card(i))
 	_timer.show_percentage = false
-	_timer.custom_minimum_size = Vector2(0, 4)
+	_timer.custom_minimum_size = Vector2(0, 6)
 	_timer.max_value = 1.0
 	BroadcastUI.bar(_timer, BroadcastUI.CYAN)
 	box.add_child(_timer)

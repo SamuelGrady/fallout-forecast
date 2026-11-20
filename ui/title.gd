@@ -20,6 +20,7 @@ var _menu := VBoxContainer.new()
 var _settings_panel := PanelContainer.new()
 var _settings := VBoxContainer.new()
 var _settings_initial: HSlider
+var _suit_panel := PanelContainer.new()
 var _suit := VBoxContainer.new()
 var _intro := Control.new()
 var _deck := VcrDeck.new()
@@ -84,7 +85,7 @@ void fragment() {
 	_add_full_rect(wall, _intro)
 	_intro.add_child(_deck)
 	_deck.tape_depth = -84.0
-	var skip := _label(_intro, "PRESS ANY BUTTON TO SKIP", Vector2(0, 674), 16, BroadcastUI.MUTED, 960.0)
+	var skip := _label(_intro, "PRESS ANY BUTTON TO SKIP", Vector2(0, 674), 18, BroadcastUI.MUTED, 960.0)
 	skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	skip.offset_top = -45
 	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -114,39 +115,49 @@ func _build_playback_menu() -> void:
 		line.add_theme_constant_override("shadow_offset_y", 3)
 		line.add_theme_color_override("font_shadow_color", Color("267E75"))
 
-	_menu.position = Vector2(104, 325)
+	_menu.position = Vector2(104, 328)
 	_menu.custom_minimum_size.x = 354.0
-	_menu.add_theme_constant_override("separation", 5)
+	_menu.add_theme_constant_override("separation", 7)
 	_content.add_child(_menu)
 	if OS.has_feature("web"):
 		# Web: PLAY SOLO shares its row with a DOWNLOAD button for the desktop build.
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 5)
+		row.add_theme_constant_override("separation", 7)
 		_menu.add_child(row)
 		var play := _button(row, "PLAY SOLO", _on_play)
 		play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		BroadcastUI.button_role(play, true)
 		var download := _button(row, "DOWNLOAD", _on_download)
 		download.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		download.custom_minimum_size.x = 150
+		download.custom_minimum_size.x = 148
 		download.tooltip_text = "Get the desktop build (Windows / Linux)"
+		BroadcastUI.button_role(download, false, false)
 	else:
 		BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
 	_button(_menu, "CLOUD PLAY", _on_join)
 	_suit_button = _button(_menu, "SUIT", _on_suit)
 	_settings_button = _button(_menu, "SETTINGS", _on_settings)
-	_button(_menu, "QUIT", _on_quit).visible = not OS.has_feature("web")
+	var quit := _button(_menu, "QUIT", _on_quit)
+	BroadcastUI.button_role(quit, false, true)
+	quit.visible = not OS.has_feature("web")
 	_set_menu_enabled(false)
 
-	_settings_panel.position = Vector2(495, 87)
-	_settings_panel.custom_minimum_size.x = 376.0
+	var panel_style := BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.CYAN)
+	panel_style.content_margin_left = 16
+	panel_style.content_margin_right = 16
+	panel_style.content_margin_top = 14
+	panel_style.content_margin_bottom = 14
+
+	_settings_panel.position = Vector2(492, 68)
+	_settings_panel.custom_minimum_size.x = 380.0
+	_settings_panel.add_theme_stylebox_override("panel", panel_style)
 	_settings_panel.hide()
 	_content.add_child(_settings_panel)
 	_settings.add_theme_constant_override("separation", 5)
 	_settings_panel.add_child(_settings)
 	var heading := Label.new()
 	heading.text = "SETTINGS"
-	BroadcastUI.text(heading, 38, BroadcastUI.CYAN)
+	BroadcastUI.text(heading, 34, BroadcastUI.CYAN)
 	_settings.add_child(heading)
 	_settings_initial = _slider(_settings, "MOUSE SENSITIVITY", 0.0005, 0.006, Settings.mouse_sensitivity, func(v: float): Settings.mouse_sensitivity = v)
 	_slider(_settings, "VOLUME", 0.0, 1.0, Settings.master_volume, _set_volume)
@@ -161,35 +172,43 @@ func _build_playback_menu() -> void:
 		Settings.save())
 	var server_caption := Label.new()
 	server_caption.text = "SERVER (WSS)"
-	BroadcastUI.text(server_caption, 19, BroadcastUI.CYAN)
+	BroadcastUI.text(server_caption, 20, BroadcastUI.CYAN)
 	_settings.add_child(server_caption)
 	var server_edit := LineEdit.new()
 	server_edit.text = Settings.server_url
 	server_edit.placeholder_text = Net.CLOUD_URL
-	server_edit.custom_minimum_size.y = 38
+	server_edit.custom_minimum_size.y = 36
 	server_edit.text_changed.connect(func(t: String): Settings.server_url = t.strip_edges())
 	server_edit.text_submitted.connect(func(_t: String):
 		Sound.play("ui_click")
 		Settings.save())
 	BroadcastUI.focus_sound(server_edit)
 	_settings.add_child(server_edit)
-	var export := _button(_settings, "EXPORT PERF REPORT", func(): pass)
+	var export := _button(_settings, "EXPORT PERF REPORT", func(): pass, 40)
 	export.pressed.connect(func():
 		Perf.export_report()
 		export.text = "PERF REPORT DOWNLOADED" if OS.has_feature("web") else "PERF REPORT SAVED")
-	_button(_settings, "BACK", _on_back)
+	var settings_back := _button(_settings, "BACK", _on_back, 40)
+	BroadcastUI.button_role(settings_back, false, true)
 
-	_suit.position = Vector2(510, 110)
-	_suit.custom_minimum_size.x = 362.0
+	_suit_panel.position = Vector2(492, 92)
+	_suit_panel.custom_minimum_size.x = 380.0
+	_suit_panel.add_theme_stylebox_override("panel", panel_style)
+	_suit_panel.hide()
+	_content.add_child(_suit_panel)
 	_suit.add_theme_constant_override("separation", 8)
-	_suit.hide()
-	_content.add_child(_suit)
-	_suit_picker = SuitPicker.new(Vector2i(280, 280))
+	_suit_panel.add_child(_suit)
+	var suit_heading := Label.new()
+	suit_heading.text = "SUIT CONFIG"
+	BroadcastUI.text(suit_heading, 34, BroadcastUI.CYAN)
+	_suit.add_child(suit_heading)
+	_suit_picker = SuitPicker.new(Vector2i(264, 240))
 	_suit_picker.changed.connect(func(color: int, skin: int):
 		Settings.suit_color = color
 		Settings.suit_skin = skin)
 	_suit.add_child(_suit_picker)
-	_button(_suit, "BACK", _on_back)
+	var suit_back := _button(_suit, "BACK", _on_back, 40)
+	BroadcastUI.button_role(suit_back, false, true)
 	_playback.hide()
 
 
@@ -239,7 +258,7 @@ func _input(event: InputEvent) -> void:
 		_play_transport(FAST_FORWARD)
 		_finish_intro()
 		get_viewport().set_input_as_handled()
-	elif (_settings_panel.visible or _suit.visible) and event.is_action_pressed("ui_cancel"):
+	elif (_settings_panel.visible or _suit_panel.visible) and event.is_action_pressed("ui_cancel"):
 		Sound.play("ui_click")
 		_on_back()
 		get_viewport().set_input_as_handled()
@@ -286,11 +305,11 @@ func _label(parent: Control, text: String, at: Vector2, font_size: int, color: C
 	return label
 
 
-func _button(parent: Control, text: String, action: Callable) -> Button:
+func _button(parent: Control, text: String, action: Callable, height := 44) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size.y = 43
+	button.custom_minimum_size.y = height
 	BroadcastUI.button_role(button)
 	BroadcastUI.animate_button(button)
 	button.pressed.connect(action)
@@ -301,6 +320,7 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 func _toggle(caption: String, checked: bool, action: Callable) -> void:
 	var toggle := CheckButton.new()
 	toggle.text = caption
+	toggle.custom_minimum_size.y = 36
 	toggle.button_pressed = checked
 	toggle.toggled.connect(action)
 	BroadcastUI.animate_button(toggle)
@@ -310,15 +330,14 @@ func _toggle(caption: String, checked: bool, action: Callable) -> void:
 func _slider(parent: Control, caption: String, lo: float, hi: float, value: float, on_change: Callable) -> HSlider:
 	var label := Label.new()
 	label.text = caption
-	label.add_theme_color_override("font_color", OSD_COLOR)
-	label.add_theme_font_size_override("font_size", 19)
+	BroadcastUI.text(label, 20, BroadcastUI.CYAN)
 	parent.add_child(label)
 	var slider := HSlider.new()
 	slider.min_value = lo
 	slider.max_value = hi
 	slider.step = (hi - lo) / 100.0
 	slider.value = value
-	slider.custom_minimum_size = Vector2(320, 21)
+	slider.custom_minimum_size = Vector2(320, 20)
 	slider.value_changed.connect(on_change)
 	slider.value_changed.connect(func(_value: float): Sound.ui_focus())
 	BroadcastUI.focus_sound(slider)
@@ -374,9 +393,12 @@ var _status_label: Label
 func _join_status(text: String) -> void:
 	if _status_label == null:
 		_status_label = Label.new()
-		_status_label.add_theme_font_size_override("font_size", 20)
-		_status_label.add_theme_color_override("font_color", BroadcastUI.CYAN)
-		_status_label.position = _menu.position + Vector2(0, -34)
+		BroadcastUI.text(_status_label, 20, BroadcastUI.CYAN)
+		BroadcastUI.back_label(_status_label, BroadcastUI.CYAN, 6)
+		_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_status_label.custom_minimum_size.x = _menu.custom_minimum_size.x
+		_status_label.size.x = _menu.custom_minimum_size.x
+		_status_label.position = _menu.position + Vector2(0, -48)
 		_content.add_child(_status_label)
 	_status_label.text = text
 	_status_label.visible = text != ""
@@ -438,26 +460,29 @@ func _finish_eject() -> void:
 	get_tree().quit()
 
 
-## A failed host attempt keeps the error and its Back action in the menu area.
+## A failed join attempt keeps the error and its Back action in the menu area.
 func _show_error(text: String) -> void:
 	_menu.hide()
+	var panel := PanelContainer.new()
+	panel.position = _menu.position
+	panel.custom_minimum_size.x = _menu.custom_minimum_size.x
+	panel.add_theme_stylebox_override("panel", BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.PINK))
+	_content.add_child(panel)
 	var row := VBoxContainer.new()
-	row.position = _menu.position
-	row.custom_minimum_size.x = _menu.custom_minimum_size.x
 	row.add_theme_constant_override("separation", 12)
-	_content.add_child(row)
+	panel.add_child(row)
 	var label := Label.new()
-	label.text = text
+	label.text = text.to_upper()
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 22)
-	label.add_theme_color_override("font_color", BroadcastUI.PINK)
+	BroadcastUI.text(label, 21, BroadcastUI.PINK)
 	row.add_child(label)
 	var back := _button(row, "BACK", func():
-		row.queue_free()
+		panel.queue_free()
 		_menu.show()
 		_menu_buttons()[0].grab_focus())
+	BroadcastUI.button_role(back, true)
 	back.grab_focus()
-	BroadcastUI.reveal(row)
+	BroadcastUI.reveal(panel)
 
 
 func _on_settings() -> void:
@@ -469,16 +494,16 @@ func _on_settings() -> void:
 
 func _on_suit() -> void:
 	_menu.hide()
-	_suit.show()
+	_suit_panel.show()
 	_suit_picker.focus_selected()
 	SceneLoader.tracking_wipe()
 
 
 func _on_back() -> void:
 	Settings.save()
-	var button := _suit_button if _suit.visible else _settings_button
+	var button := _suit_button if _suit_panel.visible else _settings_button
 	_settings_panel.hide()
-	_suit.hide()
+	_suit_panel.hide()
 	_menu.show()
 	button.grab_focus()
 	SceneLoader.tracking_wipe()

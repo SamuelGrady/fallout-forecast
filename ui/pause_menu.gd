@@ -21,13 +21,15 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	center.add_child(row)
-	_panel.custom_minimum_size = Vector2(326, 0)
-	var centered := CenterContainer.new()
-	centered.add_child(_panel)
-	row.add_child(centered)
+	var panel_style := BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.CYAN)
+	_panel.custom_minimum_size = Vector2(326, 440)
+	_panel.add_theme_stylebox_override("panel", panel_style)
+	row.add_child(_panel)
 	_mutations.custom_minimum_size = Vector2(492, 440)
+	_mutations.add_theme_stylebox_override("panel", panel_style)
 	row.add_child(_mutations)
 	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 10)
 	_mutations.add_child(list)
 	var mutation_title := Label.new()
 	mutation_title.text = "MUTATION LOG"
@@ -40,7 +42,9 @@ func _ready() -> void:
 	_mutation_text.add_theme_font_override("bold_font", BroadcastUI.FONT)
 	_mutation_text.add_theme_font_size_override("normal_font_size", 21)
 	_mutation_text.add_theme_font_size_override("bold_font_size", 22)
-	var focus := BroadcastUI.panel(Color.TRANSPARENT)
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color.TRANSPARENT
+	focus.border_color = BroadcastUI.CYAN
 	focus.set_border_width_all(1)
 	focus.set_content_margin_all(0)
 	_mutation_text.add_theme_stylebox_override("focus", focus)
@@ -48,17 +52,25 @@ func _ready() -> void:
 	BroadcastUI.focus_sound(_mutation_text)
 	list.add_child(_mutation_text)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 12)
 	_panel.add_child(box)
 	var title := Label.new()
 	title.text = "BROADCAST PAUSED"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(title, 36, BroadcastUI.CYAN)
+	BroadcastUI.text(title, 34, BroadcastUI.CYAN)
 	box.add_child(title)
 	_resume_button = _button(box, "RESUME", _resume)
 	_button(box, "MAIN MENU", _main_menu)
 	if not OS.has_feature("web"):
 		_button(box, "QUIT", get_tree().quit)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(spacer)
+	var hint := Label.new()
+	hint.text = "[%s] RESUME" % BroadcastUI.input_hint("pause")
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	BroadcastUI.text(hint, 19, BroadcastUI.MUTED)
+	box.add_child(hint)
 	for item in box.get_children():
 		if item is Button:
 			item.focus_neighbor_right = item.get_path_to(_mutation_text)
@@ -67,9 +79,10 @@ func _ready() -> void:
 	BroadcastUI.text(_remote, 30, BroadcastUI.CYAN)
 	BroadcastUI.back_label(_remote)
 	_remote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_remote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_remote.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_remote.offset_left = -320
-	_remote.offset_right = 320
+	_remote.offset_left = -300
+	_remote.offset_right = 300
 	_remote.offset_top = -40
 	_remote.offset_bottom = 40
 	_remote.visible = false
@@ -94,28 +107,27 @@ func _scroll_mutations(event: InputEvent) -> void:
 ## mutations, each with its description.
 func _refresh_mutations() -> void:
 	var roll := GameManager.mutations
+	var muted := BroadcastUI.MUTED.to_html(false)
+	var paper := BroadcastUI.PAPER.to_html(false)
 	var lines := PackedStringArray()
 	lines.append("[b][color=#%s]INFECTED  /  THIS WAVE[/color][/b]" % BroadcastUI.PINK.to_html(false))
 	if roll == null or roll.active.is_empty():
-		lines.append("[color=#9aa3ad]None right now.[/color]")
+		lines.append("[color=#%s]NONE RIGHT NOW.[/color]" % muted)
 	else:
 		for id in roll.active:
 			var entry: MutationData = roll.table.get_entry(id)
 			if entry:
-				lines.append("[b]%s[/b]
-[color=#e6d4d4]%s[/color]" % [entry.display_name.to_upper(), entry.description])
+				lines.append("[b]%s[/b]\n[color=#%s]%s[/color]" % [entry.display_name.to_upper(), paper, entry.description])
 	lines.append("")
 	lines.append("[b][color=#%s]SQUAD  /  THIS RUN[/color][/b]" % BroadcastUI.ACID.to_html(false))
 	if roll == null or roll.player_mutations.is_empty():
-		lines.append("[color=#9aa3ad]None yet. Draft one after each Calm.[/color]")
+		lines.append("[color=#%s]NONE YET. DRAFT ONE AFTER EACH CALM.[/color]" % muted)
 	else:
 		for id in roll.player_mutations:
 			if GameManager.PLAYER_MUTATIONS.has(id):
 				var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
-				lines.append("[b]%s[/b]
-[color=#dcefd6]%s[/color]" % [str(info.name), str(info.desc)])
-	_mutation_text.text = "
-".join(lines)
+				lines.append("[b]%s[/b]\n[color=#%s]%s[/color]" % [str(info.name).to_upper(), paper, str(info.desc)])
+	_mutation_text.text = "\n".join(lines)
 	_mutation_text.get_v_scroll_bar().value = 0.0
 
 

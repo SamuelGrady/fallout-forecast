@@ -60,18 +60,20 @@ func _ready() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	back.add_child(center)
 	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.CYAN))
 	center.add_child(panel)
 	var box := VBoxContainer.new()
+	box.custom_minimum_size.x = 460
 	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
 	_caption.text = "LOADING TAPE"
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(_caption, 40)
+	BroadcastUI.text(_caption, 42, BroadcastUI.PAPER)
 	box.add_child(_caption)
 	_district.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.text(_district, 24, BroadcastUI.CYAN)
 	box.add_child(_district)
-	_bar.custom_minimum_size = Vector2(440, 10)
+	_bar.custom_minimum_size = Vector2(460, 10)
 	_bar.show_percentage = false
 	_bar.max_value = 1.0
 	BroadcastUI.bar(_bar, BroadcastUI.CYAN)
@@ -79,11 +81,13 @@ func _ready() -> void:
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.text(_counter, 20, BroadcastUI.MUTED)
 	box.add_child(_counter)
-	var corner := Label.new()
-	corner.text = "PLAY  >"
-	BroadcastUI.text(corner, 24)
-	corner.position = Vector2(40, 30)
-	add_child(corner)
+	# Same OSD corner as the title screen (ui/title.gd): glyph and caption sit apart.
+	for spec: Array in [[">" if OS.has_feature("web") else "▶", Vector2(51, 36), 17], ["PLAY", Vector2(78, 34), 22]]:
+		var corner := Label.new()
+		corner.text = str(spec[0])
+		BroadcastUI.text(corner, int(spec[2]), Color("CCEADB"), 2)
+		corner.position = spec[1]
+		add_child(corner)
 	var tracking := CanvasLayer.new()
 	tracking.layer = 121
 	add_child(tracking)

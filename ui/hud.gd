@@ -123,7 +123,7 @@ func _bar(parent: Control, bar: ProgressBar, height: float, color: Color, max_va
 
 
 func _build_forecast() -> void:
-	var top := _column(_panel_at(Control.PRESET_CENTER_TOP, 408, Vector2(0, 82), Vector2(.5, 0)))
+	var top := _column(_panel_at(Control.PRESET_CENTER_TOP, 396, Vector2(0, 78), Vector2(.5, 0)))
 	var header := HBoxContainer.new()
 	_row(top, header)
 	_weather.kind = "weather"
@@ -161,15 +161,15 @@ func _build_forecast() -> void:
 
 	_tape_counter.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_tape_counter.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_tape_counter.offset_right = -24
-	_tape_counter.offset_top = 59
+	_tape_counter.offset_right = -20
+	_tape_counter.offset_top = 56
 	_tape_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	BroadcastUI.text(_tape_counter, roundi(24 * Settings.hud_scale), BroadcastUI.AMBER)
 	BroadcastUI.back_label(_tape_counter, BroadcastUI.AMBER, 4)
 	_layout.add_child(_tape_counter)
 
 	_teammates.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
-	_teammates.offset_left = 24
+	_teammates.offset_left = 20
 	_teammates.offset_top = -142
 	_teammates.add_theme_constant_override("separation", 7)
 	_teammates.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -177,7 +177,8 @@ func _build_forecast() -> void:
 
 
 func _build_vitals() -> void:
-	var box := _column(_panel_at(Control.PRESET_BOTTOM_LEFT, 248, Vector2(24, -24), Vector2(0, 1)))
+	# Kept compact so a future ~360x64 bottom-center hotbar clears even at Large HUD scale.
+	var box := _column(_panel_at(Control.PRESET_BOTTOM_LEFT, 232, Vector2(20, -20), Vector2(0, 1)))
 	for row in [_enemy_icons, _squad_icons]:
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override("h_separation", 4)
@@ -201,7 +202,7 @@ func _build_vitals() -> void:
 
 
 func _build_armory() -> void:
-	_armory = _panel_at(Control.PRESET_BOTTOM_RIGHT, 216, Vector2(-24, -24), Vector2(1, 1))
+	_armory = _panel_at(Control.PRESET_BOTTOM_RIGHT, 212, Vector2(-20, -20), Vector2(1, 1))
 	var box := _column(_armory, 2)
 	for label in [_unlock, _weapon, _ammo]:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -220,23 +221,25 @@ func _build_armory() -> void:
 
 
 func _build_messages() -> void:
-	_notice(_banner, Control.PRESET_CENTER_TOP, 504, 235, 28, BroadcastUI.PAPER)
-	_notice(_lightning, Control.PRESET_TOP_RIGHT, 208, 108, 19, BroadcastUI.CYAN)
+	# Directly under the forecast panel, clear of the wave card (JuiceHud) and the draft strip.
+	_notice(_banner, Control.PRESET_CENTER_TOP, 480, 158, 28, BroadcastUI.PAPER)
+	_notice(_lightning, Control.PRESET_TOP_RIGHT, 224, 100, 19, BroadcastUI.CYAN)
 	_notice(_downed, Control.PRESET_CENTER, 408, 48, 34, BroadcastUI.PINK)
-	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 408, -82, 22, BroadcastUI.PAPER)
+	_notice(_prompt, Control.PRESET_CENTER_BOTTOM, 360, -112, 22, BroadcastUI.PAPER)
+	_prompt.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_revive_progress.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_revive_progress.offset_left = -100
 	_revive_progress.offset_right = 100
-	_revive_progress.offset_top = -34
-	_revive_progress.offset_bottom = -28
-	_bar(_layout, _revive_progress, 6, BroadcastUI.CYAN)
+	_revive_progress.offset_top = -102
+	_revive_progress.offset_bottom = -94
+	_bar(_layout, _revive_progress, 8, BroadcastUI.CYAN)
 	_revive_progress.hide()
 
 
 func _notice(label: Label, preset: Control.LayoutPreset, width: float, y: float, font_size: int, color: Color) -> void:
 	label.set_anchors_and_offsets_preset(preset)
-	label.offset_left = -width - 24 if preset == Control.PRESET_TOP_RIGHT else -width * .5
-	label.offset_right = -24 if preset == Control.PRESET_TOP_RIGHT else width * .5
+	label.offset_left = -width - 20 if preset == Control.PRESET_TOP_RIGHT else -width * .5
+	label.offset_right = -20 if preset == Control.PRESET_TOP_RIGHT else width * .5
 	label.offset_top = y
 	label.offset_bottom = y
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -418,7 +421,7 @@ func _update_vitals(player: Player, delta: float) -> void:
 		_equipment.text += "   /   TARP [%s]" % BroadcastUI.input_hint("use_item")
 	if GameManager.has_mutation("static_charge") and player.static_charge > 0.01:
 		_equipment.text += "\nSTATIC  %d%%%s" % [roundi(player.static_charge * 100.0), "  READY" if player.static_charge >= 0.25 else ""]
-	_prompt.text = player.interact_prompt
+	_prompt.text = player.interact_prompt.to_upper()
 	_prompt.visible = not _prompt.text.is_empty() and player.state in ["ok", "downed"]
 	_reticle.progress = player.interact_progress
 	_reticle.targeted = _prompt.visible
@@ -489,6 +492,8 @@ func _update_teammates(local: Player) -> void:
 			var style := BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.MUTED)
 			style.set_content_margin_all(8)
 			card.add_theme_stylebox_override("panel", style)
+			BroadcastUI.text(card.get_node("%Name") as Label, 19, BroadcastUI.PAPER)
+			BroadcastUI.text(card.get_node("%State") as Label, 18, BroadcastUI.PINK)
 			BroadcastUI.bar(card.get_node("%Health"), BroadcastUI.PINK)
 			BroadcastUI.bar(card.get_node("%Suit"), BroadcastUI.CYAN)
 			_teammates.add_child(card)
