@@ -20,6 +20,7 @@ var _since_cursed := 0
 var _last_cursed := {}  # player instance id -> true if their last roll was cursed
 var _double_waiting := {}  # crate instance id -> [player, time]
 var _clock := 0.0
+var _crate_seq := 0
 
 
 func _ready() -> void:
@@ -33,20 +34,50 @@ func _process(delta: float) -> void:
 
 
 func spawn_for_calm() -> void:
+	if not Net.is_host():
+		return
 	var parent := _container()
 	if parent == null:
 		return
 	for old in get_tree().get_nodes_in_group("crates"):
 		old.queue_free()
+	_clear_crates.rpc()
 	var markers := get_tree().get_nodes_in_group("crate_spawn").duplicate()
 	markers.shuffle()
 	var count := mini(GameManager.CRATES_PER_CALM[GameManager.player_count()], markers.size())
 	for i in count:
 		var double := i == 0 and WeatherManager.wave >= 2 and not GameManager.is_solo()
-		var crate := (DoubleCrateScene if double else CrateScene).instantiate()
-		parent.add_child(crate, true)
-		crate.global_position = (markers[i] as Node3D).global_position
-		crate.rotation.y = randf() * TAU
+		# Names are the contract: a client's "open crate" request finds the same
+		# path here, so every crate gets a unique one for the whole run.
+		_crate_seq += 1
+		var node_name := "C_%d" % _crate_seq
+		var at: Vector3 = (markers[i] as Node3D).global_position
+		var yaw := randf() * TAU
+		_spawn(parent, node_name, double, at, yaw)
+		_spawn_crate.rpc(node_name, double, at, yaw)
+
+
+func _spawn(parent: Node, node_name: String, double: bool, at: Vector3, yaw: float) -> void:
+	var crate := (DoubleCrateScene if double else CrateScene).instantiate()
+	crate.name = node_name
+	crate.set("double", double)
+	parent.add_child(crate, true)
+	crate.global_position = at
+	crate.rotation.y = yaw
+
+
+@rpc("authority", "call_remote", "reliable")
+func _spawn_crate(node_name: String, double: bool, at: Vector3, yaw: float) -> void:
+	var parent := _container()
+	if parent == null or parent.has_node(node_name):
+		return
+	_spawn(parent, node_name, double, at, yaw)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _clear_crates() -> void:
+	for old in get_tree().get_nodes_in_group("crates"):
+		old.queue_free()
 
 
 func open(crate: Node, player: Node) -> void:
@@ -132,10 +163,28 @@ func _is_useful(player: Node, item: String) -> bool:
 	return true
 
 
+## Every peer plays the spin and lands on the same result.
 func _reveal(crate: Node, item: String, override_text := "") -> void:
 	var pool: Array = (loot.common_items + loot.rare_items + loot.cursed_items).map(func(i): return loot.display_name(i))
 	var text := override_text if override_text != "" else loot.display_name(item)
-	crate.play_spin(text, loot.tier_of(item), pool, item)
+	var tier := loot.tier_of(item)
+	_apply_reveal(crate.name, text, tier, pool, item)
+	_apply_reveal.rpc(crate.name, text, tier, pool, item)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _apply_reveal(node_name: String, text: String, tier: String, pool: Array, item_id: String) -> void:
+	var parent := _container()
+	if parent == null:
+		return
+	var crate := parent.get_node_or_null(node_name)
+	if crate == null:
+		return
+	# Opened is host state, but every peer's prompt has to stop offering it.
+	var interact := crate.get_node_or_null("Interact")
+	if interact:
+		interact.set("opened", true)
+	crate.play_spin(text, tier, pool, item_id)
 
 
 func _give(player: Node, item: String) -> void:

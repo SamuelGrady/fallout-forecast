@@ -1,6 +1,7 @@
 extends Control
 const RUN_SCENE := "res://main.tscn"
 const TITLE_SCENE := "res://ui/title.tscn"
+const LOBBY_SCENE := "res://ui/lobby.tscn"
 
 func _ready() -> void:
 	MenuState.reset()
@@ -50,15 +51,25 @@ func _ready() -> void:
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	actions.add_theme_constant_override("separation",16)
 	box.add_child(actions)
-	var play := _button(actions,"PLAY AGAIN",func(): get_tree().change_scene_to_file(RUN_SCENE))
+	var play: Button
+	# Online, another run has to start from the lobby: only the host can send
+	# everyone into the run scene.
+	if Net.is_online():
+		play = _button(actions,"BACK TO LOBBY",func(): get_tree().change_scene_to_file(LOBBY_SCENE))
+	else:
+		play = _button(actions,"PLAY AGAIN",func(): get_tree().change_scene_to_file(RUN_SCENE))
 	BroadcastUI.button_role(play,true)
-	_button(actions,"MAIN MENU",func(): get_tree().change_scene_to_file(TITLE_SCENE))
+	_button(actions,"MAIN MENU",_on_menu)
 	play.grab_focus()
 	BroadcastUI.reveal(box)
 
+func _on_menu() -> void:
+	Net.leave()
+	get_tree().change_scene_to_file(TITLE_SCENE)
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		get_tree().change_scene_to_file(TITLE_SCENE)
+		_on_menu()
 		get_viewport().set_input_as_handled()
 
 func _label(parent: Node, text: String, font_size: int, color: Color) -> void:

@@ -63,4 +63,5 @@ func _main_menu() -> void:
 	GameManager.mutations.clear()
 	WeatherManager.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Net.leave()
 	get_tree().change_scene_to_file("res://ui/title.tscn")

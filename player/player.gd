@@ -95,6 +95,7 @@ var aiming := false
 var sprint_lock := 0.0
 ## Host: post-revive grace. No damage or suit drain until it runs out.
 var _grace_left := 0.0
+var _last_headshot_ms := 0
 const REVIVE_GRACE := 1.0
 const SELF_REVIVE_SUIT := 30.0
 
@@ -207,7 +208,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if _is_host():
+	_net_step(delta)
+	if Net.is_host():
 		_host_tick(delta)
 	if state != _shown_state:
 		_apply_state_visuals()
@@ -297,12 +299,12 @@ func _physics_process(delta: float) -> void:
 		_melee_left -= delta
 		if Input.is_action_just_pressed("fire") and _melee_left <= 0.0:
 			_melee_left = melee_cooldown
-			if _is_host():
+			if Net.is_host():
 				_melee()
 			else:
 				_request_melee.rpc_id(1)
 	if has_tarp and state == "ok" and Input.is_action_just_pressed("use_item"):
-		tarp_raised = not tarp_raised
+		_set_tarp(not tarp_raised)
 
 
 # ------------------------------------------------------------------ host rules
@@ -331,7 +333,7 @@ func _host_tick(delta: float) -> void:
 
 ## Enemies, spore clouds, suit drain and (for Turned players) teammates' guns.
 func take_damage(amount: float, _source: Node = null) -> void:
-	if not _is_host():
+	if not Net.is_host():
 		return
 	match state:
 		"ok":
@@ -349,7 +351,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 
 
 func heal(amount: float) -> void:
-	if _is_host() and state == "ok":
+	if Net.is_host() and state == "ok":
 		health = minf(health + amount, max_health)
 
 
@@ -419,7 +421,7 @@ func _melee() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _request_melee() -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority() and state == "turned":
+	if Net.is_host() and multiplayer.get_remote_sender_id() == get_multiplayer_authority() and state == "turned":
 		_melee()
 
 
@@ -585,14 +587,15 @@ func _update_shelter() -> void:
 	var now_sheltered := roof_check.is_colliding() or in_shelter_area
 	if now_sheltered != sheltered or now_in_puddle != in_puddle:
 		_set_exposure(now_sheltered, now_in_puddle)
-		if multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		# Clients tell the host; the host is the only one who acts on it.
+		if not Net.is_host():
 			_report_exposure.rpc_id(1, sheltered, in_puddle)
 
 
 ## Client -> host: this player's shelter and puddle state changed.
 @rpc("any_peer", "call_remote", "reliable")
 func _report_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+	if Net.is_host() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
 		_set_exposure(is_sheltered, is_in_puddle)
 
 
@@ -607,5 +610,155 @@ func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
 		exposed_changed.emit(exposed)
 
 
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+# ------------------------------------------------------------------ network
+## Owner -> host -> everyone else. ENet clients can only address the host, so
+## the host relays; that is why each value has a _push_ and an _apply_ half.
+##
+## These RPCs are "any_peer" rather than "authority" on purpose: the node's
+## authority is its owner, so a host relaying on behalf of a client would be
+## rejected by an "authority" check. Each handler validates the sender instead.
+const NET_RATE := 20.0
+## How often the host resends health, suit, state and the tarp.
+const VITALS_RATE := 0.2
+
+var _net_left := 0.0
+var _vitals_left := 0.0
+## enemy net id -> the damage number still floating over it.
+var _numbers := {}
+
+
+func _net_step(delta: float) -> void:
+	if not Net.is_online():
+		return
+	_net_left -= delta
+	if _net_left <= 0.0:
+		_net_left = 1.0 / NET_RATE
+		if is_multiplayer_authority():
+			if Net.is_host():
+				_relay_transform.rpc(global_position, rotation.y, head.rotation.x, velocity)
+			else:
+				_push_transform.rpc_id(1, global_position, rotation.y, head.rotation.x, velocity)
+	if not Net.is_host():
+		return
+	_vitals_left -= delta
+	if _vitals_left <= 0.0:
+		_vitals_left = VITALS_RATE
+		_apply_vitals.rpc(health, suit_integrity, state, bleed_left, tarp_raised)
+
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _push_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> void:
+	if not Net.is_host() or multiplayer.get_remote_sender_id() != get_multiplayer_authority():
+		return
+	_apply_transform(pos, yaw, pitch, vel)
+	_relay_transform.rpc(pos, yaw, pitch, vel)
+
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _relay_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	_apply_transform(pos, yaw, pitch, vel)
+
+
+## Remote copies are driven straight from the network; only the owner moves
+## itself with move_and_slide (its _physics_process returns early otherwise).
+func _apply_transform(pos: Vector3, yaw: float, pitch: float, vel: Vector3) -> void:
+	if is_multiplayer_authority():
+		return
+	global_position = pos
+	rotation.y = yaw
+	head.rotation.x = pitch
+	velocity = vel
+
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool) -> void:
+	if Net.is_host() or multiplayer.get_remote_sender_id() != 1:
+		return
+	health = hp
+	suit_integrity = suit
+	bleed_left = bleed
+	tarp_raised = tarp and new_state == "ok"
+	# Assigned, not _set_state(): a remote player's change must not replay the
+	# downed/revive stingers on this machine.
+	state = new_state
+
+
+func _set_tarp(value: bool) -> void:
+	tarp_raised = value
+	if not Net.is_online() or not is_multiplayer_authority():
+		return
+	if Net.is_host():
+		_apply_tarp.rpc(value)
+	else:
+		_push_tarp.rpc_id(1, value)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _push_tarp(value: bool) -> void:
+	if not Net.is_host() or multiplayer.get_remote_sender_id() != get_multiplayer_authority():
+		return
+	tarp_raised = value
+	_apply_tarp.rpc(value)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _apply_tarp(value: bool) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	tarp_raised = value
+
+
+## Host: tell whoever fired that the shot landed. The host's own player shows
+## it straight away; a client's is sent to that client.
+func notify_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id := 0) -> void:
+	if not Net.is_host():
+		return
+	if get_multiplayer_authority() == 1 or not Net.is_online():
+		local_hit(killed, critical, point, amount, enemy_id)
+	else:
+		_receive_hit.rpc_id(get_multiplayer_authority(), killed, critical, point, amount, enemy_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id: int) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	local_hit(killed, critical, point, amount, enemy_id)
+
+
+## Owner of the shot: hit marker, floating number and the headshot sting.
+func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id := 0) -> void:
+	GameManager.combat_hit.emit(killed, critical)
+	if amount > 0:
+		show_damage(point, amount, critical, enemy_id)
+	# One headshot sting per shot even when several pellets crit.
+	if critical and Time.get_ticks_msec() - _last_headshot_ms > 60:
+		_last_headshot_ms = Time.get_ticks_msec()
+		Sound.play("headshot", -10.0)
+
+
+## A damage number at the point the shot landed. Rapid hits on the same enemy
+## stack into one number, which is why the enemy's net id comes along: the
+## stacking has to happen on the shooter's machine, whichever peer that is.
+func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	if enemy_id > 0:
+		var existing = _numbers.get(enemy_id)
+		if is_instance_valid(existing) and float(existing.get("age")) < 0.12:
+			existing.add_hit(amount, critical)
+			return
+	var number := Label3D.new()
+	number.set_script(preload("res://weapons/damage_number.gd"))
+	# Set before add_child: damage_number's _ready() reads both.
+	number.set("amount", amount)
+	number.set("critical", critical)
+	parent.add_child(number)
+	number.global_position = point + Vector3.UP * 0.25
+	if enemy_id > 0:
+		if _numbers.size() > 64:
+			_numbers.clear()
+		_numbers[enemy_id] = number

@@ -34,8 +34,11 @@ The Godot console executable on Drew's PC is `C:/Users/drewd/Desktop/Godot_v4.7.
 
 ## Architecture
 
-- **`main.tscn` / `main.gd`:** the current entry point. It holds `Level`, `WeatherFX` (with `LightningFX`), `Player`, `Enemies` (the placeholder spawner), `RetroScreen`, `HUD` and `DebugHUD`. It moves the player to the first `player_spawn`. This is a single-player stand-in; the design calls for Title → Lobby → Run, with the host spawning players.
-- **Host authority pattern:** `_is_host()` means no peer or `multiplayer.is_server()`, so everything works offline as the host. AI, damage, the weather timers and lightning timing run on the host. Clients send what they own: their exposure (`Player._report_exposure`) and shots (`WeaponHolder._request_shot`). Visuals (rain, fog, puddle growth, RetroScreen, flicker props) run locally on each client.
+- **Scene flow:** `ui/title.tscn` → `ui/lobby.tscn` → `main.tscn` → `ui/results.tscn` → back to the lobby (online) or the title. JOIN GAME goes through `ui/server_browser.tscn`. Offline play skips the lobby.
+- **`game/net.gd`** (autoload `Net`): the session. Hosts or joins with `ENetMultiplayerPeer` on port 7777, holds the lobby roster, answers UDP discovery probes on port 7778, and is the **single** `is_host()` / `is_online()` the rest of the code asks. Do not add another copy of that check.
+- **`main.tscn` / `main.gd`:** the run entry point. It holds `Level`, `WeatherFX` (with `LightningFX`), `Player`, `Enemies` (the placeholder spawner), `RetroScreen`, `HUD` and `DebugHUD`. Solo it moves the baked-in `Player` to the first `player_spawn`. In a session it frees that Player and builds `Players/P_<peer id>` for every roster member on every peer, setting authority before `add_child` so paths and ownership match.
+- **Host authority pattern:** `Net.is_host()` means "no peer, or we are the server", so everything works offline as the host. AI, damage, the weather timers and lightning timing run on the host. Clients send what they own: their exposure (`Player._report_exposure`), transform and shots (`WeaponHolder._request_shot`). Visuals (rain, fog, puddle growth, RetroScreen, flicker props) run locally on each client.
+- **RPC rules:** an autoload or a scene node keeps authority 1, so host→client broadcasts there use `@rpc("authority", "call_remote", ...)`. A **player node's authority is its owner**, so anything on it must be `@rpc("any_peer", ...)` with an explicit `get_remote_sender_id()` check — otherwise the host relaying on a client's behalf is rejected. ENet is client/server: clients cannot address each other, so everything is client → host → clients.
 - **`weather/weather_manager.gd`** (autoload `WeatherManager`): phase cycle, `storm_intensity`, `enemy_buff()`, `suit_loss_per_second()`, and the `lightning_struck` signal. GameManager can set `auto_cycle = false` and drive it with `set_phase()`.
 - **`player/player.gd` (`Player`):**
   - Movement and look run only on the authority.
@@ -63,4 +66,4 @@ The Godot console executable on Drew's PC is `C:/Users/drewd/Desktop/Godot_v4.7.
   - F3, F4, F5 spawn a Drip, Gutter or Mister
   - F6 lightning, F8 retro effect, F9 debug text, F11 fullscreen
 
-Not built yet: the `Net`, `GameManager` and `RNG` autoloads, crates and loot, the mutation roll, the boss, menus and audio.
+Not built yet: the ping wheel, export builds for the demo machines, and per-player colours. Known networking gaps: enemy death fragments and the death sound only play on the host, the decon shower sound is host-only, and there is no interpolation, so remote players move in 20 Hz steps.

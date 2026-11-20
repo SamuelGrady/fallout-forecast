@@ -1,9 +1,16 @@
 extends Node3D
-## Run entry point. Offline (running main.tscn directly) it uses the Player
-## already in the scene. Puts the level's decon showers in play and starts the
-## run on the host.
+## Run entry point.
+##
+## Solo (and when main.tscn is run straight from the editor) the Player baked
+## into the scene is the player. In a session the roster owns the players
+## instead: every peer builds the same set of nodes from Net.roster, names them
+## P_<peer id> so the paths match for RPCs, and hands each one its owner's
+## authority. The baked-in Player is dropped in that case.
+##
+## Also puts the level's decon showers in play and starts the run on the host.
 
 const DeconShower := preload("res://props/decon_shower.gd")
+const PlayerScene := preload("res://player/player.tscn")
 
 
 func _ready() -> void:
@@ -20,12 +27,83 @@ func _ready() -> void:
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
 	$Level.add_child(signs)
-	var spawns := get_tree().get_nodes_in_group("player_spawn")
-	if has_node("Player") and not spawns.is_empty():
-		$Player.global_transform = (spawns[0] as Node3D).global_transform
+	_setup_players()
+	Net.roster_changed.connect(_sync_players)
+	Net.server_closed.connect(_leave_to_title)
 	if GameManager.is_host():
 		GameManager.start_run.call_deferred()
 	GameManager.run_finished.connect(_on_run_finished)
+
+
+## Solo: place the scene's Player. Session: replace it with the roster's set.
+func _setup_players() -> void:
+	if not Net.is_online():
+		var spawns := get_tree().get_nodes_in_group("player_spawn")
+		if has_node("Player") and not spawns.is_empty():
+			$Player.global_transform = (spawns[0] as Node3D).global_transform
+		return
+	_sync_players()
+	if has_node("Player"):
+		var baked := $Player as Player
+		# Groups outlive queue_free for a frame, so drop it from both by hand.
+		baked.remove_from_group("players")
+		baked.remove_from_group("local_player")
+		baked.queue_free()
+
+
+## Every peer runs this on join and on every roster change, building the same
+## nodes at the same paths. Adding is index-by-sorted-roster, so a newcomer
+## never moves an existing player.
+func _sync_players() -> void:
+	if not Net.is_online() or not is_inside_tree():
+		return
+	var container := _players_container()
+	var spawns := get_tree().get_nodes_in_group("player_spawn")
+	var ids := Net.roster.keys()
+	ids.sort()
+	for i in ids.size():
+		var peer_id := int(ids[i])
+		var node_name := "P_%d" % peer_id
+		if container.has_node(node_name):
+			container.get_node(node_name).set("display_name", _peer_name(peer_id))
+			continue
+		var player := PlayerScene.instantiate() as Player
+		player.name = node_name
+		# Authority before add_child: player.gd._ready() checks it to decide
+		# whether to take the camera and capture the mouse.
+		player.set_multiplayer_authority(peer_id)
+		container.add_child(player)
+		player.display_name = _peer_name(peer_id)
+		if not spawns.is_empty():
+			player.global_position = (spawns[i % spawns.size()] as Node3D).global_position
+	# Anyone who left.
+	for child in container.get_children():
+		var peer_id := _peer_of(str(child.name))
+		if peer_id < 0 or not Net.roster.has(peer_id):
+			child.remove_from_group("players")
+			child.remove_from_group("local_player")
+			child.queue_free()
+
+
+func _players_container() -> Node3D:
+	var container := get_node_or_null("Players") as Node3D
+	if container == null:
+		container = Node3D.new()
+		container.name = "Players"
+		add_child(container)
+	return container
+
+
+func _peer_name(peer_id: int) -> String:
+	var info: Dictionary = Net.roster.get(peer_id, {})
+	return str(info.get("name", "PLAYER %d" % peer_id))
+
+
+## "P_7" -> 7, or -1 if the node isn't a roster player.
+func _peer_of(node_name: String) -> int:
+	if not node_name.begins_with("P_"):
+		return -1
+	return int(node_name.substr(2))
 
 
 ## Same three district objectives on every peer; the host picks the live one.
@@ -49,9 +127,23 @@ func _exit_tree() -> void:
 
 func _on_run_finished(_won: bool, _results: Dictionary) -> void:
 	get_tree().create_timer(4.5).timeout.connect(func():
-		GameManager.mutations.clear()
-		WeatherManager.stop()
+		_end()
 		get_tree().change_scene_to_file("res://ui/results.tscn"))
+
+
+## The host left (or dropped us): there is no run to be in any more.
+func _leave_to_title() -> void:
+	_end()
+	Net.leave()
+	get_tree().change_scene_to_file("res://ui/title.tscn")
+
+
+## Run bookkeeping, but leave the session up: after a finished run everyone
+## goes back to the lobby to play again.
+func _end() -> void:
+	Net.end_run()
+	GameManager.mutations.clear()
+	WeatherManager.stop()
 
 
 ## Each decon_shower marker gets an "Interact" child (same path on every peer).

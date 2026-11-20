@@ -1,6 +1,13 @@
 extends Node3D
 ## Finite waves arrive in bursts, with recovery windows between groups.
 ## The last infected must be killed before a normal Downpour can clear.
+##
+## The host runs all of this and replicates: one reliable spawn per enemy, one
+## reliable despawn per death (with whatever it dropped), and one unreliable
+## packet per tick carrying every enemy's position. Clients never run the AI,
+## they only draw.
+##
+## Debug (debug builds, host only): F3 spawns a Drip, F4 a Gutter, F5 a Mister.
 
 @export var drip_scene: PackedScene = preload("res://enemies/drip/drip.tscn")
 @export var gutter_scene: PackedScene = preload("res://enemies/gutter/gutter.tscn")
@@ -14,7 +21,12 @@ extends Node3D
 @export var mister_weight := 1.2
 @export var mister_first_wave := 2
 
+## Position broadcasts per second when the host is relaying to clients.
+const NET_HZ := 10.0
+
 var _timer := 0.0
+var _next_net_id := 1
+var _net_sync := 0.0
 var _wave := 0
 var _budget := 0
 var _spawned := 0
@@ -41,8 +53,13 @@ func _on_phase(phase: int, wave: int) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not _is_host() or not GameManager.run_active or GameManager.finished:
+	if not Net.is_host() or not GameManager.run_active or GameManager.finished:
 		return
+	if Net.is_online():
+		_net_sync -= delta
+		if _net_sync <= 0.0:
+			_net_sync = 1.0 / NET_HZ
+			_push_enemies()
 	if _supplies_pending:
 		_spawn_street_supplies()
 		_supplies_pending = false
@@ -117,15 +134,16 @@ func _run_beat(wave: int) -> void:
 
 
 func _spawn_near(scene: PackedScene, center: Vector3, spread: float) -> EnemyBase:
-	if alive_count() >= 60:
+	if not Net.is_host() or alive_count() >= 60:
 		return null
-	var enemy := scene.instantiate() as EnemyBase
-	add_child(enemy, true)
 	var point := center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
 	var map := get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) > 0:
 		point = NavigationServer3D.map_get_closest_point(map, point)
-	enemy.global_position = point + Vector3(0, 0.15, 0)
+	var where := point + Vector3(0, 0.15, 0)
+	var enemy := _make(scene, where, false)
+	if enemy and Net.is_online():
+		_spawn_enemy.rpc(enemy.net_id, _kind_of(scene), where, false)
 	return enemy
 
 
@@ -148,19 +166,17 @@ func combat_status() -> String:
 func _spawn_street_supplies() -> void:
 	for old in get_tree().get_nodes_in_group("street_supplies"):
 		old.queue_free()
+	if Net.is_online():
+		_clear_supplies.rpc()
 	# Main Street, parking lot and park: open approaches with multiple exits.
 	for point in [Vector3(-30, 0.12, 2.5), Vector3(28, 0.12, -2.5), Vector3(4, 0.12, 42), Vector3(46, 0.12, 34)]:
-		var pack := Node3D.new()
-		pack.set_script(preload("res://weapons/ammo_drop.gd"))
-		pack.kind = "supply"
-		pack.expires_after = 600.0
-		add_child(pack)
-		pack.global_position = point
-		pack.add_to_group("street_supplies")
+		spawn_drop(point, "supply", 600.0)
+		if Net.is_online():
+			_spawn_supply.rpc(point)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (OS.is_debug_build() and _is_host() and event is InputEventKey and event.pressed and not event.echo):
+	if not (OS.is_debug_build() and Net.is_host() and event is InputEventKey and event.pressed and not event.echo):
 		return
 	match event.keycode:
 		KEY_F3:
@@ -176,17 +192,22 @@ func alive_count() -> int:
 
 
 func spawn(scene: PackedScene) -> EnemyBase:
+	# The host owns spawns; a client asking would make an enemy that never
+	# thinks and never replicates.
+	if not Net.is_host():
+		return null
 	var at: Variant = _gutter_spawn_point() if scene == gutter_scene else _marker_position("enemy_spawn")
 	if at == null:
 		push_warning("No spawn point for %s" % scene.resource_path)
 		return null
-	var enemy := scene.instantiate() as EnemyBase
-	add_child(enemy, true)
 	var point: Vector3 = at
 	var map := get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) > 0:
 		point = NavigationServer3D.map_get_closest_point(map, point)
-	enemy.global_position = point + Vector3(0, 0.15, 0)
+	var where := point + Vector3(0, 0.15, 0)
+	var enemy := _make(scene, where, false)
+	if enemy and Net.is_online():
+		_spawn_enemy.rpc(enemy.net_id, _kind_of(scene), where, false)
 	return enemy
 
 
@@ -195,10 +216,51 @@ func spawn_copy(enemy: EnemyBase, at: Vector3, small: bool) -> void:
 	var scene := load(enemy.scene_file_path) as PackedScene
 	if scene == null:
 		return
+	# Deferred: this runs from inside the parent's death.
 	var copy := scene.instantiate() as EnemyBase
 	copy.is_small = small
+	copy.net_id = _next_net_id
+	_next_net_id += 1
 	add_child.call_deferred(copy, true)
 	copy.set_deferred("global_position", at)
+	if Net.is_online():
+		_spawn_enemy.rpc(copy.net_id, _kind_of(scene), at, small)
+
+
+## Build one enemy on this peer. `is_small` and net_id are set before add_child
+## because EnemyBase._ready() reads them. Clients pass the host's id in; only
+## the host hands out new ones.
+func _make(scene: PackedScene, at: Vector3, small: bool, forced_id := 0) -> EnemyBase:
+	var enemy := scene.instantiate() as EnemyBase
+	enemy.is_small = small
+	if forced_id > 0:
+		enemy.net_id = forced_id
+	else:
+		enemy.net_id = _next_net_id
+		_next_net_id += 1
+	add_child(enemy, true)
+	enemy.global_position = at
+	return enemy
+
+
+## Which kind of enemy this is, for the wire. Compares resource paths rather
+## than instances, because splitters reload the scene by path.
+func _kind_of(scene: PackedScene) -> int:
+	var path := scene.resource_path
+	if path == gutter_scene.resource_path:
+		return 1
+	if path == mister_scene.resource_path:
+		return 2
+	return 0
+
+
+func _scene_of(kind: int) -> PackedScene:
+	match kind:
+		1:
+			return gutter_scene
+		2:
+			return mister_scene
+	return drip_scene
 
 
 func _pick_scene() -> PackedScene:
@@ -256,5 +318,84 @@ func _near_players(points: Array) -> Variant:
 	return candidates.pick_random() if not candidates.is_empty() else null
 
 
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+# ------------------------------------------------------------------ network
+## A drop every peer will see: it is collected locally by whoever walks over
+## it, so the node has to exist on every machine.
+func spawn_drop(at: Vector3, kind := "ammo", expires := 35.0) -> void:
+	var drop := Node3D.new()
+	drop.set_script(preload("res://weapons/ammo_drop.gd"))
+	# Set before add_child: ammo_drop's _ready() reads both.
+	drop.set("kind", kind)
+	drop.set("expires_after", expires)
+	add_child(drop)
+	drop.global_position = at
+	if kind == "supply":
+		drop.add_to_group("street_supplies")
+
+
+@rpc("authority", "call_remote", "reliable")
+func _spawn_supply(point: Vector3) -> void:
+	spawn_drop(point, "supply", 600.0)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _clear_supplies() -> void:
+	for old in get_tree().get_nodes_in_group("street_supplies"):
+		old.queue_free()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool) -> void:
+	if _find_net(net_id) != null:
+		return
+	_make(_scene_of(kind), at, small, net_id)
+
+
+## Host: one enemy died. Tell the clients which one, and what it dropped.
+func notify_despawn(enemy: EnemyBase, drops: Array) -> void:
+	if Net.is_host() and Net.is_online():
+		_despawn_enemy.rpc(enemy.net_id, drops)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _despawn_enemy(net_id: int, drops: Array) -> void:
+	var enemy := _find_net(net_id)
+	if enemy:
+		enemy.remove_from_group("enemies")
+		enemy.queue_free()
+	for entry in drops:
+		spawn_drop(entry[0], str(entry[1]))
+
+
+## One packet per tick for every enemy rather than one per enemy: positions and
+## yaws only, since the AI itself runs on the host alone.
+func _push_enemies() -> void:
+	var ids := PackedInt32Array()
+	var places := PackedVector3Array()
+	var yaws := PackedFloat32Array()
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Node3D
+		if enemy == null or not enemy.is_inside_tree():
+			continue
+		ids.append(int(enemy.get("net_id")))
+		places.append(enemy.global_position)
+		yaws.append(enemy.rotation.y)
+	if ids.is_empty():
+		return
+	_sync_enemies.rpc(ids, places, yaws)
+
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _sync_enemies(ids: PackedInt32Array, places: PackedVector3Array, yaws: PackedFloat32Array) -> void:
+	for i in ids.size():
+		var enemy := _find_net(ids[i])
+		if enemy:
+			enemy.global_position = places[i]
+			enemy.rotation.y = yaws[i]
+
+
+func _find_net(net_id: int) -> EnemyBase:
+	for node in get_tree().get_nodes_in_group("enemies"):
+		if int(node.get("net_id")) == net_id:
+			return node as EnemyBase
+	return null

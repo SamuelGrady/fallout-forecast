@@ -18,6 +18,8 @@ signal died(enemy: EnemyBase)
 @export var data: EnemyData
 
 var health := 0.0
+## Host-assigned, used by the spawner to match this enemy across peers.
+var net_id := 0
 var _bullet_critical := false
 var target: Node3D
 var _stagger_left := 0.0
@@ -55,7 +57,6 @@ static var _attack_material: StandardMaterial3D
 var _reveal_left := 0.0
 var _hit_left := 0.0
 var _attack_flash_left := 0.0
-var _damage_number: Label3D
 var _last_bullet_point := Vector3.ZERO
 var _push := Vector3.ZERO
 var _last_hit_by: Node = null
@@ -77,7 +78,7 @@ func _ready() -> void:
 	health = data.max_health * GameManager.enemy_health_scale() * (0.3 if is_small else 1.0)
 	if is_small:
 		scale = Vector3.ONE * 0.6
-	if not _is_host():
+	if not Net.is_host():
 		set_physics_process(false)
 
 
@@ -316,7 +317,7 @@ func attack(victim: Node3D, amount: float) -> void:
 
 ## Host only. Shooting calls this after the host's raycast hits.
 func take_damage(amount: float, _source: Node = null) -> void:
-	if not _is_host() or health <= 0.0:
+	if not Net.is_host() or health <= 0.0:
 		return
 	if _source and _source.is_in_group("players"):
 		_last_hit_by = _source
@@ -329,8 +330,11 @@ func take_damage(amount: float, _source: Node = null) -> void:
 			var hit_at := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position + Vector3.UP * 1.1
 			ShotFX.sparks(get_parent(), hit_at, to_source.normalized(), 4)
 	health -= amount
-	if is_instance_valid(_source) and _source.is_in_group("local_player"):
-		GameManager.combat_hit.emit(health <= 0.0, _bullet_critical)
+	# Hit feedback belongs to whoever fired, host or client, so the shooter's
+	# Player node decides where it appears (see Player.notify_hit).
+	if is_instance_valid(_source) and _source.has_method("notify_hit"):
+		var where := _last_bullet_point if _last_bullet_point != Vector3.ZERO else global_position
+		_source.notify_hit(health <= 0.0, _bullet_critical, where, ceili(amount), net_id)
 	damaged.emit(amount, maxf(health, 0.0))
 	if health <= 0.0:
 		die()
@@ -340,17 +344,16 @@ func die() -> void:
 	if _dead:
 		return
 	_dead = true
+	# The spawner owns the drops and tells every peer to make them: a drop is
+	# collected locally by whoever walks over it, so it has to exist everywhere.
+	var drops: Array = []
 	if not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
-		var drop := Node3D.new()
-		drop.set_script(preload("res://weapons/ammo_drop.gd"))
-		get_parent().add_child(drop)
-		drop.global_position = global_position
+		drops.append([global_position, "ammo"])
 	if not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
-		var recovery := Node3D.new()
-		recovery.set_script(preload("res://weapons/ammo_drop.gd"))
-		recovery.kind = "health" if randf() < 0.5 else "suit"
-		get_parent().add_child(recovery)
-		recovery.global_position = global_position + Vector3(0.6, 0.0, 0.0)
+		drops.append([global_position + Vector3(0.6, 0.0, 0.0), "health" if randf() < 0.5 else "suit"])
+	if get_parent() and get_parent().has_method("spawn_drop"):
+		for entry in drops:
+			get_parent().spawn_drop(entry[0], str(entry[1]))
 	if _fragment_materials.is_empty():
 		for c in [Color("#b5df68"), Color("#337c87")]:
 			var material := StandardMaterial3D.new()
@@ -379,6 +382,8 @@ func die() -> void:
 	if GameManager.has_mutation("splitters") and not is_small and get_parent().has_method("spawn_copy"):
 		for i in 2:
 			get_parent().spawn_copy(self, global_position + Vector3(randf_range(-0.8, 0.8), 0.1, randf_range(-0.8, 0.8)), true)
+	if get_parent() and get_parent().has_method("notify_despawn"):
+		get_parent().notify_despawn(self, drops)
 	died.emit(self)
 	queue_free()
 
@@ -424,12 +429,8 @@ func _face(direction: Vector3) -> void:
 		rotation.y = atan2(-direction.x, -direction.z)
 
 
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
-
-
 func take_bullet(amount: float, point: Vector3, source: Node) -> void:
-	if health <= 0.0 or not _is_host():
+	if health <= 0.0 or not Net.is_host():
 		return
 	var height := to_local(point).y
 	var head_height := 1.42
@@ -448,25 +449,11 @@ func take_bullet(amount: float, point: Vector3, source: Node) -> void:
 	if _bullet_critical:
 		stagger(0.3)
 	_last_bullet_point = point
-	var before := health
 	take_damage(amount * (GameManager.headshot_multiplier() if _bullet_critical else 1.0), source)
 	_last_bullet_point = Vector3.ZERO
-	if is_instance_valid(source) and source.is_in_group("local_player"):
-		var dealt := ceili(minf(before, before - health))
-		if is_instance_valid(_damage_number) and _damage_number.age < 0.12:
-			_damage_number.add_hit(dealt, _bullet_critical)
-		else:
-			var number := Label3D.new()
-			number.set_script(preload("res://weapons/damage_number.gd"))
-			number.amount = dealt
-			number.critical = _bullet_critical
-			get_parent().add_child(number)
-			number.global_position = point + Vector3.UP * .25
-			_damage_number = number
-		# One headshot cue per shot even when several pellets crit.
-		if _bullet_critical and Time.get_ticks_msec() - _last_headshot_ms > 60:
-			_last_headshot_ms = Time.get_ticks_msec()
-			Sound.play("headshot", -10.0)
+	# The floating number is the shooter's business: take_damage routes it
+	# through Player.notify_hit, so it stacks on their screen wherever the host
+	# is. Drew's stacking moved to Player.local_hit for that reason.
 	_bullet_critical = false
 
 

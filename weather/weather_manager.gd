@@ -68,9 +68,9 @@ var intensity_override := -1.0
 func _process(delta: float) -> void:
 	if running:
 		phase_time_left = maxf(phase_time_left - delta, 0.0)
-		if auto_cycle and _is_host() and phase_time_left <= 0.0 and not hold and _combat_complete():
+		if auto_cycle and Net.is_host() and phase_time_left <= 0.0 and not hold and _combat_complete():
 			next_phase()
-		if _is_host() and phase == Phase.DOWNPOUR:
+		if Net.is_host() and phase == Phase.DOWNPOUR:
 			_lightning_timer -= delta
 			if _lightning_timer <= 0.0:
 				_lightning_timer = randf_range(lightning_min_interval, lightning_max_interval)
@@ -86,7 +86,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not OS.is_debug_build() or not _is_host():
+	if not OS.is_debug_build() or not Net.is_host():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -100,18 +100,35 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Host: everyone is ready, so cut a waiting phase (Calm or Clearing) short.
 func skip_wait() -> void:
-	if not _is_host() or hold or not (phase == Phase.CALM or phase == Phase.CLEARING):
+	if not Net.is_host() or hold or not (phase == Phase.CALM or phase == Phase.CLEARING):
 		return
 	if phase_time_left > 3.0:
 		_apply_phase(phase, wave, 3.0)
-		if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
+		if Net.is_online():
 			_receive_phase.rpc(phase, wave, 3.0)
+
+
+## Host: force storm_intensity toward `value` (-1 to go back to the phase's
+## target). Every client eases toward the same number, so the boss's sacs step
+## the storm down on every screen at once.
+func set_intensity_override(value: float) -> void:
+	if not Net.is_host():
+		return
+	intensity_override = value
+	if Net.is_online():
+		_override.rpc(value)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _override(value: float) -> void:
+	intensity_override = value
 
 
 ## Host: start wave 1 at Calm.
 func start_run() -> void:
 	hold = false
-	intensity_override = -1.0
+	# Through the setter so clients drop any override left by the last boss.
+	set_intensity_override(-1.0)
 	set_phase(Phase.CALM, 1)
 
 
@@ -142,22 +159,27 @@ func next_phase() -> void:
 
 ## Host: jump to a phase. Sends it to every client.
 func set_phase(new_phase: Phase, new_wave: int) -> void:
-	if not _is_host():
+	if not Net.is_host():
 		push_warning("WeatherManager.set_phase called on a client")
 		return
 	var duration := _duration_for(new_phase)
 	_apply_phase(new_phase, new_wave, duration)
-	if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
+	if Net.is_online():
 		_receive_phase.rpc(new_phase, new_wave, duration)
 
 
 ## Host: strike lightning at a random spot (or at `at`) on every client.
 func strike_lightning(at: Variant = null) -> void:
-	if not _is_host():
+	if not Net.is_host():
 		return
 	var position: Vector3 = at if at is Vector3 else Vector3(
 		randf_range(-lightning_area, lightning_area), 0.0, randf_range(-lightning_area, lightning_area))
-	_strike.rpc(position, randi())
+	var strike_seed := randi()
+	# rpc() needs a live peer, so solo strikes come straight off the signal.
+	if Net.is_online():
+		_strike.rpc(position, strike_seed)
+	else:
+		lightning_struck.emit(position, strike_seed)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -167,7 +189,7 @@ func _strike(position: Vector3, strike_seed: int) -> void:
 
 ## Host: send the current phase to one peer (call when a player joins mid-run).
 func sync_to_peer(peer_id: int) -> void:
-	if _is_host():
+	if Net.is_host():
 		_receive_phase.rpc_id(peer_id, phase, wave, phase_time_left)
 		_receive_intensity.rpc_id(peer_id, storm_intensity)
 
@@ -254,10 +276,8 @@ func _state_for(value: float) -> StormState:
 	return StormState.CLEAR
 
 
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
-
-
+## A Downpour doesn't end while the horde is still alive. Host only, since it
+## is only used to decide whether the phase timer may advance.
 func _combat_complete() -> bool:
 	if phase != Phase.DOWNPOUR or not GameManager.run_active:
 		return true

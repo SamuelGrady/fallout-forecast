@@ -137,12 +137,12 @@ func fire() -> void:
 	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
-	_play_shot(current, origin, dir, shot_seed, true)
-	if _is_host():
-		_resolve_shot(current, origin, dir, shot_seed)
-		_broadcast_fx(current, origin, dir, shot_seed, player.get_multiplayer_authority())
+	_play_shot(data, origin, dir, shot_seed, true)
+	if Net.is_host():
+		_resolve_shot(data, origin, dir, shot_seed)
+		_broadcast_fx(data.resource_path, origin, dir, shot_seed, player.get_multiplayer_authority())
 	else:
-		_request_shot.rpc_id(1, current, origin, dir, shot_seed)
+		_request_shot.rpc_id(1, data.resource_path, origin, dir, shot_seed)
 	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * lerpf(1.0, 0.65, _aim), deg_to_rad(5.0))
 	_heat = minf(1.0, _heat + 0.22)
 	fired.emit(data)
@@ -176,38 +176,53 @@ func _finish_reload() -> void:
 
 
 # ------------------------------------------------------------------ network
+## A shot travels as its WeaponData path, not a loadout index: every machine
+## unlocks guns independently (Settings.unlocked_guns is local), so index 2
+## is not the same weapon on the host and the client.
 @rpc("any_peer", "call_remote", "reliable")
-func _request_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
+func _request_shot(path: String, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
 	var sender := multiplayer.get_remote_sender_id()
-	if not multiplayer.is_server() or sender != player.get_multiplayer_authority():
+	if not Net.is_host() or sender != player.get_multiplayer_authority():
+		return
+	var data := _weapon_at(path)
+	if data == null:
 		return
 	# The shot must start near where the host thinks this player's head is.
-	if index < 0 or index >= loadout.size() or origin.distance_to(camera.global_position) > 4.0:
+	# At 20 Hz the host's copy is a few centimetres stale, so this is loose.
+	if origin.distance_to(camera.global_position) > 4.0:
 		return
-	_resolve_shot(index, origin, dir.normalized(), shot_seed)
-	_broadcast_fx(index, origin, dir.normalized(), shot_seed, sender)
-	if multiplayer.get_unique_id() != sender:
-		_play_shot(index, origin, dir, shot_seed, false)
+	_resolve_shot(data, origin, dir.normalized(), shot_seed)
+	_broadcast_fx(path, origin, dir.normalized(), shot_seed, sender)
+	_play_shot(data, origin, dir, shot_seed, false)
+
+
+## Only the weapons folder, so a client can't ask the host to load anything.
+func _weapon_at(path: String) -> WeaponData:
+	if not (path.begins_with("res://weapons/") and path.ends_with(".tres")):
+		return null
+	return load(path) as WeaponData
 
 
 @rpc("any_peer", "call_remote", "unreliable")
-func _shot_fx(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
-	if multiplayer.get_remote_sender_id() == 1:
-		_play_shot(index, origin, dir, shot_seed, false)
+func _shot_fx(path: String, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	var data := _weapon_at(path)
+	if data:
+		_play_shot(data, origin, dir, shot_seed, false)
 
 
-func _broadcast_fx(index: int, origin: Vector3, dir: Vector3, shot_seed: int, shooter_peer: int) -> void:
-	if not multiplayer.has_multiplayer_peer():
+func _broadcast_fx(path: String, origin: Vector3, dir: Vector3, shot_seed: int, shooter_peer: int) -> void:
+	if not Net.is_online():
 		return
 	for peer in multiplayer.get_peers():
 		if peer != shooter_peer:
-			_shot_fx.rpc_id(peer, index, origin, dir, shot_seed)
+			_shot_fx.rpc_id(peer, path, origin, dir, shot_seed)
 
 
 # ------------------------------------------------------------------ shot logic
 ## Host only: damage. Projectiles deal their own damage on the host's copy.
-func _resolve_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
-	var data := loadout[index]
+func _resolve_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int) -> void:
 	if data.pull_radius > 0.0:
 		# Boombox: every shot drags nearby enemies toward the shooter.
 		for enemy in get_tree().get_nodes_in_group("enemies"):
@@ -239,8 +254,7 @@ func _resolve_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int) ->
 
 
 ## Every peer: effects. Projectiles are simulated by every peer from here.
-func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_local: bool) -> void:
-	var data := loadout[index]
+func _play_shot(data: WeaponData, origin: Vector3, dir: Vector3, shot_seed: int, is_local: bool) -> void:
 	var world := player.get_parent()
 	var muzzle := _muzzle_position() if is_local else origin + dir * 0.6
 	var ballistic := data.kind == WeaponData.Kind.HITSCAN
@@ -282,7 +296,7 @@ func _play_shot(index: int, origin: Vector3, dir: Vector3, shot_seed: int, is_lo
 		_:
 			var projectile := Projectile.new()
 			world.add_child(projectile)
-			projectile.launch(muzzle, dir, data, _is_host(), player)
+			projectile.launch(muzzle, dir, data, Net.is_host(), player)
 
 
 func _pellet_rays(data: WeaponData, _origin: Vector3, dir: Vector3, shot_seed: int) -> Array[Vector3]:
@@ -405,8 +419,11 @@ func _animate(delta: float) -> void:
 	if loadout.is_empty() or _model == null:
 		return
 	var data := loadout[current]
+	# Only the owning player aims down sights; Input on this machine says
+	# nothing about anyone else's.
 	var aiming: bool = player.is_multiplayer_authority() and player.get("state") == "ok" and not player.get("tarp_raised") 			and _reload_left <= 0.0 and GameManager.mutations.stage == "" 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
-	player.set("aiming", aiming)
+	if player.is_multiplayer_authority():
+		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
 	camera.fov = lerpf(_hip_fov, 52.0, _aim)
 	var speed := 0.0
@@ -465,10 +482,6 @@ func _find_player() -> Node3D:
 
 func _pad_connected() -> bool:
 	return not Input.get_connected_joypads().is_empty()
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
 
 
 ## Kill drops refill ballistic guns only; supply packs also restock flares and

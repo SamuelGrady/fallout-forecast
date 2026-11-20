@@ -33,6 +33,7 @@ var _anchor := Vector3.ZERO
 var _height := 18.0
 var _t := 0.0
 var _burn_left := 0.0
+var _net_left := 0.0
 var _spore_timer := 3.0
 var _summon_timer := 8.0
 var _parts: Array[Node] = []
@@ -58,7 +59,7 @@ func _ready() -> void:
 	_build()
 	scale = Vector3.ONE * 0.15
 	create_tween().tween_property(self, "scale", Vector3.ONE, 1.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	if _is_host():
+	if Net.is_host():
 		WeatherManager.strike_lightning()
 
 
@@ -181,7 +182,14 @@ func _process(delta: float) -> void:
 		_core_rings.rotation.x += delta * 1.1
 		_core_material.emission_energy_multiplier = 2.6 + sin(_t * 7.5) * 1.2
 	_cloud_material.emission = Color(0.65, 0.28, 0.08) if is_burning() else Color(0.12, 0.2, 0.08)
-	if not _is_host() or dead:
+	# Clients only draw it: position, part health and the burn timer ride one
+	# unreliable packet ten times a second, the kill is sent reliably below.
+	if Net.is_host() and Net.is_online():
+		_net_left -= delta
+		if _net_left <= 0.0:
+			_net_left = 0.1
+			_sync.rpc(global_position, part_health, sacs_left, _burn_left)
+	if not Net.is_host() or dead:
 		return
 	if _entrance_left > 0.0:
 		_entrance_left = maxf(0.0, _entrance_left - delta)
@@ -222,17 +230,16 @@ func core_exposed() -> bool:
 
 
 var _last_deflect_ms := 0
-var _damage_number: Label3D
 
 
 func damage_part(i: int, amount: float, source: Node, point := Vector3.INF) -> void:
-	if not _is_host() or dead or part_health[i] <= 0.0:
+	if not Net.is_host() or dead or part_health[i] <= 0.0:
 		return
 	var at: Vector3 = point if point != Vector3.INF else (_parts[i] as Node3D).global_position
-	var local_hit := is_instance_valid(source) and source.is_in_group("local_player")
+	var shooter := is_instance_valid(source) and source.is_in_group("players")
 	if i == 3 and not core_exposed():
 		# Shielded core: metallic deflect so players know to pop the sacs first.
-		if local_hit and Time.get_ticks_msec() - _last_deflect_ms > 90:
+		if shooter and Time.get_ticks_msec() - _last_deflect_ms > 90:
 			_last_deflect_ms = Time.get_ticks_msec()
 			var away := Vector3.UP
 			if source is Node3D:
@@ -242,18 +249,10 @@ func damage_part(i: int, amount: float, source: Node, point := Vector3.INF) -> v
 		return
 	var before := part_health[i]
 	part_health[i] = maxf(part_health[i] - amount, 0.0)
-	if local_hit:
-		GameManager.combat_hit.emit(part_health[i] <= 0.0, false)
-		var dealt := ceili(before - part_health[i])
-		if is_instance_valid(_damage_number) and _damage_number.age < 0.12:
-			_damage_number.add_hit(dealt, false)
-		else:
-			var number := Label3D.new()
-			number.set_script(preload("res://weapons/damage_number.gd"))
-			number.amount = dealt
-			get_parent().add_child(number)
-			number.global_position = at + Vector3.UP * 0.25
-			_damage_number = number
+	# Hit marker and stacked number on the shooter's screen, host or client
+	# (Player.notify_hit). Ids from 900000 keep boss parts apart from enemies.
+	if shooter and source.has_method("notify_hit"):
+		source.notify_hit(part_health[i] <= 0.0, false, at, ceili(before - part_health[i]), 900000 + i)
 	if part_health[i] <= 0.0:
 		if i < 3:
 			_pop_sac(i)
@@ -281,7 +280,7 @@ func _pop_sac(i: int) -> void:
 	GameManager.spawn_cloud(part.global_position, 10.0, 4.0)
 	part.visible = false
 	part.collision_layer = 0
-	WeatherManager.intensity_override = STORM_STEPS[2 - sacs_left]
+	WeatherManager.set_intensity_override(STORM_STEPS[2 - sacs_left])
 	if sacs_left == 0:
 		_shatter_shell()
 
@@ -320,6 +319,37 @@ func _die() -> void:
 		GameManager.spawn_cloud(global_position + Vector3(randf_range(-5, 5), randf_range(-3, 1), randf_range(-5, 5)), 0.0, 3.5)
 	defeated.emit()
 	GameManager.boss_defeated()
+	if Net.is_online():
+		_died.rpc()
+	var t := create_tween()
+	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
+	t.tween_callback(queue_free)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync(pos: Vector3, parts: Array, sacs: int, burn: float) -> void:
+	if Net.is_host():
+		return
+	global_position = pos
+	for i in mini(parts.size(), part_health.size()):
+		part_health[i] = float(parts[i])
+		if i < 3 and part_health[i] <= 0.0 and i < _parts.size():
+			var part := _parts[i] as Node3D
+			if part:
+				part.visible = false
+				part.collision_layer = 0
+	sacs_left = sacs
+	_burn_left = burn
+	if _shell:
+		_shell.visible = sacs > 0
+
+
+@rpc("authority", "call_remote", "reliable")
+func _died() -> void:
+	if Net.is_host():
+		return
+	dead = true
+	Sound.play_at("explosion_big", global_position)
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)
 	t.tween_callback(queue_free)
@@ -342,7 +372,3 @@ func _summon() -> void:
 	for k in 2:
 		var scene: PackedScene = spawner.mister_scene if k == 0 else spawner.drip_scene
 		spawner.spawn(scene)
-
-
-func _is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()

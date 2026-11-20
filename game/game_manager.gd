@@ -41,6 +41,7 @@ var crates: Node
 
 func _ready() -> void:
 	WeatherManager.phase_changed.connect(_on_phase_changed)
+	Net.peer_joined.connect(_on_peer_joined)
 	mutations = MutationRoll.new()
 	mutations.name = "MutationRoll"
 	add_child(mutations)
@@ -74,6 +75,17 @@ func start_run() -> void:
 	decon_max = DECON_CHARGES[n]
 	_set_decon(decon_max)
 	WeatherManager.start_run()
+
+
+## Host: someone joined while a run was going. Bring them up to date; Net has
+## already sent them into the run scene.
+func _on_peer_joined(peer_id: int) -> void:
+	if not is_host() or not run_active:
+		return
+	WeatherManager.sync_to_peer(peer_id)
+	_sync_decon.rpc_id(peer_id, decon_charges)
+	if mutations:
+		mutations.sync_to_peer(peer_id)
 
 
 func players() -> Array:
@@ -197,11 +209,15 @@ func complete_objective(objective: Node, player: Node) -> void:
 		return
 	_set_objective("")
 	add_decon_charge(1)
-	var pack := Node3D.new()
-	pack.set_script(preload("res://weapons/ammo_drop.gd"))
-	pack.kind = "supply"
-	objective.get_parent().add_child(pack)
-	pack.global_position = objective.global_position + Vector3(1.2, 0.12, 0.0)
+	# Through the spawner so every peer gets the pack.
+	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
+	if spawner == null:
+		spawner = get_tree().current_scene.get_node_or_null("Enemies")
+	var at: Vector3 = objective.global_position + Vector3(1.2, -0.88, 0.0)
+	if spawner and spawner.has_method("spawn_drop"):
+		spawner.spawn_drop(at, "supply", 600.0)
+		if _online():
+			spawner._spawn_supply.rpc(at)
 	Sound.play("reel_land", -6.0, 1.2)
 	show_banner("%s: +1 DECON, SUPPLIES" % str(objective.SITES[objective.site].label), Color("ffd56a"), 2.4)
 	var s := _stat(player)
@@ -390,12 +406,28 @@ func spawn_boss() -> void:
 	var anchor := get_tree().get_first_node_in_group("boss_anchor") as Node3D
 	if spawner == null:
 		return
-	var boss: Node3D = (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
-	spawner.add_child(boss, true)
-	boss.global_position = anchor.global_position if anchor else Vector3(0, 18, 0)
+	var at: Vector3 = anchor.global_position if anchor else Vector3(0, 18, 0)
+	_spawn_boss_node(spawner, at)
+	_spawn_boss.rpc(at)
 	WeatherManager.hold = true
-	WeatherManager.intensity_override = 1.0
+	WeatherManager.set_intensity_override(1.0)
 	show_banner("CUMULUS", Color("8FD65A"), 2.2)
+
+
+func _spawn_boss_node(parent: Node, at: Vector3) -> void:
+	var boss := (load("res://enemies/boss/boss_cumulus.tscn") as PackedScene).instantiate()
+	boss.name = "BossCumulus"
+	parent.add_child(boss, true)
+	boss.global_position = at
+
+
+@rpc("authority", "call_remote", "reliable")
+func _spawn_boss(at: Vector3) -> void:
+	var world := _world()
+	var spawner := world.get_node_or_null("Enemies") if world else null
+	if spawner == null or not get_tree().get_nodes_in_group("boss").is_empty():
+		return
+	_spawn_boss_node(spawner, at)
 
 
 ## Host: the core popped. Clear skies, then the win.
@@ -403,7 +435,7 @@ func boss_defeated() -> void:
 	if victory_locked or finished:
 		return
 	victory_locked = true
-	WeatherManager.intensity_override = 0.0
+	WeatherManager.set_intensity_override(0.0)
 	WeatherManager.hold = false
 	show_banner("STORM CLEARED", Color(0.4, 1, 0.6), 2.5)
 	var run := _run_id
@@ -526,9 +558,8 @@ func _world() -> Node:
 
 
 func _online() -> bool:
-	return multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer) \
-		and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+	return Net.is_online()
 
 
 func is_host() -> bool:
-	return not multiplayer.has_multiplayer_peer() or multiplayer.is_server()
+	return Net.is_host()

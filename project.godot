@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+Net="*res://game/net.gd"
 WeatherManager="*res://weather/weather_manager.gd"
 Settings="*res://game/settings.gd"
 Sound="*res://game/sound.gd"
@@ -29,9 +30,7 @@ MenuState="*res://ui/menu_state.gd"
 
 window/size/viewport_width=960
 window/size/viewport_height=720
-window/size/mode=3
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [input]
 
