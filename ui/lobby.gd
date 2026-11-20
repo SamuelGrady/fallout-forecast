@@ -12,6 +12,7 @@ var _roster: VBoxContainer
 var _status: Label
 var _ready_button: Button
 var _start_button: Button
+var _picker: SuitPicker
 var _leaving := false
 
 
@@ -25,9 +26,9 @@ func _ready() -> void:
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.offset_left = -300
-	box.offset_right = 300
-	box.offset_top = -220
+	box.offset_left = -440
+	box.offset_right = 440
+	box.offset_top = -330
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -45,21 +46,34 @@ func _ready() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_status)
 
+	# Your suit on the left, the roster and buttons on the right.
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 28)
+	box.add_child(columns)
+	_picker = SuitPicker.new()
+	_picker.changed.connect(_on_suit_changed)
+	columns.add_child(_picker)
+	var side := VBoxContainer.new()
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.add_theme_constant_override("separation", 14)
+	columns.add_child(side)
+
 	_roster = VBoxContainer.new()
 	_roster.add_theme_constant_override("separation", 6)
 	_roster.custom_minimum_size.y = 200
-	box.add_child(_roster)
+	side.add_child(_roster)
 
-	_start_button = _button(box, "START RUN", _on_start)
-	_ready_button = _button(box, "READY", _on_ready)
-	_button(box, "LEAVE", _on_leave)
+	_start_button = _button(side, "START RUN", _on_start)
+	_ready_button = _button(side, "READY", _on_ready)
+	_button(side, "LEAVE", _on_leave)
 
 	Net.roster_changed.connect(_refresh)
 	Net.run_started.connect(_on_run_started)
 	Net.server_closed.connect(_on_server_closed)
 	Net.connection_failed.connect(_on_server_closed)
 	_refresh()
-	_start_button.grab_focus()
+	var primary := _start_button if Net.is_host() else _ready_button
+	primary.grab_focus()
 
 
 func _refresh() -> void:
@@ -81,6 +95,7 @@ func _refresh() -> void:
 	ids.sort()
 	for peer_id in ids:
 		_roster.add_child(_row(int(peer_id), Net.roster[peer_id]))
+	_sync_picker()
 	if ids.is_empty():
 		var waiting := Label.new()
 		waiting.text = "waiting for players..."
@@ -110,6 +125,16 @@ func _host_line() -> String:
 func _row(peer_id: int, info: Dictionary) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
+	var chip := Panel.new()
+	chip.custom_minimum_size = Vector2(22, 22)
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Cosmetics.color(int(info.get("color", peer_id)))
+	chip_style.border_color = Color("#0c1422")
+	chip_style.set_border_width_all(2)
+	chip.add_theme_stylebox_override("panel", chip_style)
+	chip.tooltip_text = Cosmetics.skin_name(int(info.get("skin", 0)))
+	row.add_child(chip)
 	var name_label := Label.new()
 	var name := str(info.get("name", "PLAYER"))
 	if peer_id == 1:
@@ -127,6 +152,24 @@ func _row(peer_id: int, info: Dictionary) -> Control:
 	state.add_theme_color_override("font_color", Color("8FD65A") if ready else Color("FF3EA5"))
 	row.add_child(state)
 	return row
+
+
+## Grey out colours others wear, and show what the host actually gave us.
+func _sync_picker() -> void:
+	var me := Net.local_id()
+	var taken := []
+	for peer_id in Net.roster:
+		if int(peer_id) != me:
+			taken.append(int(Net.roster[peer_id].get("color", -1)))
+	var mine: Dictionary = Net.roster.get(me, {})
+	_picker.set_value(int(mine.get("color", _picker.color)), int(mine.get("skin", _picker.skin)), taken)
+
+
+func _on_suit_changed(color: int, skin: int) -> void:
+	Settings.suit_color = color
+	Settings.suit_skin = skin
+	Settings.save()
+	Net.set_cosmetic(color, skin)
 
 
 func _is_ready(peer_id: int) -> bool:

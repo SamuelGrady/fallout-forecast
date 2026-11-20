@@ -44,6 +44,8 @@ func _setup_players() -> void:
 		var spawns := get_tree().get_nodes_in_group("player_spawn")
 		if has_node("Player") and not spawns.is_empty():
 			$Player.global_transform = (spawns[0] as Node3D).global_transform
+		if has_node("Player"):
+			_apply_look($Player, Settings.suit_color, Settings.suit_skin)
 		return
 	_sync_players()
 	if has_node("Player"):
@@ -67,11 +69,18 @@ func _sync_players() -> void:
 	for i in ids.size():
 		var peer_id := int(ids[i])
 		var node_name := "P_%d" % peer_id
-		if container.has_node(node_name):
-			container.get_node(node_name).set("display_name", _peer_name(peer_id))
+		var info: Dictionary = Net.roster[ids[i]]
+		var color := int(info.get("color", peer_id))
+		var skin := int(info.get("skin", 0))
+		var existing := container.get_node_or_null(node_name) as Player
+		if existing:
+			existing.display_name = _peer_name(peer_id)
+			_apply_look(existing, color, skin)
 			continue
 		var player := PlayerScene.instantiate() as Player
 		player.name = node_name
+		# Before add_child, so the body model is built in this look.
+		_apply_look(player, color, skin)
 		# Authority before add_child: player.gd._ready() checks it to decide
 		# whether to take the camera and capture the mouse.
 		player.set_multiplayer_authority(peer_id)
@@ -86,6 +95,15 @@ func _sync_players() -> void:
 			child.remove_from_group("players")
 			child.remove_from_group("local_player")
 			child.queue_free()
+
+
+## Suit colour and skin onto a player and its body model (rebuilt if changed).
+func _apply_look(player: Player, color: int, skin: int) -> void:
+	player.suit_color = Cosmetics.color(color)
+	player.skin = Cosmetics.wrap_skin(skin)
+	var body := player.get_node_or_null("BodyModel")
+	if body and body.has_method("set_look"):
+		body.set_look(player.suit_color, player.skin)
 
 
 func _players_container() -> Node3D:

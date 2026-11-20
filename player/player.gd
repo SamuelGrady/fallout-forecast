@@ -85,6 +85,8 @@ var self_revives := 1
 # Owner-set (synced to others).
 var display_name := "You"
 var suit_color := Color(1.0, 0.85, 0.2)
+## Cosmetics.SKINS index; main.gd sets both from the roster (or Settings solo).
+var skin := 0
 var has_tarp := false
 var tarp_raised := false
 ## Set by WeaponHolder: the held weapon drains the suit even in shelter.

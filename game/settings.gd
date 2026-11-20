@@ -12,6 +12,9 @@ var retro_enabled := true
 ## Comfort: dims lightning flashes and VHS tracking glitches.
 var reduced_flash := false
 var unlocked_guns: Array = ["res://weapons/pump_shotgun.tres"]
+## Survivor look (indices into Cosmetics.COLORS / Cosmetics.SKINS).
+var suit_color := 0
+var suit_skin := 0
 
 func unlock_gun(path: String) -> void:
 	if path not in unlocked_guns:
@@ -28,6 +31,8 @@ func _ready() -> void:
 		retro_enabled = cfg.get_value("video", "retro_enabled", retro_enabled)
 		reduced_flash = cfg.get_value("video", "reduced_flash", reduced_flash)
 		unlocked_guns = cfg.get_value("progress", "guns", unlocked_guns)
+		suit_color = posmod(int(cfg.get_value("cosmetic", "color", suit_color)), Cosmetics.COLORS.size())
+		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
 	apply()
 
 
@@ -43,6 +48,8 @@ func save() -> void:
 	cfg.set_value("video", "retro_enabled", retro_enabled)
 	cfg.set_value("video", "reduced_flash", reduced_flash)
 	cfg.set_value("progress", "guns", unlocked_guns)
+	cfg.set_value("cosmetic", "color", suit_color)
+	cfg.set_value("cosmetic", "skin", suit_skin)
 	cfg.save(PATH)
 	apply()
 

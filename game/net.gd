@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 2
+const PROTOCOL := 3
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -49,7 +49,8 @@ enum Mode { OFFLINE, HOST, CLIENT }
 
 var mode: Mode = Mode.OFFLINE
 var local_name := ""
-## peer id -> {"name": String, "ready": bool}
+## peer id -> {"name": String, "ready": bool, "color": int, "skin": int}
+## color / skin index Cosmetics.COLORS / SKINS; the host keeps colours unique.
 var roster := {}
 ## ip -> {"name": String, "players": int, "max": int, "port": int}
 var servers := {}
@@ -146,6 +147,7 @@ func host(port := PORT, as_player := true) -> Error:
 	roster.clear()
 	if as_player:
 		roster[1] = {"name": local_name, "ready": false}
+		_assign_cosmetic(1, Settings.suit_color, Settings.suit_skin)
 	start_beacon()
 	roster_changed.emit()
 	return OK
@@ -212,6 +214,30 @@ func set_ready(value: bool) -> void:
 		_request_ready.rpc_id(1, value)
 
 
+## Change our suit colour / skin. The host may hand back a different colour
+## if someone already wears that one; the roster says what we really got.
+func set_cosmetic(color: int, skin: int) -> void:
+	if not is_online() or run_active:
+		return
+	if is_host():
+		if roster.has(1):
+			_assign_cosmetic(1, color, skin)
+			_push_roster.rpc(roster)
+			roster_changed.emit()
+	else:
+		_request_cosmetic.rpc_id(1, color, skin)
+
+
+## Host: store a peer's look, nudging the colour to the next free one.
+func _assign_cosmetic(peer_id: int, color: int, skin: int) -> void:
+	var taken := []
+	for other in roster:
+		if int(other) != peer_id:
+			taken.append(int(roster[other].get("color", -1)))
+	roster[peer_id]["color"] = Cosmetics.free_color(color, taken)
+	roster[peer_id]["skin"] = Cosmetics.wrap_skin(skin)
+
+
 ## Host: send everyone into the run.
 func request_start() -> void:
 	if not is_host():
@@ -233,7 +259,9 @@ func _on_connected() -> void:
 	if local_name == "":
 		local_name = "PLAYER %d" % multiplayer.get_unique_id()
 	_connect_left = 0.0
-	_hello.rpc_id(1, local_name, PROTOCOL)
+	# Keep the hello RPC's argument types stable so older hosts can decline it.
+	var hello := JSON.stringify({"name": local_name, "color": Settings.suit_color, "skin": Settings.suit_skin})
+	_hello.rpc_id(1, hello, PROTOCOL)
 	joined_server.emit()
 
 
@@ -294,7 +322,7 @@ func _on_server_disconnected() -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _hello(name: String, protocol := 0) -> void:
+func _hello(hello: String, protocol := 0) -> void:
 	if not is_host():
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
@@ -310,7 +338,14 @@ func _hello(name: String, protocol := 0) -> void:
 			if mode == Mode.HOST:
 				multiplayer.multiplayer_peer.disconnect_peer(peer_id))
 		return
-	roster[peer_id] = {"name": name, "ready": false}
+	var data: Variant = JSON.parse_string(hello)
+	if not data is Dictionary:
+		return
+	var player_name: Variant = data.get("name")
+	var color: Variant = data.get("color")
+	var skin: Variant = data.get("skin")
+	roster[peer_id] = {"name": player_name.left(32) if player_name is String else "PLAYER", "ready": false}
+	_assign_cosmetic(peer_id, int(color) if color is float else 0, int(skin) if skin is float else 0)
 	_push_roster.rpc(roster)
 	roster_changed.emit()
 	# A run already in progress: send them in, and let GameManager catch up.
@@ -342,6 +377,17 @@ func _request_ready(value: bool) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	if roster.has(peer_id):
 		roster[peer_id]["ready"] = value
+		_push_roster.rpc(roster)
+		roster_changed.emit()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_cosmetic(color: int, skin: int) -> void:
+	if not is_host() or run_active:
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if roster.has(peer_id):
+		_assign_cosmetic(peer_id, color, skin)
 		_push_roster.rpc(roster)
 		roster_changed.emit()
 
