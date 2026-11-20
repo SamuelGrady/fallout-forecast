@@ -107,7 +107,7 @@ func _update_storm_countdown(seconds: int) -> void:
 	if show:
 		_countdown_label.text = "STORM IN  %d" % seconds
 		if seconds != _last_countdown:
-			Sound.play("reel_tick", -6.0, 0.8)
+			Sound.play("storm_countdown", -15.0, lerpf(0.88, 1.16, (5.0 - seconds) / 4.0))
 	_last_countdown = seconds if show else -1
 
 

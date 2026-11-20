@@ -141,9 +141,11 @@ func _refresh_cells(charges: int) -> void:
 		_head_light.light_energy = 1.4 if has_charge else 0.45
 
 
+@rpc("authority", "call_remote", "reliable")
 func play_spray() -> void:
 	_spray_left = 1.4
 	_spray_root.visible = true
+	Sound.play_at("decon_spray", global_position + Vector3.UP, -8.0)
 
 
 func _process(delta: float) -> void:
@@ -172,3 +174,4 @@ func interact(player: Node) -> void:
 	GameManager.use_decon(player)
 	if GameManager.decon_charges < before:
 		play_spray()
+		Net.rpc_to_run(play_spray, [])

@@ -336,7 +336,6 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 		WeatherManager.Phase.CLEARING:
 			_set_objective("")
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
-			Sound.play("reel_land", -6.0)
 			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
 			if unlocks.has(_wave):
 				var gun := load("res://weapons/%s.tres" % unlocks[_wave]) as WeaponData
@@ -383,7 +382,6 @@ func _do_interact(target: Interactable, player: Node) -> void:
 func use_decon(player: Node) -> void:
 	if decon_charges <= 0 or float(player.get("suit_integrity")) >= 99.0:
 		return
-	Sound.play("decon")
 	player.set("suit_integrity", 100.0)
 	_set_decon(decon_charges - 1)
 

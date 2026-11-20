@@ -99,6 +99,7 @@ func _flare_process(delta: float) -> void:
 	if left <= 0.0:
 		if is_in_group("active_flares"):
 			remove_from_group("active_flares")
+			Sound.play_at("dome_collapse", global_position, -10.0)
 		if left < -0.3:
 			queue_free()
 
@@ -113,7 +114,7 @@ func _deploy_dome() -> void:
 	_deployed_at = _age
 	add_to_group("active_flares")
 	rotation = Vector3.ZERO
-	Sound.play_at("decon", global_position, -4.0, 1.4)
+	Sound.play_at("dome_deploy", global_position, -7.0)
 	ShotFX.flash(get_parent(), global_position + Vector3.UP, Color(0.35, 0.95, 1.0), 6.0, 0.2)
 	var r := data.effect_radius
 	_dome = MeshInstance3D.new()

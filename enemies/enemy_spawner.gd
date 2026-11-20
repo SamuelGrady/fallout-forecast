@@ -351,6 +351,17 @@ func _spawn_enemy(net_id: int, kind: int, at: Vector3, small: bool) -> void:
 	_make(_scene_of(kind), at, small, net_id)
 
 
+func notify_tell(net_id: int, cue: String, duration: float, volume: float) -> void:
+	Net.rpc_to_run(_play_enemy_tell, [net_id, cue, duration, volume])
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _play_enemy_tell(net_id: int, cue: String, duration: float, volume: float) -> void:
+	var enemy := _find_net(net_id)
+	if enemy:
+		enemy.play_tell(cue, duration, volume)
+
+
 ## Host: one enemy died. Tell the clients which one, and what it dropped.
 func notify_despawn(enemy: EnemyBase, drops: Array) -> void:
 	if Net.is_host() and Net.is_online():
@@ -361,6 +372,7 @@ func notify_despawn(enemy: EnemyBase, drops: Array) -> void:
 func _despawn_enemy(net_id: int, drops: Array) -> void:
 	var enemy := _find_net(net_id)
 	if enemy:
+		Sound.play_at("enemy_death", enemy.global_position)
 		enemy.remove_from_group("enemies")
 		enemy.queue_free()
 	for entry in drops:

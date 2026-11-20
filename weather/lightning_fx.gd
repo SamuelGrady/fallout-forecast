@@ -27,6 +27,7 @@ func _ready() -> void:
 		thunder_stream = _make_thunder()
 	_thunder_player.stream = thunder_stream
 	_thunder_player.volume_db = thunder_volume_db
+	_thunder_player.bus = &"Ambience"
 	add_child(_thunder_player)
 
 	_bolt_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -54,8 +55,14 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 
 	var distance := listener.distance_to(position)
 	var delay := clampf(distance / 343.0 * 10.0, 0.5, 2.0)
-	_thunder_player.volume_db = thunder_volume_db - clampf(distance / 10.0, 0.0, 8.0)
-	get_tree().create_timer(delay).timeout.connect(_thunder_player.play)
+	if not Net.dedicated:
+		var level := thunder_volume_db - clampf(distance / 10.0, 0.0, 8.0)
+		get_tree().create_timer(delay).timeout.connect(_play_thunder.bind(level))
+
+
+func _play_thunder(level: float) -> void:
+	_thunder_player.volume_db = level
+	_thunder_player.play()
 
 
 func _spawn_bolt(ground: Vector3, rng: RandomNumberGenerator) -> void:

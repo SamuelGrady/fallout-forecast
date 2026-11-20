@@ -88,7 +88,7 @@ func _physics_process(delta: float) -> void:
 			if not _lunge_hit:
 				# Missed: an audible skid and a splash so players know the
 				# opening is now.
-				Sound.play_at("step_2", global_position, -6.0, 0.6)
+				announce_tell("gutter_skid", 0.0, -10.0)
 				ShotFX.puff(get_parent(), global_position + Vector3.UP * 0.1, Color(0.5, 0.65, 0.7, 0.7), 0.35, 0.4)
 		return
 
@@ -103,8 +103,7 @@ func _physics_process(delta: float) -> void:
 			_face(_direction)
 			_windup = 0.65
 			_telegraph.visible = true
-			attack_flash(0.65)
-			Sound.play_at("spore_burst", global_position, -16.0)
+			announce_tell("gutter_windup", _windup, -12.0)
 
 
 func _start_lunge(direction: Vector3) -> void:

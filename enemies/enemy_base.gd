@@ -271,6 +271,19 @@ func attack_flash(duration: float) -> void:
 	_refresh_overlay()
 
 
+func announce_tell(cue: String, duration: float, volume: float) -> void:
+	play_tell(cue, duration, volume)
+	if Net.is_online() and get_parent().has_method("notify_tell"):
+		get_parent().notify_tell(net_id, cue, duration, volume)
+
+
+func play_tell(cue: String, duration: float, volume: float) -> void:
+	if duration > 0.0:
+		attack_flash(duration)
+	var height := 0.2 if str(data.display_name) == "Gutter" else 1.0
+	Sound.play_at(cue, global_position + Vector3.UP * height, volume, randf_range(0.93, 1.07))
+
+
 ## Local only: explicit through-wall reveal outline (lightning strikes, Flare Gun).
 func reveal(duration: float) -> void:
 	if _reveal_material == null:
@@ -484,9 +497,6 @@ func _begin_attack(victim: Node3D, amount: float) -> void:
 	_attack_amount = amount
 	_windup_left = 0.45
 	winding_up.emit()
-	attack_flash(0.45)
 	# Audible windup tell so attacks from behind can still be dodged.
-	if str(data.display_name).to_lower() == "mister":
-		Sound.play_at("spore_burst", global_position + Vector3.UP * 1.5, -12.0, 0.7)
-	else:
-		Sound.play_at("turned", global_position + Vector3.UP, -14.0, 1.6)
+	var cue := "mister_windup" if data.display_name == "Mister" else "drip_windup"
+	announce_tell(cue, _windup_left, -12.0)

@@ -13,17 +13,19 @@ const RAIN_BUS := &"Rain"
 ## Mix buses. Rain sits under Ambience; Music ducks under Weapons fire.
 const BUSES := [&"Music", &"Weapons", &"Threats", &"UI", &"Ambience"]
 const WEAPON_CUES := ["reload", "jam", "reel_tick", "throw_bomb", "hit_enemy", "hit_flesh", "headshot", "shotgun_pump", "rifle_reload"]
-const UI_CUES := ["ui_click", "pickup", "lever", "reel_land", "crate_open", "decon", "revive"]
-const AMBIENCE_CUES := ["downpour", "step_0", "step_1", "step_2", "step_3"]
+const UI_CUES := ["ui_click", "pickup", "lever", "reel_land", "crate_open", "decon", "revive", "storm_countdown", "storm_arrival", "storm_clear"]
+const AMBIENCE_CUES := ["downpour", "step_0", "step_1", "step_2", "step_3", "decon_spray", "dome_deploy", "dome_collapse"]
 var _last_cue_ms := {}
 
 var _layers: Array[AudioStreamPlayer] = []
 var _rain: AudioStreamPlayer
+var _wind: AudioStreamPlayer
 var _rain_filter := AudioEffectLowPassFilter.new()
 var _boss_active := false
 var _rain_gain := 0.0
 var _shelter_mix := 0.0
 var _pressure := 0.0
+var _last_phase := Vector2i(-1, -1)
 
 
 func _ready() -> void:
@@ -57,7 +59,7 @@ func _add_bus(bus_name: StringName, send: StringName) -> int:
 func bus_for(cue: String) -> StringName:
 	if cue.begins_with("shot_") or cue.begins_with("gun_") or cue in WEAPON_CUES:
 		return &"Weapons"
-	if cue in UI_CUES:
+	if cue in UI_CUES or cue.begins_with("vcr_") or cue.begins_with("ping_"):
 		return &"UI"
 	if cue in AMBIENCE_CUES:
 		return &"Ambience"
@@ -74,27 +76,40 @@ func _recent(cue: String, min_gap: float) -> bool:
 
 
 func start_run() -> void:
+	if Net.dedicated:
+		return
 	for source in MUSIC:
 		var stream := load(source).duplicate() as AudioStreamOggVorbis
 		stream.loop = true
 		_layers.append(_loop(stream, &"Music"))
-	var rain_stream := load("res://assets/audio/sfx/rain.wav").duplicate() as AudioStreamWAV
-	rain_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	rain_stream.loop_end = roundi(rain_stream.get_length() * rain_stream.mix_rate)
-	_rain = _loop(rain_stream, RAIN_BUS)
+	_rain = _loop_wav("res://assets/audio/sfx/rain.wav", RAIN_BUS)
+	_wind = _loop_wav("res://assets/audio/sfx/storm_wind.wav", RAIN_BUS)
 
 
 func stop_run() -> void:
+	if _layers.is_empty():
+		return
 	for layer in _layers:
 		layer.stop()
 		layer.queue_free()
 	_layers.clear()
 	_boss_active = false
-	_rain.stop()
-	_rain.queue_free()
+	for voice in [_rain, _wind]:
+		voice.stop()
+		voice.queue_free()
 	_rain = null
+	_wind = null
 	_rain_gain = 0.0
 	_shelter_mix = 0.0
+	_pressure = 0.0
+	_last_phase = Vector2i(-1, -1)
+
+
+func _loop_wav(path: String, bus: StringName) -> AudioStreamPlayer:
+	var stream := load(path).duplicate() as AudioStreamWAV
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
+	return _loop(stream, bus)
 
 
 func _loop(stream: AudioStream, bus := &"Master") -> AudioStreamPlayer:
@@ -135,14 +150,26 @@ func _process(delta: float) -> void:
 	# Under a roof the rain should still be there, just dull and close.
 	_rain_filter.cutoff_hz = lerpf(16000.0, 1500.0, _shelter_mix)
 	_rain.volume_linear = _rain_gain * lerpf(0.4, 0.32, _shelter_mix)
+	_wind.volume_linear = smoothstep(0.23, 1.0, _rain_gain) * lerpf(0.38, 0.09, _shelter_mix)
 
 
-func _phase_changed(phase: int, _wave: int) -> void:
-	if phase == WeatherManager.Phase.DOWNPOUR and _rain:
-		_play_stream(load("res://assets/audio/sfx/downpour.wav") as AudioStream, -8.0, 1.0, &"Ambience")
+func _phase_changed(phase: int, wave: int) -> void:
+	var transition := Vector2i(phase, wave)
+	if _rain == null or transition == _last_phase:
+		return
+	_last_phase = transition
+	match phase:
+		WeatherManager.Phase.DRIZZLE:
+			play("storm_arrival", -13.0)
+		WeatherManager.Phase.DOWNPOUR:
+			play("downpour", -7.0)
+		WeatherManager.Phase.CLEARING:
+			play("storm_clear", -12.0)
 
 
 func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
+	if Net.dedicated:
+		return
 	if cue == "pickup":
 		# Pickups come in bursts after a fight: one soft, varied cue at a time.
 		if _recent(cue, 0.3):
@@ -165,6 +192,8 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 
 
 func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) -> void:
+	if Net.dedicated:
+		return
 	var world := get_tree().current_scene
 	if not world:
 		return
