@@ -46,4 +46,5 @@ func _physics_process(delta: float) -> void:
 		return
 	for body in get_overlapping_bodies():
 		if body.has_method("take_damage"):
-			body.take_damage(damage_per_second * delta, source)
+			# The cloud outlives the enemy that spat it out.
+			body.take_damage(damage_per_second * delta, source if is_instance_valid(source) else null)
