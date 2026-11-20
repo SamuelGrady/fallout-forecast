@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 6
+const PROTOCOL := 7
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 
@@ -210,6 +210,7 @@ func join(address: String, port := PORT) -> Error:
 
 ## Drop the session. Safe to call when there isn't one.
 func leave() -> void:
+	chat_log.clear()
 	stop_beacon()
 	stop_scanning()
 	mode = Mode.OFFLINE
@@ -279,6 +280,72 @@ func set_cosmetic(color: int, skin: int) -> void:
 			roster_changed.emit()
 	else:
 		_request_cosmetic.rpc_id(1, color, skin)
+
+
+# ------------------------------------------------------------------ lobby chat
+## A line of lobby chat arrived (from anyone, including us via the host).
+signal chat_received(sender: String, text: String)
+const CHAT_MAX := 100
+const CHAT_HISTORY := 30
+## Recent lines, so someone opening the lobby sees the conversation.
+var chat_log: Array = []  # [[sender, text], ...]
+var _chat_last_ms := {}   # peer id -> last accepted message (host only)
+
+
+## Send a chat line. Goes through the host, which cleans and rate-limits it.
+func send_chat(text: String) -> void:
+	var clean := _clean_chat(text)
+	if clean == "" or not is_online():
+		return
+	if is_host():
+		_accept_chat(1, local_name, clean)
+	else:
+		_request_chat.rpc_id(1, clean)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_chat(text: String) -> void:
+	if not is_host():
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	if not roster.has(peer):
+		return
+	_accept_chat(peer, str(roster[peer].get("name", "PLAYER")), _clean_chat(text))
+
+
+func _accept_chat(peer: int, sender: String, text: String) -> void:
+	if text == "":
+		return
+	var now := Time.get_ticks_msec()
+	if now - int(_chat_last_ms.get(peer, -10000)) < 700:
+		return
+	_chat_last_ms[peer] = now
+	if dedicated:
+		print("[chat] %s: %s" % [sender, text])
+	rpc_to_all(_chat_rpc, [sender, text])
+	_store_chat(sender, text)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _chat_rpc(sender: String, text: String) -> void:
+	_store_chat(sender, _clean_chat(text))
+
+
+func _store_chat(sender: String, text: String) -> void:
+	chat_log.append([sender, text])
+	if chat_log.size() > CHAT_HISTORY:
+		chat_log.pop_front()
+	chat_received.emit(sender, text)
+
+
+## Plain text only: no control characters, no BBCode, length-capped.
+func _clean_chat(text: String) -> String:
+	var out := ""
+	for ch in text.strip_edges():
+		var code := ch.unicode_at(0)
+		if code >= 32 and code != 127:
+			out += ch
+	return out.replace("[", "(").replace("]", ")").left(CHAT_MAX)
 
 
 func set_display_name(new_name: String) -> void:

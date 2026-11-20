@@ -89,6 +89,9 @@ func _ready() -> void:
 	_force_button = _button(side, "FORCE START", _on_force)
 	_button(side, "LEAVE", _on_leave)
 
+	_build_chat()
+	Net.chat_received.connect(_on_chat)
+
 	Net.roster_changed.connect(_refresh)
 	Net.run_started.connect(_on_run_started)
 	Net.server_closed.connect(_on_server_closed)
@@ -225,6 +228,62 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 		action.call())
 	parent.add_child(b)
 	return b
+
+
+# ------------------------------------------------------------------ chat
+const QUICK := ["READY?", "ONE SEC", "LET'S GO", "GG"]
+var _chat_log := RichTextLabel.new()
+var _chat_edit := LineEdit.new()
+
+
+## Chat strip along the bottom: recent lines, a text box, quick phrases.
+func _build_chat() -> void:
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_top = -168
+	panel.offset_left = 40
+	panel.offset_right = -40
+	panel.offset_bottom = -12
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.04, 0.08, 0.82)
+	style.border_color = BroadcastUI.CYAN
+	style.border_width_left = 3
+	style.set_content_margin_all(8)
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	panel.add_child(v)
+	_chat_log.bbcode_enabled = false
+	_chat_log.scroll_following = true
+	_chat_log.custom_minimum_size.y = 82
+	_chat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_chat_log.add_theme_font_size_override("normal_font_size", 18)
+	v.add_child(_chat_log)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	v.add_child(row)
+	_chat_edit.placeholder_text = "SAY SOMETHING... (ENTER)"
+	_chat_edit.max_length = Net.CHAT_MAX
+	_chat_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_chat_edit.text_submitted.connect(func(t):
+		Net.send_chat(t)
+		_chat_edit.clear())
+	row.add_child(_chat_edit)
+	for phrase in QUICK:
+		var b := Button.new()
+		b.text = phrase
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(func(): Net.send_chat(phrase))
+		row.add_child(b)
+	for line in Net.chat_log:
+		_on_chat(line[0], line[1])
+	panel.visible = Net.is_online()
+
+
+func _on_chat(sender: String, text: String) -> void:
+	_chat_log.add_text("%s: %s
+" % [sender.to_upper(), text])
 
 
 func _on_ready() -> void:
