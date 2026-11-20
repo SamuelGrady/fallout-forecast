@@ -4,6 +4,7 @@ extends Node
 
 
 const RENAME := {
+	"VideoVaultSign": "VIDEO VAULT",
 	"GasSign": "GAS",
 	"DeckSign": "PLAZA",
 	"QuarantineSignW": "QUARANTINE",
@@ -36,16 +37,33 @@ func _ready() -> void:
 			label.text = ""
 			continue
 		if sign_name == "Sign" and parent and parent.name.begins_with("BusStop"):
+			# Beyond the shelter eave so the board clears its roof on both sides.
+			label.position.x = 2.51
+			_ground_post(label, 0.0)
 			_build_bus_pictogram(label)
 			label.text = ""
 			continue
 		if sign_name.begins_with("QuarantineSign"):
+			for x in [-1.18, 1.18]:
+				_ground_post(label, x)
 			_build_quarantine_sign(label)
+			label.text = ""
+			continue
+		if sign_name == "PinecrestSign":
+			_paint_tank(label)
 			label.text = ""
 			continue
 		var text: String = RENAME.get(sign_name, label.text)
 		var is_double := sign_name in DOUBLE_SIDED
-		var add_board := sign_name != "PinecrestSign"
+		var add_board := sign_name not in ["ArcadeSign", "LaundromatSign", "DinerSign"]
+		if label.has_meta("facade_mount") and add_board:
+			label.translate_object_local(Vector3.BACK * 0.105)
+		if sign_name == "DeckSign" or sign_name == "GasSign":
+			var support: CSGBox3D = parent.get_node("Canopy" if sign_name == "GasSign" else "DeckRailBack")
+			var edge_z := -support.size.z/2 + 0.25 if sign_name == "GasSign" else 0.0
+			label.position = support.position + Vector3(0, support.size.y/2 + 1.0, edge_z)
+			for x in [-0.95, 0.95]:
+				_post(label, x, -1.06, -0.07, 0.095)
 		_build_text_sign(label, text, is_double, add_board)
 		label.text = ""
 
@@ -53,8 +71,7 @@ func _ready() -> void:
 func _build_text_sign(label: Label3D, text: String, double_sided: bool, add_board: bool) -> void:
 	# Cap height that matches the old Label3D's on-screen size.
 	var height := label.font_size * label.pixel_size * 0.62
-	var painted := label.name == "PinecrestSign"
-	var lettering := NeonLettering.build(text, height, label.modulate, not painted, not add_board)
+	var lettering := NeonLettering.build(text, height, label.modulate, true, true)
 	if add_board:
 		var aabb: AABB = (lettering.get_meta("tubes") as MeshInstance3D).mesh.get_aabb()
 		var board := MeshInstance3D.new()
@@ -73,7 +90,7 @@ func _build_text_sign(label: Label3D, text: String, double_sided: bool, add_boar
 		frame.material_override = _solid_mat(label.modulate.darkened(0.45), 0.7)
 		label.add_child(frame)
 	if double_sided:
-		var back := NeonLettering.build(text, height, label.modulate, not painted, false)
+		var back := NeonLettering.build(text, height, label.modulate, true, true)
 		back.rotation.y = PI
 		back.position = Vector3(0.0, 0.0, -0.14)
 		lettering.add_child(back)
@@ -111,8 +128,8 @@ func _build_bus_pictogram(label: Label3D) -> void:
 
 func _build_park_pictogram(label: Label3D) -> void:
 	# Double-sided timber & enamel park marker with 3D layered pine tree silhouette.
-	var post := _make_box(Vector3(0.14, 2.2, 0.14), Color("#4c3728"))
-	post.position = Vector3(0.0, -1.1, 0.0)
+	var post := _make_box(Vector3(0.16, 1.8, 0.16), Color("#4c3728"))
+	post.position = Vector3(0.0, -1.36, 0.0)
 	label.add_child(post)
 	var board := _make_box(Vector3(1.15, 1.05, 0.1), Color("#1c3a27"))
 	label.add_child(board)
@@ -162,11 +179,11 @@ func _build_quarantine_sign(label: Label3D) -> void:
 		var dot := _make_box(Vector3(0.06, 0.05, 0.05), Color("#15181b"))
 		dot.position = Vector3(-1.15 * side, -0.1, z + side * 0.008)
 		label.add_child(dot)
-	var front := NeonLettering.build("QUARANTINE", 0.36, Color("#f5d142"), true, false)
-	front.position = Vector3(0.22, 0.0, 0.055)
-	var back := NeonLettering.build("QUARANTINE", 0.36, Color("#f5d142"), true, false)
+	var front := NeonLettering.build("QUARANTINE", 0.26, Color("#f5d142"), true, true)
+	front.position = Vector3(0.32, 0.0, 0.055)
+	var back := NeonLettering.build("QUARANTINE", 0.26, Color("#f5d142"), true, true)
 	back.rotation.y = PI
-	back.position = Vector3(0.44, 0.0, -0.11)
+	back.position = Vector3(-0.64, 0.0, -0.11)
 	front.add_child(back)
 	label.add_child(front)
 	label.set_meta("lettering", front)
@@ -174,6 +191,10 @@ func _build_quarantine_sign(label: Label3D) -> void:
 
 func _build_fountain_emblem(label: Label3D) -> void:
 	# Replace redundant town-name plaque with a small cast-bronze civic crest.
+	var basin: CSGCylinder3D = label.get_parent().get_node("FountainRim")
+	var half_facet := PI / basin.sides
+	label.rotation.y = PI/2 - half_facet
+	label.position = basin.position + label.basis.z * (basin.radius * cos(half_facet) + 0.025)
 	var plaque := _make_box(Vector3(0.68, 0.44, 0.06), Color("#5c4a32"))
 	label.add_child(plaque)
 	var rim := _make_box(Vector3(0.74, 0.5, 0.04), Color("#8c7348"))
@@ -185,6 +206,36 @@ func _build_fountain_emblem(label: Label3D) -> void:
 	crest.position = Vector3(0.0, 0.02, 0.045)
 	crest.material_override = _solid_mat(Color("#b5985e"), 0.5)
 	label.add_child(crest)
+
+
+func _post(label: Label3D, x: float, bottom: float, z: float, thickness: float) -> void:
+	var top := -0.39
+	var post := _make_box(Vector3(thickness, top-bottom, thickness), Color("#53646a"))
+	post.position = Vector3(x, (top+bottom)/2, z)
+	label.add_child(post)
+
+
+func _ground_post(label: Label3D, x: float) -> void:
+	# Both sidewalks and the barricade shoulders sit on the level's y=0 ground.
+	_post(label, x, -label.global_position.y - 0.06, 0.0, 0.13)
+
+
+func _paint_tank(label: Label3D) -> void:
+	var tank: CSGCylinder3D = label.get_parent().get_node("Tank")
+	var angle := TAU / tank.sides
+	var apothem := tank.radius * cos(angle/2)
+	label.position = tank.position
+	# Three letters fit each flat of the sixteen-sided tank. Lay the paint
+	# directly on three consecutive faces so the outer letters follow the tank.
+	var paint := Node3D.new()
+	label.add_child(paint)
+	for i in 3:
+		var group := NeonLettering.build(label.text.substr(i*3, 3), 0.57, label.modulate, false, false)
+		group.rotation.y = (i - 0.5) * angle
+		group.position = group.basis.z * apothem
+		group.scale.y = 1.75
+		paint.add_child(group)
+	label.set_meta("lettering", paint)
 
 
 func _make_box(size: Vector3, color: Color, emissive := false) -> MeshInstance3D:
