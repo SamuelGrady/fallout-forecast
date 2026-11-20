@@ -31,6 +31,13 @@ func _ready() -> void:
 	signs.set_script(preload("res://props/map_signs.gd"))
 	$Level.add_child(signs)
 	_setup_players()
+	var pings := PingSystem.new()
+	pings.name = "Pings"
+	add_child(pings)
+	if not Net.dedicated:
+		var ping_hud := preload("res://ui/ping_hud.gd").new()
+		ping_hud.system = pings
+		$HUD.add_child(ping_hud)
 	Net.roster_changed.connect(_sync_players)
 	Net.server_closed.connect(_leave_to_title)
 	if GameManager.is_host():

@@ -102,6 +102,10 @@ func set_partner_waiting(duration: float) -> void:
 	_partner_waiting = duration
 
 
+func can_ping() -> bool:
+	return _result == "" and not is_queued_for_deletion()
+
+
 ## Every peer: open the lid and lift the actual reward hovering out of the crate.
 func play_spin(result: String, tier: String, _pool: Array, item_id := "") -> void:
 	Sound.play_at("crate_open", global_position)

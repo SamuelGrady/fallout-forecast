@@ -86,6 +86,32 @@ func _draw() -> void:
 		"park":
 			draw_colored_polygon(PackedVector2Array([Vector2(0,-27),Vector2(25,12),Vector2(-25,12)]),color)
 			draw_rect(Rect2(-4,12,8,17),color)
+		# Ping wheel (ui/ping_hud.gd).
+		"go":
+			draw_arc(Vector2(0,-8), 15, 0, TAU, 24, color, 5, true)
+			draw_colored_polygon(PackedVector2Array([Vector2(-13,0),Vector2(13,0),Vector2(0,27)]), color)
+			draw_circle(Vector2(0,-8), 5, color)
+		"danger":
+			var triangle := PackedVector2Array([Vector2(0,-26),Vector2(26,22),Vector2(-26,22)])
+			draw_colored_polygon(triangle, color * Color(1,1,1,0.2))
+			triangle.append(triangle[0])
+			draw_polyline(triangle, color, 5, true)
+			draw_line(Vector2(0,-10), Vector2(0,7), color, 6, true)
+			draw_circle(Vector2(0,15), 3.5, color)
+		"crate":
+			draw_rect(Rect2(-22,-18,44,38), color, false, 5)
+			draw_line(Vector2(-22,-6), Vector2(22,-6), color, 4, true)
+			draw_rect(Rect2(-5,-10,10,9), color)
+		"shelter":
+			_line([Vector2(-27,4),Vector2(0,-17),Vector2(27,4)], 6)
+			draw_line(Vector2(-19,4), Vector2(-19,27), color, 4, true)
+			draw_line(Vector2(19,4), Vector2(19,27), color, 4, true)
+			for x in [-12, 0, 12]:
+				draw_line(Vector2(x+3,-31), Vector2(x,-24), color * Color(1,1,1,0.6), 3, true)
+		"objective":
+			var diamond := PackedVector2Array([Vector2(0,-26),Vector2(26,0),Vector2(0,26),Vector2(-26,0),Vector2(0,-26)])
+			draw_polyline(diamond, color, 5, true)
+			draw_circle(Vector2.ZERO, 7, color)
 		_:
 			draw_circle(Vector2.ZERO, 20, color, false, 4, true)
 

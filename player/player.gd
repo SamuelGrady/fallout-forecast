@@ -107,6 +107,8 @@ var ammo = null
 var max_ammo = null
 var interact_prompt := ""
 var interact_progress := 0.0
+## The radial ping wheel uses mouse motion and the right stick while open.
+var look_locked := false
 
 var _height := 1.8
 var _coyote_timer := 0.0
@@ -576,6 +578,8 @@ func get_move_state() -> String:
 
 
 func _look(amount: Vector2) -> void:
+	if look_locked:
+		return
 	rotate_y(-amount.x)
 	var limit := deg_to_rad(max_pitch_degrees)
 	_pitch = clampf(_pitch - amount.y, -limit, limit)
