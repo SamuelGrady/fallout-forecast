@@ -29,6 +29,17 @@ func _ready() -> void:
 		warm.name = "WarmUp"
 		warm.set_script(preload("res://game/warmup.gd"))
 		add_child.call_deferred(warm)
+	if not Net.dedicated:
+		# Red arcs pointing at whatever just hurt you.
+		var hits := CanvasLayer.new()
+		hits.name = "HitIndicator"
+		hits.set_script(preload("res://ui/hit_indicator.gd"))
+		add_child(hits)
+		# Follow-cam on a teammate while you're OUT.
+		var spectator := Node3D.new()
+		spectator.name = "Spectator"
+		spectator.set_script(preload("res://ui/spectator.gd"))
+		add_child(spectator)
 	# Teammate nameplates and off-screen pointers, visible through walls.
 	var markers := CanvasLayer.new()
 	markers.name = "TeammateMarkers"

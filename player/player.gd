@@ -21,6 +21,8 @@ extends CharacterBody3D
 signal sheltered_changed(is_sheltered: bool)
 signal exposed_changed(is_exposed: bool)
 signal damaged(amount: float)
+## Owner only: a hit landed from this world position (HUD hit-direction arc).
+signal hurt_from(position: Vector3)
 signal state_changed(new_state: String)
 
 const WORLD_LAYER := 1 << 0
@@ -424,6 +426,21 @@ func sample_position(target_ms: int) -> Vector3:
 
 
 ## Enemies, spore clouds, suit drain and (for Turned players) teammates' guns.
+## Host: tell this player's owner where a hit came from.
+func _send_hurt_from(at: Vector3) -> void:
+	if is_multiplayer_authority():
+		hurt_from.emit(at)
+	elif Net.is_online():
+		_receive_hurt_from.rpc_id(get_multiplayer_authority(), at)
+
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _receive_hurt_from(at: Vector3) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	hurt_from.emit(at)
+
+
 func take_damage(amount: float, _source: Node = null) -> void:
 	if not Net.is_host():
 		return
@@ -433,6 +450,8 @@ func take_damage(amount: float, _source: Node = null) -> void:
 				return
 			health = maxf(health - amount, 0.0)
 			damaged.emit(amount)
+			if _source is Node3D and amount >= 1.0:
+				_send_hurt_from((_source as Node3D).global_position)
 			# Brief hit i-frames on real combat hits so swarms can't instant-delete
 			# the player in a single frame (continuous rain drain ticks stay smooth).
 			if health > 0.0 and (_source != null or amount >= 4.0):
