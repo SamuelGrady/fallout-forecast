@@ -25,6 +25,7 @@ class_name WebMaterials
 const _DONE := &"_web_mat_done"
 const _VC_ADDED := &"_web_vc_added"
 const _VC_FREE := &"_web_vc_free"
+const _EMISSION_ADDED := &"_web_emission_added"
 
 static var _installed := false
 static var _enabled := -1
@@ -156,6 +157,7 @@ static func normalize(material: Material, colorless := false) -> bool:
 			m.emission_texture = null
 			m.emission_operator = BaseMaterial3D.EMISSION_OP_ADD
 			m.emission_enabled = true
+			m.set_meta(_EMISSION_ADDED, true)
 		# Closed opaque meshes hide back faces behind the depth buffer.
 		if m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and m.cull_mode == BaseMaterial3D.CULL_BACK \
 				and not m.uv1_triplanar and m.billboard_mode == BaseMaterial3D.BILLBOARD_DISABLED and not m.grow:
@@ -167,6 +169,12 @@ static func normalize(material: Material, colorless := false) -> bool:
 		m.vertex_color_is_srgb = true
 		m.set_meta(_VC_ADDED, true)
 	return shader_key(m) != before
+
+
+## True if the material really glows (not just the black emission this pass
+## adds). Use instead of `emission_enabled` when sorting materials.
+static func glows(material: BaseMaterial3D) -> bool:
+	return material.emission_enabled and not material.has_meta(_EMISSION_ADDED)
 
 
 static func _is_colormap(texture: Texture2D) -> bool:

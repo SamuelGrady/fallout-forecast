@@ -23,6 +23,8 @@ const WeatherEnemy := preload("res://enemies/weather_enemy.gd")
 
 ## Render layer the swatches use while the world is hidden from the camera.
 const WARM_LAYER := 1 << 19
+## World props from ItemCatalog.prop_model (stations, airdrops, deployables).
+const PROPS: Array[String] = ["crate_station", "airdrop", "sandbag_wall", "umbrella_open", "harpoon_bolt", "road_flare"]
 
 const STAGES: Array[String] = [
 	"surfaces",
@@ -166,11 +168,11 @@ func _advance_stage() -> void:
 			_warm_boss(base, up)
 			_hold = 2 if _web else 1
 		"guns_a":
-			_warm_guns(["rifle", "shotgun", "flare", "dome", "frag"], base, right)
+			_warm_items(_item_ids().slice(0, 12), base, right)
 			_warm_dome_shell(base, right)
 			_hold = 2 if _web else 1
 		"guns_b":
-			_warm_guns(["bug_bomb", "revolver", "nailgun", "boombox"], base, right)
+			_warm_items(_item_ids().slice(12) + PROPS, base, right)
 			_warm_props_fx(base, right, up)
 			_hold = 2 if _web else 1
 		"combat_fx":
@@ -277,16 +279,35 @@ func _warm_boss(base: Vector3, up: Vector3) -> void:
 	boss.set_process(false)
 
 
-func _warm_guns(ids: Array[String], base: Vector3, right: Vector3) -> void:
-	var x := -1.5
+## Every loot item: held model, world pickup and thrown/fired round.
+func _item_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in ItemCatalog.GUNS:
+		ids.append(id)
+	for id: String in ItemCatalog.STACKS:
+		ids.append(id)
+	return ids
+
+
+func _warm_items(ids: Array[String], base: Vector3, right: Vector3) -> void:
+	var x := -1.6
+	var step := 3.2 / maxf(1.0, ids.size() - 1)
 	for id in ids:
-		var gun := GunModels.build(id)
-		_holder.add_child(gun)
-		gun.global_position = base + right * x + Vector3.UP * 0.3
-		var round_model := GunModels.projectile(id)
-		_holder.add_child(round_model)
-		round_model.global_position = base + right * x + Vector3.UP * 0.85
-		x += 0.75
+		var models: Array[Node3D] = []
+		if ItemCatalog.GUNS.has(id) or ItemCatalog.STACKS.has(id):
+			models.append(ItemCatalog.model(id))
+			models.append(ItemCatalog.model(id, true))
+		var round_model := ItemCatalog.prop_model(id)
+		if round_model:
+			models.append(round_model)
+		var y := 0.85
+		for model in models:
+			if model == null:
+				continue
+			_holder.add_child(model)
+			model.global_position = base + right * x + Vector3.UP * y
+			y -= 0.45
+		x += step
 
 
 func _warm_dome_shell(base: Vector3, right: Vector3) -> void:

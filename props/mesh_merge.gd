@@ -41,7 +41,7 @@ static func merge_children(parent: Node3D, cast_shadow := true) -> MeshInstance3
 		var mat := mi.material_override as StandardMaterial3D
 		if mat == null or mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 			continue
-		var glow := mat.emission_enabled or mat.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED
+		var glow := WebMaterials.glows(mat) or mat.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED
 		_append(groups[glow], mi.mesh, mi.transform, mat.albedo_color)
 		merged.append(mi)
 	if merged.size() < 2:

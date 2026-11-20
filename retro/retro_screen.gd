@@ -213,7 +213,7 @@ func _convert(material: Material) -> ShaderMaterial:
 	var m := material as StandardMaterial3D
 	# Leave anything special alone: glass, puddles, glows, unshaded effects.
 	if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or m.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED \
-			or m.emission_enabled or m.grow or m.no_depth_test:
+			or WebMaterials.glows(m) or m.grow or m.no_depth_test:
 		return null
 	var s := ShaderMaterial.new()
 	s.shader = PS1
