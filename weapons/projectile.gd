@@ -180,6 +180,7 @@ func _has_los(from: Vector3, to: Vector3) -> bool:
 
 
 func _explode() -> void:
+	Juice.shake(0.7 if data.kind == WeaponData.Kind.GRENADE else 0.5, global_position)
 	Sound.play_at("explosion_big" if data.kind == WeaponData.Kind.GRENADE else "explosion", global_position)
 	_done = true
 	if is_in_group("enemy_lures"):

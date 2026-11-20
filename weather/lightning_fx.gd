@@ -52,6 +52,8 @@ func _exit_tree() -> void:
 
 
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
+	Juice.shake(0.45, position)
+	Juice.duck_music(-8.0, 1.2)
 	var fx := get_parent()
 	if fx and "flash" in fx:
 		fx.flash = Settings.flash_scale()

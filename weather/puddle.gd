@@ -72,6 +72,44 @@ func _physics_process(delta: float) -> void:
 		base = base.lerp(Color(0.22, 0.82, 0.9, 0.88), pulse)
 	_material.albedo_color = base
 	_apply()
+	if raining and growth > 0.3 and randf() < intensity * (0.35 if OS.has_feature("web") else 0.8):
+		_ripple()
+
+
+static var _ripple_mesh: TorusMesh
+var _ripples := 0
+
+
+## A raindrop ring: expands and fades at a random spot on the puddle.
+func _ripple() -> void:
+	if _ripples >= 3:
+		return
+	if _ripple_mesh == null:
+		_ripple_mesh = TorusMesh.new()
+		_ripple_mesh.inner_radius = 0.85
+		_ripple_mesh.outer_radius = 1.0
+		_ripple_mesh.rings = 16
+		_ripple_mesh.ring_segments = 3
+	var ring := MeshInstance3D.new()
+	ring.mesh = _ripple_mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.85, 0.95, 1.0, 0.5)
+	ring.material_override = mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ring)
+	var r := radius() * 0.8
+	var a := randf() * TAU
+	ring.position = Vector3(cos(a), 0.0, sin(a)) * randf() * r + Vector3.UP * 0.02
+	ring.scale = Vector3(0.05, 0.05, 0.05)
+	_ripples += 1
+	var tween := ring.create_tween().set_parallel(true)
+	tween.tween_property(ring, "scale", Vector3(0.35, 0.05, 0.35), 0.6)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.6)
+	tween.chain().tween_callback(func():
+		_ripples -= 1
+		ring.queue_free())
 
 
 func radius() -> float:

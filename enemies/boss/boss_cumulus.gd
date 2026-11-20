@@ -278,6 +278,8 @@ func total_fraction() -> float:
 
 
 func _pop_sac(i: int) -> void:
+	Juice.shake(0.8)
+	Juice.duck_music(-6.0, 1.0)
 	sacs_left -= 1
 	var part: Node3D = _parts[i]
 	Sound.play_at("explosion", part.global_position)
@@ -318,6 +320,9 @@ func _shatter_shell() -> void:
 
 
 func _die() -> void:
+	Juice.shake(1.0)
+	Juice.duck_music(-12.0, 2.5)
+	Juice.hit_stop(120.0)
 	Sound.play_at("explosion_big", global_position)
 	# Final kill punctuation: a full-mix boom and the jackpot sting.
 	Sound.play("explosion_big", -2.0, 0.8)

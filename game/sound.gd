@@ -306,6 +306,10 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 	voice.pitch_scale = pitch
 	voice.bus = bus_for(cue)
 	voice.max_distance = 45.0
+	# Distant sounds lose their highs (built-in air absorption), so a
+	# teammate's gunfire down the street sounds far away.
+	voice.attenuation_filter_cutoff_hz = 2800.0
+	voice.attenuation_filter_db = -14.0
 	world.add_child(voice)
 	voice.global_position = position
 	voice.finished.connect(voice.queue_free)

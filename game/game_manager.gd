@@ -298,6 +298,8 @@ func _sync_objective(site: String) -> void:
 func complete_objective(objective: Node, player: Node) -> void:
 	if not is_host() or not objective.active:
 		return
+	if is_instance_valid(player) and player.is_in_group("local_player"):
+		Juice.popup("+OBJECTIVE", Color("#ffd56a"))
 	_set_objective("")
 	add_decon_charge(1)
 	# Through the spawner so every peer gets the pack.

@@ -333,7 +333,8 @@ func _physics_process(delta: float) -> void:
 		_step_distance += Vector2(travel.x, travel.z).length()
 		if _step_distance >= 1.9:
 			_step_distance = 0.0
-			Sound.play("step_%d" % (randi() % 4), -20.0)
+			_footstep()
+	_landing_check()
 	_update_shelter()
 
 	_handle_interact(delta)
@@ -441,6 +442,62 @@ func _receive_hurt_from(at: Vector3) -> void:
 	hurt_from.emit(at)
 
 
+# ------------------------------------------------------------------ feel
+var _air_speed := 0.0
+var _was_floored := true
+
+
+## Footstep by surface: puddle splash, grass, wood (porches, decks), asphalt.
+func _footstep() -> void:
+	if in_puddle:
+		Sound.play("splash_%d" % (randi() % 2), -14.0, randf_range(0.9, 1.1))
+		if is_multiplayer_authority() and velocity.length() > 6.0:
+			ShotFX.puff(get_parent(), global_position + Vector3.UP * 0.1, Color(0.6, 0.75, 0.85, 0.6), 0.18, 0.35)
+		return
+	var surface := _surface_under()
+	match surface:
+		"grass":
+			Sound.play("step_grass_%d" % (randi() % 2), -16.0, randf_range(0.9, 1.1))
+		"wood":
+			Sound.play("step_wood_%d" % (randi() % 2), -15.0, randf_range(0.9, 1.1))
+		_:
+			Sound.play("step_%d" % (randi() % 4), -20.0)
+
+
+func _surface_under() -> String:
+	var query := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.3, global_position + Vector3.DOWN * 0.6, WORLD_LAYER, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or hit.collider == null:
+		return "asphalt"
+	var path := str((hit.collider as Node).get_path()).to_lower()
+	for key in ["grass", "lawn", "park", "yard", "planter"]:
+		if path.contains(key):
+			return "grass"
+	for key in ["porch", "deck", "pavilion", "wood", "gazebo"]:
+		if path.contains(key):
+			return "wood"
+	return "asphalt"
+
+
+## A short dip and thud when landing from a real fall.
+func _landing_check() -> void:
+	var floored := is_on_floor()
+	if not floored:
+		_air_speed = minf(_air_speed, velocity.y)
+	elif not _was_floored and _air_speed < -4.5:
+		var dip := clampf(-_air_speed * 0.012, 0.04, 0.12)
+		var base_y := head.position.y
+		var tween := head.create_tween()
+		tween.tween_property(head, "position:y", base_y - dip, 0.06)
+		tween.tween_property(head, "position:y", base_y, 0.18)
+		Sound.play("step_%d" % (randi() % 4), -12.0, 0.8)
+		Juice.shake(0.12)
+		_air_speed = 0.0
+	if floored:
+		_air_speed = 0.0
+	_was_floored = floored
+
+
 func take_damage(amount: float, _source: Node = null) -> void:
 	if not Net.is_host():
 		return
@@ -506,6 +563,8 @@ func revive(by: Node) -> void:
 	if state != "downed":
 		return
 	health = revive_health
+	if by != self and is_instance_valid(by) and by.is_in_group("local_player"):
+		Juice.popup("+REVIVE", Color("#8fe36a"))
 	_grace_left = REVIVE_GRACE
 	_revive_grace_left = REVIVE_GRACE
 	invulnerable = true

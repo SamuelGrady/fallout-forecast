@@ -57,7 +57,9 @@ func _seconds() -> float:
 
 
 func _on_tree_changed() -> void:
-	var current := get_tree().current_scene if get_tree() else null
+	if not is_inside_tree():
+		return
+	var current := get_tree().current_scene
 	var path := current.scene_file_path if current else ""
 	if path != _scene:
 		_scene = path
