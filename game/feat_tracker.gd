@@ -102,7 +102,11 @@ func _process(delta: float) -> void:
 		_award_all("slp_mode")
 
 
+## True if `player` stands inside this Shield Dome (umbrellas share the group).
 func _under(dome: Node3D, player: Node3D) -> bool:
+	var kind: Variant = dome.get("id")
+	if kind != null and str(kind) != "shield_dome":
+		return false
 	var data: Variant = dome.get("data")
 	var radius := float(data.effect_radius) if data else 0.0
 	return not dome.is_queued_for_deletion() and dome.global_position.distance_to(player.global_position + Vector3.UP) <= radius
