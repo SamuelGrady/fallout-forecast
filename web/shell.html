@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$GODOT_PROJECT_NAME</title>
+  $GODOT_HEAD_INCLUDE
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #10101e; color: #f2e3c6; }
+    body { margin: 0; }
+    canvas { position: fixed; inset: 0; display: block; outline: 0; }
+    #launch { position: fixed; inset: 0; display: grid; place-content: center; padding: 1.5rem; text-align: center; background: #10101e; }
+    #launch[hidden], #fullscreen[hidden] { display: none; }
+    h1 { margin: 0 0 .75rem; color: #ff3ea5; text-transform: uppercase; letter-spacing: .06em; }
+    p { max-width: 32rem; }
+    button { color: inherit; background: #25223e; border: 1px solid #68d9dd; border-radius: .25rem; padding: .6rem 1rem; font: inherit; cursor: pointer; }
+    button:hover { background: #373251; }
+    button:focus-visible { outline: 2px solid #ff3ea5; outline-offset: 3px; }
+    #fullscreen { position: fixed; bottom: .75rem; left: 50%; transform: translateX(-50%); font-size: .875rem; }
+    :fullscreen #fullscreen, .mouse-captured #fullscreen { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
+  <main id="launch">
+    <h1>$GODOT_PROJECT_NAME</h1>
+    <p>Click the game during a run to capture the mouse. Press Esc to release it.</p>
+    <button id="start" type="button">Start game</button>
+    <p id="status" role="status"></p>
+  </main>
+  <button id="fullscreen" type="button" hidden>Fullscreen</button>
+  <script src="$GODOT_URL"></script>
+  <script>
+    const canvas = document.getElementById("canvas");
+    const launch = document.getElementById("launch");
+    const start = document.getElementById("start");
+    const status = document.getElementById("status");
+    const fullscreen = document.getElementById("fullscreen");
+
+    fullscreen.addEventListener("click", async () => {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (error) {
+        console.warn("Fullscreen unavailable:", error.message);
+      }
+      canvas.focus();
+    });
+    document.addEventListener("pointerlockchange", () => {
+      document.body.classList.toggle("mouse-captured", document.pointerLockElement === canvas);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && document.fullscreenElement) {
+        document.exitFullscreen().catch(console.warn);
+      }
+    }, { capture: true });
+
+    start.addEventListener("click", async () => {
+      start.disabled = true;
+      status.textContent = "Loading…";
+      try {
+        if (typeof Engine === "undefined") throw new Error("The game script could not load.");
+        const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
+        if (missing.length) throw new Error(missing.join(". "));
+        const engine = new Engine($GODOT_CONFIG);
+        await engine.startGame({
+          canvas,
+          onProgress(current, total) {
+            if (total > 0) status.textContent = `Loading… ${Math.floor(100 * current / total)}%`;
+          },
+        });
+        launch.hidden = true;
+        fullscreen.hidden = !document.fullscreenEnabled;
+        canvas.focus();
+      } catch (error) {
+        status.textContent = `${error.message} Reload this page to try again.`;
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

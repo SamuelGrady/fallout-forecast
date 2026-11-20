@@ -102,7 +102,7 @@ func _ready() -> void:
 	_button(_menu, "HOST GAME", _on_host).visible = Net.can_host()
 	_button(_menu, "JOIN GAME", _on_join)
 	_button(_menu, "SETTINGS", _on_settings)
-	_button(_menu, "QUIT", get_tree().quit)
+	_button(_menu, "QUIT", get_tree().quit).visible = not OS.has_feature("web")
 
 	_settings.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_settings.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -268,7 +268,7 @@ func _on_back() -> void:
 	Settings.save()
 	_settings.visible = false
 	_menu.visible = true
-	_menu.get_child(1).grab_focus()
+	_menu.get_child(0 if OS.has_feature("web") else 1).grab_focus()
 
 
 func _snow_shader() -> Shader:

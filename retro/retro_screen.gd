@@ -16,6 +16,7 @@ const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
 @export var enabled := true
 @export var interface_only := false
 var _interface_layer: CanvasLayer
+var _web := OS.has_feature("web")
 @export var vertex_snap := 120.0
 @export var lightning_glitch := 1.0
 @export var downed_glitch := 0.45
@@ -31,14 +32,20 @@ var _ps1_materials: Array[ShaderMaterial] = []
 
 
 func _ready() -> void:
-	screen.material = screen.material.duplicate()
-	(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", false)
 	enabled = Settings.retro_enabled
 	Settings.video_changed.connect(_on_video_changed)
 	var recording_layer := CanvasLayer.new()
 	recording_layer.layer = 4
 	add_child(recording_layer)
 	$VHS.reparent(recording_layer, false)
+	rec.add_theme_font_override("font", BroadcastUI.FONT)
+	stamp.add_theme_font_override("font", BroadcastUI.FONT)
+	# Keep the REC/timestamp overlay without the WebGL screen copies or material swaps.
+	if _web:
+		_apply_enabled()
+		return
+	screen.material = screen.material.duplicate()
+	(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", false)
 	if interface_only:
 		layer = 5
 		(screen.material as ShaderMaterial).set_shader_parameter("interface_pass", true)
@@ -57,8 +64,6 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 	_convert_tree.call_deferred(get_tree().root)
 	_apply_enabled()
-	rec.add_theme_font_override("font", BroadcastUI.FONT)
-	stamp.add_theme_font_override("font", BroadcastUI.FONT)
 
 
 func _exit_tree() -> void:
@@ -96,9 +101,14 @@ func _process(delta: float) -> void:
 	if player and player.get("state") == "downed":
 		target = downed_glitch * Settings.flash_scale()
 	_glitch = maxf(move_toward(_glitch, 0.0, delta * 1.6), target)
-	(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
+	if not _web:
+		(screen.material as ShaderMaterial).set_shader_parameter("glitch", _glitch)
 
-	rec.text = ("● REC" if fmod(_clock, 1.0) < 0.6 else "   REC") + "  ▶"
+	var recording := fmod(_clock, 1.0) < 0.6
+	if _web:
+		rec.text = ("* REC" if recording else "   REC") + "  >"
+	else:
+		rec.text = ("● REC" if recording else "   REC") + "  ▶"
 	var s := START_SECONDS + int(_clock)
 	var day := 31 + s / 86400
 	s %= 86400
@@ -131,7 +141,7 @@ func _prune_cache() -> void:
 
 
 func _apply_enabled() -> void:
-	screen.visible = enabled
+	screen.visible = enabled and not _web
 	if _interface_layer:
 		_interface_layer.visible = enabled
 	rec.visible = enabled

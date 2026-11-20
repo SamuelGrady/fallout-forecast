@@ -26,7 +26,8 @@ func _ready() -> void:
 	box.add_child(title)
 	_button(box, "RESUME", _resume)
 	_button(box, "MAIN MENU", _main_menu)
-	_button(box, "QUIT", get_tree().quit)
+	if not OS.has_feature("web"):
+		_button(box, "QUIT", get_tree().quit)
 	visible = false
 	_remote.theme = BroadcastUI.theme()
 	_remote.add_theme_font_size_override("font_size", 30)
