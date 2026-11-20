@@ -85,7 +85,8 @@ func jammed() -> bool:
 	return _jam_left > 0.0
 
 func can_act() -> bool:
-	return loot != null and loot.run_id > 0 and player.state == "ok" and not GameManager.awaiting_tape_choice 		and not GameManager.is_voting() and not get_tree().paused
+	return loot != null and loot.run_id > 0 and player.state == "ok" and not GameManager.awaiting_tape_choice \
+			and not GameManager.is_voting() and not get_tree().paused
 
 func _process(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
@@ -219,7 +220,8 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 				loot.spawn_pickup(item, at)
 				send_state()
 		"charge":
-			if selected_weapon().charge_time > 0.0 and _cooldown <= 0.0 and _reload_serial == 0 					and selected().count > 0 and not player.tarp_raised and _charge_serial == 0:
+			if selected_weapon().charge_time > 0.0 and _cooldown <= 0.0 and _reload_serial == 0 \
+					and selected().count > 0 and not player.tarp_raised and _charge_serial == 0:
 				_charge_serial = expected
 				_charge_at = loot.clock
 				_play_charge(loot.run_id, expected)
@@ -229,7 +231,8 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func _play_charge(run: int, serial: int) -> void:
 	var sender := multiplayer.get_remote_sender_id()
-	if (sender == 1 or (sender == 0 and Net.is_host())) and run == loot.run_id 			and selected_serial() == serial and player.is_multiplayer_authority():
+	if (sender == 1 or (sender == 0 and Net.is_host())) and run == loot.run_id \
+			and selected_serial() == serial and player.is_multiplayer_authority():
 		Sound.play("gun_disruptor_charge", -8.0)
 
 func _cancel_actions() -> void:
@@ -240,7 +243,8 @@ func _cancel_actions() -> void:
 
 func _start_reload_host() -> void:
 	var definition := selected_definition()
-	if definition == null or definition.kind != ItemDefinition.Kind.GUN or _reload_serial != 0 			or selected().count >= definition.weapon.mag_size or selected_reserve() <= 0 or player.tarp_raised:
+	if definition == null or definition.kind != ItemDefinition.Kind.GUN or _reload_serial != 0 \
+			or selected().count >= definition.weapon.mag_size or selected_reserve() <= 0 or player.tarp_raised:
 		return
 	_charge_serial = 0
 	_reload_serial = selected_serial()
@@ -280,9 +284,12 @@ func _request_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aimi
 		_host_shot(run, serial, origin, dir, is_aiming, Net.get_rewind_ms(multiplayer.get_remote_sender_id()))
 
 func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, rewind_ms: int) -> bool:
-	if not Net.is_host() or not can_act() or run != loot.run_id or serial == 0 or selected_serial() != serial 			or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
+	if not Net.is_host() or not can_act() or run != loot.run_id or serial == 0 or selected_serial() != serial \
+			or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
 		return false
-	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.5 			or origin.distance_to(camera.global_position) > 3.0 			or not WeaponCombat.clear_path(get_world_3d(), camera.global_position, origin):
+	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.5 \
+			or origin.distance_to(camera.global_position) > 3.0 \
+			or not WeaponCombat.clear_path(get_world_3d(), camera.global_position, origin):
 		return false
 	var item := selected()
 	var definition := selected_definition()
@@ -631,7 +638,9 @@ func _animate(delta: float) -> void:
 	var data := selected_weapon()
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
-	var aiming: bool = can_act() and not player.get("tarp_raised") 			and _reload_left <= 0.0 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
+	var aiming: bool = can_act() and not player.get("tarp_raised") \
+			and _reload_left <= 0.0 \
+			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))

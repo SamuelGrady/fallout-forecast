@@ -396,7 +396,9 @@ var ready_count := 0
 
 
 func can_ready_up() -> bool:
-	return run_active and not finished and not WeatherManager.hold 			and WeatherManager.phase in [WeatherManager.Phase.CALM, WeatherManager.Phase.CLEARING] 			and WeatherManager.phase_time_left > 3.0
+	return run_active and not finished and not WeatherManager.hold \
+			and WeatherManager.phase in [WeatherManager.Phase.CALM, WeatherManager.Phase.CLEARING] \
+			and WeatherManager.phase_time_left > 3.0
 
 
 ## Owner: this player is done looting and wants the next phase now.

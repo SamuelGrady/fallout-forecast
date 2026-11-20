@@ -23,6 +23,7 @@ var _active: Array = []
 
 func _ready() -> void:
 	add_to_group("compass_marker")
+	add_to_group("crates")  # Team pings mark stations and the drop as "crate".
 	set_meta("compass_color", AMBER if is_drop else CYAN)
 	set_meta("compass_label", "SUPPLY DROP" if is_drop else "STATION")
 	set_meta("compass_icon", "drop" if is_drop else "station")
@@ -59,6 +60,9 @@ func _add_pad(mode: String, at: Vector3) -> void:
 	pad.mode = mode
 	pad.position = at
 	add_child(pad)
+
+func can_ping() -> bool:
+	return not is_queued_for_deletion() and (not is_drop or not opened)
 
 func available(mode: String) -> bool:
 	if is_queued_for_deletion():

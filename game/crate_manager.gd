@@ -214,7 +214,8 @@ func _handle_hold(run: int, key: String, mode: String, step: String, player: Nod
 			return true
 
 func _valid(player: Node, target: SupplyStation, mode: String) -> bool:
-	if not is_instance_valid(player) or not is_instance_valid(target) or player.state != "ok" or not target.available(mode) 			or not GameManager.run_active or GameManager.is_voting() or GameManager.awaiting_tape_choice:
+	if not is_instance_valid(player) or not is_instance_valid(target) or player.state != "ok" or not target.available(mode) \
+			or not GameManager.run_active or GameManager.is_voting() or GameManager.awaiting_tape_choice:
 		return false
 	var pad := target.get_node_or_null(mode) as SupplyInteract
 	if pad == null or pad.global_position.distance_to(player.global_position) > pad.radius:

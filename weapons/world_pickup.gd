@@ -43,7 +43,8 @@ func _process(delta: float) -> void:
 		visual.rotation.y += delta * 1.4
 
 func can_interact(player: Node) -> bool:
-	return not is_queued_for_deletion() and item != null and player.state == "ok" 		and (claim_peer == 0 or claim_peer == player.get_multiplayer_authority())
+	return not is_queued_for_deletion() and item != null and player.state == "ok" \
+			and (claim_peer == 0 or claim_peer == player.get_multiplayer_authority())
 
 func get_prompt(player: Node) -> String:
 	var holder := player.get_node("Head/Camera3D/WeaponHolder") as WeaponHolder

@@ -318,7 +318,8 @@ func _tick_zone() -> void:
 				GameManager.disperse_cloud(cloud)
 
 func _contains(point: Vector3) -> bool:
-	return global_position.distance_to(point) <= data.effect_radius 		and WeaponCombat.clear_path(get_world_3d(), global_position + Vector3.UP * 0.25, point)
+	return global_position.distance_to(point) <= data.effect_radius \
+			and WeaponCombat.clear_path(get_world_3d(), global_position + Vector3.UP * 0.25, point)
 
 func _strike_rod(at: Vector3, _seed: int) -> void:
 	if not is_queued_for_deletion() and at.is_equal_approx(global_position) and Net.is_host():
@@ -357,7 +358,8 @@ func explode() -> void:
 		source.end_hit_batch()
 	var dry: Dictionary = {}
 	for puddle: Node3D in get_tree().get_nodes_in_group("puddles"):
-		if puddle.global_position.distance_to(at) <= radius + puddle.radius() 				and WeaponCombat.clear_path(get_world_3d(), eye, puddle.global_position + Vector3.UP * 0.2):
+		if puddle.global_position.distance_to(at) <= radius + puddle.radius() \
+				and WeaponCombat.clear_path(get_world_3d(), eye, puddle.global_position + Vector3.UP * 0.2):
 			puddle.clear()
 			dry[puddle.get_path()] = 0.0
 	WeatherManager.replicate_puddle_growth(dry)

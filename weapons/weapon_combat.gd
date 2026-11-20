@@ -173,7 +173,8 @@ static func _find_submerged(holder: WeaponHolder, origin: Vector3, ray: Vector3,
 			continue
 		var at := enemy.global_position + Vector3.UP * 0.15
 		var distance := (at - origin).dot(ray)
-		if distance > 0 and distance < limit and (origin + ray * distance).distance_to(at) < 0.72 				and clear_path(holder.get_world_3d(), origin, at):
+		if distance > 0 and distance < limit and (origin + ray * distance).distance_to(at) < 0.72 \
+				and clear_path(holder.get_world_3d(), origin, at):
 			best = enemy
 			point = at
 			limit = distance
@@ -184,7 +185,8 @@ static func _find_submerged(holder: WeaponHolder, origin: Vector3, ray: Vector3,
 static func _hit_special(holder: WeaponHolder, enemy: EnemyBase, point: Vector3, ray: Vector3, origin: Vector3, data: WeaponData, damage: float) -> void:
 	match data.mechanic:
 		"pin":
-			if (enemy.is_small or enemy.data.display_name in ["Sleet", "Gutter", "Drip"]) and enemy.miniboss_wave == 0 					and not clear_path(holder.get_world_3d(), point, point + ray * 1.4):
+			if (enemy.is_small or enemy.data.display_name in ["Sleet", "Gutter", "Drip"]) and enemy.miniboss_wave == 0 \
+					and not clear_path(holder.get_world_3d(), point, point + ray * 1.4):
 				enemy.stagger(1.15)
 				enemy.reveal(1.15)
 		"salt":
@@ -237,7 +239,8 @@ static func _chain(holder: WeaponHolder, first: EnemyBase, point: Vector3, damag
 
 static func _in_water(tree: SceneTree, point: Vector3) -> bool:
 	for puddle: Node3D in tree.get_nodes_in_group("puddles"):
-		if puddle.radius() > 0.20 and absf(point.y - puddle.global_position.y) <= 0.8 				and Vector2(point.x - puddle.global_position.x, point.z - puddle.global_position.z).length() <= puddle.radius():
+		if puddle.radius() > 0.20 and absf(point.y - puddle.global_position.y) <= 0.8 \
+				and Vector2(point.x - puddle.global_position.x, point.z - puddle.global_position.z).length() <= puddle.radius():
 			return true
 	return false
 
@@ -299,7 +302,8 @@ static func pellet_rays(dir: Vector3, seed: int, spread_degrees: float, count: i
 static func is_damageable(target: Object) -> bool:
 	if not is_instance_valid(target) or not target.has_method("take_damage"):
 		return false
-	return target is EnemyBase or (target is Node and (target.is_in_group("boss_parts") 		or (target.is_in_group("players") and target.get("state") == "turned")))
+	return target is EnemyBase or (target is Node and (target.is_in_group("boss_parts") \
+			or (target.is_in_group("players") and target.get("state") == "turned")))
 
 static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool) -> void:
 	var data := ItemCatalog.definition(id).weapon

@@ -297,7 +297,8 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
 	sprint_lock = maxf(0.0, sprint_lock - delta)
-	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" 			and not aiming and sprint_lock <= 0.0
+	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" \
+			and not aiming and sprint_lock <= 0.0
 	var speed := walk_speed
 	match state:
 		"downed":
