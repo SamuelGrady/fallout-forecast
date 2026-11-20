@@ -31,7 +31,7 @@ const CLOUD_URL := "wss://fallout.drew.place/"
 const CLOUD_HOST := "fallout.drew.place"
 ## Bump whenever an rpc or the scene layout changes: a client and server on
 ## different builds are turned away with a message instead of desyncing.
-const PROTOCOL := 9
+const PROTOCOL := 11
 ## Give up on a join that hasn't connected after this long.
 const CONNECT_TIMEOUT := 8.0
 

@@ -351,7 +351,7 @@ func _physics_process(delta: float) -> void:
 	_update_shelter()
 
 	_handle_interact(delta)
-	if Input.is_action_just_pressed("ready_up") and state == "ok":
+	if Input.is_action_just_pressed("ready_up") and state == "ok" and not GameManager.is_voting():
 		GameManager.ready_up()
 	if state == "turned":
 		_melee_left -= delta
@@ -361,7 +361,7 @@ func _physics_process(delta: float) -> void:
 				_melee()
 			else:
 				_request_melee.rpc_id(1)
-	if has_tarp and state == "ok" and Input.is_action_just_pressed("use_item"):
+	if has_tarp and state == "ok" and not GameManager.is_voting() and Input.is_action_just_pressed("use_item"):
 		_set_tarp(not tarp_raised)
 
 
@@ -390,6 +390,8 @@ func _host_tick(delta: float) -> void:
 			var drain := WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale() if exposed else 0.0
 			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
 				drain = 0.0  # Shield Dome: full shelter
+			if exposed and WeaponProjectile.dries(global_position + Vector3.UP, get_tree()):
+				drain *= 0.25
 			if holding_leaky:
 				drain = maxf(drain, leaky_drain)
 			if drain > 0.0:
@@ -675,41 +677,33 @@ func _teleport(xf: Transform3D) -> void:
 		_applied_pull = Vector3.ZERO
 
 
-## Host: give this player an item. Health and suit items apply on the host;
-## ammo, weapons and the Tarp apply on the owning client.
+## Host grants utility ownership. The owner receives only the presentation state.
 func grant(item: String) -> void:
-	match item:
-		"medkit":
-			heal(50.0)
-		"suit_patch":
-			suit_integrity = minf(suit_integrity + 50.0, 100.0)
-		_:
-			if is_multiplayer_authority():
-				_apply_grant(item)
-			else:
-				_grant.rpc_id(get_multiplayer_authority(), item)
+	if not Net.is_host():
+		return
+	if item == "tarp":
+		has_tarp = true
+		if not is_multiplayer_authority():
+			_grant_tarp.rpc_id(get_multiplayer_authority())
+	elif item.begins_with("weapon:"):
+		var loot := RunLoot.find(get_tree())
+		var id := ItemCatalog.id_for_weapon_path(item.trim_prefix("weapon:"))
+		if id != "" and id != "disruptor":
+			var at := loot.ground_at(self, -global_basis.z)
+			loot.spawn_item(id, global_position if at == Vector3.INF else at)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _grant(item: String) -> void:
+func _grant_tarp() -> void:
 	if multiplayer.get_remote_sender_id() == 1:
-		_apply_grant(item)
-
-
-func _apply_grant(item: String) -> void:
-	if item == "tarp":
 		has_tarp = true
-		return
-	var holder := get_node_or_null("Head/Camera3D/WeaponHolder")
-	if holder and holder.has_method("grant"):
-		holder.grant(item)
 
 
 # ------------------------------------------------------------------ interact
 func _handle_interact(delta: float) -> void:
 	var best: Interactable = null
 	var best_score := INF
-	if state != "turned":
+	if state != "turned" and not GameManager.is_voting():
 		var forward := -camera.global_basis.z
 		for node in get_tree().get_nodes_in_group("interactables"):
 			var it := node as Interactable
@@ -738,6 +732,8 @@ func _handle_interact(delta: float) -> void:
 				best_score = score
 	if best != _hold_target:
 		if is_instance_valid(_hold_target):
+			if _hold_target is SupplyInteract and _hold > 0.0 and not _hold_done:
+				_hold_target.action(self, "cancel")
 			_hold_target.set_targeted(false)
 		_hold_target = best
 		_hold = 0.0
@@ -752,12 +748,21 @@ func _handle_interact(delta: float) -> void:
 	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), best.get_prompt(self)]
 	var need := best.get_hold_time(self)
 	if Input.is_action_pressed("interact"):
+		if _hold == 0.0 and best is SupplyInteract:
+			best.action(self, "begin")
 		_hold += delta
 		interact_progress = clampf(_hold / maxf(need,0.001),0,1)
 		if _hold >= need and not _hold_done:
 			_hold_done = true
-			GameManager.interact(best,self)
+			if best is WorldPickup:
+				best.request(self)
+			elif best is SupplyInteract:
+				best.action(self, "finish")
+			else:
+				GameManager.interact(best, self)
 	else:
+		if best is SupplyInteract and _hold > 0.0 and not _hold_done:
+			best.action(self, "cancel")
 		_hold = 0.0
 		_hold_done = false
 		interact_progress = 0.0
@@ -973,8 +978,8 @@ func _set_tarp(value: bool) -> void:
 func _push_tarp(value: bool) -> void:
 	if not Net.is_host() or multiplayer.get_remote_sender_id() != get_multiplayer_authority():
 		return
-	tarp_raised = value
-	_apply_tarp.rpc(value)
+	tarp_raised = value and has_tarp and state == "ok" and not GameManager.is_voting()
+	Net.rpc_to_run(_apply_tarp, [tarp_raised])
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -984,22 +989,62 @@ func _apply_tarp(value: bool) -> void:
 	tarp_raised = value
 
 
-## Host: tell whoever fired that the shot landed. The host's own player shows
-## it straight away; a client's is sent to that client.
+var _hit_batch_depth := 0
+var _hit_batch: Dictionary = {}
+
+
+func begin_hit_batch() -> void:
+	_hit_batch_depth += 1
+
+
+func end_hit_batch() -> void:
+	_hit_batch_depth -= 1
+	if _hit_batch_depth == 0 and not _hit_batch.is_empty():
+		_send_hit_batch(_hit_batch.values())
+		_hit_batch.clear()
+
+
 func notify_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id := 0) -> void:
 	if not Net.is_host():
 		return
-	if get_multiplayer_authority() == 1 or not Net.is_online():
-		local_hit(killed, critical, point, amount, enemy_id)
+	if _hit_batch_depth == 0:
+		_send_hit_batch([[killed, critical, point, amount, enemy_id]])
+		return
+	var key := enemy_id if enemy_id != 0 else -1 - _hit_batch.size()
+	if _hit_batch.has(key):
+		var row: Array = _hit_batch[key]
+		row[0] = row[0] or killed
+		row[1] = row[1] or critical
+		row[3] += amount
 	else:
-		_receive_hit.rpc_id(get_multiplayer_authority(), killed, critical, point, amount, enemy_id)
+		_hit_batch[key] = [killed, critical, point, amount, enemy_id]
+
+
+func _send_hit_batch(hits: Array) -> void:
+	var peer := get_multiplayer_authority()
+	if peer == 1:
+		_apply_hits(hits)
+	elif Net.run_peers.has(peer):
+		var loot := RunLoot.find(get_tree())
+		_receive_hits.rpc_id(peer, loot.run_id, hits)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _receive_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_id: int) -> void:
-	if multiplayer.get_remote_sender_id() != 1:
-		return
-	local_hit(killed, critical, point, amount, enemy_id)
+func _receive_hits(run: int, hits: Array) -> void:
+	var loot := RunLoot.find(get_tree())
+	if multiplayer.get_remote_sender_id() == 1 and loot and run == loot.run_id:
+		_apply_hits(hits)
+
+
+func _apply_hits(hits: Array) -> void:
+	var killed := false
+	var critical := false
+	for row: Array in hits:
+		killed = killed or row[0]
+		critical = critical or row[1]
+		if row[3] > 0:
+			show_damage(row[2], row[3], row[1], row[4])
+	local_hit(killed, critical, Vector3.ZERO, 0)
 
 
 ## Owner of the shot: hit marker, floating number and the headshot sting.

@@ -22,7 +22,6 @@ const SporeCloud := preload("res://enemies/mister/spore_cloud.gd")
 const ENEMY_COUNT_SCALE := [1.0, 1.0, 1.6, 2.2, 2.8]
 const ENEMY_HEALTH_SCALE := [1.0, 1.0, 1.1, 1.2, 1.3]
 const DECON_CHARGES := [4, 4, 5, 6, 7]
-const CRATES_PER_CALM := [3, 3, 4, 5, 6]
 
 var decon_charges := 4
 var decon_max := 4
@@ -87,7 +86,13 @@ func start_run() -> void:
 	var n := player_count()
 	decon_max = DECON_CHARGES[n]
 	_set_decon(decon_max)
+	var loot := RunLoot.find(get_tree())
+	loot.begin(_run_id)
+	crates.begin_run()
 	WeatherManager.start_run()
+	for peer: int in Net.run_peers:
+		_on_run_peer_loaded(peer)
+		loot.sync_to_peer(peer)
 
 
 ## Host: send the current state once the peer has finished loading the map.
@@ -441,13 +446,16 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 		return
 	match phase:
 		WeatherManager.Phase.DRIZZLE:
+			crates.end_calm()
 			var objectives := get_tree().get_nodes_in_group("district_objectives")
 			if not objectives.is_empty():
 				var objective: Node = objectives[(_wave - 1) % objectives.size()]
 				_set_objective(objective.site)
 				show_banner("OBJECTIVE: %s" % objective.site_label, Color("ffd56a"), 2.2)
 		WeatherManager.Phase.CALM:
-			crates.spawn_for_calm()
+			crates.start_calm()
+			if _wave == 3:
+				_drop_milestone("frag", false)
 			# Clear weather: showers refill one charge.
 			if decon_charges < decon_max:
 				_set_decon(decon_charges + 1)
@@ -457,28 +465,30 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
-			if _wave > _waves_survived:
+			var newly_cleared := _wave > _waves_survived
+			if newly_cleared:
 				_waves_survived = _wave
 				if endless:
 					endless_score += 500 + 100 * (_wave - WeatherManager.FINAL_WAVE)
 			_set_objective("")
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
-			var unlocks := {1: "spray_rifle", 2: "flare_gun", 3: "bug_bomb"}
-			if unlocks.has(_wave):
-				var gun := load("res://weapons/%s.tres" % unlocks[_wave]) as WeaponData
-				# Persistent unlock (title loadout) is separate from the in-run
-				# issue, which never force-swaps or stacks reserve ammo.
-				var is_new := gun.resource_path not in Settings.unlocked_guns
-				Settings.unlock_gun(gun.resource_path)
-				for p in players():
-					p.grant("issue:" + gun.resource_path)
-				if is_new:
-					_announce_unlock(gun.display_name.to_upper())
+			var unlocks := {1: "spray_rifle", 2: "shield_dome", 3: "frag"}
+			if newly_cleared and unlocks.has(_wave):
+				_drop_milestone(unlocks[_wave], true)
 			if not endless:
 				mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
 					p.on_clearing()
+
+
+func _drop_milestone(id: String, discover: bool) -> void:
+	var loot := RunLoot.find(get_tree())
+	if discover:
+		loot.milestone(id)
+	for player: Node3D in players():
+		var at := loot.ground_at(player, -player.global_basis.z * 1.6)
+		loot.spawn_item(id, player.global_position if at == Vector3.INF else at)
 
 
 # ------------------------------------------------------------------ interact
@@ -544,10 +554,11 @@ func _stat(player: Node) -> Dictionary:
 var _volatile_popping := false
 
 
-func record_kill(source: Node, at := Vector3.INF, elite := false) -> void:
+func record_kill(source: Node, at := Vector3.INF, elite := false, miniboss := false) -> void:
 	if not is_host() or not source or not source.is_in_group("players"):
 		return
 	_stat(source).kills += 1
+	RunLoot.holder(source).earn_scrap(40 if miniboss else (12 if elite else 5))
 	if endless:
 		endless_score += 250 if elite else 100
 	# Bio-Siphon: each kill restores health and suit integrity.
@@ -566,11 +577,9 @@ func record_kill(source: Node, at := Vector3.INF, elite := false) -> void:
 			if enemy == null or enemy.health <= 0.0:
 				continue
 			if enemy.global_position.distance_to(at) <= pop_radius:
-				enemy.take_damage(pop_dmg, source)
 				var push := enemy.global_position - at
 				push.y = 0.0
-				if push.length_squared() > 0.001:
-					enemy.knockback(push.normalized() * 6.0 * explosive_knockback_scale())
+				enemy.take_blast(pop_dmg, source, at, push.normalized() * 6.0 * explosive_knockback_scale())
 		broadcast_blast(at + Vector3.UP * 0.6, pop_radius * 0.35, Color(1.0, 0.54, 0.22, 0.85))
 		_volatile_popping = false
 
@@ -821,8 +830,8 @@ func finish(won: bool) -> void:
 	for p in players():
 		var s := _stat(p)
 		var holder: Node = p.get_node_or_null("Head/Camera3D/WeaponHolder")
-		if holder and not holder.loadout.is_empty():
-			s["weapon"] = holder.loadout[holder.current].display_name
+		if holder and holder.selected_weapon():
+			s["weapon"] = holder.selected_weapon().display_name
 	var squad: Array = []
 	if mutations:
 		for id in mutations.player_mutations:
@@ -868,42 +877,62 @@ func _finish(won: bool, results: Dictionary) -> void:
 
 
 # ------------------------------------------------------------------ shared effects
+var _hazard_seq := 0
+
+
 ## Host: a glob on an arc, simulated on every peer; only the host's hazard hurts.
 func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false) -> void:
+	_hazard_seq += 1
 	if _online():
-		Net.rpc_to_run(_spawn_spore, [from, to, flight, damage_per_second, acid])
-	_spawn_spore(from, to, flight, damage_per_second, acid)
+		Net.rpc_to_run(_spawn_spore, [_hazard_seq, from, to, flight, damage_per_second, acid])
+	_spawn_spore(_hazard_seq, from, to, flight, damage_per_second, acid)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool) -> void:
+func _spawn_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool) -> void:
 	var world := _world()
 	if world == null:
 		return
 	var spore := SporeProjectile.new()
 	spore.damage_per_second = damage_per_second
 	spore.acid = acid
+	spore.hazard_id = id
 	world.add_child(spore)
 	spore.launch(from, to, flight)
 
 
 ## Host: a spore cloud right here (Spores mutation, boss).
 func spawn_cloud(at: Vector3, damage_per_second: float, radius := 2.5) -> void:
+	_hazard_seq += 1
 	if _online():
-		_spawn_cloud.rpc(at, damage_per_second, radius)
-	_spawn_cloud(at, damage_per_second, radius)
+		Net.rpc_to_run(_spawn_cloud, [_hazard_seq, at, damage_per_second, radius])
+	_spawn_cloud(_hazard_seq, at, damage_per_second, radius)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_cloud(at: Vector3, damage_per_second: float, radius: float) -> void:
+func _spawn_cloud(id: int, at: Vector3, damage_per_second: float, radius: float) -> void:
 	var world := _world()
 	if world == null:
 		return
 	var cloud := SporeCloud.new()
 	cloud.damage_per_second = damage_per_second
 	cloud.radius = radius
+	cloud.hazard_id = id
 	world.add_child(cloud)
 	cloud.global_position = at
+
+
+func disperse_cloud(cloud: Node) -> void:
+	Net.rpc_to_run(_disperse_cloud, [cloud.hazard_id])
+	cloud.queue_free()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _disperse_cloud(id: int) -> void:
+	for cloud: Node in get_tree().get_nodes_in_group("spore_clouds"):
+		if cloud.hazard_id == id:
+			cloud.queue_free()
+			break
 
 
 func show_banner(text: String, color: Color, seconds := 3.0) -> void:

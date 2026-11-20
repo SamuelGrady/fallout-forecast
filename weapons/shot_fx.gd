@@ -7,6 +7,8 @@ class_name ShotFX
 ## doesn't allocate resources per shot.
 static var _streak_mesh: BoxMesh
 static var _materials := {}
+static var _puff_mesh: SphereMesh
+static var _spark_mesh: BoxMesh
 
 
 static func _unshaded(color: Color) -> StandardMaterial3D:
@@ -15,6 +17,8 @@ static func _unshaded(color: Color) -> StandardMaterial3D:
 		var material := StandardMaterial3D.new()
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.albedo_color = color
+		if color.a < 1.0:
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.disable_fog = true
 		_materials[key] = material
 	return _materials[key]
@@ -62,39 +66,35 @@ static func flash(parent: Node, at: Vector3, color := Color(1.0, 0.8, 0.4), ener
 
 
 static func puff(parent: Node, at: Vector3, color: Color, size := 0.18, life := 0.25) -> void:
+	if _puff_mesh == null:
+		_puff_mesh = SphereMesh.new()
+		_puff_mesh.radius = 1.0
+		_puff_mesh.height = 2.0
+		_puff_mesh.radial_segments = 8
+		_puff_mesh.rings = 4
 	var mesh := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = size
-	sphere.height = size * 2.0
-	sphere.radial_segments = 8
-	sphere.rings = 4
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = color
-	sphere.material = material
-	mesh.mesh = sphere
+	mesh.mesh = _puff_mesh
+	mesh.material_override = _unshaded(color)
+	mesh.scale = Vector3.ONE * size
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mesh)
 	mesh.global_position = at
 	var tween := mesh.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(mesh, "scale", Vector3.ONE * 2.5, life)
-	tween.tween_property(material, "albedo_color:a", 0.0, life)
+	tween.tween_property(mesh, "scale", Vector3.ONE * size * 2.5, life)
+	tween.tween_property(mesh, "transparency", 1.0, life)
 	tween.chain().tween_callback(mesh.queue_free)
 
 
 static func sparks(parent: Node, at: Vector3, outward := Vector3.UP, count := 6) -> void:
 	var dir := outward.normalized() if outward.length_squared() > 0.001 else Vector3.UP
-	for i in count:
+	if _spark_mesh == null:
+		_spark_mesh = BoxMesh.new()
+		_spark_mesh.size = Vector3(0.03, 0.03, 0.16)
+	for i in mini(count, 4) if OS.has_feature("web") else count:
 		var spark := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.03, 0.03, 0.16)
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = Color("#ffe599") if i % 2 == 0 else Color("#7ce8ff")
-		box.material = mat
-		spark.mesh = box
+		spark.mesh = _spark_mesh
+		spark.material_override = _unshaded(Color("#ffe599") if i % 2 == 0 else Color("#7ce8ff"))
 		spark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		parent.add_child(spark)
 		spark.global_position = at
@@ -104,3 +104,24 @@ static func sparks(parent: Node, at: Vector3, outward := Vector3.UP, count := 6)
 		tween.tween_property(spark, "global_position", at + spread * randf_range(0.45, 0.95), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(spark, "scale", Vector3.ZERO, 0.18)
 		tween.chain().tween_callback(spark.queue_free)
+
+
+static func beam(parent: Node, from: Vector3, to: Vector3, color: Color, width: float) -> void:
+	var length := from.distance_to(to)
+	if length <= 0.05:
+		return
+	if _streak_mesh == null:
+		_streak_mesh = BoxMesh.new()
+		_streak_mesh.size = Vector3(0.018, 0.018, 1.0)
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = _streak_mesh
+	mesh.material_override = _unshaded(Color(color, 0.72))
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mesh)
+	var direction := (to - from) / length
+	var up := Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT
+	mesh.look_at_from_position((from + to) / 2.0, to, up)
+	mesh.scale = Vector3(width / 0.018, width / 0.018, length)
+	var tween := mesh.create_tween()
+	tween.tween_property(mesh, "transparency", 1.0, 0.11)
+	tween.tween_callback(mesh.queue_free)

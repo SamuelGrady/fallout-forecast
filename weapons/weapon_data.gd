@@ -2,7 +2,11 @@ class_name WeaponData
 extends Resource
 ## Tuning for one weapon (WeaponData.tres in the design doc).
 
-enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
+enum Kind { HITSCAN, FLARE, GRENADE, ROCKET, PLACE, USE }
+
+@export var mechanic := ""
+@export var charge_time := 0.0
+@export var critical_bonus := 1.0
 
 @export var shot_sound := ""
 @export var display_name := "Weapon"
@@ -30,6 +34,7 @@ enum Kind { HITSCAN, FLARE, GRENADE, ROCKET }
 @export var burst_spread := 0.0
 
 @export_group("Projectile")
+@export var fuse := 0.0
 @export var projectile_speed := 30.0
 @export var projectile_gravity := 1.0
 ## Grenade blast radius, or the flare's reveal radius.
@@ -80,3 +85,5 @@ func make_model() -> Node3D:
 @export var ads_fov := 52.0
 ## Distance from the eye to the sight while aiming, in meters.
 @export var ads_eye_relief := 0.32
+
+

@@ -46,6 +46,9 @@ func _ready() -> void:
 		_level.add_child(signs)
 	_setup_decon_showers()
 	_setup_objectives()
+	var loot := RunLoot.new()
+	loot.name = "RunLoot"
+	add_child(loot)
 	_setup_players()
 
 	if OS.has_feature("web"):
@@ -198,6 +201,8 @@ func _sync_players() -> void:
 	for child in container.get_children():
 		var peer_id := _peer_of(str(child.name))
 		if peer_id < 0 or not Net.roster.has(peer_id):
+			if Net.is_host() and child is Player:
+				RunLoot.holder(child).spill()
 			child.remove_from_group("players")
 			child.remove_from_group("local_player")
 			child.queue_free()
