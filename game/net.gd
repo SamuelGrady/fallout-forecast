@@ -5,13 +5,17 @@ extends Node
 ## of that check; now they all ask Net. Offline counts as host, exactly as
 ## before, so solo play runs the same code path as a hosted game.
 ##
-## Topology is ENet client/server. Clients can only talk to the host, never to
-## each other, so every client-to-client message goes client -> host -> clients:
-## see the "_push_* / _apply_*" pairs on Player and MutationRoll.
+## Transport is WebSocketMultiplayerPeer everywhere (so browser builds can
+## play): a LAN host listens for ws:// on TCP PORT, and the cloud server sits
+## behind Caddy's TLS at CLOUD_URL (wss://). Topology is client/server.
+## Clients can only talk to the host, never to each other, so every
+## client-to-client message goes client -> host -> clients: see the
+## "_push_* / _apply_*" pairs on Player and MutationRoll.
 ##
-## Discovery: the host answers UDP probes on DISCOVERY_PORT; the join screen
-## broadcasts a probe to 255.255.255.255 (and 127.0.0.1, so a second window on
-## the same machine shows up) and lists whatever answers.
+## Discovery (desktop only; browsers have no UDP): the host answers UDP probes
+## on DISCOVERY_PORT; the join screen broadcasts a probe to 255.255.255.255
+## (and 127.0.0.1, so a second window on the same machine shows up) and lists
+## whatever answers. The reply advertises the host's ws port.
 
 signal roster_changed
 signal servers_changed
@@ -21,6 +25,17 @@ signal connection_failed
 signal server_closed
 signal joined_server
 
+## The public dedicated server (server/README.md). Desktop and web builds both
+## join it with join_cloud(); keep this URL stable, the web export uses it.
+const CLOUD_URL := "wss://fallout.drew.place/"
+const CLOUD_HOST := "fallout.drew.place"
+## Bump whenever an rpc or the scene layout changes: a client and server on
+## different builds are turned away with a message instead of desyncing.
+const PROTOCOL := 1
+## Give up on a join that hasn't connected after this long.
+const CONNECT_TIMEOUT := 8.0
+
+## WebSocket (TCP) port a host listens on; the cloud container uses it too.
 const PORT := 7777
 const DISCOVERY_PORT := 7778
 const MAX_PLAYERS := 4
@@ -36,10 +51,18 @@ var mode: Mode = Mode.OFFLINE
 var local_name := ""
 ## peer id -> {"name": String, "ready": bool}
 var roster := {}
-## ip -> {"name": String, "players": int, "max": int}
+## ip -> {"name": String, "players": int, "max": int, "port": int}
 var servers := {}
 ## True between the lobby's START and the results screen.
 var run_active := false
+## Headless dedicated server (`-- --server`): hosts with no local player, so
+## peer 1 is never in the roster. See game/dedicated_server.gd.
+var dedicated := false
+## Why the last join failed, for the join screen ("" = no answer).
+var last_error := ""
+
+var _connect_left := 0.0
+var _host_port := PORT
 
 var _beacon: PacketPeerUDP
 var _scout: PacketPeerUDP
@@ -53,9 +76,20 @@ func _ready() -> void:
 	multiplayer.connected_to_server.connect(_on_connected)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	if "--server" in OS.get_cmdline_user_args():
+		dedicated = true
+		var server := Node.new()
+		server.name = "DedicatedServer"
+		server.set_script(load("res://game/dedicated_server.gd"))
+		add_child(server)
 
 
 func _process(delta: float) -> void:
+	if _connect_left > 0.0:
+		_connect_left -= delta
+		if _connect_left <= 0.0 and mode == Mode.CLIENT:
+			last_error = "NO ANSWER FROM THE SERVER."
+			_on_connection_failed()
 	if _beacon:
 		_pump_beacon()
 	if _scanning:
@@ -90,34 +124,65 @@ func peer_count() -> int:
 	return maxi(roster.size(), 1)
 
 
-## Open a session. Returns OK, or an ENet error the lobby can show.
-func host(port := PORT) -> Error:
+## Browsers can't host or listen for LAN probes; they only join.
+func can_host() -> bool:
+	return not OS.has_feature("web")
+
+
+## Open a session. Returns OK, or an error the lobby can show.
+## as_player = false is the dedicated server: no roster entry for peer 1.
+func host(port := PORT, as_player := true) -> Error:
 	leave()
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(port, MAX_PLAYERS)
+	if not can_host():
+		return ERR_UNAVAILABLE
+	var peer := WebSocketMultiplayerPeer.new()
+	var err := peer.create_server(port)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer
+	_host_port = port
 	mode = Mode.HOST
-	local_name = "HOST"
+	local_name = "HOST" if as_player else "CLOUD SERVER"
 	roster.clear()
-	roster[1] = {"name": local_name, "ready": false}
+	if as_player:
+		roster[1] = {"name": local_name, "ready": false}
 	start_beacon()
 	roster_changed.emit()
 	return OK
 
 
+## Join the public cloud server (CLOUD_URL). Same path on desktop and web.
+func join_cloud() -> Error:
+	return join(CLOUD_URL)
+
+
+## "192.168.1.20", "host:9000", "ws://..." or "wss://..." -> a WebSocket URL.
+func to_url(address: String, port := PORT) -> String:
+	var target := address.strip_edges()
+	if target.begins_with("ws://") or target.begins_with("wss://"):
+		return target
+	var colon := target.rfind(":")
+	if colon > 0 and target.count(":") == 1:
+		return "ws://%s/" % target
+	return "ws://%s:%d/" % [target, port]
+
+
 ## Join a session. connection_failed / joined_server arrive later, by signal.
+## address is anything to_url() accepts.
 func join(address: String, port := PORT) -> Error:
 	leave()
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_client(address.strip_edges(), port)
+	last_error = ""
+	var url := to_url(address, port)
+	var peer := WebSocketMultiplayerPeer.new()
+	var err := peer.create_client(url)
 	if err != OK:
+		last_error = "BAD ADDRESS %s." % url
 		return err
 	# Set the mode before the peer, so the handshake's callbacks see CLIENT.
 	mode = Mode.CLIENT
 	roster.clear()
 	multiplayer.multiplayer_peer = peer
+	_connect_left = CONNECT_TIMEOUT
 	return OK
 
 
@@ -127,6 +192,7 @@ func leave() -> void:
 	stop_scanning()
 	mode = Mode.OFFLINE
 	run_active = false
+	_connect_left = 0.0
 	roster.clear()
 	# Mode is already OFFLINE, so the disconnects this triggers are ignored.
 	# Back to Godot's default offline peer, not null: with no peer at all,
@@ -166,7 +232,8 @@ func _on_connected() -> void:
 		return
 	if local_name == "":
 		local_name = "PLAYER %d" % multiplayer.get_unique_id()
-	_hello.rpc_id(1, local_name)
+	_connect_left = 0.0
+	_hello.rpc_id(1, local_name, PROTOCOL)
 	joined_server.emit()
 
 
@@ -193,10 +260,22 @@ func _on_server_disconnected() -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _hello(name: String) -> void:
+func _hello(name: String, protocol := 0) -> void:
 	if not is_host():
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
+	var refusal := ""
+	if protocol != PROTOCOL:
+		refusal = "THE SERVER RUNS A DIFFERENT BUILD (v%d, YOU HAVE v%d). UPDATE THE GAME." % [PROTOCOL, protocol]
+	elif roster.size() >= MAX_PLAYERS:
+		refusal = "THE SERVER IS FULL."
+	if refusal != "":
+		_reject.rpc_id(peer_id, refusal)
+		# Let the reliable message go out before the peer is dropped.
+		get_tree().create_timer(0.5).timeout.connect(func():
+			if mode == Mode.HOST:
+				multiplayer.multiplayer_peer.disconnect_peer(peer_id))
+		return
 	roster[peer_id] = {"name": name, "ready": false}
 	_push_roster.rpc(roster)
 	roster_changed.emit()
@@ -204,6 +283,16 @@ func _hello(name: String) -> void:
 	if run_active:
 		_start_run.rpc_id(peer_id)
 	peer_joined.emit(peer_id)
+
+
+## Host -> one client: you can't join, and why. The join screen shows it.
+@rpc("authority", "call_remote", "reliable")
+func _reject(reason: String) -> void:
+	if mode != Mode.CLIENT:
+		return
+	leave()
+	last_error = reason
+	connection_failed.emit()
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -231,6 +320,8 @@ func _start_run() -> void:
 # ------------------------------------------------------------------ discovery
 func start_beacon() -> void:
 	stop_beacon()
+	if not can_host():
+		return
 	_beacon = PacketPeerUDP.new()
 	if _beacon.bind(DISCOVERY_PORT) != OK:
 		_beacon = null
@@ -253,13 +344,15 @@ func _pump_beacon() -> void:
 		var from_port := _beacon.get_packet_port()
 		if packet.get_string_from_utf8() != PROBE:
 			continue
-		var reply := "%s|%s|%d|%d" % [GAME_ID, local_name, roster.size(), MAX_PLAYERS]
+		var reply := "%s|%s|%d|%d|%d" % [GAME_ID, local_name, roster.size(), MAX_PLAYERS, _host_port]
 		_beacon.set_dest_address(from_ip, from_port)
 		_beacon.put_packet(reply.to_utf8_buffer())
 
 
 func start_scanning() -> void:
 	stop_scanning()
+	if not can_host():
+		return
 	_scout = PacketPeerUDP.new()
 	if _scout.bind(0) != OK:
 		_scout = null
@@ -299,7 +392,8 @@ func _pump_scout() -> void:
 		var count := int(parts[2])
 		if str(existing.get("name", "")) != parts[1] or int(existing.get("players", -1)) != count:
 			changed = true
-		servers[ip] = {"name": parts[1], "players": count, "max": int(parts[3])}
+		servers[ip] = {"name": parts[1], "players": count, "max": int(parts[3]),
+			"port": int(parts[4]) if parts.size() > 4 else PORT}
 		_seen[ip] = Time.get_ticks_msec() / 1000.0
 	if changed:
 		servers_changed.emit()

@@ -1,0 +1,23 @@
+# Fallout Forecast cloud server on ballista. See server/README.md.
+# Caddy (coolify-proxy, caddy-docker-proxy) terminates TLS for
+# fallout.drew.place and forwards the WebSocket to the container's port 7777.
+# No host port is published.
+services:
+  fallout-server:
+    image: fallout-server:${FALLOUT_TAG:-latest}
+    container_name: fallout-server
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.5
+    networks: [coolify]
+    labels:
+      caddy: fallout.drew.place
+      caddy.reverse_proxy: "{{upstreams 7777}}"
+      caddy_ingress_network: coolify
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  coolify:
+    external: true

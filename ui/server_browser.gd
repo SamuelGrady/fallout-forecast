@@ -14,6 +14,7 @@ var _status: Label
 var _address: LineEdit
 var _connect_button: Button
 var _leaving := false
+var _connecting := false
 
 
 func _ready() -> void:
@@ -28,7 +29,7 @@ func _ready() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.offset_left = -340
 	box.offset_right = 340
-	box.offset_top = -240
+	box.offset_top = -270
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
 	BroadcastUI.reveal(box)
@@ -46,16 +47,21 @@ func _ready() -> void:
 	_status.add_theme_color_override("font_color", Color("8FD65A"))
 	box.add_child(_status)
 
+	# The always-on dedicated server (server/README.md), above the LAN list.
+	var cloud := _button(box, "CLOUD SERVER   ·   %s" % Net.CLOUD_HOST, func(): _connect_to(Net.CLOUD_URL))
+	cloud.custom_minimum_size = Vector2(0, 52)
+	BroadcastUI.button_role(cloud, true)
+
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 6)
-	_list.custom_minimum_size.y = 190
+	_list.custom_minimum_size.y = 160
 	box.add_child(_list)
 
 	var manual := HBoxContainer.new()
 	manual.add_theme_constant_override("separation", 10)
 	box.add_child(manual)
 	_address = LineEdit.new()
-	_address.placeholder_text = "192.168.1.20"
+	_address.placeholder_text = "192.168.1.20 or host:port"
 	_address.custom_minimum_size = Vector2(280, 46)
 	_address.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_address.text_submitted.connect(func(text): _connect_to(text))
@@ -76,7 +82,12 @@ func _ready() -> void:
 	Net.connection_failed.connect(_on_failed)
 	Net.start_scanning()
 	_refresh()
-	_connect_button.grab_focus()
+	# Browsers have no UDP, so no LAN list: the cloud server or a wss:// address.
+	if not Net.can_host():
+		_list.visible = false
+		_status.text = "JOIN THE CLOUD SERVER, OR TYPE A wss:// ADDRESS"
+		_address.placeholder_text = "wss://host/"
+	cloud.grab_focus()
 
 
 func _exit_tree() -> void:
@@ -103,7 +114,7 @@ func _refresh() -> void:
 		var info: Dictionary = Net.servers[ip]
 		# A fresh local per row: the button closure captures this one, not the
 		# loop variable.
-		var address := str(ip)
+		var address := "%s:%d" % [str(ip), int(info.get("port", Net.PORT))]
 		var row := Button.new()
 		row.text = "%s   ·   %d / %d   ·   %s" % [
 			str(info.get("name", "HOST")), int(info.get("players", 0)),
@@ -119,10 +130,11 @@ func _refresh() -> void:
 
 func _connect_to(address: String) -> void:
 	var target := address.strip_edges()
-	if target == "" or _leaving:
+	if target == "" or _leaving or _connecting:
 		return
-	_status.text = "CONNECTING TO %s ..." % target
+	_status.text = "CONNECTING TO %s ..." % target.to_upper()
 	_status.add_theme_color_override("font_color", Color("FFE04A"))
+	_connecting = true
 	var err := Net.join(target)
 	if err != OK:
 		_on_failed()
@@ -138,7 +150,8 @@ func _on_joined() -> void:
 func _on_failed() -> void:
 	if _leaving:
 		return
-	_status.text = "NO ANSWER. Check the address, or that the host is on your network."
+	_connecting = false
+	_status.text = Net.last_error if Net.last_error != "" else "NO ANSWER. Check the address, or that the host is on your network."
 	_status.add_theme_color_override("font_color", Color("FF3EA5"))
 	Net.start_scanning()
 

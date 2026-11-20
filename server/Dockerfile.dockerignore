@@ -1,0 +1,11 @@
+# BuildKit reads this file for server/Dockerfile (build context = repo root).
+# Game assets (including .wav sfx) must stay: scenes preload them.
+.git
+.godot/
+.claude/
+tools/
+docs/
+server/
+recordings/
+Playtest.cmd
+**/__pycache__/
