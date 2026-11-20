@@ -26,7 +26,12 @@ func _ready() -> void:
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
 	if thunder_stream == null:
 		if _cached_thunder == null:
-			_cached_thunder = _make_thunder()
+			# Pre-rendered (same recipe as _make_thunder): synthesizing it here
+			# took ~100 ms on desktop and far longer in WebAssembly.
+			if ResourceLoader.exists("res://assets/audio/sfx/thunder.wav"):
+				_cached_thunder = load("res://assets/audio/sfx/thunder.wav")
+			else:
+				_cached_thunder = _make_thunder()
 		thunder_stream = _cached_thunder
 	_thunder_player.stream = thunder_stream
 	_thunder_player.volume_db = thunder_volume_db

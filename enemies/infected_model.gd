@@ -144,6 +144,11 @@ func _ready() -> void:
 	if _enemy.miniboss_wave > 0:
 		_build_miniboss_trappings(_enemy.miniboss_wave)
 	scale *= randf_range(0.94, 1.06)
+	# One mesh per bone instead of ~40 boxes per enemy: a horde was over a
+	# thousand draw calls, which is what made big fights crawl on WebGL.
+	for bone in [_body, _head, _jaw] + limbs + _elbows + _knees:
+		if bone:
+			MeshMerge.merge_children(bone, not _web_model)
 	_body.add_child(_mutation_root)
 	_apply_mutations()
 	if GameManager.mutations:

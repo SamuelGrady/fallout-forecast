@@ -26,6 +26,8 @@ func _ready() -> void:
 	# The visible bubble is exactly the damage sphere, plus a ground ring so
 	# its edge reads even from above.
 	var sphere := SphereMesh.new()
+	sphere.radial_segments = 12
+	sphere.rings = 6
 	sphere.radius = radius
 	sphere.height = radius * 2.0
 	_mesh_material.albedo_color = Color(0.45, 0.9, 0.25, 0.35)

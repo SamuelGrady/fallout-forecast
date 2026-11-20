@@ -29,6 +29,8 @@ func _ready() -> void:
 	_ring = MeshInstance3D.new()
 	if _ring_mesh == null:
 		_ring_mesh = TorusMesh.new()
+		_ring_mesh.rings = 24
+		_ring_mesh.ring_segments = 6
 		_ring_mesh.inner_radius = 0.28
 		_ring_mesh.outer_radius = 0.34
 	_ring.mesh = _ring_mesh

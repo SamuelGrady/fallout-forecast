@@ -230,9 +230,20 @@ func _phase_changed(phase: int, wave: int) -> void:
 			play("storm_clear", -12.0)
 
 
+## Cues played at least once (first plays load the file: worth a Perf mark).
+var _played := {}
+
+
+func _first_play(cue: String) -> void:
+	if not _played.has(cue):
+		_played[cue] = true
+		Perf.mark("first sound " + cue)
+
+
 func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 	if Net.dedicated:
 		return
+	_first_play(cue)
 	if cue == "pickup":
 		# Pickups come in bursts after a fight: one soft, varied cue at a time.
 		if _recent(cue, 0.3):
@@ -266,6 +277,7 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) -> void:
 	if Net.dedicated:
 		return
+	_first_play(cue)
 	if cue == "pickup" and _recent(cue, 0.3):
 		return
 	if _web:

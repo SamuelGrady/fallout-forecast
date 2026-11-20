@@ -32,6 +32,7 @@ Playtest="*res://game/playtest.gd"
 MenuState="*res://ui/menu_state.gd"
 Preload="*res://game/preload.gd"
 SceneLoader="*res://game/scene_loader.gd"
+Perf="*res://game/perf.gd"
 
 [display]
 

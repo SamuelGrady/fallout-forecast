@@ -100,6 +100,8 @@ func _build() -> void:
 		var sac := _make_part("Sac%d" % i, i, 1.7, Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0), _sac_material)
 		var halo := MeshInstance3D.new()
 		var torus := TorusMesh.new()
+		torus.rings = 24
+		torus.ring_segments = 6
 		torus.inner_radius = 2.05
 		torus.outer_radius = 2.32
 		halo.mesh = torus
@@ -123,6 +125,8 @@ func _build() -> void:
 	for tilt in [Vector3(0.4, 0, 0.2), Vector3(-0.5, 0.3, 0.7)]:
 		var rmesh := MeshInstance3D.new()
 		var torus := TorusMesh.new()
+		torus.rings = 24
+		torus.ring_segments = 6
 		torus.inner_radius = 2.75
 		torus.outer_radius = 3.0
 		rmesh.mesh = torus
@@ -132,6 +136,8 @@ func _build() -> void:
 
 	_shell = MeshInstance3D.new()
 	var shell_mesh := SphereMesh.new()
+	shell_mesh.radial_segments = 12
+	shell_mesh.rings = 6
 	shell_mesh.radius = 2.85
 	shell_mesh.height = 5.7
 	var shell_mat := StandardMaterial3D.new()
@@ -155,6 +161,8 @@ func _make_part(part_name: String, i: int, radius: float, pos: Vector3, material
 	body.add_child(cs)
 	var m := MeshInstance3D.new()
 	var sm := SphereMesh.new()
+	sm.radial_segments = 12
+	sm.rings = 6
 	sm.radius = radius
 	sm.height = radius * 2.0
 	sm.material = material

@@ -9,6 +9,9 @@ extends CanvasLayer
 ## during the load, but behind this card instead of a frozen frame.
 
 var _target := ""
+## Desktop background prefetch (title/lobby): path -> true while in flight.
+var _prefetching := {}
+var _prefetched := {}
 var _waited := 0
 var _bar := ProgressBar.new()
 var _caption := Label.new()
@@ -54,19 +57,60 @@ func _ready() -> void:
 	set_process(false)
 
 
+## Start loading `path` in the background (desktop only: the web build has no
+## worker threads, so a "background" load would freeze the menu). goto() on
+## the same path then reuses this request, or switches at once if it's done.
+## NOTE: not called anywhere. A threaded prefetch of main.tscn from the title
+## deadlocked (the run never started), so entering a run always goes through
+## goto() and the loading card. Kept for a future retry.
+func prefetch(path: String) -> void:
+	if OS.has_feature("web") or Net.dedicated or _prefetching.has(path) or _prefetched.has(path):
+		return
+	if ResourceLoader.load_threaded_request(path, "PackedScene", true) == OK:
+		_prefetching[path] = true
+		set_process(true)
+
+
+## True while a background prefetch is loading (Preload holds off meanwhile).
+func busy() -> bool:
+	return not _prefetching.is_empty() or _target != ""
+
+
+func _poll_prefetch() -> void:
+	for path in _prefetching.keys():
+		var status := ResourceLoader.load_threaded_get_status(path)
+		if status == ResourceLoader.THREAD_LOAD_LOADED:
+			_prefetched[path] = ResourceLoader.load_threaded_get(path)
+			_prefetching.erase(path)
+		elif status != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			_prefetching.erase(path)
+
+
 ## Show the loading card and switch to `path` once it has loaded.
 func goto(path: String) -> void:
 	if _target != "":
 		return
+	Perf.mark("load start " + path.get_file())
 	_target = path
 	_waited = 0
 	_clock = 0.0
 	_bar.value = 0.0
+	# Already prefetched in the background: switch without the card.
+	if _prefetched.has(path):
+		var scene: PackedScene = _prefetched[path]
+		_prefetched.erase(path)
+		_finish(scene)
+		return
 	visible = true
 	set_process(true)
 
 
 func _process(delta: float) -> void:
+	_poll_prefetch()
+	if _target == "":
+		if _prefetching.is_empty():
+			set_process(false)
+		return
 	_clock += delta
 	var dots := int(_clock * 3.0) % 4
 	_caption.text = "LOADING TAPE" + ".".repeat(dots)
@@ -74,7 +118,7 @@ func _process(delta: float) -> void:
 	# Let the card reach the screen before any blocking work.
 	if _waited < 2:
 		_waited += 1
-		if _waited == 2:
+		if _waited == 2 and not _prefetching.has(_target):
 			if ResourceLoader.load_threaded_request(_target, "PackedScene", false) != OK:
 				_finish(load(_target) as PackedScene)
 		return
@@ -84,6 +128,8 @@ func _process(delta: float) -> void:
 		_bar.value = lerpf(_bar.value, float(progress[0]), 0.4)
 	match status:
 		ResourceLoader.THREAD_LOAD_LOADED:
+			_prefetching.erase(_target)
+			_prefetched.erase(_target)
 			_finish(ResourceLoader.load_threaded_get(_target) as PackedScene)
 		ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 			push_warning("SceneLoader: threaded load failed for %s; loading directly" % _target)
@@ -91,6 +137,7 @@ func _process(delta: float) -> void:
 
 
 func _finish(scene: PackedScene) -> void:
+	Perf.mark("load done, entering scene")
 	set_process(false)
 	_bar.value = 1.0
 	var path := _target

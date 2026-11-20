@@ -15,6 +15,7 @@ uniform vec3 uv_offset = vec3(0.0);
 // Snap grid in clip space; 0 turns snapping off.
 uniform float snap = 120.0;
 uniform bool affine = false;
+uniform bool use_vertex_color = false;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -38,6 +39,12 @@ void vertex() {
 
 void fragment() {
 	vec4 c = albedo;
+	if (use_vertex_color) {
+		// Vertex colours are authored in sRGB (MeshMerge); match albedo's space.
+		vec3 v = COLOR.rgb;
+		vec3 lin = mix(pow((v + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), v * (1.0 / 12.92), lessThan(v, vec3(0.04045)));
+		c *= vec4(lin, COLOR.a);
+	}
 	if (use_texture) {
 		if (triplanar) {
 			vec3 w = pow(abs(world_normal), vec3(4.0));

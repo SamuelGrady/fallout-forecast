@@ -271,6 +271,7 @@ func alive_count() -> int:
 
 
 func spawn(scene: PackedScene) -> EnemyBase:
+	Perf.mark("spawn " + scene.resource_path.get_file().get_basename())
 	# The host owns spawns; a client asking would make an enemy that never
 	# thinks and never replicates.
 	if not Net.is_host():

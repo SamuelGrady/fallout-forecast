@@ -40,6 +40,7 @@ func _ready() -> void:
 	box.add_child(title)
 	_button(box, "RESUME", _resume)
 	_button(box, "MAIN MENU", _main_menu)
+	_button(box, "EXPORT PERF REPORT", _export_perf)
 	if not OS.has_feature("web"):
 		_button(box, "QUIT", get_tree().quit)
 	visible = false
@@ -152,3 +153,11 @@ func _main_menu() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Net.leave()
 	get_tree().change_scene_to_file("res://ui/title.tscn")
+
+
+func _export_perf() -> void:
+	var where := Perf.export_report()
+	for child in _panel.get_child(0).get_children():
+		if child is Button and child.text.begins_with("EXPORT"):
+			child.text = "EXPORTED - " + ("DOWNLOADED" if OS.has_feature("web") else "SAVED")
+	print(where)

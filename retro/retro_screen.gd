@@ -217,6 +217,7 @@ func _convert(material: Material) -> ShaderMaterial:
 		s.set_shader_parameter("albedo_texture", m.albedo_texture)
 		s.set_shader_parameter("use_texture", true)
 	s.set_shader_parameter("triplanar", m.uv1_triplanar)
+	s.set_shader_parameter("use_vertex_color", m.vertex_color_use_as_albedo)
 	s.set_shader_parameter("uv_scale", m.uv1_scale)
 	s.set_shader_parameter("uv_offset", m.uv1_offset)
 	s.set_shader_parameter("snap", vertex_snap if enabled else 0.0)

@@ -45,6 +45,8 @@ func _build_station_visuals() -> void:
 	# Showerhead status ring & light (cyan = ready, amber/red = empty).
 	_head_ring = MeshInstance3D.new()
 	var torus := TorusMesh.new()
+	torus.rings = 24
+	torus.ring_segments = 6
 	torus.inner_radius = 0.32
 	torus.outer_radius = 0.4
 	_head_ring.mesh = torus

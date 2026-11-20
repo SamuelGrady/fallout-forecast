@@ -19,6 +19,8 @@ var suit_skin := 0
 var player_name := ""
 ## Server JOIN GAME connects to. Empty = Net.CLOUD_URL (wss://fallout.drew.place/).
 var server_url := ""
+## Show the live performance overlay (Perf autoload). Recording is always on.
+var perf_overlay := false
 
 func unlock_gun(path: String) -> void:
 	if path not in unlocked_guns:
@@ -39,6 +41,7 @@ func _ready() -> void:
 		suit_skin = Cosmetics.wrap_skin(int(cfg.get_value("cosmetic", "skin", suit_skin)))
 		player_name = str(cfg.get_value("profile", "name", player_name)).strip_edges().left(18)
 		server_url = str(cfg.get_value("network", "server_url", server_url)).strip_edges()
+		perf_overlay = bool(cfg.get_value("debug", "perf_overlay", perf_overlay))
 	apply()
 
 
@@ -58,6 +61,7 @@ func save() -> void:
 	cfg.set_value("cosmetic", "skin", suit_skin)
 	cfg.set_value("profile", "name", player_name.strip_edges().left(18))
 	cfg.set_value("network", "server_url", server_url.strip_edges())
+	cfg.set_value("debug", "perf_overlay", perf_overlay)
 	cfg.save(PATH)
 	apply()
 

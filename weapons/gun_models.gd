@@ -183,6 +183,8 @@ static func _frag(root: Node3D) -> void:
 	_box(root, Vector3(0.012, 0.07, 0.006), Vector3(0, 0.02, -0.036), STEEL, 0.7, Vector3(-8, 0, 0))  # spoon
 	var ring := MeshInstance3D.new()
 	var torus := TorusMesh.new()
+	torus.rings = 24
+	torus.ring_segments = 6
 	torus.inner_radius = 0.008
 	torus.outer_radius = 0.012
 	ring.mesh = torus
@@ -201,6 +203,8 @@ static func _bug_bomb(root: Node3D) -> void:
 	_cylinder(root, 0.008, 0.02, Vector3(0, 0.072, 0), Color("#e23b2e"), 0.0, Vector3.ZERO)
 	var ring := MeshInstance3D.new()
 	var torus := TorusMesh.new()
+	torus.rings = 24
+	torus.ring_segments = 6
 	torus.inner_radius = 0.009
 	torus.outer_radius = 0.013
 	ring.mesh = torus

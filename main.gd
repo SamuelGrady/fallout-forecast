@@ -44,6 +44,12 @@ func _ready() -> void:
 	var signs := Node.new()
 	signs.set_script(preload("res://props/map_signs.gd"))
 	$Level.add_child(signs)
+	if OS.has_feature("web") and not Net.dedicated:
+		# Web only: merge static props per material once everything above is
+		# built (WebGL pays heavily per draw call; desktop keeps culling).
+		(func():
+			var merged := StaticBatcher.batch($Level)
+			Perf.mark("static batch merged %d meshes" % merged)).call_deferred()
 	_setup_players()
 	var pings := PingSystem.new()
 	pings.name = "Pings"

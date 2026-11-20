@@ -147,7 +147,7 @@ static func _add_tube(surface: SurfaceTool, a: Vector3, b: Vector3, radius: floa
 		return
 	if _tube_mesh == null:
 		_tube_mesh = CylinderMesh.new()
-		_tube_mesh.radial_segments = 6
+		_tube_mesh.radial_segments = 4 if OS.has_feature("web") else 6
 		_tube_mesh.rings = 1
 		_tube_mesh.cap_top = false
 		_tube_mesh.cap_bottom = false
@@ -166,8 +166,8 @@ static func _add_joint(surface: SurfaceTool, at: Vector3, radius: float) -> void
 		_joint_mesh = SphereMesh.new()
 		_joint_mesh.radius = 1.0
 		_joint_mesh.height = 2.0
-		_joint_mesh.radial_segments = 6
-		_joint_mesh.rings = 3
+		_joint_mesh.radial_segments = 4 if OS.has_feature("web") else 6
+		_joint_mesh.rings = 2 if OS.has_feature("web") else 3
 	surface.append_from(_joint_mesh, 0, Transform3D(Basis.from_scale(Vector3.ONE * radius), at))
 
 

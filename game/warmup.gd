@@ -35,6 +35,7 @@ func _ready() -> void:
 
 
 func _spawn() -> void:
+	Perf.mark("warm-up start")
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		queue_free()
@@ -86,6 +87,8 @@ func _spawn() -> void:
 	# Shield Dome / spore-cloud style transparent unshaded shells.
 	var dome := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
+	sphere.radial_segments = 12
+	sphere.rings = 6
 	sphere.is_hemisphere = true
 	sphere.radius = 0.8
 	sphere.height = 0.8
@@ -117,6 +120,7 @@ func _process(_delta: float) -> void:
 	if _frames < FRAMES:
 		return
 	set_process(false)
+	Perf.mark("warm-up end")
 	_holder.queue_free()
 	var tween := create_tween()
 	for child in _overlay.get_children():

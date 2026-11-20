@@ -152,6 +152,16 @@ func _build_playback_menu() -> void:
 	server_edit.text_changed.connect(func(t): Settings.server_url = t.strip_edges())
 	server_edit.text_submitted.connect(func(_t): Settings.save())
 	_settings.add_child(server_edit)
+	var perf := CheckButton.new()
+	perf.text = "PERFORMANCE OVERLAY"
+	perf.button_pressed = Settings.perf_overlay
+	perf.toggled.connect(func(on):
+		Settings.perf_overlay = on
+		Settings.save())
+	_style_button(perf)
+	_settings.add_child(perf)
+	var export := _button(_settings, "EXPORT PERF REPORT", func(): pass)
+	export.pressed.connect(func(): export.text = Perf.export_report().to_upper().left(34))
 	if Net.can_host():
 		_button(_settings, "BROWSE LAN GAMES", _on_browse_lan)
 	_button(_settings, "BACK", _on_back)

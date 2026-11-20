@@ -17,6 +17,8 @@ func _ready() -> void:
 	add_to_group("interactables")
 	_highlight = MeshInstance3D.new()
 	var ring := TorusMesh.new()
+	ring.rings = 24
+	ring.ring_segments = 6
 	ring.inner_radius = 0.42
 	ring.outer_radius = 0.47
 	_highlight.mesh = ring

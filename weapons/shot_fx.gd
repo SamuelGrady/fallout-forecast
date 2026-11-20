@@ -48,6 +48,10 @@ static func tracer(parent: Node, from: Vector3, to: Vector3, color: Color, _life
 
 
 static func flash(parent: Node, at: Vector3, color := Color(1.0, 0.8, 0.4), energy := 4.0, life := 0.05) -> void:
+	# Web (Compatibility renderer): each dynamic light adds a draw pass for
+	# everything it touches; the muzzle puff carries the flash instead.
+	if OS.has_feature("web"):
+		return
 	var light := OmniLight3D.new()
 	light.light_color = color
 	light.light_energy = energy

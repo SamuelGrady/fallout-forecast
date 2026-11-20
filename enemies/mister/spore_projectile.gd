@@ -17,6 +17,8 @@ var _marker: MeshInstance3D
 func _ready() -> void:
 	var mesh := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
+	sphere.radial_segments = 12
+	sphere.rings = 6
 	sphere.radius = 0.2
 	sphere.height = 0.4
 	var material := StandardMaterial3D.new()

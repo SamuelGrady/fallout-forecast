@@ -80,7 +80,10 @@ func _process(delta: float) -> void:
 		_rain_material.albedo_color = color
 
 	if _environment:
-		_environment.fog_enabled = intensity > 0.01
+		# Fog stays enabled (density 0 when clear): flipping fog_enabled changes
+		# the shader variant of every material, so the first rain recompiled
+		# the whole scene (a 1 s hitch on desktop, far worse on WebGL).
+		_environment.fog_enabled = true
 		_environment.fog_density = _sample_fog(intensity) * (0.65 if flare_cover else 1.0)
 		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
 		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) + flash * 3.0
