@@ -1,4 +1,4 @@
-﻿class_name BroadcastUI
+class_name BroadcastUI
 extends RefCounted
 
 const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
@@ -25,40 +25,97 @@ static func theme() -> Theme:
 	result.default_font = FONT
 	result.default_font_size = 22
 	result.set_color("font_color", "Label", PAPER)
-	var focus := panel(Color.TRANSPARENT)
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color.TRANSPARENT
+	focus.border_color = CYAN
 	focus.set_border_width_all(2)
 	focus.set_content_margin_all(0)
-	for type in ["Button", "CheckButton"]:
-		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+	for type: String in ["Button", "CheckButton"]:
+		var is_check := type == "CheckButton"
+		for state: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 			var color := PANEL
+			var accent := CYAN if is_check else MUTED.darkened(0.2)
 			if state in ["hover", "hover_pressed"]:
-				color = Color("#274452")
+				color = Color("#24424f")
+				accent = CYAN
 			elif state == "pressed":
-				color = Color("#22404b")
+				color = Color("#1d3844")
+				accent = CYAN
 			elif state == "disabled":
 				color = INK
-			var style := panel(color, MUTED if state == "disabled" else CYAN)
-			style.set_content_margin_all(9)
-			style.content_margin_left = 16
-			style.content_margin_right = 16
+				accent = MUTED.darkened(0.45)
+			var style := _button_box(color, accent, 3 if is_check else 2, 5 if is_check else 7, 12 if is_check else 14)
 			result.set_stylebox(state, type, style)
 		result.set_stylebox("focus", type, focus)
 		result.set_color("font_color", type, PAPER)
 		result.set_color("font_focus_color", type, PAPER)
 		result.set_color("font_hover_color", type, CYAN)
-		result.set_color("font_disabled_color", type, MUTED.darkened(0.2))
-		result.set_font_size("font_size", type, 24)
-	result.set_stylebox("normal", "LineEdit", panel(PANEL, MUTED))
-	result.set_stylebox("focus", "LineEdit", focus)
+		result.set_color("font_pressed_color", type, CYAN)
+		result.set_color("font_hover_pressed_color", type, CYAN)
+		result.set_color("font_disabled_color", type, MUTED.darkened(0.25))
+		result.set_font_size("font_size", type, 22 if is_check else 24)
+	var edit_normal := _edit_box(Color("#0e1a26"), MUTED.darkened(0.15), 1, 3)
+	var edit_focus := _edit_box(Color("#132331"), CYAN, 2, 3)
+	var edit_readonly := _edit_box(INK, MUTED.darkened(0.4), 1, 3)
+	result.set_stylebox("normal", "LineEdit", edit_normal)
+	result.set_stylebox("focus", "LineEdit", edit_focus)
+	result.set_stylebox("read_only", "LineEdit", edit_readonly)
+	result.set_font_size("font_size", "LineEdit", 22)
 	result.set_color("font_color", "LineEdit", PAPER)
-	result.set_color("font_placeholder_color", "LineEdit", MUTED)
+	result.set_color("font_placeholder_color", "LineEdit", MUTED.darkened(0.15))
+	result.set_color("caret_color", "LineEdit", CYAN)
+	result.set_font("normal_font", "RichTextLabel", FONT)
+	result.set_font("bold_font", "RichTextLabel", FONT)
+	result.set_font_size("normal_font_size", "RichTextLabel", 20)
+	result.set_color("default_color", "RichTextLabel", PAPER)
 	result.set_stylebox("focus", "HSlider", focus)
+	var scroll_track := StyleBoxFlat.new()
+	scroll_track.bg_color = Color(PANEL, 0.6)
+	scroll_track.content_margin_left = 3
+	scroll_track.content_margin_right = 3
+	result.set_stylebox("scroll", "VScrollBar", scroll_track)
+	result.set_stylebox("scroll_focus", "VScrollBar", scroll_track)
+	for spec: Array in [["grabber", MUTED.darkened(0.35)], ["grabber_highlight", CYAN], ["grabber_pressed", PAPER]]:
+		var grab := StyleBoxFlat.new()
+		grab.bg_color = spec[1]
+		grab.content_margin_left = 3
+		grab.content_margin_right = 3
+		result.set_stylebox(spec[0], "VScrollBar", grab)
 	result.set_stylebox("panel", "PanelContainer", panel())
 	for spec in [["slider", PANEL], ["grabber_area", CYAN], ["grabber_area_highlight", PAPER]]:
 		var track := panel(spec[1], spec[1])
 		track.set_content_margin_all(3)
 		result.set_stylebox(spec[0], "HSlider", track)
 	return result
+
+
+static func _button_box(bg: Color, accent: Color, left_width: int, pad_y: int, pad_x: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = accent
+	style.border_width_left = left_width
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.content_margin_top = pad_y
+	style.content_margin_bottom = pad_y
+	style.content_margin_left = pad_x
+	style.content_margin_right = pad_x
+	return style
+
+
+static func _edit_box(bg: Color, border: Color, border_all: int, border_left: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(border_all)
+	style.border_width_left = border_left
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	return style
+
 
 static func text(label: Label, font_size: int, color := PAPER, outline := 0) -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -146,15 +203,30 @@ static func focus_sound(control: Control) -> void:
 
 
 static func button_role(button: Button, primary := false, quiet := false) -> void:
-	var style := panel(Color("#29545d") if primary else Color("#14232d"))
-	style.border_width_left = 4 if primary else 0
-	style.set_content_margin_all(9)
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	if quiet:
-		style.bg_color.a = 0.15
-		button.add_theme_font_size_override("font_size", 20)
-	button.add_theme_stylebox_override("normal", style)
+	var pad_y := 5 if quiet else 7
+	var pad_x := 11 if quiet else 14
+	var left_w := 4 if primary else (2 if quiet else 3)
+	var normal_bg := Color("#244d57") if primary else (Color(PANEL, 0.55) if quiet else PANEL)
+	var hover_bg := Color("#2f626e") if primary else Color("#24424f", 0.95 if quiet else 1.0)
+	var press_bg := Color("#1c3e47") if primary else Color("#1d3844")
+	var normal_border := CYAN if primary else MUTED.darkened(0.35 if quiet else 0.2)
+	button.add_theme_stylebox_override("normal", _button_box(normal_bg, normal_border, left_w, pad_y, pad_x))
+	button.add_theme_stylebox_override("hover", _button_box(hover_bg, CYAN, left_w, pad_y, pad_x))
+	button.add_theme_stylebox_override("pressed", _button_box(press_bg, CYAN, left_w, pad_y, pad_x))
+	button.add_theme_stylebox_override("disabled", _button_box(Color(INK, 0.65 if quiet else 1.0), MUTED.darkened(0.45), left_w, pad_y, pad_x))
+	button.add_theme_font_size_override("font_size", 20 if quiet else 24)
+
+
+static func button_accent(button: Button, accent: Color, quiet := false) -> void:
+	var pad_y := 5 if quiet else 7
+	var pad_x := 11 if quiet else 14
+	var base := accent.darkened(0.76)
+	button.add_theme_stylebox_override("normal", _button_box(base, accent, 3, pad_y, pad_x))
+	button.add_theme_stylebox_override("hover", _button_box(accent.darkened(0.66), accent, 3, pad_y, pad_x))
+	button.add_theme_stylebox_override("pressed", _button_box(accent.darkened(0.82), accent, 3, pad_y, pad_x))
+	button.add_theme_stylebox_override("disabled", _button_box(INK, MUTED.darkened(0.45), 3, pad_y, pad_x))
+	button.add_theme_color_override("font_hover_color", accent)
+	button.add_theme_font_size_override("font_size", 20 if quiet else 24)
 
 
 static func input_hint(action: String) -> String:
