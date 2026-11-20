@@ -19,6 +19,7 @@ const OSD_COLOR := Color("CCEADB")
 var _playback := Control.new()
 var _menu := VBoxContainer.new()
 var _settings := VBoxContainer.new()
+var _suit := VBoxContainer.new()
 var _intro := Control.new()
 var _deck := VcrDeck.new()
 var _snow := ColorRect.new()
@@ -27,6 +28,8 @@ var _transport := AudioStreamPlayer.new()
 var _tracking := AudioStreamPlayer.new()
 var _counter: Label
 var _settings_button: Button
+var _suit_button: Button
+var _suit_picker: SuitPicker
 var _host_button: Button
 var _t := 0.0
 var _menu_ready := false
@@ -98,7 +101,7 @@ func _build_playback_menu() -> void:
 		line.add_theme_constant_override("shadow_offset_y", 3)
 		line.add_theme_color_override("font_shadow_color", Color("267E75"))
 
-	_menu.position = Vector2(104, 337)
+	_menu.position = Vector2(104, 325)
 	_menu.custom_minimum_size.x = 354.0
 	_menu.add_theme_constant_override("separation", 5)
 	_playback.add_child(_menu)
@@ -107,6 +110,7 @@ func _build_playback_menu() -> void:
 	_host_button = _button(_menu, "HOST GAME", _on_host)
 	_host_button.visible = Net.can_host()
 	_button(_menu, "JOIN GAME", _on_join)
+	_suit_button = _button(_menu, "SUIT", _on_suit)
 	_settings_button = _button(_menu, "SETTINGS", _on_settings)
 	_button(_menu, "QUIT", _on_quit).visible = not OS.has_feature("web")
 	for button in _menu.get_children():
@@ -132,6 +136,18 @@ func _build_playback_menu() -> void:
 	_style_button(calm)
 	_settings.add_child(calm)
 	_button(_settings, "BACK", _on_back)
+
+	_suit.position = Vector2(510, 110)
+	_suit.custom_minimum_size.x = 362.0
+	_suit.add_theme_constant_override("separation", 8)
+	_suit.hide()
+	_playback.add_child(_suit)
+	_suit_picker = SuitPicker.new(Vector2i(280, 280))
+	_suit_picker.changed.connect(func(color: int, skin: int):
+		Settings.suit_color = color
+		Settings.suit_skin = skin)
+	_suit.add_child(_suit_picker)
+	_button(_suit, "BACK", _on_back)
 	_playback.hide()
 
 
@@ -179,7 +195,7 @@ func _input(event: InputEvent) -> void:
 		_play_transport(FAST_FORWARD)
 		_finish_intro()
 		get_viewport().set_input_as_handled()
-	elif _settings.visible and event.is_action_pressed("ui_cancel"):
+	elif (_settings.visible or _suit.visible) and event.is_action_pressed("ui_cancel"):
 		_on_back()
 		get_viewport().set_input_as_handled()
 
@@ -345,11 +361,20 @@ func _on_settings() -> void:
 	_settings.get_child(1).grab_focus()
 
 
+func _on_suit() -> void:
+	_menu.hide()
+	_suit.show()
+	BroadcastUI.reveal(_suit)
+	_suit_picker.focus_selected()
+
+
 func _on_back() -> void:
 	Settings.save()
+	var button := _suit_button if _suit.visible else _settings_button
 	_settings.hide()
+	_suit.hide()
 	_menu.show()
-	_settings_button.grab_focus()
+	button.grab_focus()
 
 
 func _snow_shader() -> Shader:
