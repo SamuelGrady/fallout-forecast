@@ -314,7 +314,7 @@ func _build_miniboss_trappings(wave: int) -> void:
 				_piece(_body, Vector3(side * 0.34, 1.18, 0.24), Vector3(0.28, 0.34, 0.28), sac, true)
 			_piece(_head, Vector3(0, 0.24, -0.1), Vector3(0.46, 0.12, 0.12), spine, true)
 		3:
-			# MIASMA HERALD: oversized twin toxic canisters + neon respirator visor.
+			# CLOUDBURST: oversized twin toxic canisters + neon respirator visor.
 			var glow := Color("#88ff3c")
 			var metal := Color("#463864")
 			for side in [-1.0, 1.0]:

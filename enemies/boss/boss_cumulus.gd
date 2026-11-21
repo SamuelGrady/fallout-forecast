@@ -6,8 +6,8 @@ extends Node3D
 ## - With all sacs gone the core's shell breaks and it can be killed.
 ## - It heals while rain falls on it (faster the harder it rains), unless a
 ##   Flare Gun flare burned near it in the last few seconds.
-## - Attacks: lobs spore globs at players (exposed ones first) and calls in
-##   Misters and Drips.
+## - Lobs spores and calls in Misters and Drips. The exposed core backs off
+##   and cycles through faster, marked salvos.
 ## Host runs all of it; the parts are built the same way on every peer.
 
 signal defeated
@@ -33,6 +33,9 @@ const FOCUS_TIME := 10.0
 const CATCH_UP := 1.6
 const ACCEL := 4.5
 const ARRIVED := 8.0
+const CORE_STANDOFF := 15.0
+const CORE_DRIFT := 1.4
+const CORE_ATTACK_INTERVAL := 1.95
 @export var drop_per_sac := 4.0
 
 var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
@@ -43,10 +46,12 @@ var preview_only := false
 
 var _anchor := Vector3.ZERO
 var _height := 0.0
+var _orbit_radius := 0.0
 var _t := 0.0
 var _burn_left := 0.0
 var _net_left := 0.0
 var _spore_timer := 3.0
+var _core_pattern := 0
 var _summon_timer := 8.0
 var _parts: Array[Node] = []
 var _sac_halos: Array[MeshInstance3D] = []
@@ -80,6 +85,7 @@ func _ready() -> void:
 	_anchor = global_position
 	_center = Vector3(_anchor.x, 0.0, _anchor.z)
 	_height = _anchor.y + 16.0
+	_orbit_radius = hover_offset
 	var scale_hp := GameManager.enemy_health_scale() if GameManager.has_method("enemy_health_scale") else 1.0
 	for i in 3:
 		part_max[i] = sac_health * scale_hp
@@ -250,7 +256,9 @@ func _process(delta: float) -> void:
 	var descend_rate := 10.0 if _entrance_left > 0.0 else 2.2
 	_height = move_toward(_height, goal_height, delta * descend_rate)
 	_follow_focus(delta)
-	var drift := Vector3(cos(_t * 0.35), 0, sin(_t * 0.35)) * hover_offset
+	var drift_radius_now := CORE_DRIFT if core_exposed() else hover_offset
+	_orbit_radius = move_toward(_orbit_radius, drift_radius_now, delta * 3.0)
+	var drift := Vector3(cos(_t * 0.35), 0, sin(_t * 0.35)) * _orbit_radius
 	global_position = _center + drift + Vector3(0, _height + sin(_t * 0.8) * 0.6, 0)
 	# Rain heals it, unless a flare is burning nearby.
 	_burn_left -= delta
@@ -261,8 +269,8 @@ func _process(delta: float) -> void:
 				part_health[i] = minf(part_health[i] + heal, part_max[i])
 	_spore_timer -= delta
 	if _spore_timer <= 0.0:
-		_spore_timer = spore_interval
-		_lob_spore()
+		_spore_timer = CORE_ATTACK_INTERVAL if core_exposed() else spore_interval
+		_fire_at_player()
 	_summon_timer -= delta
 	if _summon_timer <= 0.0:
 		_summon_timer = summon_interval
@@ -344,6 +352,7 @@ func _pop_sac(i: int) -> void:
 
 func _shatter_shell() -> void:
 	Perf.mark("boss core exposed")
+	_spore_timer = minf(_spore_timer, 0.9)
 	Sound.play_at("explosion_big", _shell.global_position)
 	ShotFX.flash(get_parent(), _shell.global_position, Color("#ff5689"), 10.0, 0.25)
 	_shell.visible = false
@@ -403,13 +412,24 @@ func _follow_focus(delta: float) -> void:
 		_velocity = _velocity.move_toward(Vector3.ZERO, ACCEL * delta)
 		_center += _velocity * delta
 		return
-	var want := Vector3(_focus.global_position.x, 0.0, _focus.global_position.z)
+	var player_pos := Vector3(_focus.global_position.x, 0.0, _focus.global_position.z)
+	var want := player_pos
 	var home := Vector3(_anchor.x, 0.0, _anchor.z)
-	if want.distance_to(home) > leash:
-		want = home + (want - home).normalized() * leash
+	if core_exposed():
+		var away := player_pos.direction_to(_center)
+		if away.is_zero_approx():
+			away = player_pos.direction_to(home) if player_pos != home else Vector3.BACK
+		want += away * CORE_STANDOFF
+		# Strafe along the leash when retreating straight back would pin Cumulus.
+		if want.distance_to(home) > leash and player_pos.distance_to(home) > leash - CORE_STANDOFF:
+			var tangent := home.direction_to(player_pos).cross(Vector3.UP)
+			if tangent.dot(away) < 0.0:
+				tangent = -tangent
+			want = player_pos + tangent * CORE_STANDOFF
+	want = home + (want - home).limit_length(leash)
 	var to_want := want - _center
 	var distance := to_want.length()
-	# Only time spent hanging over this player counts toward switching focus.
+	# Count time spent in attack position toward switching focus.
 	if distance < ARRIVED:
 		_focus_left -= delta
 	# Cruise fast when far, ease off over the last stretch so it settles in
@@ -438,6 +458,8 @@ func _sync(pos: Vector3, parts: Array, sacs: int, burn: float) -> void:
 	_burn_left = burn
 	if _shell:
 		_shell.visible = sacs > 0
+	if _core_rings:
+		_core_rings.visible = sacs == 0
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -451,14 +473,38 @@ func _died() -> void:
 	t.tween_callback(queue_free)
 
 
-func _lob_spore() -> void:
+func _fire_at_player() -> void:
 	var players := get_tree().get_nodes_in_group("players").filter(func(p): return p.get("state") == "ok")
 	if players.is_empty():
 		return
 	var exposed := players.filter(func(p): return p.get("exposed") != false)
 	var target: Node3D = (exposed if not exposed.is_empty() else players).pick_random()
-	var aim := target.global_position + Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
-	GameManager.spawn_spore(global_position + Vector3(0, -3, 0), aim, 1.8, 8.0)
+	var start := global_position + Vector3.DOWN * 3.0
+	var aim := target.global_position
+	if not core_exposed():
+		aim += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
+		GameManager.spawn_spore(start, aim, 1.8, 8.0)
+		return
+	var toward_player := aim - global_position
+	toward_player.y = 0.0
+	toward_player = toward_player.normalized() if toward_player.length_squared() > 0.01 else Vector3.FORWARD
+	var across := toward_player.cross(Vector3.UP)
+	match _core_pattern:
+		0:
+			# Downburst: force the player out of one spot with lingering acid.
+			GameManager.spawn_spore(start, aim, 1.35, 8.0, true, self)
+		1:
+			# Crosswind: three staggered impact markers across the firing lane.
+			for step in 3:
+				GameManager.spawn_spore(start, aim + across * ((step - 1) * 5.4), 1.2 + step * 0.25, 8.0, false, self)
+		2:
+			# Squall: lead a moving target along their route, with time to turn.
+			var travel := (target as CharacterBody3D).velocity if target is CharacterBody3D else Vector3.ZERO
+			travel.y = 0.0
+			var along := travel.normalized() if travel.length_squared() > 1.0 else toward_player
+			GameManager.spawn_spore(start, aim, 1.15, 8.0, false, self)
+			GameManager.spawn_spore(start, aim + along * 5.5, 1.65, 8.0, true, self)
+	_core_pattern = (_core_pattern + 1) % 3
 
 
 func _summon() -> void:

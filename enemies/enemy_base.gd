@@ -90,7 +90,7 @@ static var _web := OS.has_feature("web")
 const MINIBOSS_NAMES := {
 	1: "THE DREDGE",
 	2: "SEWER MATRIARCH",
-	3: "MIASMA HERALD",
+	3: "CLOUDBURST",
 	4: "VOLT GOLIATH",
 }
 const MINIBOSS_HP_MULT := {1: 4.5, 2: 4.2, 3: 4.5, 4: 5.5}
@@ -137,7 +137,8 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_status(delta)
 	_attack_timer -= delta
-	if miniboss_wave > 0:
+	# Cloudburst uses Mister's standard attack windup for its patterns.
+	if miniboss_wave > 0 and miniboss_wave != 3:
 		_tick_miniboss_ability(delta)
 	if _stagger_left > 0.0 or _recover_left > 0.0 or _windup_left > 0.0:
 		_stagger_left = maxf(0.0, _stagger_left - delta)
@@ -406,23 +407,7 @@ func _tick_miniboss_ability(delta: float) -> void:
 				GameManager.broadcast_blast(global_position + Vector3.UP * 0.8, 1.4, Color(1.0, 0.24, 0.48, 0.85))
 				for i in 2:
 					spawner.spawn_copy(self, global_position + Vector3(randf_range(-1.6, 1.6), 0.15, randf_range(-1.6, 1.6)), true)
-		3:
-			# MIASMA HERALD: 3-glob spore barrage fan.
-			if dist > 24.0:
-				_miniboss_ability_timer = 0.8
-				return
-			_miniboss_ability_timer = 5.0
-			announce_tell("mister_windup", 0.35, -4.0)
-			var start := global_position + Vector3.UP * 2.4
-			var to_t := target.global_position - global_position
-			to_t.y = 0.0
-			var base_dir := to_t.normalized() if to_t.length_squared() > 0.01 else -global_basis.z
-			var reach := clampf(to_t.length(), 6.0, 20.0)
-			for angle in [-0.32, 0.0, 0.32]:
-				var goal := global_position + base_dir.rotated(Vector3.UP, angle) * reach
-				goal.y = target.global_position.y
-				GameManager.spawn_spore(start, goal, 1.15, 10.0)
-		_:
+		4:
 			# VOLT GOLIATH: telegraphed lightning strike + chain arc near target.
 			if dist > 26.0:
 				_miniboss_ability_timer = 0.8
