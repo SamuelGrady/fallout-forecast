@@ -3,6 +3,7 @@ extends Node3D
 var limbs: Array[Node3D] = []
 var _clock := 0.0
 var _hurt := 0.0
+var _hurt_side := 0.0
 var _attack := 0.0
 var _body: Node3D
 var _enemy: EnemyBase
@@ -50,6 +51,11 @@ func _ready() -> void:
 		GameManager.mutations.mutations_changed.connect(_on_mutations_changed)
 	_enemy.winding_up.connect(func(): _anticipation = 1.0)
 	_enemy.staggered.connect(func(): _hurt = 1.0)
+	_enemy.impact_reaction.connect(func(direction: Vector3, critical: bool):
+		_hurt = 1.0
+		_hurt_side = clampf(direction.dot(_enemy.global_basis.x), -1.0, 1.0)
+		if critical:
+			_head_kick = 1.0)
 	_enemy.molted.connect(_on_molted)
 	_enemy.attacked.connect(func(_target, _amount): _attack = 1.0)
 	scale *= 0.1
@@ -392,7 +398,7 @@ func _process(delta: float) -> void:
 			_knees[i / 2].rotation.x = -maxf(0.0, -sin(_clock + phase)) * 0.7 * amount - 0.08
 	_body.position.y = absf(sin(_clock)) * _gait.bounce * maxf(amount, 0.2)
 	# Hit reaction: snap back and twist away from the shot.
-	_body.rotation.z = sin(_clock * .5) * _gait.sway + _hurt * .22
+	_body.rotation.z = sin(_clock * .5) * _gait.sway + _hurt * .22 * _hurt_side
 	_body.rotation.x = _gait.lean + _hurt * 0.35
 	for i in _spore_sacs.size():
 		var pulse := 1.0 + 0.14 * sin(_clock * 1.4 + i * 1.3)

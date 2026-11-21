@@ -239,6 +239,10 @@ func _build_zone(announce: bool) -> void:
 	rim.scale = Vector3(data.effect_radius, 1.0, data.effect_radius)
 	rim.position.y = 0.055
 	add_child(rim)
+	if announce and id == "shield_dome" and not Settings.reduced_flash:
+		var radius_scale := rim.scale
+		rim.scale = Vector3(0.18, 1.0, 0.18) * radius_scale
+		rim.create_tween().tween_property(rim, "scale", radius_scale, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	var canopy_missing := false
 	if id == "umbrella":
 		var custom_umbrella := ItemCatalog.prop_model("umbrella_open")

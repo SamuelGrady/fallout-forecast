@@ -166,7 +166,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 func fire() -> void:
-	if not Net.can_send_run_rpc() or selected() == null:
+	if not Net.can_send_run_rpc() or not can_act() or selected() == null:
 		return
 	_fire_buffer = 0.0
 	var dir := -camera.global_basis.z
@@ -174,7 +174,16 @@ func fire() -> void:
 		_host_shot(loot.run_id, selected_serial(), camera.global_position, dir, _aim > 0.5, 0)
 	else:
 		_pending_action = 0.14
-		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, _aim > 0.5)
+		var data := selected_weapon()
+		var predict: bool = data.kind == WeaponData.Kind.HITSCAN and data.charge_time <= 0.0 \
+			and data.jam_chance == 0.0 and not player.is_sprinting and not player.tarp_raised \
+			and _cooldown <= 0.0 and _jam_left <= 0.0 and selected().count > 0 \
+			and (_reload_left <= 0.0 or data.shell_reload)
+		var ads := _aim > 0.5
+		if predict:
+			WeaponCombat.play_fx(loot, selected().id, _muzzle_position(), [], true)
+			_local_shot_motion(selected().id, data, ads)
+		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, ads, predict)
 
 func start_reload() -> void:
 	_command("reload")
@@ -283,11 +292,11 @@ func _reload_sound(data: WeaponData) -> void:
 	Sound.play(cue, -12.0 if data.shell_reload else -8.0)
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool) -> void:
+func _request_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, predicted: bool) -> void:
 	if _valid_sender():
-		_host_shot(run, serial, origin, dir, is_aiming, Net.get_rewind_ms(multiplayer.get_remote_sender_id()))
+		_host_shot(run, serial, origin, dir, is_aiming, Net.get_rewind_ms(multiplayer.get_remote_sender_id()), predicted)
 
-func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, rewind_ms: int) -> bool:
+func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, rewind_ms: int, predicted := false) -> bool:
 	if not Net.is_host() or not can_act() or run != loot.run_id or serial == 0 or selected_serial() != serial \
 			or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
 		return false
@@ -330,7 +339,7 @@ func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming:
 	var traces := WeaponCombat.resolve(self, item, origin, dir, seed, spread, is_aiming, lucky, rewind_ms)
 	player.end_hit_batch()
 	_play_shot(item.id, origin, dir, traces, is_aiming)
-	Net.rpc_to_run(_shot_fx, [loot.run_id, item.id, origin, dir, traces, is_aiming])
+	Net.rpc_to_run(_shot_fx, [loot.run_id, item.id, origin, dir, traces, is_aiming, predicted])
 	var emptied := item.count == 0 and definition.kind != ItemDefinition.Kind.GUN
 	if emptied:
 		slots[current] = null
@@ -347,20 +356,25 @@ func _apply_jam() -> void:
 		Sound.play("jam")
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func _shot_fx(run: int, id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool) -> void:
+func _shot_fx(run: int, id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool, predicted: bool) -> void:
 	if multiplayer.get_remote_sender_id() == 1 and run == loot.run_id:
-		_play_shot(id, origin, dir, traces, ads)
+		_play_shot(id, origin, dir, traces, ads, predicted)
 
-func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool) -> void:
+func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool, predicted := false) -> void:
 	if Net.dedicated:
 		return
 	var local := player.is_multiplayer_authority()
 	var data := ItemCatalog.definition(id).weapon
 	var muzzle := _muzzle_position() if local and equipped_id == id else origin + dir * 0.55
-	WeaponCombat.play_fx(loot, id, muzzle, traces, local)
+	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted))
 	if not local:
 		return
 	_pending_action = 0.0
+	if not predicted:
+		_local_shot_motion(id, data, ads)
+
+
+func _local_shot_motion(id: String, data: WeaponData, ads: bool) -> void:
 	_cooldown = data.fire_interval * GameManager.fire_rate_scale()
 	_kick = 1.0
 	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)

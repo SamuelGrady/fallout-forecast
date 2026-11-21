@@ -10,6 +10,7 @@ extends CharacterBody3D
 ## flare weaken lowers both. See speed_multiplier() and damage_multiplier().
 
 signal damaged(amount: float, health_left: float)
+signal impact_reaction(direction: Vector3, critical: bool)
 signal winding_up
 signal staggered
 signal molted
@@ -727,9 +728,9 @@ func _face(direction: Vector3, instant := false) -> void:
 	rotation.y += clampf(wrapf(want - rotation.y, -PI, PI), -step, step)
 
 
-func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> bool:
 	if health <= 0.0 or not Net.is_host():
-		return
+		return false
 	var height := (point.y - rewound_pos.y) / maxf(absf(scale.y), 0.01) if rewound_pos != Vector3.INF else to_local(point).y
 	_bullet_critical = is_critical_hit(height, source)
 	if source is Node3D:
@@ -750,7 +751,9 @@ func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vec
 	# The floating number is the shooter's business: take_damage routes it
 	# through Player.notify_hit, so it stacks on their screen wherever the host
 	# is. Drew's stacking moved to Player.local_hit for that reason.
+	var critical := _bullet_critical
 	_bullet_critical = false
+	return critical
 
 
 func is_critical_hit(height: float, _source: Node) -> bool:

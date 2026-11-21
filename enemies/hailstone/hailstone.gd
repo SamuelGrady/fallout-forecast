@@ -93,10 +93,11 @@ func is_critical_hit(height: float, source: Node) -> bool:
 	return height >= .94 and height <= 1.94 and source is Node3D and _facing_source(source) < -.35
 
 
-func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> void:
+func take_bullet(amount: float, point: Vector3, source: Node, rewound_pos := Vector3.INF, critical_bonus := 1.0) -> bool:
 	_taking_bullet = true
-	super.take_bullet(amount, point, source, rewound_pos, critical_bonus)
+	var critical := super.take_bullet(amount, point, source, rewound_pos, critical_bonus)
 	_taking_bullet = false
+	return critical
 
 
 func take_damage(amount: float, source: Node = null) -> void:

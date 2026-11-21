@@ -11,10 +11,16 @@ const VENDING_POOLS := [
 	["shield_dome", "hunting_rifle", "battery_zapper", "flare_launcher", "lightning_rod", "umbrella"],
 ]
 const VENDING_PRICES := [8, 14, 22]
+const EARLY_VENDING_POOLS := [
+	["med_tin", "suit_patch"],
+	["pump_shotgun", "spray_rifle"],
+	["shield_dome", "umbrella"],
+]
 
 var loot: LootTable = STATION_TABLE
 var stations: Dictionary = {}
 var airdrop: SupplyStation
+var last_drop_position := Vector3.INF
 var _pending: Array[Dictionary] = []
 var _holds: Dictionary = {}
 var _waiting: Dictionary = {}
@@ -37,6 +43,7 @@ func begin_run() -> void:
 	_offer_serial = 0
 	_drop_wave = 0
 	_launched_wave = 0
+	last_drop_position = Vector3.INF
 	_pending_drop = false
 	_retry_drop_at = 0.0
 	_clock = 0.0
@@ -81,6 +88,7 @@ func start_calm() -> void:
 	if not Net.is_host() or _drop_wave == WeatherManager.wave:
 		return
 	_drop_wave = WeatherManager.wave
+	last_drop_position = Vector3.INF
 	_waiting.clear()
 	for key: String in stations.keys():
 		var station: Variant = stations[key]
@@ -105,6 +113,7 @@ func _try_spawn_airdrop() -> void:
 		return
 	_pending_drop = false
 	_launched_wave = WeatherManager.wave
+	last_drop_position = at
 	Perf.mark("crates spawn wave %d" % WeatherManager.wave)
 	_make_airdrop(at, SupplyStation.DESCENT)
 	Net.rpc_to_run(_airdrop_spawn, [_run, at, SupplyStation.DESCENT])
@@ -266,7 +275,8 @@ func _restock(station: SupplyStation, sold := -1) -> void:
 		if sold >= 0 and i != sold:
 			continue
 		var previous: String = station.offers[i][0] if i < station.offers.size() else ""
-		var pool: Array = VENDING_POOLS[i].filter(func(id: String): return id != previous)
+		var stock := EARLY_VENDING_POOLS if WeatherManager.wave < 4 else VENDING_POOLS
+		var pool: Array = stock[i].filter(func(id: String): return id != previous)
 		var tier := ItemCatalog.TUNED if i == 2 and WeatherManager.wave > 1 else ItemCatalog.STANDARD
 		_offer_serial += 1
 		offers[i] = [pool[_vending_rng.randi_range(0, pool.size() - 1)], tier, VENDING_PRICES[i], _offer_serial]

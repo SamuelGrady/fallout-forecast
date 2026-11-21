@@ -75,7 +75,7 @@ func available(mode: String) -> bool:
 		return false
 	if mode == "airdrop":
 		return descent_left <= 0.0 and not opened
-	return not is_drop and (not offer_for(mode).is_empty() or (mode == "double" and has_double))
+	return not is_drop and (not offer_for(mode).is_empty() or (mode == "double" and has_double and WeatherManager.wave >= 4))
 
 func offer_for(mode: String) -> Array:
 	var index := OFFER_PADS.find(mode)
@@ -120,6 +120,8 @@ func _process(delta: float) -> void:
 				Sound.play_at("airdrop_land", global_position, -4.0)
 				ShotFX.puff(self, global_position + Vector3.UP * 0.25,
 					Color(0.67, 0.50, 0.35, 0.76), 0.95, 0.7)
+				if not Settings.reduced_flash:
+					create_tween().tween_method(_compass_tint, 1.0, 0.0, 0.6)
 			if _chute:
 				_chute.visible = descent_left > 0.0
 			_smoke_left -= delta
@@ -129,6 +131,9 @@ func _process(delta: float) -> void:
 					Color(1.0, 0.47, 0.23, 0.68), 0.25, 1.3)
 	if not Net.dedicated:
 		_tick_reveal(delta)
+
+func _compass_tint(amount: float) -> void:
+	set_meta("compass_color", AMBER.lerp(BroadcastUI.PAPER, amount))
 
 func _build_station() -> void:
 	_box(_frame, Vector3(0, 1.01, 0), Vector3(2.00, 2.02, 0.80), Color("#173640"))
@@ -163,7 +168,7 @@ func _build_station() -> void:
 		_offer_items.append(mount)
 	if has_double:
 		_box(_frame, Vector3(0.72, 0.56, -0.45), Vector3(0.30, 0.25, 0.12), Color("#224353"))
-		_label("2X", Vector3(0.72, 0.56, -0.52), AMBER, 35)
+		_label("2X W4+", Vector3(0.72, 0.56, -0.52), AMBER, 35)
 
 func _build_pallet() -> void:
 	_box(_frame, Vector3(0, 0.20, 0), Vector3(1.70, 0.40, 1.38), Color("#354b53"))

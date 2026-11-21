@@ -223,11 +223,11 @@ func _process(delta: float) -> void:
 				_update_trail(bar, delta)
 	var state := str(me.get("state"))
 	var suit := float(me.get("suit_integrity")) if me.get("suit_integrity") != null else 100.0
-	var exposed: bool = me.get("exposed") != false and WeatherManager.is_raining()
+	var hazard: String = me.acid_hazard()
 	if _warming:
 		return
 	# Suit breach.
-	var breach := state == "ok" and suit < 25.0 and exposed
+	var breach := state == "ok" and suit < 25.0 and hazard in ["rain", "puddle"]
 	_vignette.visible = breach
 	if breach:
 		if not _seen_breach:
@@ -239,7 +239,7 @@ func _process(delta: float) -> void:
 			_breach_beep = 0.8
 			Sound.play("suit_beep", -10.0)
 	# Rain drips while exposed.
-	var drip := WeatherManager.storm_intensity if exposed and state == "ok" else 0.0
+	var drip := WeatherManager.storm_intensity if hazard == "rain" and state == "ok" else 0.0
 	_drips.visible = drip > 0.05
 	if _drips.visible:
 		if not _seen_drips:

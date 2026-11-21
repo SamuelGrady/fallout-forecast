@@ -264,7 +264,7 @@ func is_storm_active() -> bool:
 
 
 func is_raining() -> bool:
-	return storm_state != StormState.CLEAR and is_storm_active()
+	return storm_intensity > 0.02 and is_storm_active()
 
 
 ## Multiplier for enemy speed and damage at the current storm state.
@@ -276,7 +276,11 @@ func enemy_buff() -> float:
 func suit_loss_per_second() -> float:
 	if not is_storm_active():
 		return 0.0
-	return SUIT_LOSS_PER_SECOND[storm_state]
+	for i in range(1, STORM_INTENSITY.size()):
+		if storm_intensity <= STORM_INTENSITY[i]:
+			var fraction := inverse_lerp(STORM_INTENSITY[i - 1], STORM_INTENSITY[i], storm_intensity)
+			return lerpf(SUIT_LOSS_PER_SECOND[i - 1], SUIT_LOSS_PER_SECOND[i], fraction)
+	return SUIT_LOSS_PER_SECOND.back()
 
 
 @rpc("authority", "call_remote", "reliable")

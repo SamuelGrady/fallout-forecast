@@ -102,6 +102,7 @@ var _health := ProgressBar.new()
 var _suit_icon := GameIcon.new()
 var _health_icon := GameIcon.new()
 var _status_icon := GameIcon.new()
+var _hazard_text := Label.new()
 var _health_text := Label.new()
 var _decon_icon := GameIcon.new()
 var _decon_text := Label.new()
@@ -277,6 +278,9 @@ func _build_vitals() -> void:
 	_status_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	suit_row.add_child(_ignore(_status_icon))
 	_status_icon.hide()
+	BroadcastUI.hud_text(_hazard_text, 16, BroadcastUI.CYAN)
+	suit_row.add_child(_ignore(_hazard_text))
+	_hazard_text.hide()
 	var health_row := _vital_row(_health_icon, "health", BroadcastUI.PINK, _health, "HealthBar")
 	BroadcastUI.hud_text(_health_text, BroadcastUI.T_META, BroadcastUI.PINK)
 	health_row.add_child(_health_text)
@@ -538,14 +542,17 @@ func _update_vitals(player: Player, delta: float) -> void:
 	_health_text.visible = low_health and player.state == "ok"
 	_health_text.text = str(roundi(player.health))
 	_update_damage(player, delta)
-	var exposed := WeatherManager.is_raining() and player.exposed and player.state == "ok"
-	var protected := exposed and preload("res://weapons/projectile.gd").protects(player.global_position + Vector3.UP, get_tree())
-	var breach := exposed and not protected and _suit.value < 25.0
-	_status_icon.visible = exposed
+	var hazard: String = player.acid_hazard() if player.state in ["ok", "downed"] else ""
+	var protected := hazard == "shelter"
+	var breach := hazard in ["rain", "puddle"] and _suit.value < 25.0
+	_status_icon.visible = not hazard.is_empty()
 	_status_icon.kind = "shelter" if protected else "rain"
-	var pulse := 1.0 if Settings.reduced_flash else 0.6 + 0.4 * sin(_clock * (10.0 if breach else 5.0))
-	_status_icon.color = BroadcastUI.CYAN if protected else (BroadcastUI.PINK if breach else BroadcastUI.ACID)
-	_status_icon.modulate.a = 1.0 if protected else pulse
+	var pulse := 1.0 if Settings.reduced_flash else 0.65 + 0.35 * sin(_clock * 6.0)
+	_status_icon.color = BroadcastUI.CYAN if protected else (BroadcastUI.PINK if hazard == "puddle" or breach else BroadcastUI.ACID)
+	_status_icon.modulate.a = pulse if breach else 1.0
+	_hazard_text.visible = _status_icon.visible
+	_hazard_text.text = {"shelter": "DRY", "puddle": "ACID POOL", "rain": "ACID RAIN"}.get(hazard, "")
+	_hazard_text.add_theme_color_override("font_color", _status_icon.color)
 	_suit_icon.color = BroadcastUI.PINK.lerp(BroadcastUI.CYAN, pulse) if breach else BroadcastUI.CYAN
 	_decon_text.text = str(GameManager.decon_charges)
 	_tarp_icon.visible = player.has_tarp
@@ -560,7 +567,7 @@ func _update_vitals(player: Player, delta: float) -> void:
 		_static_icon.color = BroadcastUI.AMBER if ready else BroadcastUI.MUTED
 		_static_text.text = "%d%%" % roundi(player.static_charge * 100.0)
 	_vitals_hot = maxf(0.0, _vitals_hot - delta)
-	var hot := exposed or _vitals_hot > 0.0 or player.health < player.max_health * 0.5 or _suit.value < 50.0 or player.state != "ok"
+	var hot := hazard in ["rain", "puddle"] or _vitals_hot > 0.0 or player.health < player.max_health * 0.5 or _suit.value < 50.0 or player.state != "ok"
 	_fade(_vitals, hot, 0.45, delta)
 	_update_center(player, delta)
 

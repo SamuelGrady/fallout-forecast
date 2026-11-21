@@ -156,8 +156,9 @@ func _on_dealt(enemy: String, cards: Array) -> void:
 	if entry:
 		_enemy_icon.kind = entry.id
 		_enemy_icon.color = entry.color
-		_enemy_text.text = entry.display_name.to_upper()
-	_enemy_bar.visible = entry != null
+	_enemy_text.text = str(WeatherManager.WavePlan.FORECAST.get(WeatherManager.wave_modifier(), "STORM FORECAST"))
+	_enemy_icon.visible = entry != null
+	_enemy_bar.visible = true
 	_enemy_bar.modulate.a = 1.0
 	BroadcastUI.reveal(_enemy_bar)
 	_strip.visible = not cards.is_empty()

@@ -74,6 +74,9 @@ var sheltered := false
 var in_puddle := false
 ## What the host reads for suit integrity and Drip targeting.
 var exposed := true
+## One warning window per wet stretch, even if the player ducks briefly into cover.
+var _first_rain_contact := false
+var _rain_warning_left := 0.0
 
 # Host-owned (synced to clients).
 var health := 100.0
@@ -382,16 +385,24 @@ func _host_tick(delta: float) -> void:
 			static_charge = maxf(0.0, static_charge - delta * 0.14)
 	else:
 		static_charge = 0.0
+	var hazard := acid_hazard()
+	if not WeatherManager.is_storm_active():
+		_first_rain_contact = false
+		_rain_warning_left = 0.0
+	elif hazard == "rain" and not _first_rain_contact:
+		_first_rain_contact = true
+		_rain_warning_left = 0.8
+	_rain_warning_left = maxf(0.0, _rain_warning_left - delta)
 	match state:
 		"ok":
 			if _revive_grace_left > 0.0:
 				return
-			if GameManager.has_player_mutation("hydro_skin") and exposed and WeatherManager.is_raining() and suit_integrity > 0.0:
+			if GameManager.has_player_mutation("hydro_skin") and hazard == "rain" and suit_integrity > 0.0:
 				heal(2.5 * delta)
-			var drain := WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale() if exposed else 0.0
-			if preload("res://weapons/projectile.gd").protects(global_position + Vector3.UP, get_tree()):
-				drain = 0.0  # Shield Dome: full shelter
-			if exposed and WeaponProjectile.dries(global_position + Vector3.UP, get_tree()):
+			var drain := 0.0
+			if hazard == "puddle" or (hazard == "rain" and _rain_warning_left <= 0.0):
+				drain = WeatherManager.suit_loss_per_second() * GameManager.suit_drain_scale()
+			if drain > 0.0 and WeaponProjectile.dries(global_position + Vector3.UP, get_tree()):
 				drain *= 0.25
 			if holding_leaky:
 				drain = maxf(drain, leaky_drain)
@@ -401,7 +412,7 @@ func _host_tick(delta: float) -> void:
 				else:
 					take_damage(drain * delta)
 		"downed":
-			var rate := 2.0 if exposed and WeatherManager.is_raining() else 1.0
+			var rate := 2.0 if hazard in ["rain", "puddle"] else 1.0
 			bleed_left -= delta * rate
 			if bleed_left <= 0.0:
 				_bleed_out()
@@ -833,6 +844,17 @@ func _can_stand() -> bool:
 	return not test_move(global_transform, Vector3.UP * (stand_height - _height + 0.05))
 
 
+## Shared by damage, bleed-out and local UI. A dome also covers the ground.
+func acid_hazard() -> String:
+	if not WeatherManager.is_raining():
+		return ""
+	if WeaponProjectile.protects(global_position + Vector3.UP, get_tree()):
+		return "shelter"
+	if in_puddle:
+		return "puddle"
+	return "shelter" if sheltered else "rain"
+
+
 func is_exposed() -> bool:
 	return exposed
 
@@ -857,6 +879,8 @@ func _report_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
 
 
 func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
+	if is_in_puddle and not in_puddle and is_multiplayer_authority() and WeatherManager.is_raining():
+		Sound.play("splash_0", -11.0, 0.75)
 	in_puddle = is_in_puddle
 	if is_sheltered != sheltered:
 		sheltered = is_sheltered

@@ -21,9 +21,11 @@ var growth := 0.0
 var _shape := CylinderShape3D.new()
 var _collision := CollisionShape3D.new()
 var _mesh := MeshInstance3D.new()
+var _hazard_rim: MeshInstance3D
 var _material := StandardMaterial3D.new()
 var _draw_water := false
 static var _marked_first_wet := false
+static var _hazard_mesh: TorusMesh
 
 
 func _ready() -> void:
@@ -55,6 +57,23 @@ func _ready() -> void:
 	_mesh.mesh = disc
 	_mesh.position.y = 0.075
 	add_child(_mesh)
+	if _hazard_mesh == null:
+		var edge := StandardMaterial3D.new()
+		edge.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		edge.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		edge.albedo_color = Color(0.72, 1.0, 0.34, 0.58)
+		_hazard_mesh = TorusMesh.new()
+		_hazard_mesh.inner_radius = 0.955
+		_hazard_mesh.outer_radius = 1.0
+		_hazard_mesh.rings = 24
+		_hazard_mesh.ring_segments = 4
+		_hazard_mesh.material = edge
+	_hazard_rim = MeshInstance3D.new()
+	_hazard_rim.mesh = _hazard_mesh
+	_hazard_rim.position.y = 0.008
+	_hazard_rim.scale.y = 0.1
+	_hazard_rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_mesh.add_child(_hazard_rim)
 	_apply()
 	_settle_water.call_deferred()
 
@@ -95,7 +114,7 @@ func _physics_process(delta: float) -> void:
 	_apply()
 	if not _draw_water:
 		return
-	var base := color.lerp(acid_color, clampf((intensity - 0.7) / 0.3, 0.0, 1.0))
+	var base := color.lerp(acid_color, lerpf(0.55, 1.0, intensity) if raining else 0.0)
 	if GameManager.has_mutation("undertow"):
 		var pulse := 0.55 + 0.25 * sin(Time.get_ticks_msec() * 0.006)
 		base = base.lerp(Color(0.22, 0.82, 0.9, 0.88), pulse)
@@ -123,7 +142,7 @@ func _ripple() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.85, 0.95, 1.0, 0.5)
+	mat.albedo_color = Color(0.84, 1.0, 0.42, 0.65)
 	ring.material_override = mat
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ring)
@@ -169,6 +188,7 @@ func _apply() -> void:
 			_marked_first_wet = true
 			Perf.mark("first puddle visible")
 		_mesh.visible = wet
+		_hazard_rim.visible = wet and WeatherManager.is_raining()
 		if wet:
 			_mesh.scale = Vector3(r, 1.0, r)
 

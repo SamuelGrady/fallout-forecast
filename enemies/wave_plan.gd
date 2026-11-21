@@ -12,43 +12,18 @@ const ENDLESS_MODIFIERS := [HEAVY_WEATHER, FLOOD, BLACKOUT, SWARM]
 const FORECAST := {
 	BLACKOUT: "LOW LIGHT / DENSE FOG",
 	FLOOD: "RISING WATER / UNDERTOW",
-	SWARM: "SLEET PACKS",
-	HEAVY_WEATHER: "LIGHTNING / THUNDERHEADS",
+	SWARM: "DENSE INFECTED PACKS",
+	HEAVY_WEATHER: "FREQUENT LIGHTNING",
 }
-## First group in each combat phase. Remaining groups draw from the mixes.
-const DRIZZLE_OPENERS := [
-	[Kind.DRIP, Kind.DRIP, Kind.GUTTER, Kind.DRIP],
-	[Kind.MISTER, Kind.DRIP, Kind.GUTTER, Kind.DRIP],
-	[Kind.HAILSTONE, Kind.DRIP, Kind.DRIP, Kind.MISTER],
-	[Kind.STATIC, Kind.DRIP, Kind.MISTER, Kind.DRIP],
-	[Kind.THUNDERHEAD, Kind.DRIP, Kind.STATIC, Kind.DRIP],
-	[Kind.HAILSTONE, Kind.THUNDERHEAD, Kind.STATIC, Kind.SMOG],
-]
-const DOWNPOUR_OPENERS := [
-	[Kind.SLEET, Kind.SLEET, Kind.SLEET, Kind.GUTTER],
-	[Kind.HAILSTONE, Kind.GUTTER, Kind.DRIP, Kind.MISTER],
-	[Kind.UNDERTOW, Kind.UNDERTOW, Kind.GUTTER, Kind.HAILSTONE],
-	[Kind.SMOG, Kind.SLEET, Kind.SLEET, Kind.SLEET, Kind.SLEET, Kind.STATIC],
-	[Kind.THUNDERHEAD, Kind.HAILSTONE, Kind.SMOG, Kind.UNDERTOW, Kind.STATIC],
-	[Kind.THUNDERHEAD, Kind.UNDERTOW, Kind.SMOG, Kind.SLEET, Kind.SLEET, Kind.SLEET, Kind.STATIC],
-]
-const DRIZZLE_MIX := [
-	[9, 3, 0, 0, 0, 0, 0, 0, 0],
-	[9, 3, 2, 1, 0, 0, 0, 0, 0],
-	[7, 2, 2, 2, 2, 0, 0, 0, 0],
-	[6, 2, 2, 4, 2, 1, 2, 0, 0],
-	[7, 2, 2, 3, 2, 1, 2, 2, 2],
-	[6, 2, 2, 3, 2, 3, 3, 2, 2],
-]
-const DOWNPOUR_MIX := [
-	[8, 3, 0, 3, 0, 0, 0, 0, 0],
-	[8, 3, 2, 2, 2, 0, 0, 0, 0],
-	[7, 3, 2, 2, 2, 4, 0, 0, 0],
-	[6, 2, 2, 4, 2, 2, 3, 2, 0],
-	[6, 2, 2, 3, 2, 2, 3, 2, 4],
-	[5, 2, 2, 4, 2, 3, 3, 3, 4],
-]
-
+const NORMAL_OPEN := [Kind.DRIP, Kind.GUTTER, Kind.DRIP]
+const FLOOD_OPEN := [Kind.DRIP, Kind.UNDERTOW, Kind.DRIP]
+const DRAFT_COUNTERS := {
+	BLACKOUT: ["reflex_tendons", "chitin_suit", "adrenaline_glands"],
+	FLOOD: ["hydro_skin", "adrenaline_glands", "chitin_suit"],
+	SWARM: ["bone_piercer", "reflex_tendons", "vampiric_siphon"],
+	HEAVY_WEATHER: ["chitin_suit", "voltaic_veins", "adrenaline_glands"],
+}
+const FORECAST_MUTATION := {FLOOD: "undertow", SWARM: "swarm", HEAVY_WEATHER: "conductors"}
 
 static func modifier(wave: int) -> String:
 	if wave <= MODIFIERS.size():
@@ -56,20 +31,14 @@ static func modifier(wave: int) -> String:
 	return ENDLESS_MODIFIERS[(wave - MODIFIERS.size() - 1) % ENDLESS_MODIFIERS.size()]
 
 
-static func opener(wave: int, downpour: bool) -> Array:
-	var groups := DOWNPOUR_OPENERS if downpour else DRIZZLE_OPENERS
-	return groups[clampi(wave - 1, 0, groups.size() - 1)].duplicate()
+static func opener(wave: int, _downpour: bool) -> Array:
+	var group := (FLOOD_OPEN if modifier(wave) == FLOOD else NORMAL_OPEN).duplicate()
+	if wave >= 2:
+		group.append(Kind.MISTER)
+	return group
 
 
-static func weights(wave: int, downpour: bool) -> Array:
-	var mixes := DOWNPOUR_MIX if downpour else DRIZZLE_MIX
-	var mix: Array = mixes[clampi(wave - 1, 0, mixes.size() - 1)].duplicate()
-	match modifier(wave):
-		SWARM:
-			mix[Kind.SLEET] += 4
-		FLOOD:
-			if downpour or wave > 5:
-				mix[Kind.UNDERTOW] += 3
-		HEAVY_WEATHER:
-			mix[Kind.THUNDERHEAD] += 2
-	return mix
+static func weights(wave: int, _downpour: bool) -> Array:
+	var flood := modifier(wave) == FLOOD
+	return [11 if modifier(wave) == SWARM else 8, 0 if flood else 3,
+		2 if wave >= 2 else 0, 0, 0, 3 if flood else 0, 0, 0, 0]

@@ -52,14 +52,14 @@ func begin() -> void:
 	if not Net.is_host():
 		return
 	WeatherManager.hold = true
-	var choices := table.entries.filter(func(entry): return not GameManager.endless or entry.id not in active)
-	if choices.is_empty():
-		choices = table.entries
-	var weights := choices.map(func(entry): return entry.weight)
-	var enemy: String = choices[RNG.weighted_index(weights)].id
+	var plan := WeatherManager.WavePlan
+	var forecast := WeatherManager.wave_modifier()
+	var enemy: String = plan.FORECAST_MUTATION.get(forecast, "")
 	var dealt: Array = []
-	for id in _pick_player_mutations(3):
-		dealt.append(id)
+	for id: String in plan.DRAFT_COUNTERS.get(forecast, []):
+		if not player_mutations.has(id):
+			dealt.append(id)
+	dealt.append_array(_pick_player_mutations(3 - dealt.size(), dealt))
 	_apply_deal(enemy, dealt)
 	Net.rpc_to_all(_deal_rpc, [enemy, dealt])
 
@@ -174,7 +174,7 @@ func _resolve() -> void:
 			top.append(i)
 	var pick: int = top[RNG.rng.randi_range(0, top.size() - 1)] if not top.is_empty() else -1
 	var enemy_list: Array = active.duplicate() if GameManager.endless else []
-	if enemy_pick not in enemy_list:
+	if not enemy_pick.is_empty() and enemy_pick not in enemy_list:
 		enemy_list.append(enemy_pick)
 	var granted: Array = []
 	var updated_player: Array = player_mutations.duplicate()
@@ -314,10 +314,10 @@ func grant_random_player_mutation() -> String:
 	return id
 
 
-func _pick_player_mutations(count: int) -> Array[String]:
+func _pick_player_mutations(count: int, exclude: Array = []) -> Array[String]:
 	var pool: Array[String] = []
 	for id in GameManager.PLAYER_MUTATIONS.keys():
-		if not player_mutations.has(id):
+		if not player_mutations.has(id) and id not in exclude:
 			pool.append(id)
 	var picked: Array[String] = []
 	for _i in count:

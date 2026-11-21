@@ -25,5 +25,5 @@ func in_range_move(to_target: Vector3, buff: float) -> Vector3:
 
 func attack(victim: Node3D, amount: float) -> void:
 	var start := global_position + Vector3.UP * 1.8
-	GameManager.spawn_spore(start, victim.global_position, flight_time, amount, false, self)
+	GameManager.spawn_spore(start, victim.global_position, flight_time, amount, true, self)
 	attacked.emit(victim, amount)

@@ -67,6 +67,7 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 	var traces: Array = []
 	var voltaic := GameManager.has_player_mutation("voltaic_veins") and holder._shot_counter % 4 == 0
 	var special_hits: Dictionary = {}
+	var flinches: Dictionary = {}
 	for ray: Vector3 in pellet_rays(dir, seed, spread, data.pellets):
 		var hits := _cast_hits(holder, origin, ray, data.max_range, data.pierce + 1 + GameManager.extra_pierce(), rewind_ms)
 		if data.mechanic == "reel":
@@ -87,7 +88,7 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 			var distance := origin.distance_to(at)
 			if impact == 0:
 				terminal = at
-				impact = 2 if is_damageable(target) else 1
+				impact = 2 if is_damageable(target) else _surface_impact(target)
 			if not is_damageable(target):
 				break
 			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
@@ -96,7 +97,10 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 			var amount: float = 9999.0 if lucky else damage * falloff
 			if target.has_method("take_bullet"):
 				if target is EnemyBase:
-					target.take_bullet(amount, at, shooter, hit.get("rewound_pos", Vector3.INF), data.critical_bonus)
+					var critical: bool = target.take_bullet(amount, at, shooter, hit.get("rewound_pos", Vector3.INF), data.critical_bonus)
+					var existing: Array = flinches.get(target, [])
+					if existing.is_empty() or (critical and not existing[2]):
+						flinches[target] = [target.net_id, ray, critical]
 				else:
 					target.take_bullet(amount, at, shooter)
 			else:
@@ -116,7 +120,27 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 		if data.mechanic == "suppress":
 			registry.place("disruptor", terminal, dir, item.tier, shooter)
 		traces.append([terminal, impact])
+	if not flinches.is_empty():
+		var rows: Array = []
+		for enemy: EnemyBase in flinches:
+			if enemy.health > 0.0:
+				var row: Array = flinches[enemy]
+				rows.append(row)
+				if not Net.dedicated:
+					enemy.impact_reaction.emit(row[1], row[2])
+		var spawner := holder.get_tree().current_scene.get_node_or_null("Enemies")
+		if Net.is_online() and spawner and not rows.is_empty():
+			spawner.notify_impacts(rows)
 	return traces
+
+static func _surface_impact(target: Object) -> int:
+	var node := target as Node
+	while node and node != node.get_tree().current_scene:
+		var label := str(node.name).to_lower()
+		if "metal" in label or "container" in label or "vehicle" in label or "railing" in label:
+			return 3
+		node = node.get_parent()
+	return 1
 
 static func _allows_impact(enemy: EnemyBase, origin: Vector3) -> bool:
 	return not enemy.has_method("blocks_impact") or not enemy.blocks_impact(origin)
@@ -305,9 +329,9 @@ static func is_damageable(target: Object) -> bool:
 	return target is EnemyBase or (target is Node and (target.is_in_group("boss_parts") \
 			or (target.is_in_group("players") and target.get("state") == "turned")))
 
-static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool) -> void:
+static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool, muzzle_fx := true) -> void:
 	var data := ItemCatalog.definition(id).weapon
-	if not data.shot_sound.is_empty():
+	if muzzle_fx and not data.shot_sound.is_empty():
 		if local:
 			Sound.play(data.shot_sound, -7.0)
 		else:
@@ -315,9 +339,12 @@ static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, lo
 	if data.kind != WeaponData.Kind.HITSCAN:
 		return
 	var stream := data.mechanic in ["wash", "gust", "zap", "reel", "suppress"]
-	ShotFX.puff(parent, muzzle, data.tracer_color, 0.09, 0.07)
-	if not stream:
-		ShotFX.flash(parent, muzzle, data.tracer_color, 3.5)
+	if muzzle_fx:
+		ShotFX.puff(parent, muzzle, data.tracer_color, 0.09, 0.07)
+		if not stream:
+			ShotFX.flash(parent, muzzle, data.tracer_color, 3.5)
+	var surface_contact := 0
+	var contact_at := Vector3.ZERO
 	var sum := Vector3.ZERO
 	var hits := 0
 	for i in traces.size():
@@ -329,9 +356,17 @@ static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, lo
 			else:
 				ShotFX.tracer(parent, muzzle, end, data.tracer_color)
 			if impact > 0:
-				ShotFX.puff(parent, end, Color("#b0f580") if impact == 2 else data.tracer_color, 0.08, 0.17)
+				if impact == 3 and not stream:
+					ShotFX.sparks(parent, end, (muzzle - end).normalized(), 3)
+				else:
+					ShotFX.puff(parent, end, Color("#b0f580") if impact == 2 else Color("#bbad99"), 0.08, 0.17)
+		if surface_contact == 0 and impact in [1, 3]:
+			surface_contact = impact
+			contact_at = end
 		if impact == 2:
 			hits += 1
 			sum += end
 	if hits > 0 and not stream:
 		Sound.play_at("hit_flesh", sum / hits, -18.0 + minf(6.0, 2.0 * (hits - 1)))
+	elif surface_contact and not stream:
+		Sound.play_at("reel_tick" if surface_contact == 3 else "step_1", contact_at, -23.0, 1.25)
