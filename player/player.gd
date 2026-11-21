@@ -596,8 +596,6 @@ func revive(by: Node) -> void:
 	if state != "downed":
 		return
 	health = revive_health
-	if by != self and is_instance_valid(by) and by.is_in_group("local_player"):
-		Juice.popup("+REVIVE", Color("#8fe36a"))
 	_grace_left = REVIVE_GRACE
 	_revive_grace_left = REVIVE_GRACE
 	invulnerable = true

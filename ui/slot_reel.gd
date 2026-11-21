@@ -11,7 +11,6 @@ var _enemy_bar := PanelContainer.new()
 var _enemy_icon := GameIcon.new()
 var _enemy_text := Label.new()
 var _strip := Control.new()
-var _hint := Label.new()
 var _timer := ProgressBar.new()
 var _cards: Array[PanelContainer] = []
 var _parts: Array = []  # per card: {badge, key, name, desc, pips}
@@ -53,20 +52,17 @@ func _build_enemy_bar() -> void:
 	_enemy_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_enemy_bar.offset_left = -250
 	_enemy_bar.offset_right = 250
-	_enemy_bar.offset_top = 214
-	_enemy_bar.offset_bottom = 214
+	_enemy_bar.offset_top = 84
+	_enemy_bar.offset_bottom = 84
 	_enemy_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := BroadcastUI.panel(BroadcastUI.OVERLAY, ENEMY_RED)
-	style.set_content_margin_all(8)
-	_enemy_bar.add_theme_stylebox_override("panel", style)
+	_enemy_bar.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
 	_enemy_bar.add_child(row)
 	_enemy_icon.custom_minimum_size = Vector2(24, 24)
 	row.add_child(_enemy_icon)
-	BroadcastUI.text(_enemy_text, 20, BroadcastUI.PAPER)
-	_enemy_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_enemy_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	BroadcastUI.hud_text(_enemy_text, BroadcastUI.T_BODY, ENEMY_RED)
 	row.add_child(_enemy_text)
 	add_child(_enemy_bar)
 
@@ -85,11 +81,6 @@ func _build_strip() -> void:
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	box.add_theme_constant_override("separation", 6)
 	_strip.add_child(box)
-	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(_hint, 22, BroadcastUI.PAPER)
-	BroadcastUI.back_label(_hint)
-	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(_hint)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
@@ -97,9 +88,9 @@ func _build_strip() -> void:
 	for i in 3:
 		row.add_child(_build_card(i))
 	_timer.show_percentage = false
-	_timer.custom_minimum_size = Vector2(0, 6)
+	_timer.custom_minimum_size = Vector2(0, 3)
 	_timer.max_value = 1.0
-	BroadcastUI.bar(_timer, BroadcastUI.CYAN)
+	BroadcastUI.thin_bar(_timer, BroadcastUI.CYAN)
 	box.add_child(_timer)
 
 
@@ -142,9 +133,9 @@ func _build_card(_index: int) -> PanelContainer:
 
 
 func _card_style(color: Color, selected: bool, winner := false) -> StyleBoxFlat:
-	var style := BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.AMBER if winner else (color if selected else Color(color, 0.65)))
-	style.set_border_width_all(3 if (selected or winner) else 1)
-	style.border_width_top = 5
+	var style := BroadcastUI.panel(Color(BroadcastUI.INK, 0.6), BroadcastUI.AMBER if winner else (color if selected else Color(color, 0.4)))
+	style.set_border_width_all(2 if (selected or winner) else 1)
+	style.border_width_top = 3
 	style.set_content_margin_all(10)
 	return style
 
@@ -165,7 +156,7 @@ func _on_dealt(enemy: String, cards: Array) -> void:
 	if entry:
 		_enemy_icon.kind = entry.id
 		_enemy_icon.color = entry.color
-		_enemy_text.text = "INFECTED  /  %s\n%s" % [entry.display_name.to_upper(), entry.description]
+		_enemy_text.text = entry.display_name.to_upper()
 	_enemy_bar.visible = entry != null
 	_enemy_bar.modulate.a = 1.0
 	BroadcastUI.reveal(_enemy_bar)
@@ -195,7 +186,6 @@ func _on_dealt(enemy: String, cards: Array) -> void:
 func _update_input_hints() -> void:
 	_pad_hints = Settings.using_gamepad
 	var keys := ["LEFT", "UP", "RIGHT"] if _pad_hints else ["1", "2", "3"]
-	_hint.text = "PICK A SQUAD MUTATION  /  D-PAD" if _pad_hints else "PICK A SQUAD MUTATION"
 	for i in _parts.size():
 		_parts[i].key.text = keys[i]
 
@@ -204,7 +194,7 @@ func _on_votes(counts: Array) -> void:
 	var multi := GameManager.player_count() > 1
 	for i in _parts.size():
 		var n: int = counts[i] if i < counts.size() else 0
-		_parts[i].pips.text = "%d VOTES" % n if multi else ""
+		_parts[i].pips.text = str(n) if multi and n > 0 else ""
 
 
 func _card_color(i: int) -> Color:
@@ -233,7 +223,6 @@ func _on_vote_cast(index: int) -> void:
 
 
 func _on_resolved(index: int) -> void:
-	_hint.text = "SQUAD MUTATED"
 	for i in _cards.size():
 		if i == index:
 			_cards[i].add_theme_stylebox_override("panel", _card_style(_card_color(i), false, true))

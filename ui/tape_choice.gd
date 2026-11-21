@@ -40,7 +40,7 @@ func _ready() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 14)
 	box.add_child(row)
-	_add_button(row, _continue, "CONTINUE", true)
+	_add_button(row, _continue, "ENDLESS", true)
 	_add_button(row, _stop, "END TAPE", false)
 	BroadcastUI.button_role(_continue, true)
 	BroadcastUI.button_role(_stop, false, false)
@@ -75,11 +75,12 @@ func _refresh() -> void:
 	_continue.disabled = not can_choose
 	_stop.disabled = not can_choose
 	if can_choose:
-		_prompt.text = "CONTINUE INTO ENDLESS WAVES OR END THE TAPE."
+		_prompt.text = ""
 		if not was_open or not _can_choose:
 			_continue.grab_focus()
 	else:
 		var info: Dictionary = Net.roster.get(deciding_peer, {})
-		_prompt.text = "WAITING FOR %s TO CHOOSE." % str(info.get("name", "THE SQUAD LEADER")).to_upper()
+		_prompt.text = "WAITING ON %s" % str(info.get("name", "HOST")).to_upper()
 	_can_choose = can_choose
+	_prompt.visible = not _prompt.text.is_empty()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

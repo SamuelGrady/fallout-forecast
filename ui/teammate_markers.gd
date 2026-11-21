@@ -1,9 +1,9 @@
 extends CanvasLayer
 ## Nameplates and pointers for the other players, drawn as a 2D overlay so
-## they show through walls. On-screen: name, distance and a health sliver over
-## the teammate's head in their suit colour. Off-screen (or behind you): an
-## arrow clamped to the screen edge pointing their way. Downed teammates
-## pulse red with REVIVE; Turned ones show as a hostile marker.
+## they show through walls. On-screen: distance (or the name when close or
+## under the crosshair) and a health sliver in the teammate's suit colour.
+## Off-screen: an edge arrow and distance. Downed teammates pulse pink with a
+## cross; Turned ones show a green skull.
 
 const EDGE := 34.0
 const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
@@ -59,29 +59,34 @@ func _draw_markers() -> void:
 				continue
 		var on_screen := not behind and Rect2(Vector2.ZERO, view).grow(-EDGE).has_point(screen)
 		var name := str(p.get("display_name")) if p.get("display_name") != null else "PLAYER"
-		var label := name.to_upper()
 		var accent := color
+		var glyph := ""
 		if state == "downed":
-			label = "REVIVE " + label
+			glyph = "health"
 			accent = BroadcastUI.PINK
 			if not Settings.reduced_flash:
 				accent = accent.lerp(Color("#ffc1cd"), 0.25 + 0.25 * sin(_clock * 8.0))
 		elif state == "turned":
-			label = "TURNED " + label
+			glyph = "skull"
 			accent = Color(0.55, 1.0, 0.3)
+		# Names only when close or near the crosshair; otherwise colour says who.
+		var near_center := on_screen and screen.distance_to(view * 0.5) < view.x * 0.12
+		var label := name.to_upper() if (dist < 20.0 or near_center) and state == "ok" else ""
 		if on_screen:
-			_plate(screen, label, dist, accent, p)
+			_plate(screen, label, dist, accent, p, glyph)
 		else:
-			_edge_arrow(screen, behind, view, label, dist, accent)
+			_edge_arrow(screen, behind, view, dist, accent, glyph)
 
 
-func _plate(at: Vector2, label: String, dist: float, color: Color, p: Node) -> void:
-	var size := 17
-	var text := "%s  %dm" % [label, roundi(dist)]
+func _plate(at: Vector2, label: String, dist: float, color: Color, p: Node, glyph: String) -> void:
+	var size := 16
+	var text := label if not label.is_empty() else "%dm" % roundi(dist)
 	var width := FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var origin := at + Vector2(-width * 0.5, -6)
-	_canvas.draw_string_outline(FONT, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.85))
+	_canvas.draw_string_outline(FONT, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, Color(0, 0, 0, 0.8))
 	_canvas.draw_string(FONT, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+	if not glyph.is_empty():
+		_glyph(at + Vector2(0, -30), glyph, color, 22.0)
 	# Health sliver under the name.
 	var hp := float(p.get("health")) if p.get("health") != null else 100.0
 	var max_hp := float(p.get("max_health")) if p.get("max_health") != null else 100.0
@@ -93,7 +98,7 @@ func _plate(at: Vector2, label: String, dist: float, color: Color, p: Node) -> v
 	_canvas.draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-6, -7), tip + Vector2(6, -7)]), color)
 
 
-func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, label: String, dist: float, color: Color) -> void:
+func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, dist: float, color: Color, glyph: String) -> void:
 	var center := view * 0.5
 	var dir := screen - center
 	if behind:
@@ -109,7 +114,9 @@ func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, label: String, di
 	var tip := at + dir * 12.0
 	_canvas.draw_colored_polygon(PackedVector2Array([tip, at - dir * 6.0 + side * 9.0, at - dir * 6.0 - side * 9.0]), Color(0, 0, 0, 0.6))
 	_canvas.draw_colored_polygon(PackedVector2Array([tip - dir * 2.0, at - dir * 4.0 + side * 7.0, at - dir * 4.0 - side * 7.0]), color)
-	var text := "%s %dm" % [label, roundi(dist)]
+	if not glyph.is_empty():
+		_glyph(at - dir * 26.0 + Vector2(0, -16), glyph, color, 16.0)
+	var text := "%dm" % roundi(dist)
 	var size := 15
 	var width := FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var text_at := (at - dir * 26.0) + Vector2(-width * 0.5, 5)
@@ -117,3 +124,22 @@ func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, label: String, di
 	text_at.y = clampf(text_at.y, 18.0, view.y - 6.0)
 	_canvas.draw_string_outline(FONT, text_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.85))
 	_canvas.draw_string(FONT, text_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+
+
+
+## Small state glyph drawn straight onto the canvas: a cross (downed) or a skull (turned).
+func _glyph(center: Vector2, kind: String, color: Color, side: float) -> void:
+	var u := side / 22.0
+	var ink := Color(0, 0, 0, 0.8)
+	if kind == "health":
+		for rect in [Rect2(-3, -9, 6, 18), Rect2(-9, -3, 18, 6)]:
+			var r := Rect2(center + rect.position * u, rect.size * u)
+			_canvas.draw_rect(r.grow(1.5), ink)
+		for rect in [Rect2(-3, -9, 6, 18), Rect2(-9, -3, 18, 6)]:
+			_canvas.draw_rect(Rect2(center + rect.position * u, rect.size * u), color)
+	else:
+		_canvas.draw_circle(center + Vector2(0, -2) * u, 9.5 * u, ink)
+		_canvas.draw_circle(center + Vector2(0, -2) * u, 8.0 * u, color)
+		_canvas.draw_rect(Rect2(center + Vector2(-5, 3) * u, Vector2(10, 7) * u), color)
+		_canvas.draw_circle(center + Vector2(-3.5, -2) * u, 2.5 * u, ink)
+		_canvas.draw_circle(center + Vector2(3.5, -2) * u, 2.5 * u, ink)

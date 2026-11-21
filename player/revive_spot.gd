@@ -19,11 +19,8 @@ func can_interact(player: Node) -> bool:
 	return player.get("state") == "ok"
 
 
-func get_prompt(player: Node) -> String:
-	var owner_player := get_parent()
-	if player == owner_player:
-		return "Revive"
-	return "Revive %s" % owner_player.get("display_name")
+func get_prompt(_player: Node) -> String:
+	return "Revive"
 
 
 func interact(player: Node) -> void:

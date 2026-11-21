@@ -131,7 +131,7 @@ func _prepare_navigation() -> void:
 			push_warning("No walkable navigation geometry for %s in %s" % [region.name, map_id])
 	# Dress Pinecrest facades & neon signs behind the loading card (visual only).
 	if map_id == Maps.DEFAULT_ID and not Net.dedicated and DisplayServer.get_name() != "headless" and is_instance_valid(_level):
-		SceneLoader.set_stage("DRESSING DISTRICT", 0.46)
+		SceneLoader.set_stage("LOADING TAPE", 0.46)
 		await get_tree().process_frame
 		if _finishing or not is_inside_tree():
 			return
@@ -148,11 +148,11 @@ func _prepare_navigation() -> void:
 	if OS.has_feature("web") and not Net.dedicated and is_instance_valid(_level):
 		Perf.mark("static batch start")
 		var job := StaticBatcher.begin(_level)
-		SceneLoader.set_stage("BATCHING DISTRICT", 0.45, "0%")
+		SceneLoader.set_stage("LOADING TAPE", 0.45)
 		while not job.step(8.0):
 			if _finishing or not is_inside_tree():
 				return
-			SceneLoader.set_stage("BATCHING DISTRICT", 0.45 + job.progress() * 0.15, "%d%%" % int(job.progress() * 100.0))
+			SceneLoader.set_stage("LOADING TAPE", 0.45 + job.progress() * 0.15)
 			await get_tree().process_frame
 		Perf.mark("static batch merged %d meshes (%d reads) in %.1f ms (%d frames)" % [job.merged_count, job.unique_reads, job.total_ms(), job.slices])
 		$WeatherFX.refresh_wet_surfaces(_level)

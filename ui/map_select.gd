@@ -48,10 +48,8 @@ func _ready() -> void:
 	var header := VBoxContainer.new()
 	header.add_theme_constant_override("separation", 4)
 	box.add_child(header)
-	var heading := _label(header, "VOTE FOR A DISTRICT" if mode == Mode.VOTE else "SELECT A DISTRICT", 52, BroadcastUI.PAPER)
+	var heading := _label(header, "DISTRICT", 52, BroadcastUI.PAPER)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var sub := _label(header, "SELECT A CHANNEL TO CAST YOUR LIVE VOTE" if mode == Mode.VOTE else "CHOOSE A QUARANTINE ZONE FOR THIS TAPE", 20, BroadcastUI.CYAN)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var cards := HBoxContainer.new()
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -66,9 +64,9 @@ func _ready() -> void:
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	actions.add_theme_constant_override("separation", 14)
 	box.add_child(actions)
-	_back = _action(actions, "BACK" if mode == Mode.SOLO else "BACK TO LOBBY", _on_back)
+	_back = _action(actions, "BACK", _on_back)
 	if mode != Mode.VOTE:
-		_deploy = _action(actions, "PLAY" if mode == Mode.SOLO else "SET DISTRICT", _confirm)
+		_deploy = _action(actions, "PLAY" if mode == Mode.SOLO else "SET", _confirm)
 		BroadcastUI.button_role(_deploy, true)
 	else:
 		BroadcastUI.button_role(_back, true)
@@ -109,7 +107,7 @@ func _build_card(parent: Control, map: Dictionary) -> void:
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inset.add_child(content)
 
-	_label(content, "CHANNEL " + str(map.channel), 19, map.accent)
+	_label(content, "CH " + str(map.channel), 19, map.accent)
 	var monitor := ColorRect.new()
 	monitor.clip_contents = true
 	monitor.custom_minimum_size.y = 96
@@ -152,10 +150,10 @@ func _refresh() -> void:
 		card.add_theme_stylebox_override("focus", _border(Color.TRANSPARENT, BroadcastUI.PAPER, 2))
 		if mode == Mode.VOTE:
 			var count := int(Net.lobby_vote_counts.get(id, 0))
-			var tally := "%d VOTE" % count if count == 1 else "%d VOTES" % count
-			_states[i].text = tally + ("  /  YOUR PICK" if selected else "")
+			# Tally only; your pick is the lit card border.
+			_states[i].text = "%d" % count if count > 0 else ""
 		else:
-			_states[i].text = "SELECTED" if selected else ""
+			_states[i].text = ""
 
 
 func _pick(id: String) -> void:

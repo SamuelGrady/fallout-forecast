@@ -170,7 +170,7 @@ func can_interact(player: Node) -> bool:
 
 
 func get_prompt(_player: Node) -> String:
-	return "Repair suit"
+	return "Repair"
 
 
 func interact(player: Node) -> void:

@@ -11,6 +11,11 @@ const ACID := Color("#b8e56d")
 const MUTED := Color("#aabac7")
 const PANEL := Color("#14232d")
 const OVERLAY := Color(0.025, 0.045, 0.075, 0.94)
+## In-game type scale (multiplied by Settings.hud_scale where it applies).
+const T_META := 16
+const T_BODY := 22
+const T_NUM := 34
+const T_HEAD := 56
 
 static func panel(color := INK, accent := CYAN) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -126,6 +131,33 @@ static func text(label: Label, font_size: int, color := PAPER, outline := 0) -> 
 	label.add_theme_constant_override("outline_size", outline)
 
 
+## HUD text: outlined, no backing box.
+static func hud_text(label: Label, font_size: int, color := PAPER) -> void:
+	text(label, font_size, color, 3)
+	label.add_theme_color_override("font_outline_color", Color(INK, 0.9))
+
+
+## Thin HUD bar: dim track, solid fill, no borders.
+static func thin_bar(control: ProgressBar, color: Color) -> void:
+	var background := StyleBoxFlat.new()
+	background.bg_color = Color(INK, 0.55)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = color
+	control.add_theme_stylebox_override("background", background)
+	control.add_theme_stylebox_override("fill", fill)
+	control.show_percentage = false
+
+
+## Draw a small key cap ("E", "LMB") at `at` (top-left). Returns its width.
+static func draw_key_cap(canvas: CanvasItem, at: Vector2, glyph: String, font_size := T_META, color := PAPER) -> float:
+	var width := maxf(FONT.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + 10.0, font_size + 2.0)
+	var rect := Rect2(at, Vector2(width, font_size + 2.0))
+	canvas.draw_rect(rect, Color(INK, 0.7))
+	canvas.draw_rect(rect, color, false, 1.0)
+	canvas.draw_string(FONT, at + Vector2(0, font_size - 1.0), glyph, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, color)
+	return width
+
+
 static func back_label(label: Label, accent := CYAN, padding := 6) -> void:
 	var style := panel(OVERLAY, accent)
 	style.set_content_margin_all(padding)
@@ -231,8 +263,8 @@ static func button_accent(button: Button, accent: Color, quiet := false) -> void
 
 static func input_hint(action: String) -> String:
 	if Settings.using_gamepad:
-		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
-	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
+		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "fire":"RT", "reload":"X", "ping":"D-PAD", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT"}.get(action,"A")
+	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "fire":"LMB", "reload":"R", "ping":"Z", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2"}.get(action,"ENTER")
 
 
 static func reveal(control: Control) -> void:

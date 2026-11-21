@@ -36,7 +36,6 @@ var _lit := -1
 var _elapsed := 0.0
 var _tick_left := 0.0
 var _counting := true
-var _skip := Label.new()
 
 
 func _ready() -> void:
@@ -64,29 +63,31 @@ func _ready() -> void:
 	panel.add_child(box)
 
 	var title := "ENDLESS TAPE COMPLETE" if endless else district + (" IS SAFE" if won else " IS LOST")
-	_label(box, "STOP  []   /   " + district, 20, BroadcastUI.MUTED)
+	_label(box, "STOP", 20, BroadcastUI.MUTED)
 	_label(box, title, 52, accent)
-	var epilogue := "Cumulus fell. The squad stayed on the air until the signal cut out." if endless else _epilogue(won, int(result.get("wave_reached", _survived)))
-	var signoff := _label(box, epilogue, 22, BroadcastUI.PAPER)
-	signoff.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if not endless:
 		_build_segments(box)
 	_build_summary(box, result, players, endless)
 	_build_players(box, players)
 	var squad: Array = result.get("squad_mutations", [])
 	if not squad.is_empty():
-		var mutations := _label(box, "SQUAD MUTATIONS  /  " + ", ".join(PackedStringArray(squad)), 20, BroadcastUI.ACID)
-		mutations.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# Squad mutations as an icon row.
+		var icons := _row(box, 6)
+		icons.alignment = BoxContainer.ALIGNMENT_CENTER
+		for id: String in GameManager.PLAYER_MUTATIONS:
+			var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
+			if str(info.name) in squad:
+				var icon := GameIcon.new()
+				icon.kind = id
+				icon.color = info.color
+				icon.custom_minimum_size = Vector2(26, 26)
+				icons.add_child(icon)
 	var actions := _row(box, 14)
 	var back := _button(actions, "BACK TO LOBBY", func(): SceneLoader.cut_to(LOBBY_SCENE)) if Net.is_online() else _button(actions, "PLAY AGAIN", func(): SceneLoader.goto(Maps.RUN_SCENE, map_id))
 	BroadcastUI.button_role(back, true)
 	var menu := _button(actions, "MAIN MENU", _on_menu)
 	BroadcastUI.button_role(menu, false, false)
 	back.grab_focus()
-	BroadcastUI.text(_skip, 19, BroadcastUI.MUTED)
-	_skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_skip.text = "PRESS ANY BUTTON TO SKIP TALLY" if Settings.using_gamepad else "PRESS ANY KEY TO SKIP TALLY"
-	box.add_child(_skip)
 	_render_tally(0.0)
 
 
@@ -106,11 +107,11 @@ func _build_summary(box: Control, result: Dictionary, players: Dictionary, endle
 		if stats is Dictionary:
 			total_kills += int(stats.get("kills", 0))
 	var row := _row(box, 18)
-	_metric(row, "TIME ON TAPE", int(result.get("seconds", 0)), Format.CLOCK)
-	_metric(row, "WAVES SURVIVED", _survived, Format.NUMBER if endless else Format.CAMPAIGN_WAVES)
-	_metric(row, "ELIMINATIONS", total_kills)
+	_metric(row, "TIME", int(result.get("seconds", 0)), Format.CLOCK)
+	_metric(row, "WAVES", _survived, Format.NUMBER if endless else Format.CAMPAIGN_WAVES)
+	_metric(row, "KILLS", total_kills)
 	if endless:
-		_metric(row, "TAPE SCORE", int(result.get("endless_score", 0)), Format.TAPE_SCORE)
+		_metric(row, "SCORE", int(result.get("endless_score", 0)), Format.TAPE_SCORE)
 
 
 func _metric(row: Control, caption: String, value: int, format := Format.NUMBER) -> void:
@@ -132,11 +133,11 @@ func _build_players(box: Control, players: Dictionary) -> void:
 	grid.add_theme_constant_override("v_separation", 2)
 	box.add_child(grid)
 	for heading: String in ["PLAYER", "KILLS", "REVIVES", "TURNED"]:
-		var label := _label(grid, heading, 19, BroadcastUI.CYAN)
+		var label := _label(grid, "" if heading == "PLAYER" else heading, 19, BroadcastUI.CYAN)
 		label.custom_minimum_size.x = 218 if heading == "PLAYER" else 68
 		if heading == "PLAYER":
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	var mvp := ""
+	var mvp: Label
 	var best := -1
 	for stats: Variant in players.values():
 		if not stats is Dictionary:
@@ -155,14 +156,10 @@ func _build_players(box: Control, players: Dictionary) -> void:
 		var contribution := kills + 2 * revives
 		if contribution > best:
 			best = contribution
-			mvp = callsign
-	if players.size() > 1 and not mvp.is_empty():
-		_label(box, "MVP  /  " + mvp, 22, BroadcastUI.AMBER)
-	elif players.size() == 1 and players.values()[0] is Dictionary:
-		var stats: Dictionary = players.values()[0]
-		var weapon := str(stats.get("weapon", stats.get("cursed", "")))
-		if not weapon.is_empty():
-			_label(box, "FINISHED WITH  /  " + weapon.to_upper(), 20, BroadcastUI.MUTED)
+			mvp = name_label
+	# MVP: their name in amber, no extra line.
+	if players.size() > 1 and mvp:
+		mvp.add_theme_color_override("font_color", BroadcastUI.AMBER)
 
 
 func _render_tally(fraction: float) -> bool:
@@ -197,7 +194,6 @@ func _process(delta: float) -> void:
 func _finish_tally() -> void:
 	_counting = false
 	_render_tally(1.0)
-	_skip.modulate.a = 0.0
 	set_process(false)
 
 
@@ -212,16 +208,6 @@ func _input(event: InputEvent) -> void:
 		Sound.play("ui_click")
 		get_viewport().set_input_as_handled()
 		_on_menu()
-
-
-func _epilogue(won: bool, wave: int) -> String:
-	if won:
-		return "The acid storm broke at dawn. Cumulus is gone, and the sirens finally stopped."
-	match wave:
-		0, 1: return "The first rain was enough. Nobody made it past the drizzle."
-		2, 3: return "The squad held the district for a while. Then the downpour took the rest."
-		4: return "The quarantine still stands. The squad was one storm away."
-		_: return "Cumulus swallowed the last of the signal. The tape runs out here."
 
 
 func _on_menu() -> void:

@@ -53,7 +53,7 @@ func _ready() -> void:
 		black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_overlay.add_child(black)
 		_label = Label.new()
-		_label.text = "TUNING IN..."
+		_label.text = "TUNING IN"
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_label.add_theme_font_override("font", BroadcastUI.FONT)
 		_label.add_theme_font_size_override("font_size", 34)
@@ -106,11 +106,10 @@ func _advance_stage() -> void:
 	_stage_us = Time.get_ticks_usec()
 	var total := STAGES.size()
 	var frac := float(_stage) / float(total)
-	var caption := "TUNING IN..."
-	var detail := "%d / %d" % [_stage + 1, total]
-	SceneLoader.set_stage(caption, 0.60 + frac * 0.38, detail)
+	var caption := "TUNING IN"
+	SceneLoader.set_stage(caption, 0.60 + frac * 0.38)
 	if _label:
-		_label.text = "%s  %s" % [caption, detail]
+		_label.text = caption
 
 	var forward := -camera.global_basis.z
 	var right := camera.global_basis.x

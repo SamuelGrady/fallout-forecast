@@ -21,8 +21,7 @@ func _ready() -> void:
 	add_child(_camera)
 	_layer.layer = 7
 	add_child(_layer)
-	BroadcastUI.text(_label, roundi(24 * Settings.hud_scale), BroadcastUI.CYAN)
-	BroadcastUI.back_label(_label)
+	BroadcastUI.hud_text(_label, roundi(BroadcastUI.T_BODY * Settings.hud_scale), BroadcastUI.CYAN)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_label.offset_left = -220
@@ -80,7 +79,9 @@ func _process(delta: float) -> void:
 	_camera.global_position = _camera.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
 	_camera.look_at(head, Vector3.UP)
 	var callsign := str(target.get("display_name")) if target.get("display_name") != null else "TEAMMATE"
-	_label.text = "SPECTATING  /  %s\nBACK AT CLEARING" % callsign.to_upper()
+	_label.text = callsign.to_upper()
+	var suit: Variant = target.get("suit_color")
+	_label.add_theme_color_override("font_color", suit if suit is Color else BroadcastUI.CYAN)
 	if available.size() > 1:
-		_label.text += "   [%s] NEXT" % ("RT" if Settings.using_gamepad else "LMB")
+		_label.text += "   %s >" % BroadcastUI.input_hint("fire")
 	_label.visible = true

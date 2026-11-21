@@ -1,12 +1,27 @@
 class_name ItemHotbar
 extends Control
+## Five item slots, bottom centre. No filled boxes: an outline on the selected
+## cell, the item icon, the tier as a coloured underline, a count for
+## consumables, and scrap as an icon + number at the right end.
 
 const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
 const CELL := Vector2(68, 64)
 const GAP := 5
 ## Whole hotbar: 5 cells and 4 gaps (360 x 64 px in the 960x720 viewport).
 const SIZE := Vector2(CELL.x * 5 + GAP * 4, CELL.y)
+const INK := Color(0.047, 0.078, 0.133, 0.9)
 var _state: Array = []
+var _flash := 0.0
+var _scrap_icon := GameIcon.new()
+
+
+func _ready() -> void:
+	_scrap_icon.kind = "scrap"
+	_scrap_icon.color = Color("#ffc365")
+	_scrap_icon.size = Vector2(14, 14)
+	_scrap_icon.position = Vector2(SIZE.x + 6, CELL.y - 18)
+	add_child(_scrap_icon)
+
 
 func refresh(holder: WeaponHolder) -> void:
 	var data: Array = [holder.current, holder.scrap]
@@ -16,33 +31,56 @@ func refresh(holder: WeaponHolder) -> void:
 		_state = data
 		queue_redraw()
 
+
+## Slot contents without the selection or scrap, so the HUD can tell a pickup
+## or swap apart from ammo ticking down.
+func state_key() -> Array:
+	return _state.slice(2).map(func(item): return item.slice(0, 2) if item is Array and not item.is_empty() else [])
+
+
+## Pulse the selected cell (unlocks, pickups).
+func flash() -> void:
+	_flash = 1.2
+
+
+func _process(delta: float) -> void:
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta)
+		queue_redraw()
+
+
 func _draw() -> void:
 	if _state.is_empty():
 		return
-	var scrap_text := "%d SCRAP" % _state[1]
-	draw_string(FONT, Vector2(0, -5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
+	var scrap_text := str(_state[1])
+	draw_string_outline(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, INK)
+	draw_string(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
 	for i in WeaponHolder.SLOT_COUNT:
-		var at := Vector2(i * (CELL.x + GAP), 0)
 		var selected: bool = _state[0] == i
+		var at := Vector2(i * (CELL.x + GAP), -4.0 if selected else 0.0)
 		var item: Array = _state[i + 2]
 		var color := Color("#728b92") if item.is_empty() else ItemCatalog.tier_color(item[0], item[1])
-		draw_rect(Rect2(at, CELL), Color("#203647f5") if selected else Color("#101c25de"))
-		draw_rect(Rect2(at, CELL), Color("#c7faff") if selected else Color("#6d899089"), false, 2.0 if selected else 1.0)
-		draw_rect(Rect2(at + Vector2(2, CELL.y - 4), Vector2(CELL.x - 4, 3)), color)
-		draw_string(FONT, at + Vector2(5, 16), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, color)
+		if selected:
+			draw_rect(Rect2(at, CELL), Color(color, 0.14))
+			var outline := Color("#ffc365").lerp(Color("#c7faff"), 1.0 - _flash / 1.2) if _flash > 0.0 else Color("#c7faff")
+			draw_rect(Rect2(at, CELL), outline, false, 2.0)
+		else:
+			draw_rect(Rect2(at, CELL), Color(0.43, 0.54, 0.56, 0.28), false, 1.0)
+		draw_string_outline(FONT, at + Vector2(5, 15), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, INK)
+		draw_string(FONT, at + Vector2(5, 15), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.91, 0.91, 0.84, 0.75 if selected else 0.4))
 		if item.is_empty():
-			draw_rect(Rect2(at + Vector2(28, 30), Vector2(12, 2)), color)
+			draw_rect(Rect2(at + Vector2(28, 30), Vector2(12, 2)), Color(color, 0.5))
 			continue
+		draw_rect(Rect2(at + Vector2(6, CELL.y - 5), Vector2(CELL.x - 12, 2)), color)
 		var definition := ItemCatalog.definition(item[0])
+		var alpha := 1.0 if selected else 0.7
 		if definition.icon:
-			draw_texture_rect(definition.icon, Rect2(at + Vector2(16, 6), Vector2(36, 36)), false)
+			draw_texture_rect(definition.icon, Rect2(at + Vector2(14, 8), Vector2(40, 40)), false, Color(1, 1, 1, alpha))
 		else:
 			var initials := ""
 			for word in definition.display_name.split(" "):
 				initials += word.left(1)
-			draw_rect(Rect2(at + Vector2(19, 10), Vector2(30, 28)), Color(color, 0.15))
-			draw_string(FONT, at + Vector2(15, 31), initials.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 38, 20, color)
+			draw_string(FONT, at + Vector2(15, 36), initials.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 38, 22, Color(color, alpha))
 		if definition.kind != ItemDefinition.Kind.GUN:
-			draw_string(FONT, at + Vector2(CELL.x - 26, 40), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, color)
-		draw_string(FONT, at + Vector2(2, 56), ItemCatalog.tier_name(item[0], item[1]),
-			HORIZONTAL_ALIGNMENT_CENTER, CELL.x - 4, 11, color)
+			draw_string_outline(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, 3, INK)
+			draw_string(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, color)

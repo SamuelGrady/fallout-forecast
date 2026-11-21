@@ -331,8 +331,6 @@ func _sync_objective(site: String) -> void:
 func complete_objective(objective: Node, player: Node) -> void:
 	if not is_host() or not objective.active:
 		return
-	if is_instance_valid(player) and player.is_in_group("local_player"):
-		Juice.popup("+OBJECTIVE", Color("#ffd56a"))
 	_set_objective("")
 	add_decon_charge(1)
 	# Through the spawner so every peer gets the pack.
@@ -345,7 +343,7 @@ func complete_objective(objective: Node, player: Node) -> void:
 		if _online():
 			Net.rpc_to_run(spawner._spawn_supply, [at])
 	Sound.play("reel_land", -6.0, 1.2)
-	show_banner("%s: +1 DECON, SUPPLIES" % str(objective.site_label), Color("ffd56a"), 2.4)
+	show_banner("SECURED", Color("ffd56a"), 2.0)
 	var s := _stat(player)
 	s["objectives"] = int(s.get("objectives", 0)) + 1
 
@@ -453,7 +451,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if not objectives.is_empty():
 				var objective: Node = objectives[(_wave - 1) % objectives.size()]
 				_set_objective(objective.site)
-				show_banner("OBJECTIVE: %s" % objective.site_label, Color("ffd56a"), 2.2)
+				show_banner(str(objective.site_label).to_upper(), Color("ffd56a"), 2.2)
 		WeatherManager.Phase.CALM:
 			crates.start_calm()
 			if _wave == 3:
@@ -876,10 +874,7 @@ func _finish(won: bool, results: Dictionary) -> void:
 	finished = true
 	run_active = false
 	last_results = results
-	var headline := Maps.display_name(str(results.get("map_id", Maps.DEFAULT_ID))) + (" IS SAFE" if won else " IS LOST")
-	if bool(results.get("endless", false)):
-		headline = "ENDLESS TAPE COMPLETE"
-	banner.emit(headline, Color(0.4, 1, 0.6) if won else Color(1, 0.3, 0.3), 4.0)
+	# No banner: the defeat card / results screen carry the outcome.
 	run_finished.emit(won, results)
 
 
