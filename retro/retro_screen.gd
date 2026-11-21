@@ -18,7 +18,7 @@ const START_SECONDS := 23 * 3600 + 47 * 60  # 11:47 PM
 @export var enabled := true
 @export var interface_only := false
 var _interface_layer: CanvasLayer
-var _web := OS.has_feature("web")
+var _web := WebMaterials.emulate_web_look()
 @export var vertex_snap := 120.0
 @export var lightning_glitch := 1.0
 @export var downed_glitch := 0.45
@@ -213,7 +213,7 @@ func _convert(material: Material) -> ShaderMaterial:
 	var m := material as StandardMaterial3D
 	# Leave anything special alone: glass, puddles, glows, unshaded effects.
 	if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or m.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED \
-			or m.emission_enabled or m.grow or m.no_depth_test:
+			or WebMaterials.glows(m) or m.grow or m.no_depth_test:
 		return null
 	var s := ShaderMaterial.new()
 	s.shader = PS1
