@@ -32,6 +32,7 @@ const WEATHER_SCENES := [
 const NET_HZ := 20.0
 const MIN_ARRIVAL_DISTANCE := 12.0
 const PREFERRED_ARRIVAL_DISTANCE := 45.0
+const MINIBOSS_WAVE := 3
 
 var _timer := 0.0
 var _next_net_id := 1
@@ -59,7 +60,6 @@ var _beat_done := false
 ## False Clearing mutation: mid-Downpour lull + elite spawn.
 var _false_clearing_done := false
 var _false_clearing_left := 0.0
-## Wave 1-4 Mini-Boss spawned once the main wave horde winds down.
 var _cleanup_left := 5.0
 var _miniboss_spawned := false
 
@@ -141,8 +141,7 @@ func _physics_process(delta: float) -> void:
 	if not _beat_done and (ambush or late_beat):
 		_beat_done = true
 		_run_beat(_wave)
-	if downpour and _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned \
-			and _spawned >= ceili(_budget * 0.5):
+	if downpour and _awaiting_miniboss() and _spawned >= ceili(_budget * 0.5):
 		_miniboss_spawned = spawn_miniboss(_wave) != null
 	if _spawned >= _budget and alive_count() <= 3:
 		_cleanup_left = maxf(0.0, _cleanup_left - delta)
@@ -393,7 +392,7 @@ func wave_total() -> int:
 
 
 func _awaiting_miniboss() -> bool:
-	return _wave > 0 and _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned
+	return _wave == MINIBOSS_WAVE and not _miniboss_spawned
 
 
 func recovery_time() -> float:
