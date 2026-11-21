@@ -12,7 +12,7 @@ extends Area3D
 @export var grow_time := 45.0
 ## Seconds to dry from full size once the rain stops.
 @export var dry_time := 25.0
-@export var color := Color(0.25, 0.35, 0.3, 0.75)
+@export var color := Color(0.44, 0.52, 0.6, 0.66)
 @export var acid_color := Color(0.35, 0.7, 0.2, 0.8)
 
 ## 0 = dry, 1 = full size.
@@ -46,14 +46,31 @@ func _ready() -> void:
 	disc.height = 0.01
 	disc.radial_segments = 20
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_material.roughness = 0.05
-	_material.metallic = 0.6
+	# Reads as a sheet of water against wet asphalt: pale, glossy, sky-lit.
+	_material.roughness = 0.02
+	_material.metallic = 0.3
+	_material.metallic_specular = 1.0
 	_material.albedo_color = color
 	disc.material = _material
 	_mesh.mesh = disc
 	_mesh.position.y = 0.075
 	add_child(_mesh)
 	_apply()
+	_settle_water.call_deferred()
+
+
+## Puddle markers sit at slightly different heights from the road under them
+## (Pinecrest's are at 0 on a 6-8 cm road), so the disc could end up buried.
+## Rest it just above whatever floor is under the marker.
+func _settle_water() -> void:
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		return
+	var from := global_position + Vector3.UP * 0.6
+	var query := PhysicsRayQueryParameters3D.create(from, global_position + Vector3.DOWN * 0.6, 1)
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		_mesh.position.y = (hit.position as Vector3).y - global_position.y + 0.03
 
 
 var _tick_elapsed := 0.0
@@ -112,7 +129,7 @@ func _ripple() -> void:
 	add_child(ring)
 	var r := radius() * 0.8
 	var a := randf() * TAU
-	ring.position = Vector3(cos(a), 0.0, sin(a)) * randf() * r + Vector3.UP * 0.02
+	ring.position = Vector3(cos(a), 0.0, sin(a)) * randf() * r + Vector3.UP * (_mesh.position.y + 0.012)
 	ring.scale = Vector3(0.05, 0.05, 0.05)
 	_ripples += 1
 	var tween := ring.create_tween().set_parallel(true)

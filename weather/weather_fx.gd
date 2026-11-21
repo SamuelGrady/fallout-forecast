@@ -42,6 +42,7 @@ var _wet_colors: Dictionary[Material, Color] = {}
 var _wetness := -1.0
 var _wind_props: Array[Node3D] = []
 var _wind_rest: Array[Basis] = []
+var _wind_materials: Array[ShaderMaterial] = []
 var _wind_clock := 0.0
 var _wind_was_active := false
 var _sun_rest := Basis.IDENTITY
@@ -55,6 +56,8 @@ const WET_TEXTURES := [
 	"canopy.png", "awning_cyan.png", "awning_pink.png", "quay_steel.png", "diamond_plate.png",
 ]
 const WET_SURFACE := &"storm_wet_surface"
+## Builder-authored leaf materials; RetroScreen copies it onto the PS1 copy.
+const WIND_FOLIAGE := &"wind_foliage"
 
 
 func _ready() -> void:
@@ -158,6 +161,8 @@ static func is_wet_surface(material: StandardMaterial3D) -> bool:
 
 
 func _collect_surface(material: Material) -> void:
+	if material is ShaderMaterial and material.has_meta(WIND_FOLIAGE) and not OS.has_feature("web") 			and not _wind_materials.has(material):
+		_wind_materials.append(material)
 	if material == null or _wet_materials.has(material):
 		return
 	if material is StandardMaterial3D and is_wet_surface(material):
@@ -173,6 +178,7 @@ func refresh_wet_surfaces(level: Node3D) -> void:
 	_update_wet_surfaces(0.0)
 	_wet_materials.clear()
 	_wet_colors.clear()
+	_wind_materials.clear()
 	_collect_surface_finish(level)
 
 
@@ -209,7 +215,7 @@ func _exit_tree() -> void:
 
 
 func _update_wind(intensity: float, delta: float) -> void:
-	if _wind_props.is_empty() or (intensity <= 0.0 and not _wind_was_active):
+	if (_wind_props.is_empty() and _wind_materials.is_empty()) or (intensity <= 0.0 and not _wind_was_active):
 		return
 	_wind_clock += delta
 	_wind_was_active = intensity > 0.0
@@ -221,6 +227,10 @@ func _update_wind(intensity: float, delta: float) -> void:
 		var node := _wind_props[i]
 		node.basis = Basis.from_euler(Vector3(sin(phase) * gust * 0.026, 0.0,
 			(sin(phase * 0.8) + 0.45) * gust * 0.045)) * _wind_rest[i]
+	# Merged forest leaves bend in the PS1 vertex shader instead.
+	for material in _wind_materials:
+		material.set_shader_parameter("wind", gust)
+		material.set_shader_parameter("wind_time", _wind_clock)
 
 
 func _update_web_shelter_hole(player: Player) -> void:

@@ -9,6 +9,7 @@ var _clear_circles: Array[Vector3] = [] # x, z, radius
 var _trail_segments: Array[Array] = [] # [Vector2 a, Vector2 b, float half_width]
 var _mat_batches: Dictionary = {} # parent Node3D -> { key: [Material, bool cast_shadow, Array[[Mesh, Transform3D]]] }
 var _cast_shadow := true
+var _foliage := {}
 
 
 func add_visual(kind: String, center: Vector3, size: Vector3, material: Material, rot: Vector3) -> void:
@@ -48,6 +49,20 @@ func flush() -> void:
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_mat_batches.clear()
 	batches.clear()
+
+
+## Leaves and needles that sway in the storm wind on desktop. The PS1 shader
+## bends the vertices by height (see ps1.gdshader `foliage`), so merged
+## forest batches sway without splitting into per-tree nodes. `sway` scales
+## the bend; low ferns need more to read.
+func foliage(color: String, sway := 1.0) -> Material:
+	var key := "%s/%s" % [color, sway]
+	if not _foliage.has(key):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(color)
+		m.set_meta(&"wind_foliage", sway)
+		_foliage[key] = m
+	return _foliage[key]
 
 
 func start_scene(title: String) -> void:
@@ -344,7 +359,7 @@ func october_maple() -> void:
 		tube(tip + Vector3.UP * 0.63, 0.97, 1.6, leaf, 2.12)
 		tube(tip + Vector3.UP * 2.24, 2.06, 1.65, leaf, 0.34)
 	tube(Vector3(0.0, 5.8, 0.0), 2.1, 2.3, leaf_b, 0.54)
-	finish_prop("october_maple")
+	finish_prop("october_maple", true)
 
 
 func fire_tower() -> void:
@@ -938,14 +953,14 @@ func forest_trees_and_undergrowth() -> void:
 	var bark := surface("#4c3e3a", "wood", 0.45)
 	# 2 pine shades + 2 oak shades + 1 fern shade = only 6 merged draw calls per quadrant!
 	var pine_mats: Array[Material] = [
-		paint("#263d41"),
-		paint("#2f4943"),
+		foliage("#263d41", 0.7),
+		foliage("#2f4943", 0.7),
 	]
 	var oak_mats: Array[Material] = [
-		paint("#3f503f"),
-		paint("#524d3f"),
+		foliage("#3f503f", 0.8),
+		foliage("#524d3f", 0.8),
 	]
-	var fern_mat := paint("#3e5f45")
+	var fern_mat := foliage("#3e5f45", 4.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 19871031

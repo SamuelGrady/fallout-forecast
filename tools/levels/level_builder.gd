@@ -215,7 +215,9 @@ func finish_prop(id: String, wind := false) -> void:
 		visual.add_to_group("wind_sway", true)
 		for child in scene.get_children():
 			if child is MeshInstance3D:
+				child.owner = null
 				child.reparent(visual, false)
+				child.owner = scene
 	props[id] = save("res://props/%s/%s.tscn" % [district, id])
 	scene.free()
 
