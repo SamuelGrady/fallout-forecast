@@ -117,10 +117,6 @@ func _draw() -> void:
 			draw_line(Vector2(19,4), Vector2(19,27), color, 4, true)
 			for x in [-12, 0, 12]:
 				draw_line(Vector2(x+3,-31), Vector2(x,-24), color * Color(1,1,1,0.6), 3, true)
-		"objective":
-			var diamond := PackedVector2Array([Vector2(0,-26),Vector2(26,0),Vector2(0,26),Vector2(-26,0),Vector2(0,-26)])
-			draw_polyline(diamond, color, 5, true)
-			draw_circle(Vector2.ZERO, 7, color)
 		# HUD status glyphs (ui/hud.gd).
 		"rain":
 			draw_colored_polygon(PackedVector2Array([Vector2(0,-27),Vector2(15,4),Vector2(10,18),

@@ -9,7 +9,6 @@ extends Node3D
 
 const DeconShower := preload("res://props/decon_shower.gd")
 const PlayerScene := preload("res://player/player.tscn")
-const DistrictObjective := preload("res://props/district_objective.gd")
 
 var map_id := ""
 var map_scene: PackedScene
@@ -56,7 +55,6 @@ func _ready() -> void:
 	GameManager.map_id = map_id
 	Telemetry.run_started(map_id)
 	_setup_decon_showers()
-	_setup_objectives()
 	var loot := RunLoot.new()
 	loot.name = "RunLoot"
 	add_child(loot)
@@ -297,34 +295,6 @@ func _peer_of(node_name: String) -> int:
 	if not node_name.begins_with("P_"):
 		return -1
 	return int(node_name.substr(2))
-
-
-## Same objective paths on every peer. New districts use their drain markers.
-func _setup_objectives() -> void:
-	var root := Node3D.new()
-	root.name = "DistrictObjectives"
-	_level.add_child(root)
-	if map_id == Maps.DEFAULT_ID:
-		for site: String in DistrictObjective.PINECREST_SITES:
-			var data: Dictionary = DistrictObjective.PINECREST_SITES[site]
-			_add_objective(root, site, data.label, _level.to_global(data.at))
-	else:
-		var markers := get_tree().get_nodes_in_group("district_objective_spawn")
-		if markers.is_empty():
-			markers = get_tree().get_nodes_in_group("drain_spawn")
-		for i in mini(3, markers.size()):
-			var marker := markers[i] as Node3D
-			_add_objective(root, "drain_%d" % (i + 1), "SEAL DRAIN %d" % (i + 1), marker.global_position)
-
-
-func _add_objective(root: Node3D, site: String, label: String, at: Vector3) -> void:
-	var objective := DistrictObjective.new()
-	objective.name = site
-	objective.site = site
-	objective.site_label = label
-	root.add_child(objective)
-	# Lift the use point off the ground so the interact ray reaches it.
-	objective.global_position = at + Vector3.UP
 
 
 var _finishing := false

@@ -46,9 +46,12 @@ func can_interact(player: Node) -> bool:
 	return not is_queued_for_deletion() and item != null and player.state == "ok" \
 			and (claim_peer == 0 or claim_peer == player.get_multiplayer_authority())
 
+func interact_point() -> Vector3:
+	return global_position + Vector3.UP * 0.28
+
 func get_prompt(player: Node) -> String:
 	var holder := player.get_node("Head/Camera3D/WeaponHolder") as WeaponHolder
-	var action := "Swap for" if holder.needs_swap(item) else "Take"
+	var action := "Swap" if holder.needs_swap(item) else "Take"
 	return "%s %s" % [action, ItemCatalog.definition(item.id).display_name]
 
 func request(player: Node) -> void:

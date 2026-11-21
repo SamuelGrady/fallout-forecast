@@ -3,7 +3,7 @@ extends Control
 ## Built by PingSystem (game/ping_system.gd) on every peer with a screen.
 ##
 ## Controls ("ping": middle mouse, Z, D-pad down):
-## - tap: ping what's under the crosshair (enemy, crate, decon, objective,
+## - tap: ping what's under the crosshair (enemy, crate, decon,
 ##   pickup, or GO HERE on the spot). Downed, a tap is REVIVE ME.
 ## - hold: the wheel opens and the camera freezes. Mouse or right stick
 ##   picks a slice; release sends it, release in the middle cancels.

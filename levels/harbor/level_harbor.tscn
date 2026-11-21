@@ -2418,7 +2418,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.08, -24)
 
 [node name="StormDrains" type="Node3D" parent="." unique_id=247237909]
 
-[node name="Grate" type="Marker3D" parent="StormDrains" unique_id=1307563322 groups=["drain_spawn", "district_objective_spawn"]]
+[node name="Grate" type="Marker3D" parent="StormDrains" unique_id=1307563322 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54, 0.02, -29)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate" unique_id=1122899812]
@@ -2466,7 +2466,7 @@ mesh = SubResource("BoxMesh_56dp1")
 material_override = SubResource("StandardMaterial3D_ycwa6")
 mesh = SubResource("ArrayMesh_kv1bb")
 
-[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=2111444232 groups=["drain_spawn", "district_objective_spawn"]]
+[node name="Grate5" type="Marker3D" parent="StormDrains" unique_id=2111444232 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.02, 5)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate5" unique_id=515804532]
@@ -2490,7 +2490,7 @@ mesh = SubResource("BoxMesh_56dp1")
 material_override = SubResource("StandardMaterial3D_ycwa6")
 mesh = SubResource("ArrayMesh_qsga4")
 
-[node name="Grate7" type="Marker3D" parent="StormDrains" unique_id=726279294 groups=["drain_spawn", "district_objective_spawn"]]
+[node name="Grate7" type="Marker3D" parent="StormDrains" unique_id=726279294 groups=["drain_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0.02, 34)
 
 [node name="Finish" type="MeshInstance3D" parent="StormDrains/Grate7" unique_id=1121936417]

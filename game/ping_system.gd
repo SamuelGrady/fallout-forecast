@@ -31,7 +31,6 @@ const KINDS := {
 	"danger": {"label": "LOOK OUT", "icon": "danger", "cue": "ping_danger"},
 	"crate": {"label": "CRATE", "icon": "crate", "cue": "ping_item"},
 	"decon": {"label": "DECON", "icon": "shower", "cue": "ping_item"},
-	"objective": {"label": "OBJECTIVE", "icon": "objective", "cue": "ping_item"},
 	"ammo": {"label": "AMMO", "icon": "ammo", "cue": "ping_item"},
 	"health": {"label": "MEDKIT", "icon": "health", "cue": "ping_item"},
 	"suit": {"label": "SUIT PATCH", "icon": "suit", "cue": "ping_item"},
@@ -241,7 +240,7 @@ func aim(player: Player) -> Dictionary:
 
 ## A quick tap: the most useful thing near the crosshair. Enemy under the
 ## crosshair, then an enemy just off it, then a crate, decon shower, active
-## objective or pickup, then the spot itself (GO HERE).
+## or pickup, then the spot itself (GO HERE).
 func context_ping(player: Player, only_kind := "") -> Dictionary:
 	var looked := aim(player)
 	if only_kind in ["", "enemy"]:
@@ -263,9 +262,6 @@ func context_ping(player: Player, only_kind := "") -> Dictionary:
 			candidates.append([crate, "crate", 0.985, crate.global_position + Vector3.UP * 0.5])
 	for shower in get_tree().get_nodes_in_group("decon_shower"):
 		candidates.append([shower, "decon", 0.985, shower.global_position + Vector3.UP])
-	for objective in get_tree().get_nodes_in_group("district_objectives"):
-		if objective.get("active"):
-			candidates.append([objective, "objective", 0.985, objective.global_position])
 	for drop in get_tree().get_nodes_in_group("ammo_drops"):
 		var drop_kind := str(drop.get("flavor") if drop.get("flavor") != null else drop.get("kind"))
 		if KINDS.has(drop_kind):

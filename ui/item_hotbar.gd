@@ -74,6 +74,11 @@ func _draw() -> void:
 		draw_rect(Rect2(at + Vector2(6, CELL.y - 5), Vector2(CELL.x - 12, 2)), color)
 		var definition := ItemCatalog.definition(item[0])
 		var alpha := 1.0 if selected else 0.7
+		if selected:
+			var hint := "%s DROP" % BroadcastUI.input_hint("drop_item")
+			var hint_at := at + Vector2(0, -5)
+			draw_string_outline(FONT, hint_at, hint, HORIZONTAL_ALIGNMENT_CENTER, CELL.x, 15, 3, INK)
+			draw_string(FONT, hint_at, hint, HORIZONTAL_ALIGNMENT_CENTER, CELL.x, 15, Color("#c7faff"))
 		if definition.icon:
 			draw_texture_rect(definition.icon, Rect2(at + Vector2(14, 8), Vector2(40, 40)), false, Color(1, 1, 1, alpha))
 		else:

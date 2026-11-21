@@ -161,7 +161,7 @@ func claim(run: int, id: int, expected: int, slot: int, player: Node3D) -> bool:
 		return false
 	var inventory := holder(player)
 	# A selection queued behind the owner's last snapshot can be stale.
-	if inventory.current != slot or inventory.selected_serial() != expected:
+	if not inventory.can_act() or inventory.current != slot or inventory.selected_serial() != expected:
 		return false
 	var item := node.item
 	var replaced := inventory.accept_pickup(item)
@@ -176,11 +176,11 @@ func claim(run: int, id: int, expected: int, slot: int, player: Node3D) -> bool:
 	inventory.send_state()
 	return true
 
-func _reachable(node: Node3D, player: Node3D, reach: float) -> bool:
+func _reachable(node: WorldPickup, player: Node3D, reach: float) -> bool:
 	if player.state != "ok" or player.global_position.distance_to(node.global_position) > reach:
 		return false
 	var eye: Vector3 = holder(player).camera.global_position
-	var query := PhysicsRayQueryParameters3D.create(eye, node.global_position + Vector3.UP * 0.28, 1)
+	var query := PhysicsRayQueryParameters3D.create(eye, node.interact_point(), 1)
 	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 func ground_at(player: Node3D, offset: Vector3) -> Vector3:

@@ -172,7 +172,7 @@ func canneries() -> void:
 	var names := ["NORTH STAR  /  ICE","HARBOR POINT CANNING CO.","PIER 3  /  COLD STORE"]
 	for i in 3:
 		section("CanneryBay"+str(i+1))
-		# Leave a service lane beside the ice house for the water-filter objective.
+		# Leave a service lane beside the ice house.
 		part.position = Vector3([-35,-1,39][i],0,-47)
 		var wall := surface(["#98c4bd","#dc9b73","#abc7c3"][i],"quay_steel",0.26)
 		var steel := paint("#354f59")
@@ -354,7 +354,6 @@ func markers() -> void:
 	shower("BuoyShed",Vector3(-15,0,51))
 	var grates := (directories.StormDrains as Node3D).get_children()
 	for i: int in [0, 4, 6]:
-		grates[i].add_to_group("district_objective_spawn", true)
 	points("StreetSupplySpawns","street_supply_spawn",[Vector2(-38,-24), Vector2(36,-19), Vector2(20,35), Vector2(44,46)],0.06)
 	marker("","boss_anchor","BossAnchor",Vector3(27,18,46))
 	puddles([Vector3(-57,3,-20),Vector3(-33,3,-30),Vector3(-10,3.2,-23),Vector3(2,2,-32),Vector3(30,3,-25),Vector3(55,3,-33),Vector3(-26,3,-3),Vector3(-4,2.5,5),Vector3(34,2.8,0),Vector3(48,2.4,6),Vector3(0,2.5,18),Vector3(12,3.2,34),Vector3(32,3.5,48),Vector3(-1,2,52),Vector3(44,2.5,54),Vector3(-50,2,5)])

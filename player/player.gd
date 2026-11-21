@@ -702,6 +702,7 @@ func _grant_tarp() -> void:
 
 # ------------------------------------------------------------------ interact
 func _handle_interact(delta: float) -> void:
+	var pressed := Input.is_action_pressed("interact")
 	var best: Interactable = null
 	var best_score := INF
 	if state != "turned" and not GameManager.is_voting():
@@ -711,7 +712,10 @@ func _handle_interact(delta: float) -> void:
 			if it == null or not it.is_visible_in_tree() or not it.can_interact(self):
 				continue
 			var self_revive := it.get_parent() == self and state == "downed"
-			var direction := it.global_position - camera.global_position
+			var target_position := it.global_position
+			if it is WorldPickup:
+				target_position = it.interact_point()
+			var direction := target_position - camera.global_position
 			var distance := global_position.distance_to(it.global_position)
 			if distance > it.radius + (0.6 if it == _hold_target and _hold > 0.0 else 0.0):
 				continue
@@ -723,7 +727,7 @@ func _handle_interact(delta: float) -> void:
 				var cone := lerpf(0.25, 0.65, clampf((distance - 0.6) / 1.4, 0.0, 1.0))
 				if forward.dot(direction.normalized()) < cone:
 					continue
-				var query := PhysicsRayQueryParameters3D.create(camera.global_position,it.global_position, WORLD_LAYER,[get_rid()])
+				var query := PhysicsRayQueryParameters3D.create(camera.global_position, target_position, WORLD_LAYER, [get_rid()])
 				var hit := get_world_3d().direct_space_state.intersect_ray(query)
 				if not hit.is_empty() and hit.collider != it.get_parent():
 					continue
@@ -738,17 +742,18 @@ func _handle_interact(delta: float) -> void:
 			_hold_target.set_targeted(false)
 		_hold_target = best
 		_hold = 0.0
-		_hold_done = false
 		interact_progress = 0.0
 		if best:
 			best.set_targeted(true)
 	if best == null:
+		if not pressed:
+			_hold_done = false
 		interact_prompt = ""
 		interact_progress = 0.0
 		return
 	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), best.get_prompt(self)]
 	var need := best.get_hold_time(self)
-	if Input.is_action_pressed("interact"):
+	if pressed and not _hold_done:
 		if _hold == 0.0 and best is SupplyInteract:
 			best.action(self, "begin")
 		_hold += delta
@@ -761,7 +766,7 @@ func _handle_interact(delta: float) -> void:
 				best.action(self, "finish")
 			else:
 				GameManager.interact(best, self)
-	else:
+	elif not pressed:
 		if best is SupplyInteract and _hold > 0.0 and not _hold_done:
 			best.action(self, "cancel")
 		_hold = 0.0

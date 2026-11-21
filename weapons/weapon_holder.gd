@@ -128,9 +128,6 @@ func _handle_input() -> void:
 	if wheel != 0:
 		select_slot(posmod(current + wheel, SLOT_COUNT))
 		return
-	if Input.is_action_just_pressed("drop_item") and selected():
-		_command("drop")
-		return
 	var data := selected_weapon()
 	if data == null or player.tarp_raised:
 		return
@@ -158,6 +155,13 @@ func _handle_input() -> void:
 			fire()
 		elif selected_reserve() > 0 and _reload_left <= 0.0:
 			start_reload()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if Net.dedicated or not player.is_multiplayer_authority():
+		return
+	if event.is_action_pressed("drop_item") and selected() and can_act():
+		_command("drop")
+		get_viewport().set_input_as_handled()
 
 func fire() -> void:
 	if not Net.can_send_run_rpc() or selected() == null:
@@ -213,11 +217,9 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 			var at := loot.ground_at(player, forward * 1.1)
 			if at == Vector3.INF:
 				at = loot.ground_at(player, Vector3.ZERO)
-			if at != Vector3.INF:
-				var item := selected()
+			if at.is_finite() and loot.spawn_pickup(selected(), at) != 0:
 				slots[current] = null
 				_cancel_actions()
-				loot.spawn_pickup(item, at)
 				send_state()
 		"charge":
 			if selected_weapon().charge_time > 0.0 and _cooldown <= 0.0 and _reload_serial == 0 \

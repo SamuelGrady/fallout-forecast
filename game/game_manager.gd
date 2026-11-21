@@ -82,7 +82,6 @@ func start_run() -> void:
 	_run_id += 1
 	_run_started_ms = Time.get_ticks_msec()
 	run_active = true
-	_active_objective = ""
 	stats.clear()
 	if mutations:
 		mutations.reset_run()
@@ -116,7 +115,6 @@ func _sync_run_to_peer(peer_id: int) -> void:
 	var spawner := world.get_node_or_null("Enemies") if world else null
 	if spawner:
 		spawner.sync_to_peer(peer_id)
-	_sync_objective.rpc_id(peer_id, _active_objective)
 	var boss := get_tree().get_first_node_in_group("boss") as Node3D
 	if boss and not boss.get("dead"):
 		_spawn_boss.rpc_id(peer_id, boss.global_position)
@@ -317,44 +315,6 @@ func player_for_peer(peer: int) -> Node:
 	return null
 
 
-# ------------------------------------------------------------------ objectives
-var _active_objective := ""
-
-
-func _set_objective(site: String) -> void:
-	_active_objective = site
-	if _online():
-		_sync_objective.rpc(site)
-	_sync_objective(site)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _sync_objective(site: String) -> void:
-	for objective in get_tree().get_nodes_in_group("district_objectives"):
-		objective.set_active(objective.site == site)
-
-
-## Host: a player finished the live objective.
-func complete_objective(objective: Node, player: Node) -> void:
-	if not is_host() or not objective.active:
-		return
-	_set_objective("")
-	add_decon_charge(1)
-	# Through the spawner so every peer gets the pack.
-	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
-	if spawner == null:
-		spawner = get_tree().current_scene.get_node_or_null("Enemies")
-	var at: Vector3 = objective.global_position + Vector3(1.2, -0.88, 0.0)
-	if spawner and spawner.has_method("spawn_drop"):
-		spawner.spawn_drop(at, "supply", 600.0)
-		if _online():
-			Net.rpc_to_run(spawner._spawn_supply, [at])
-	Sound.play("reel_land", -6.0, 1.2)
-	show_banner("SECURED", Color("ffd56a"), 2.0)
-	var s := _stat(player)
-	s["objectives"] = int(s.get("objectives", 0)) + 1
-
-
 # ------------------------------------------------------------------ global pause
 ## In a session, a pause stops the game for everyone (host-authoritative), and
 ## anyone can resume. Solo play just pauses locally as before.
@@ -455,11 +415,6 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 	match phase:
 		WeatherManager.Phase.DRIZZLE:
 			crates.end_calm()
-			var objectives := get_tree().get_nodes_in_group("district_objectives")
-			if not objectives.is_empty():
-				var objective: Node = objectives[(_wave - 1) % objectives.size()]
-				_set_objective(objective.site)
-				show_banner(str(objective.site_label).to_upper(), Color("ffd56a"), 2.2)
 		WeatherManager.Phase.CALM:
 			crates.start_calm()
 			if _wave == 3:
@@ -478,7 +433,6 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 				_waves_survived = _wave
 				if endless:
 					endless_score += 500 + 100 * (_wave - WeatherManager.FINAL_WAVE)
-			_set_objective("")
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
 			var unlocks := {1: "spray_rifle", 2: "shield_dome", 3: "frag"}
 			if newly_cleared and unlocks.has(_wave):
