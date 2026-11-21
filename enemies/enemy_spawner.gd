@@ -61,6 +61,7 @@ var _false_clearing_done := false
 var _false_clearing_left := 0.0
 ## Wave 1-4 Mini-Boss spawned once the main wave horde winds down.
 var _cleanup_left := 5.0
+var _miniboss_spawned := false
 
 
 func _ready() -> void:
@@ -87,6 +88,7 @@ func _on_phase(phase: int, wave: int) -> void:
 		_beat_done = false
 		_false_clearing_done = false
 		_cleanup_left = 5.0
+		_miniboss_spawned = false
 	if phase == WeatherManager.Phase.DRIZZLE or fresh_wave:
 		_budget = _wave_budget(wave, GameManager.enemy_spawn_scale())
 	if phase == WeatherManager.Phase.CLEARING:
@@ -139,6 +141,9 @@ func _physics_process(delta: float) -> void:
 	if not _beat_done and (ambush or late_beat):
 		_beat_done = true
 		_run_beat(_wave)
+	if downpour and _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned \
+			and _spawned >= ceili(_budget * 0.5):
+		_miniboss_spawned = spawn_miniboss(_wave) != null
 	if _spawned >= _budget and alive_count() <= 3:
 		_cleanup_left = maxf(0.0, _cleanup_left - delta)
 	else:
@@ -204,8 +209,16 @@ func _plan_group(slots: int, downpour: bool) -> bool:
 	var squad_slots := ceili((GameManager.player_count() - 1) * 1.5)
 	var size := mini(slots, clampi(4 + _wave + squad_slots, 5, 12 + squad_slots))
 	var mix := WavePlan.weights(_wave, downpour)
+	var special_count := 0
 	while _group.size() < size:
-		_group.append(RNG.weighted_index(mix))
+		var kind := RNG.weighted_index(mix)
+		_group.append(kind)
+		if kind >= Kind.SLEET:
+			special_count += 1
+			mix[kind] = 0
+			if special_count == 2:
+				for special in range(Kind.SLEET, mix.size()):
+					mix[special] = 0
 	return true
 
 
@@ -268,12 +281,6 @@ func _run_beat(wave: int) -> void:
 				_warn_group(origin)
 				for i in 3 + GameManager.player_count():
 					_spawn_extra(gutter_scene, origin, 2.0)
-		4:
-			var origin: Variant = _marker_position("enemy_spawn")
-			if origin is Vector3:
-				GameManager.show_banner("ARMORED HAILSTONE", Color("#ffc365"), 2.5)
-				_warn_group(origin)
-				_spawn_extra(_scene_of(Kind.HAILSTONE), origin, 0.0, true)
 		_:
 			if wave > WeatherManager.FINAL_WAVE and WavePlan.modifier(wave) == WavePlan.HEAVY_WEATHER:
 				var origin: Variant = _marker_position("enemy_spawn")
@@ -308,7 +315,7 @@ func _spawn_near(scene: PackedScene, center: Vector3, spread: float, elite := fa
 	return enemy
 
 
-## Host: enter the Wave 1-4 Mini-Boss as the main wave horde wraps up.
+## Host: bring in the named giant while its horde is still arriving.
 func spawn_miniboss(wave: int) -> EnemyBase:
 	if not Net.is_host():
 		return null
@@ -340,7 +347,7 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 
 
 func can_finish_wave() -> bool:
-	if _spawned < _budget or _pending_copies > 0:
+	if _spawned < _budget or _pending_copies > 0 or _awaiting_miniboss():
 		return false
 	if alive_count() == 0:
 		return true
@@ -376,13 +383,17 @@ func remaining() -> int:
 		return _remote_remaining if _remote_wave == _wave else 0
 	if GameManager.victory_locked:
 		return 0
-	return maxi(0, _budget - _spawned) + alive_count()
+	return maxi(0, _budget - _spawned) + alive_count() + int(_awaiting_miniboss())
 
 
 func wave_total() -> int:
 	if not Net.is_host():
 		return _remote_total if _remote_wave == _wave else 0
-	return _budget + _extras
+	return _budget + _extras + int(_awaiting_miniboss())
+
+
+func _awaiting_miniboss() -> bool:
+	return _wave > 0 and _wave < WeatherManager.FINAL_WAVE and not _miniboss_spawned
 
 
 func recovery_time() -> float:
