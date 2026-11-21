@@ -100,7 +100,7 @@ func _build_header(parent: Control) -> void:
 	bar.add_child(row)
 
 	var title := Label.new()
-	title.text = "BROADCAST LOBBY"
+	title.text = "LOBBY"
 	BroadcastUI.text(title, 34, BroadcastUI.PAPER)
 	row.add_child(title)
 
@@ -125,7 +125,7 @@ func _build_suit_panel(parent: Control) -> void:
 	panel.add_child(col)
 
 	var heading := Label.new()
-	heading.text = "SUIT CONFIG"
+	heading.text = "SUIT"
 	BroadcastUI.text(heading, 20, BroadcastUI.CYAN)
 	col.add_child(heading)
 
@@ -149,21 +149,15 @@ func _build_roster_panel(parent: Control) -> void:
 	col.add_child(top)
 
 	_roster_heading = Label.new()
-	_roster_heading.text = "SQUAD ROSTER"
+	_roster_heading.text = "SQUAD"
 	_roster_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_roster_heading.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	BroadcastUI.text(_roster_heading, 20, BroadcastUI.CYAN)
 	top.add_child(_roster_heading)
 
-	var name_lbl := Label.new()
-	name_lbl.text = "CALLSIGN"
-	name_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	BroadcastUI.text(name_lbl, 18, BroadcastUI.MUTED)
-	top.add_child(name_lbl)
-
 	_name_edit = LineEdit.new()
 	_name_edit.text = Settings.player_name if Settings.player_name != "" else Net.local_name
-	_name_edit.placeholder_text = "YOUR NAME..."
+	_name_edit.placeholder_text = "CALLSIGN"
 	_name_edit.max_length = 18
 	_name_edit.custom_minimum_size = Vector2(186, 32)
 	_name_edit.text_submitted.connect(func(value: String):
@@ -195,7 +189,7 @@ func _build_vote_panel(parent: Control) -> void:
 	col.add_child(header)
 
 	_map_heading = Label.new()
-	_map_heading.text = "DISTRICT VOTE"
+	_map_heading.text = "DISTRICT"
 	_map_heading.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	BroadcastUI.text(_map_heading, 20, BroadcastUI.CYAN)
 	header.add_child(_map_heading)
@@ -301,15 +295,15 @@ func _build_actions(parent: Control) -> void:
 	row.add_theme_constant_override("separation", 10)
 	parent.add_child(row)
 
-	_ready_button = _button(row, "READY UP", _on_ready)
+	_ready_button = _button(row, "READY", _on_ready)
 	_ready_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	BroadcastUI.button_role(_ready_button, true)
 
-	_force_button = _button(row, "FORCE START", _on_force)
+	_force_button = _button(row, "START", _on_force)
 	_force_button.custom_minimum_size = Vector2(158, 44)
 	BroadcastUI.button_accent(_force_button, BroadcastUI.AMBER)
 
-	_leave_button = _button(row, "LEAVE LOBBY", _on_leave)
+	_leave_button = _button(row, "LEAVE", _on_leave)
 	_leave_button.custom_minimum_size = Vector2(142, 44)
 	BroadcastUI.button_role(_leave_button, false, true)
 
@@ -329,7 +323,7 @@ func _build_chat(parent: Control) -> void:
 	top.add_theme_constant_override("separation", 6)
 	v.add_child(top)
 	var heading := Label.new()
-	heading.text = "SQUAD CHAT"
+	heading.text = "CHAT"
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	BroadcastUI.text(heading, 19, BroadcastUI.CYAN)
@@ -356,7 +350,7 @@ func _build_chat(parent: Control) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	v.add_child(row)
-	_chat_edit.placeholder_text = "MESSAGE SQUAD..."
+	_chat_edit.placeholder_text = "SAY..."
 	_chat_edit.custom_minimum_size.y = 34
 	BroadcastUI.focus_sound(_chat_edit)
 	_chat_edit.max_length = Net.CHAT_MAX
@@ -396,36 +390,36 @@ func _refresh() -> void:
 	_ready_button.visible = online
 	_force_button.visible = online and not all_ready
 	var me_ready := _is_ready(Net.local_id())
-	_ready_button.text = "CANCEL READY" if me_ready else "READY UP"
+	_ready_button.text = "UNREADY" if me_ready else "READY"
 	if me_ready:
 		BroadcastUI.button_accent(_ready_button, BroadcastUI.ACID)
 	else:
 		BroadcastUI.button_role(_ready_button, true)
 
 	if Net.is_offline():
-		_status.text = Net.last_error.to_upper() if Net.last_error != "" else "OFFLINE  /  RETURN TO TITLE AND PICK CLOUD PLAY"
+		_status.text = Net.last_error.to_upper() if Net.last_error != "" else "OFFLINE"
 		_status.add_theme_color_override("font_color", BroadcastUI.PINK)
 	else:
-		_status.text = "CLOUD SERVER  /  RUN STARTS WHEN ALL READY"
+		_status.text = "%d/%d READY" % [_ready_count(), Net.roster.size()]
 		_status.add_theme_color_override("font_color", BroadcastUI.ACID)
 
 	var voting := online and Net.lobby_votes_enabled
 	_vote_row.visible = voting
-	_map_heading.text = "DISTRICT VOTE" if voting else "DISTRICT"
+	_map_heading.text = "DISTRICT"
 	_map_button.visible = voting
 	_map_button.text = "FULL VIEW"
 	if voting:
 		var votes := 0
 		for count in Net.lobby_vote_counts.values():
 			votes += int(count)
-		var pick := Maps.display_name(Net.lobby_my_vote) if not Net.lobby_my_vote.is_empty() else "NO PICK"
+		var pick := Maps.display_name(Net.lobby_my_vote) if not Net.lobby_my_vote.is_empty() else "-"
 		_map_status.text = "%d VOTED  /  YOUR PICK: %s" % [votes, pick]
 		_refresh_vote_cards()
 	else:
 		_map_status.text = Maps.display_name(Net.lobby_map_id) if online else "OFFLINE"
 
 	_chat_panel.visible = online
-	_roster_heading.text = "SQUAD ROSTER  (%d/%d)" % [Net.roster.size(), Net.MAX_PLAYERS]
+	_roster_heading.text = "SQUAD  %d/%d" % [Net.roster.size(), Net.MAX_PLAYERS]
 
 	# Out of the tree now, so the rebuilt list doesn't double up for a frame.
 	for child in _roster.get_children():
@@ -438,7 +432,7 @@ func _refresh() -> void:
 	_sync_picker()
 	if ids.is_empty():
 		var waiting := Label.new()
-		waiting.text = "WAITING FOR PLAYERS..."
+		waiting.text = "WAITING..."
 		waiting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		BroadcastUI.text(waiting, 20, BroadcastUI.MUTED)
 		_roster.add_child(waiting)
@@ -524,7 +518,7 @@ func _row(peer_id: int, info: Dictionary) -> Control:
 
 	var state := Label.new()
 	var ready := bool(info.get("ready", false))
-	state.text = "READY" if ready else "NOT READY"
+	state.text = "READY" if ready else "-"
 	state.custom_minimum_size.x = 84
 	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	state.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -631,3 +625,11 @@ func _on_load_failed(message: String) -> void:
 		Net.leave()
 		Net.last_error = message
 		_on_connection_failed()
+
+
+func _ready_count() -> int:
+	var count := 0
+	for info: Variant in Net.roster.values():
+		if info is Dictionary and bool(info.get("ready", false)):
+			count += 1
+	return count

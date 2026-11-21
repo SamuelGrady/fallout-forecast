@@ -89,7 +89,7 @@ func _process(delta: float) -> void:
 	if _connect_left > 0.0:
 		_connect_left -= delta
 		if _connect_left <= 0.0 and mode == Mode.CLIENT:
-			last_error = "NO ANSWER FROM THE SERVER."
+			last_error = "NO ANSWER"
 			_on_connection_failed()
 	if mode == Mode.HOST and is_online():
 		_ping_timer -= delta
@@ -184,7 +184,7 @@ func join(address: String, port := PORT) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client(url)
 	if err != OK:
-		last_error = "BAD ADDRESS %s." % url
+		last_error = "BAD ADDRESS"
 		return err
 	# Set the mode before the peer, so the handshake's callbacks see CLIENT.
 	mode = Mode.CLIENT
@@ -650,9 +650,9 @@ func _hello(hello: String, protocol := 0) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	var refusal := ""
 	if protocol != PROTOCOL:
-		refusal = "THE SERVER RUNS A DIFFERENT BUILD (v%d, YOU HAVE v%d). UPDATE THE GAME." % [PROTOCOL, protocol]
+		refusal = "UPDATE REQUIRED (v%d, YOU HAVE v%d)" % [PROTOCOL, protocol]
 	elif roster.size() >= MAX_PLAYERS:
-		refusal = "THE SERVER IS FULL."
+		refusal = "SERVER FULL"
 	if refusal != "":
 		if _is_peer_open(peer_id):
 			_reject.rpc_id(peer_id, refusal)
@@ -746,7 +746,7 @@ func _request_name(new_name: String) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _start_run(map_id: String) -> void:
 	if not Maps.is_available(map_id):
-		_reject("THIS BUILD IS MISSING %s. UPDATE THE GAME." % Maps.display_name(map_id))
+		_reject("UPDATE REQUIRED (%s)" % Maps.display_name(map_id))
 		return
 	run_map_id = map_id
 	run_active = true

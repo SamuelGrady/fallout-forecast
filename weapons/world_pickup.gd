@@ -48,9 +48,8 @@ func can_interact(player: Node) -> bool:
 
 func get_prompt(player: Node) -> String:
 	var holder := player.get_node("Head/Camera3D/WeaponHolder") as WeaponHolder
-	var action := "Swap slot %d for" % (holder.current + 1) if holder.needs_swap(item) else "Pick up"
-	return "%s %s · %s" % [action, ItemCatalog.definition(item.id).display_name,
-		ItemCatalog.tier_name(item.id, item.tier)]
+	var action := "Swap for" if holder.needs_swap(item) else "Take"
+	return "%s %s" % [action, ItemCatalog.definition(item.id).display_name]
 
 func request(player: Node) -> void:
 	var holder := player.get_node("Head/Camera3D/WeaponHolder") as WeaponHolder

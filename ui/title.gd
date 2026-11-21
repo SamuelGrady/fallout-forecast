@@ -87,7 +87,7 @@ void fragment() {
 	_add_full_rect(wall, _intro)
 	_intro.add_child(_deck)
 	_deck.tape_depth = -84.0
-	var skip := _label(_intro, "PRESS ANY BUTTON TO SKIP", Vector2(0, 674), 18, BroadcastUI.MUTED, 960.0)
+	var skip := _label(_intro, "SKIP >>", Vector2(0, 674), 18, BroadcastUI.MUTED, 960.0)
 	skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	skip.offset_top = -45
 	skip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -132,7 +132,7 @@ func _build_playback_menu() -> void:
 		var download := _button(row, "DOWNLOAD", _on_download)
 		download.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		download.custom_minimum_size.x = 148
-		download.tooltip_text = "Get the desktop build (Windows / Linux)"
+		download.tooltip_text = "Windows / Linux build"
 		BroadcastUI.button_role(download, false, false)
 	else:
 		BroadcastUI.button_role(_button(_menu, "PLAY SOLO", _on_play), true)
@@ -162,19 +162,19 @@ func _build_playback_menu() -> void:
 	heading.text = "SETTINGS"
 	BroadcastUI.text(heading, 34, BroadcastUI.CYAN)
 	_settings.add_child(heading)
-	_settings_initial = _slider(_settings, "MOUSE SENSITIVITY", 0.0005, 0.006, Settings.mouse_sensitivity, func(v: float): Settings.mouse_sensitivity = v)
+	_settings_initial = _slider(_settings, "SENSITIVITY", 0.0005, 0.006, Settings.mouse_sensitivity, func(v: float): Settings.mouse_sensitivity = v)
 	_slider(_settings, "VOLUME", 0.0, 1.0, Settings.master_volume, _set_volume)
 	_toggle("RETRO VHS EFFECT", Settings.retro_enabled, Settings.set_retro)
 	_toggle("REDUCED FLASHING", Settings.reduced_flash, Settings.set_reduced_flash)
 	_toggle("LARGE HUD", Settings.hud_scale > 1.0, Settings.set_large_hud)
-	_toggle("PERFORMANCE OVERLAY", Settings.perf_overlay, func(on: bool):
+	_toggle("FPS OVERLAY", Settings.perf_overlay, func(on: bool):
 		Settings.perf_overlay = on
 		Settings.save())
 	_toggle("SEND TELEMETRY", Settings.telemetry_enabled, func(on: bool):
 		Settings.telemetry_enabled = on
 		Settings.save())
 	var server_caption := Label.new()
-	server_caption.text = "SERVER (WSS)"
+	server_caption.text = "SERVER"
 	BroadcastUI.text(server_caption, 20, BroadcastUI.CYAN)
 	_settings.add_child(server_caption)
 	var server_edit := LineEdit.new()
@@ -202,7 +202,7 @@ func _build_playback_menu() -> void:
 	_suit.add_theme_constant_override("separation", 8)
 	_suit_panel.add_child(_suit)
 	var suit_heading := Label.new()
-	suit_heading.text = "SUIT CONFIG"
+	suit_heading.text = "SUIT"
 	BroadcastUI.text(suit_heading, 34, BroadcastUI.CYAN)
 	_suit.add_child(suit_heading)
 	_suit_picker = SuitPicker.new(Vector2i(264, 214))
@@ -367,10 +367,10 @@ func _on_join() -> void:
 	Settings.save()
 	var err := Net.join_cloud()
 	if err != OK:
-		_show_error("Could not reach %s (error %d)." % [Net.cloud_url(), err])
+		_show_error("Can't reach server (%d)" % err)
 		return
 	_set_menu_enabled(false)
-	_join_status("CONNECTING TO %s ..." % Net.cloud_url().trim_prefix("wss://").trim_prefix("ws://").trim_suffix("/").to_upper())
+	_join_status("CONNECTING...")
 	if not Net.joined_server.is_connected(_on_joined):
 		Net.joined_server.connect(_on_joined, CONNECT_ONE_SHOT)
 	if not Net.connection_failed.is_connected(_on_join_failed):
@@ -388,8 +388,8 @@ func _on_join_failed() -> void:
 		Net.joined_server.disconnect(_on_joined)
 	_join_status("")
 	_set_menu_enabled(true)
-	var why: String = Net.last_error if Net.last_error != "" else "No answer from the server."
-	_show_error("Could not join %s. %s" % [Net.cloud_url(), why])
+	var why: String = Net.last_error if Net.last_error != "" else "NO ANSWER"
+	_show_error("Join failed  -  %s" % why)
 
 
 var _status_label: Label

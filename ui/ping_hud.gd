@@ -18,11 +18,11 @@ const WHEEL_INNER := 46.0
 const DEADZONE := 26.0
 const EDGE := 44.0
 const FEED_TIME := 3.5
-const FEED_MAX := 4
+const FEED_MAX := 3
 ## Clockwise from the top. REVIVE ME sits at the bottom.
 const SLICES := ["enemy", "crate", "go", "revive", "shelter", "danger"]
-const SLICE_LABELS := {"enemy": "ENEMY HERE", "crate": "CRATE HERE", "go": "GO HERE",
-	"revive": "REVIVE ME", "shelter": "SHELTER HERE", "danger": "LOOK OUT"}
+const SLICE_LABELS := {"enemy": "ENEMY", "crate": "CRATE", "go": "GO HERE",
+	"revive": "REVIVE ME", "shelter": "SHELTER", "danger": "LOOK OUT"}
 
 var system: PingSystem
 var _pinger: Player
@@ -183,7 +183,9 @@ func _on_pinged(ping: Dictionary) -> void:
 		icon.size = Vector2(26, 26)
 		add_child(icon)
 		_markers.append([ping, icon])
-	_feed.append({"text": "%s  /  %s" % [ping.name, label], "color": ping.color, "age": 0.0})
+	# Feed: teammates' pings only; yours is already on screen.
+	if ping.owner != multiplayer.get_unique_id():
+		_feed.append({"text": "%s  %s" % [ping.name, label], "color": ping.color, "age": 0.0})
 	while _feed.size() > FEED_MAX:
 		_feed.pop_front()
 
@@ -209,17 +211,6 @@ func _draw() -> void:
 		icon.visible = _open
 	if _open:
 		_draw_wheel()
-	elif _can_ping(_local()):
-		var key := "D-PAD DOWN" if Settings.using_gamepad else "Z / MMB"
-		var font := BroadcastUI.FONT
-		var tint := Color(BroadcastUI.PAPER, 0.8)
-		var ink := Color(BroadcastUI.INK, 0.8)
-		var l1 := "[%s] PING" % key
-		var l2 := "HOLD FOR WHEEL"
-		draw_string_outline(font, Vector2(20.0, 32.0), l1, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 17, 4, ink)
-		draw_string(font, Vector2(20.0, 32.0), l1, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 17, tint)
-		draw_string_outline(font, Vector2(20.0, 49.0), l2, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 15, 4, ink)
-		draw_string(font, Vector2(20.0, 49.0), l2, HORIZONTAL_ALIGNMENT_LEFT, 170.0, 15, Color(BroadcastUI.MUTED, 0.8))
 
 
 func _draw_marker(ping: Dictionary, icon: GameIcon, camera: Camera3D) -> void:
@@ -254,14 +245,7 @@ func _draw_marker(ping: Dictionary, icon: GameIcon, camera: Camera3D) -> void:
 		draw_arc(at, radius + 2.0, 0, TAU, 28, color, 2.5, true)
 		icon.size = Vector2.ONE * radius * 1.4
 		icon.position = at - icon.size * 0.5
-		var label: String = PingSystem.KINDS[ping.kind].label
-		var width := 96.0
-		var top := Vector2(clampf(at.x - width * 0.5, 8.0, size.x - width - 8.0),
-			at.y + (radius + 8.0 if below else -radius - 30.0))
-		draw_rect(Rect2(top, Vector2(width, 22)), ink)
-		draw_rect(Rect2(top, Vector2(3, 22)), color)
-		_text(font, top + Vector2(0, 17), label, width, 16, color)
-		_text(font, screen + Vector2(-40, -10 if below else 18), meters, 80, 15, paper)
+		_text(font, at + Vector2(-40, radius + 18.0 if below else -radius - 8.0), meters, 80, 15, paper)
 		return
 	# Off-screen: an arrow on the edge, pointing the way to turn.
 	var local := camera.global_transform.affine_inverse() * world
@@ -312,17 +296,14 @@ func _draw_wheel() -> void:
 		outline.append(points[0])
 		draw_polyline(outline, color if i == selected and enabled else Color("#314655"), 2.0, true)
 		var label_at := center + Vector2.from_angle(mid) * (WHEEL_INNER + WHEEL_RADIUS) * 0.5
-		var tint := BroadcastUI.PAPER if enabled else Color(BroadcastUI.PAPER, 0.3)
 		var icon := _wheel_icons[i]
 		icon.color = color if enabled else Color(0.5, 0.55, 0.6, 0.4)
-		icon.position = label_at + Vector2(-15, -30)
-		_text(font, label_at + Vector2(-60, 16), SLICE_LABELS[kind], 120, 15, tint)
-		if kind == "revive" and not enabled:
-			_text(font, label_at + Vector2(-60, 32), "WHEN DOWNED", 120, 11, Color(BroadcastUI.PAPER, 0.3))
+		icon.position = label_at - Vector2(15, 15)
 	draw_circle(center, WHEEL_INNER - 4.0, Color(BroadcastUI.INK, 0.95))
 	draw_arc(center, WHEEL_INNER - 4.0, 0, TAU, 32, BroadcastUI.CYAN, 2.0, true)
-	var hub := "CANCEL" if _selected_kind(player) == "" else "SEND"
-	_text(font, center + Vector2(-40, 6), hub, 80, 17, BroadcastUI.CYAN)
+	var picked := _selected_kind(player)
+	var hub: String = SLICE_LABELS.get(picked, "") if picked != "" else "X"
+	_text(font, center + Vector2(-44, 6), hub, 88, 15 if hub.length() > 6 else 17, BroadcastUI.CYAN if picked != "" else Color(BroadcastUI.MUTED, 0.8))
 	draw_circle(center + _select, 4.0, color)
 
 

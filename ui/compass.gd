@@ -13,7 +13,7 @@ enum Marker { INFECTED, ELITE, BOSS, TEAMMATE }
 
 var _markers := PackedVector4Array()
 var _objectives: Array[Node] = []
-var _backing: StyleBoxFlat
+var _live := false
 var _scan_left := 0.0
 var _warning_left := 0.0
 var _warning_at := Vector3.ZERO
@@ -24,16 +24,12 @@ var _heading := 0.0
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(PRESET_CENTER_TOP)
-	offset_left = -250
-	offset_right = 250
-	offset_top = 21
-	offset_bottom = 53
-	pivot_offset.x = 250
+	offset_left = -180
+	offset_right = 180
+	offset_top = 8
+	offset_bottom = 36
+	pivot_offset.x = 180
 	scale = Vector2.ONE * Settings.hud_scale
-	_backing = BroadcastUI.panel(BroadcastUI.OVERLAY, BroadcastUI.CYAN)
-	_backing.border_width_left = 0
-	_backing.border_width_bottom = 1
-	_backing.set_content_margin_all(0)
 	if DisplayServer.get_name() == "headless" or Net.dedicated:
 		hide()
 		set_process(false)
@@ -41,6 +37,7 @@ func _ready() -> void:
 	var spawner := get_tree().get_first_node_in_group("enemy_spawner")
 	if spawner:
 		spawner.group_incoming.connect(warn)
+	_live = true
 
 
 func warn(at: Vector3) -> void:
@@ -64,6 +61,8 @@ func _process(delta: float) -> void:
 	if _scan_left <= 0.0:
 		_scan_left = SCAN_INTERVAL
 		_scan(player)
+	var busy := _warning_left > 0.0 or not _markers.is_empty()
+	modulate.a = move_toward(modulate.a, 1.0 if busy else 0.6, delta * 3.0)
 	queue_redraw()
 
 
@@ -101,9 +100,10 @@ func _tape_x(angle: float) -> float:
 
 
 func _draw() -> void:
-	if _backing == null:
+	if not _live:
 		return
-	draw_style_box(_backing, Rect2(Vector2.ZERO, size))
+	# No backing box: a faint baseline and ticks only.
+	draw_line(Vector2(0, 23), Vector2(size.x, 23), Color(BroadcastUI.MUTED, 0.25), 1.0)
 	var first := floori((_heading - ARC) / 15.0)
 	for i in range(first, first + 14):
 		var bearing := i * 15
@@ -112,22 +112,18 @@ func _draw() -> void:
 			continue
 		var x := _tape_x(offset)
 		var major := bearing % 45 == 0
-		draw_line(Vector2(x, 16.0 if major else 19.0), Vector2(x, 23), BroadcastUI.MUTED, 1.0)
-		if major:
-			var degrees := posmod(bearing, 360)
-			var text := "%03d" % degrees
-			if degrees % 90 == 0:
-				text = "%s %s" % [CARDINALS[degrees / 90], text]
-			_caption(text, Vector2(clampf(x, 24.0, size.x - 24.0), 13), 16, BroadcastUI.PAPER if degrees % 90 == 0 else BroadcastUI.MUTED)
+		var degrees := posmod(bearing, 360)
+		var fade := 1.0 - absf(offset) / ARC * 0.7
+		draw_line(Vector2(x, 17.0 if major else 20.0), Vector2(x, 23), Color(BroadcastUI.MUTED, 0.7 * fade), 1.0)
+		if degrees % 90 == 0:
+			_caption(CARDINALS[degrees / 90], Vector2(clampf(x, 12.0, size.x - 12.0), 14), 18, Color(BroadcastUI.PAPER, fade))
 	if _warning_left > 0.0:
 		_draw_warning()
 	for marker in _markers:
 		_draw_marker(marker)
 	_draw_objectives()
 	var center := size.x * 0.5
-	draw_colored_polygon(PackedVector2Array([Vector2(center - 5, 32), Vector2(center, 27), Vector2(center + 5, 32)]), BroadcastUI.CYAN)
-	draw_rect(Rect2(center - 22, -12, 44, 15), BroadcastUI.OVERLAY)
-	_caption("%03d°" % posmod(roundi(_heading), 360), Vector2(center, -1), 17, BroadcastUI.CYAN)
+	draw_colored_polygon(PackedVector2Array([Vector2(center - 4, 30), Vector2(center, 25), Vector2(center + 4, 30)]), BroadcastUI.CYAN)
 
 
 func _caption(text: String, at: Vector2, font_size: int, color: Color) -> void:
@@ -182,15 +178,9 @@ func _draw_objectives() -> void:
 			best_angle = absf(angle)
 			nearest = objective
 	if nearest:
-		var title := str(nearest.get_meta("compass_label", "OBJECTIVE")).strip_edges().left(28)
-		if title.is_empty():
-			title = "OBJECTIVE"
 		var distance := roundi(_camera_at.distance_to(nearest.global_position))
-		var text := "%s  %dm" % [title.to_upper(), distance]
-		var width := BroadcastUI.FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 16.0
-		var x := _tape_x(_offset(nearest.global_position))
-		draw_rect(Rect2(x - width * 0.5, 33, width, 17), BroadcastUI.OVERLAY)
-		_caption(text, Vector2(x, 45), 16, _objective_color(nearest))
+		var x := clampf(_tape_x(_offset(nearest.global_position)), 16.0, size.x - 16.0)
+		_caption("%dm" % distance, Vector2(x, 42), 16, _objective_color(nearest))
 
 
 func _objective_color(node: Node3D) -> Color:

@@ -107,7 +107,6 @@ func _physics_process(delta: float) -> void:
 		_false_clearing_left -= delta
 		if _false_clearing_left <= 0.0 and get_tree().get_nodes_in_group("boss").is_empty():
 			WeatherManager.set_intensity_override(-1.0)
-			GameManager.show_banner("STORM SURGING", Color("b8e56d"), 2.0)
 	if Net.is_online():
 		_net_sync -= delta
 		if _net_sync <= 0.0:
@@ -245,7 +244,7 @@ func _trigger_false_clearing() -> void:
 	if get_tree().get_nodes_in_group("boss").is_empty():
 		WeatherManager.set_intensity_override(0.05)
 		_false_clearing_left = 6.5
-	GameManager.show_banner("FALSE CLEARING  -  ELITE INCOMING", Color("8ce8ff"), 2.8)
+	GameManager.show_banner("FALSE CLEARING", Color("8ce8ff"), 2.4)
 	var elite_kind: int = [Kind.SLEET, Kind.HAILSTONE, Kind.UNDERTOW, Kind.STATIC, Kind.SMOG, Kind.THUNDERHEAD][clampi(_wave - 1, 0, 5)]
 	var elite_scene := _scene_of(elite_kind)
 	var at: Variant = _marker_position("enemy_spawn")
@@ -288,7 +287,6 @@ func _run_beat(wave: int) -> void:
 				origin = _marker_position("enemy_spawn")
 			if origin == null:
 				return
-			GameManager.show_banner("SUPPLY AMBUSH", Color("ff8a4c"), 2.0)
 			_warn_group(at)
 			for i in 3 + GameManager.player_count():
 				_spawn_extra(gutter_scene, origin, 2.0)
@@ -297,7 +295,6 @@ func _run_beat(wave: int) -> void:
 			var origin: Variant = _marker_position("enemy_spawn")
 			if origin == null:
 				return
-			GameManager.show_banner("STREET PUSH", Color("ff5a6e"), 2.0)
 			_warn_group(origin)
 			for i in 6 + 2 * GameManager.player_count():
 				_spawn_extra(drip_scene, origin, 4.0)
@@ -306,7 +303,6 @@ func _run_beat(wave: int) -> void:
 			var origin: Variant = _marker_position("enemy_spawn")
 			if origin == null:
 				return
-			GameManager.show_banner("ELITE SQUAD", Color("b48cff"), 2.0)
 			_warn_group(origin)
 			_spawn_extra(_scene_of(Kind.STATIC), origin, 3.0, true)
 			_spawn_extra(_scene_of(Kind.SMOG), origin, 3.0, true)
@@ -374,7 +370,7 @@ func spawn_miniboss(wave: int) -> EnemyBase:
 			Net.rpc_to_run(_spawn_enemy, [enemy.net_id, _kind_of(scene), where, false, false, wave])
 		_warn_group(where)
 		Sound.play("storm_arrival", -6.0, 0.72)
-		GameManager.show_banner("MINI-BOSS: %s" % enemy.miniboss_name, Color("ff5689"), 3.2)
+		GameManager.show_banner(str(enemy.miniboss_name).to_upper(), Color("ff5689"), 3.2)
 	return enemy
 
 

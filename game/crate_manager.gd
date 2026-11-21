@@ -90,7 +90,7 @@ func _try_spawn_airdrop() -> void:
 	Perf.mark("crates spawn wave %d" % WeatherManager.wave)
 	_make_airdrop(at, SupplyStation.DESCENT)
 	Net.rpc_to_run(_airdrop_spawn, [_run, at, SupplyStation.DESCENT])
-	GameManager.show_banner("WEATHER SERVICE SUPPLY DROP", Color("#ffc365"), 3.2)
+	GameManager.show_banner("SUPPLY DROP", Color("#ffc365"), 2.4)
 	_airdrop_cue()
 	Net.rpc_to_run(_announce_drop, [_run])
 
@@ -336,7 +336,6 @@ func _open_airdrop() -> void:
 	registry.spawn_pickup(null, _safe_drop_spot(space, point, Vector3(0.0, 0.0, 1.4)), "ammo_box")
 	_remove_drop(_run)
 	Net.rpc_to_run(_remove_drop, [_run])
-	GameManager.show_banner("SUPPLY DROP OPENED", Color("#ffc365"), 2.1)
 
 func _safe_drop_spot(space: PhysicsDirectSpaceState3D, center: Vector3, offset: Vector3) -> Vector3:
 	var eye := center + Vector3.UP * 0.7

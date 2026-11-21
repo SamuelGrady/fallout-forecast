@@ -4,8 +4,8 @@ extends CanvasLayer
 ## - SUIT BREACH warning: vignette and beep while suit < 25% and exposed
 ## - downed view: desaturated, heartbeat
 ## - rain drips running down the screen while exposed in rain
-## - wave intro card ("WAVE 3  -  DOWNPOUR") as each storm starts
-## - "+HEADSHOT" / "+KILL" / "+REVIVE" popup ticker (Juice.popup)
+## - wave intro card ("WAVE 3", plus the modifier) as each storm starts
+## - small popups beside the reticle (Juice.popup: scrap, "x3" multikills)
 
 const TRAIL_DELAY := 0.35
 
@@ -36,11 +36,14 @@ func _ready() -> void:
 	add_child(_overlay)
 	_build_card()
 	add_child(preload("res://ui/tape_choice.gd").new())
-	_ticker.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
-	_ticker.offset_left = -248
-	_ticker.offset_right = -20
-	_ticker.offset_top = -64
+	# Just right of the reticle, small, so it reads without leaving the crosshair.
+	_ticker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_ticker.offset_left = 26
+	_ticker.offset_right = 226
+	_ticker.offset_top = -40
+	_ticker.offset_bottom = -6
 	_ticker.alignment = BoxContainer.ALIGNMENT_END
+	_ticker.add_theme_constant_override("separation", -4)
 	_ticker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(_ticker)
 	Juice.popup_requested.connect(_on_popup)
@@ -136,12 +139,10 @@ func _build_card() -> void:
 	_card_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_card_panel.offset_left = -240
 	_card_panel.offset_right = 240
-	_card_panel.offset_top = -112
-	_card_panel.offset_bottom = -112
+	_card_panel.offset_top = -170
+	_card_panel.offset_bottom = -170
 	_card_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := BroadcastUI.panel(BroadcastUI.OVERLAY)
-	style.set_content_margin_all(12)
-	_card_panel.add_theme_stylebox_override("panel", style)
+	_card_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_overlay.add_child(_card_panel)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -150,18 +151,18 @@ func _build_card() -> void:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		column.add_child(label)
 	_card_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	BroadcastUI.text(_card, roundi(50 * Settings.hud_scale))
-	BroadcastUI.text(_card_sub, roundi(23 * Settings.hud_scale), BroadcastUI.CYAN)
+	BroadcastUI.hud_text(_card, roundi(BroadcastUI.T_HEAD * Settings.hud_scale))
+	BroadcastUI.hud_text(_card_sub, roundi(BroadcastUI.T_BODY * Settings.hud_scale), BroadcastUI.CYAN)
 	_card_panel.hide()
 
 
 func _on_phase(phase: int, wave: int) -> void:
 	if phase != WeatherManager.Phase.DRIZZLE:
 		return
-	var subtitle: String = "THE ACID STORM" if wave == WeatherManager.FINAL_WAVE else ["", "FIRST RAIN", "DOWNPOUR WARNING", "FLOOD WATCH", "SEVERE STORM"][clampi(wave, 0, 4)]
+	var subtitle := "ACID STORM" if wave == WeatherManager.FINAL_WAVE and not GameManager.endless else ""
 	var modifier := WeatherManager.wave_modifier()
 	if not modifier.is_empty():
-		subtitle = "%s  /  %s" % [modifier, WeatherManager.WavePlan.FORECAST[modifier]]
+		subtitle = modifier.replace("_", " ").to_upper()
 	_card.text = "ENDLESS %d" % (wave - WeatherManager.FINAL_WAVE) if GameManager.endless else "WAVE %d" % wave
 	_card_sub.text = subtitle
 	if _card_tween and _card_tween.is_valid():
@@ -184,12 +185,12 @@ func _on_combat_hit(killed: bool, critical: bool) -> void:
 	var now := _clock
 	_kill_times.append(now)
 	_kill_times = _kill_times.filter(func(t): return now - float(t) < 1.5)
+	# The hitmarker and kill sound say "kill"; only streaks get a number.
 	if _kill_times.size() >= 3:
-		Juice.popup("+MULTIKILL x%d" % _kill_times.size(), BroadcastUI.AMBER)
+		Juice.popup("x%d" % _kill_times.size(), BroadcastUI.AMBER)
 		Sound.play("multikill", -8.0)
 	else:
 		Sound.play("kill_confirm", -10.0)
-	Juice.popup("+HEADSHOT KILL" if critical else "+KILL", BroadcastUI.PINK if critical else BroadcastUI.PAPER)
 	Juice.hit_stop(45.0 if critical else 25.0)
 
 
@@ -197,14 +198,15 @@ func _on_popup(text: String, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	BroadcastUI.text(label, 22, color, 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	BroadcastUI.hud_text(label, BroadcastUI.T_BODY - 2, color)
 	_ticker.add_child(label)
-	while _ticker.get_child_count() > 5:
+	while _ticker.get_child_count() > 2:
 		_ticker.get_child(0).queue_free()
 		_ticker.remove_child(_ticker.get_child(0))
 	var tween := label.create_tween()
-	tween.tween_interval(1.4)
-	tween.tween_property(label, "modulate:a", 0.0, 0.4)
+	tween.tween_interval(0.9)
+	tween.tween_property(label, "modulate:a", 0.0, 0.35)
 	tween.tween_callback(label.queue_free)
 
 

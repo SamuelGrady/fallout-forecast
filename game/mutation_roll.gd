@@ -186,7 +186,7 @@ func _resolve() -> void:
 	Net.rpc_to_all(_result_rpc, [pick, enemy_list, updated_player, granted])
 
 
-func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Array, announce: bool) -> void:
+func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Array, _announce: bool) -> void:
 	Perf.mark("mutation apply enemy=%s squad=%s" % [enemy_pick, str(granted[0]) if not granted.is_empty() else "none"])
 	stage = "result"
 	time_left = RESULT_TIME
@@ -196,17 +196,13 @@ func _apply_result(pick: int, enemy_list: Array, player_list: Array, granted: Ar
 	draft_resolved.emit(pick)
 	mutations_changed.emit(active)
 	player_mutations_changed.emit(player_mutations)
-	if announce and not active.is_empty():
-		var entry := table.get_entry(enemy_pick)
-		var text := "ENEMIES: " + entry.display_name.to_upper()
-		if not granted.is_empty():
-			text += "  |  SQUAD: " + str(GameManager.PLAYER_MUTATIONS[granted[0]].name)
-		GameManager.show_banner(text, entry.color, 2.6)
+	# No result banner: the draft strip just showed both picks and the HUD
+	# mutation row pulses with the new icons.
 
 
 @rpc("authority", "call_remote", "reliable")
 func _result_rpc(pick: int, enemy_list: Array, player_list: Array, granted: Array) -> void:
-	# The host's show_banner already reached this peer; don't re-announce.
+	# Clients apply the result quietly, like the host.
 	_apply_result(pick, enemy_list, player_list, granted, false)
 
 
@@ -297,7 +293,7 @@ func force_enemy_mutation(id: String) -> void:
 	Net.rpc_to_all(_sync_active, [active, player_mutations])
 	mutations_changed.emit(active)
 	var entry := table.get_entry(id)
-	GameManager.show_banner("MUTATION: " + entry.display_name.to_upper(), entry.color, 2.5)
+	GameManager.show_banner(entry.display_name.to_upper(), entry.color, 2.5)
 
 
 ## Dev / testing: add one unowned player mutation.
@@ -314,7 +310,7 @@ func grant_random_player_mutation() -> String:
 	Net.rpc_to_all(_sync_active, [active, player_mutations])
 	player_mutations_changed.emit(player_mutations)
 	var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
-	GameManager.show_banner("PLAYER MUTATION: " + str(info.name), info.color, 2.6)
+	GameManager.show_banner(str(info.name).to_upper(), info.color, 2.6)
 	return id
 
 

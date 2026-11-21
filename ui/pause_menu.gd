@@ -32,7 +32,7 @@ func _ready() -> void:
 	list.add_theme_constant_override("separation", 10)
 	_mutations.add_child(list)
 	var mutation_title := Label.new()
-	mutation_title.text = "MUTATION LOG"
+	mutation_title.text = "MUTATIONS"
 	BroadcastUI.text(mutation_title, 34, BroadcastUI.CYAN)
 	list.add_child(mutation_title)
 	_mutation_text.bbcode_enabled = true
@@ -55,7 +55,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 12)
 	_panel.add_child(box)
 	var title := Label.new()
-	title.text = "BROADCAST PAUSED"
+	title.text = "PAUSED"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.text(title, 34, BroadcastUI.CYAN)
 	box.add_child(title)
@@ -77,11 +77,6 @@ func _ready() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
-	var hint := Label.new()
-	hint.text = "[%s] RESUME" % BroadcastUI.input_hint("pause")
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(hint, 19, BroadcastUI.MUTED)
-	box.add_child(hint)
 	for item in box.get_children():
 		if item is Button:
 			item.focus_neighbor_right = item.get_path_to(_mutation_text)
@@ -121,18 +116,18 @@ func _refresh_mutations() -> void:
 	var muted := BroadcastUI.MUTED.to_html(false)
 	var paper := BroadcastUI.PAPER.to_html(false)
 	var lines := PackedStringArray()
-	lines.append("[b][color=#%s]INFECTED  /  THIS WAVE[/color][/b]" % BroadcastUI.PINK.to_html(false))
+	lines.append("[b][color=#%s]INFECTED[/color][/b]" % BroadcastUI.PINK.to_html(false))
 	if roll == null or roll.active.is_empty():
-		lines.append("[color=#%s]NONE RIGHT NOW.[/color]" % muted)
+		lines.append("[color=#%s]-[/color]" % muted)
 	else:
 		for id in roll.active:
 			var entry: MutationData = roll.table.get_entry(id)
 			if entry:
 				lines.append("[b]%s[/b]\n[color=#%s]%s[/color]" % [entry.display_name.to_upper(), paper, entry.description])
 	lines.append("")
-	lines.append("[b][color=#%s]SQUAD  /  THIS RUN[/color][/b]" % BroadcastUI.ACID.to_html(false))
+	lines.append("[b][color=#%s]SQUAD[/color][/b]" % BroadcastUI.ACID.to_html(false))
 	if roll == null or roll.player_mutations.is_empty():
-		lines.append("[color=#%s]NONE YET. DRAFT ONE AFTER EACH CALM.[/color]" % muted)
+		lines.append("[color=#%s]-[/color]" % muted)
 	else:
 		for id in roll.player_mutations:
 			if GameManager.PLAYER_MUTATIONS.has(id):
@@ -143,7 +138,7 @@ func _refresh_mutations() -> void:
 
 
 func _on_global_pause(paused: bool, by: String) -> void:
-	_remote.text = "PAUSED BY %s\n[%s] RESUME" % [by.to_upper(), BroadcastUI.input_hint("pause")]
+	_remote.text = "PAUSED  -  %s" % by.to_upper()
 	_remote.visible = paused and not visible
 	if not paused and visible:
 		MenuState.close(self)

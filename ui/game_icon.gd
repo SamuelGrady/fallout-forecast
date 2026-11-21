@@ -121,6 +121,22 @@ func _draw() -> void:
 			var diamond := PackedVector2Array([Vector2(0,-26),Vector2(26,0),Vector2(0,26),Vector2(-26,0),Vector2(0,-26)])
 			draw_polyline(diamond, color, 5, true)
 			draw_circle(Vector2.ZERO, 7, color)
+		# HUD status glyphs (ui/hud.gd).
+		"rain":
+			draw_colored_polygon(PackedVector2Array([Vector2(0,-27),Vector2(15,4),Vector2(10,18),
+				Vector2(0,23),Vector2(-10,18),Vector2(-15,4)]), color)
+		"skull":
+			draw_circle(Vector2(0,-5), 21, color)
+			draw_rect(Rect2(-12,8,24,17), color)
+			draw_circle(Vector2(-8,-5), 6, Color(0.05,0.08,0.12))
+			draw_circle(Vector2(8,-5), 6, Color(0.05,0.08,0.12))
+			for x in [-6, 0, 6]:
+				draw_line(Vector2(x,15), Vector2(x,25), Color(0.05,0.08,0.12), 2)
+		"scrap":
+			_line([Vector2(-20,-12),Vector2(4,-24),Vector2(24,-6),Vector2(16,20),Vector2(-14,22),Vector2(-24,4),Vector2(-20,-12)], 5)
+			draw_circle(Vector2(0,0), 7, color)
+		"check":
+			_line([Vector2(-22,0),Vector2(-6,16),Vector2(22,-16)], 7)
 		# Extra enemy mutations.
 		"conductors":
 			_line([Vector2(6,-26), Vector2(-10,-2), Vector2(4,-2), Vector2(-8,26)], 6)
