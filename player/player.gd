@@ -731,7 +731,12 @@ func _handle_interact(delta: float) -> void:
 				var hit := get_world_3d().direct_space_state.intersect_ray(query)
 				if not hit.is_empty() and hit.collider != it.get_parent():
 					continue
-			var score := distance - forward.dot(direction.normalized())
+			var alignment := forward.dot(direction.normalized())
+			var score := distance - alignment
+			if it is SupplyInteract and it.mode != "airdrop":
+				# Let the crosshair pick the bay even when another one is a
+				# little closer from an oblique angle.
+				score = distance * 0.2 - alignment + (1.0 - alignment) * 5.0
 			if score < best_score:
 				best = it
 				best_score = score

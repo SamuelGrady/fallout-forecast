@@ -414,7 +414,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 	feats.on_phase(phase, _wave)
 	match phase:
 		WeatherManager.Phase.DRIZZLE:
-			crates.end_calm()
+			crates.start_drizzle()
 		WeatherManager.Phase.CALM:
 			crates.start_calm()
 			if _wave == 3:
@@ -428,6 +428,7 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
 		WeatherManager.Phase.CLEARING:
+			crates.end_wave()
 			var newly_cleared := _wave > _waves_survived
 			if newly_cleared:
 				_waves_survived = _wave

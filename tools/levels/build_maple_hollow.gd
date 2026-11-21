@@ -1016,6 +1016,10 @@ func forest_trees_and_undergrowth() -> void:
 				_add_batched_pine(p3, h, bark, pine_mats[idx % pine_mats.size()], true)
 			else:
 				_add_batched_oak(p3, h * 0.78, bark, oak_mats[idx % oak_mats.size()], yaw_r, true)
+		if bodies.has(part):
+			var trunks: StaticBody3D = bodies[part]
+			trunks.add_to_group("tree_canopy_trunks", true)
+			trunks.set_meta("canopy_radius", 1.8)
 		_cast_shadow = false
 		var f_list: Array = quad_ferns[qi]
 		for f_item: Array in f_list:

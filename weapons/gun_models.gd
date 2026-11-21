@@ -44,6 +44,8 @@ static func build(id: String) -> Node3D:
 			_frag(root)
 		"revolver":
 			_revolver(root)
+		"service_revolver":
+			_revolver(root, true)
 		"nailgun":
 			_nailgun(root)
 		"boombox":
@@ -217,11 +219,13 @@ static func _bug_bomb(root: Node3D) -> void:
 
 
 ## Lucky Penny: a gold snub revolver with a copper cylinder.
-static func _revolver(root: Node3D) -> void:
-	_cylinder(root, 0.011, 0.11, Vector3(0, 0.02, -0.08), BRASS, 0.8)
-	_box(root, Vector3(0.012, 0.01, 0.1), Vector3(0, 0.033, -0.075), BRASS, 0.8)  # top strap
-	_cylinder(root, 0.024, 0.045, Vector3(0, 0.012, -0.01), Color("#b4643c"), 0.8)
-	_box(root, Vector3(0.028, 0.045, 0.06), Vector3(0, 0.0, 0.03), BRASS, 0.8)
+static func _revolver(root: Node3D, service := false) -> void:
+	var frame := STEEL if service else BRASS
+	var cylinder := Color("#596875") if service else Color("#b4643c")
+	_cylinder(root, 0.011, 0.11, Vector3(0, 0.02, -0.08), frame, 0.8)
+	_box(root, Vector3(0.012, 0.01, 0.1), Vector3(0, 0.033, -0.075), frame, 0.8)  # top strap
+	_cylinder(root, 0.024, 0.045, Vector3(0, 0.012, -0.01), cylinder, 0.8)
+	_box(root, Vector3(0.028, 0.045, 0.06), Vector3(0, 0.0, 0.03), frame, 0.8)
 	_box(root, Vector3(0.03, 0.08, 0.036), Vector3(0, -0.05, 0.06), Color("#3a2a1c"), 0.0, Vector3(-18, 0, 0))
 	_dot(root, Vector3(0, 0.044, -0.12), Color(1.0, 0.86, 0.45), 0.0025)
 	root.set_meta("sight", Vector3(0, 0.044, -0.12))

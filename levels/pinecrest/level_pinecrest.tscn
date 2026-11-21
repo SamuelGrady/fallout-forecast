@@ -2371,7 +2371,7 @@ shape = SubResource("BoxShape3D_h6kmn")
 [node name="Model" parent="Geometry/TownSquare/Bench35" unique_id=1222888434 instance=ExtResource("12_eqan6")]
 transform = Transform3D(2.5, 0, 0, 0, 2.5, 0, 0, 0, 2.5, 0, 0, 0)
 
-[node name="Tree-61_11" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=1042602435]
+[node name="Tree-61_11" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=1042602435 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.55338705, 0, 0.83292425, 0, 1, 0, -0.83292425, 0, 0.55338705, -61, 0, 11)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/TownSquare/Tree-61_11" unique_id=1371732899]
@@ -2381,7 +2381,7 @@ shape = SubResource("BoxShape3D_od27s")
 [node name="Model" parent="Geometry/TownSquare/Tree-61_11" unique_id=1601257465 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
-[node name="Tree-45_11" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=800052314]
+[node name="Tree-45_11" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=800052314 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.62305075, 0, -0.7821814, 0, 1, 0, 0.7821814, 0, 0.62305075, -45, 0, 11)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/TownSquare/Tree-45_11" unique_id=235700546]
@@ -2391,7 +2391,7 @@ shape = SubResource("BoxShape3D_t6l1p")
 [node name="Model" parent="Geometry/TownSquare/Tree-45_11" unique_id=1759955016 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
-[node name="Tree-61_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=1205784926]
+[node name="Tree-61_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=1205784926 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.8734993, 0, -0.48682544, 0, 1, 0, 0.48682544, 0, 0.8734993, -61, 0, 39)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/TownSquare/Tree-61_39" unique_id=52916474]
@@ -2401,7 +2401,7 @@ shape = SubResource("BoxShape3D_ta2rv")
 [node name="Model" parent="Geometry/TownSquare/Tree-61_39" unique_id=2125113371 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9, 0, 0, 0, 9, 0, 0, 0, 9, 0, 0, 0)
 
-[node name="Tree-45_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=805739787]
+[node name="Tree-45_39" type="StaticBody3D" parent="Geometry/TownSquare" unique_id=805739787 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.42470735, 0, 0.9053307, 0, 1, 0, -0.9053307, 0, -0.42470735, -45, 0, 39)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/TownSquare/Tree-45_39" unique_id=652406871]
@@ -3215,7 +3215,7 @@ font_size = 64
 
 [node name="Trees" type="Node3D" parent="Geometry" unique_id=1927839815]
 
-[node name="Tree0" type="StaticBody3D" parent="Geometry/Trees" unique_id=130072536]
+[node name="Tree0" type="StaticBody3D" parent="Geometry/Trees" unique_id=130072536 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.9980016, 0, 0.06318869, 0, 1, 0, -0.06318869, 0, 0.9980016, -60, 0, -58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree0" unique_id=538191953]
@@ -3225,7 +3225,7 @@ shape = SubResource("BoxShape3D_gy47b")
 [node name="Model" parent="Geometry/Trees/Tree0" unique_id=1216693873 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.19401, 0, 0, 0, 8.19401, 0, 0, 0, 8.19401, 0, 0, 0)
 
-[node name="Tree1" type="StaticBody3D" parent="Geometry/Trees" unique_id=1752721778]
+[node name="Tree1" type="StaticBody3D" parent="Geometry/Trees" unique_id=1752721778 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.86242193, 0, 0.5061901, 0, 1, 0, -0.5061901, 0, -0.86242193, -40, 0, -58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree1" unique_id=947471783]
@@ -3235,7 +3235,7 @@ shape = SubResource("BoxShape3D_q6fyj")
 [node name="Model" parent="Geometry/Trees/Tree1" unique_id=1082912333 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.408445, 0, 0, 0, 9.408445, 0, 0, 0, 9.408445, 0, 0, 0)
 
-[node name="Tree2" type="StaticBody3D" parent="Geometry/Trees" unique_id=110494260]
+[node name="Tree2" type="StaticBody3D" parent="Geometry/Trees" unique_id=110494260 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.087843105, 0, 0.99613434, 0, 1, 0, -0.99613434, 0, -0.087843105, -58, 0, -32)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree2" unique_id=476683186]
@@ -3245,7 +3245,7 @@ shape = SubResource("BoxShape3D_yarnt")
 [node name="Model" parent="Geometry/Trees/Tree2" unique_id=653351621 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.788727, 0, 0, 0, 8.788727, 0, 0, 0, 8.788727, 0, 0, 0)
 
-[node name="Tree3" type="StaticBody3D" parent="Geometry/Trees" unique_id=251390317]
+[node name="Tree3" type="StaticBody3D" parent="Geometry/Trees" unique_id=251390317 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.23912546, 0, -0.9709887, 0, 1, 0, 0.9709887, 0, -0.23912546, -34, 0, -30)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree3" unique_id=745167361]
@@ -3255,7 +3255,7 @@ shape = SubResource("BoxShape3D_vd4l5")
 [node name="Model" parent="Geometry/Trees/Tree3" unique_id=311871251 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.803122, 0, 0, 0, 8.803122, 0, 0, 0, 8.803122, 0, 0, 0)
 
-[node name="Tree4" type="StaticBody3D" parent="Geometry/Trees" unique_id=1992851569]
+[node name="Tree4" type="StaticBody3D" parent="Geometry/Trees" unique_id=1992851569 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.7789764, 0, 0.62705326, 0, 1, 0, -0.62705326, 0, 0.7789764, -26, 0, -58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree4" unique_id=1191773736]
@@ -3265,7 +3265,7 @@ shape = SubResource("BoxShape3D_kxjsy")
 [node name="Model" parent="Geometry/Trees/Tree4" unique_id=427276329 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.672081, 0, 0, 0, 9.672081, 0, 0, 0, 9.672081, 0, 0, 0)
 
-[node name="Tree5" type="StaticBody3D" parent="Geometry/Trees" unique_id=497165228]
+[node name="Tree5" type="StaticBody3D" parent="Geometry/Trees" unique_id=497165228 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.83248836, 0, -0.5540425, 0, 1, 0, 0.5540425, 0, 0.83248836, -58, 0, -14)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree5" unique_id=599420341]
@@ -3275,7 +3275,7 @@ shape = SubResource("BoxShape3D_ojhd0")
 [node name="Model" parent="Geometry/Trees/Tree5" unique_id=1902250927 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.21526, 0, 0, 0, 10.21526, 0, 0, 0, 10.21526, 0, 0, 0)
 
-[node name="Tree6" type="StaticBody3D" parent="Geometry/Trees" unique_id=123780910]
+[node name="Tree6" type="StaticBody3D" parent="Geometry/Trees" unique_id=123780910 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.9960427, 0, -0.08887595, 0, 1, 0, 0.08887595, 0, 0.9960427, -36, 0, -14)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree6" unique_id=1167040845]
@@ -3285,7 +3285,7 @@ shape = SubResource("BoxShape3D_2vxbm")
 [node name="Model" parent="Geometry/Trees/Tree6" unique_id=231276289 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(10.352312, 0, 0, 0, 10.352312, 0, 0, 0, 10.352312, 0, 0, 0)
 
-[node name="Tree7" type="StaticBody3D" parent="Geometry/Trees" unique_id=1504946079]
+[node name="Tree7" type="StaticBody3D" parent="Geometry/Trees" unique_id=1504946079 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.96929306, 0, 0.24590848, 0, 1, 0, -0.24590848, 0, 0.96929306, -20, 0, -45)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree7" unique_id=1372274954]
@@ -3295,7 +3295,7 @@ shape = SubResource("BoxShape3D_qq7l8")
 [node name="Model" parent="Geometry/Trees/Tree7" unique_id=743660155 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.34605, 0, 0, 0, 8.34605, 0, 0, 0, 8.34605, 0, 0, 0)
 
-[node name="Tree8" type="StaticBody3D" parent="Geometry/Trees" unique_id=231667582]
+[node name="Tree8" type="StaticBody3D" parent="Geometry/Trees" unique_id=231667582 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.5707434, 0, -0.8211285, 0, 1, 0, 0.8211285, 0, 0.5707434, 28, 0, -58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree8" unique_id=2026130349]
@@ -3305,7 +3305,7 @@ shape = SubResource("BoxShape3D_bohvp")
 [node name="Model" parent="Geometry/Trees/Tree8" unique_id=1137124318 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.312167, 0, 0, 0, 10.312167, 0, 0, 0, 10.312167, 0, 0, 0)
 
-[node name="Tree9" type="StaticBody3D" parent="Geometry/Trees" unique_id=2088937910]
+[node name="Tree9" type="StaticBody3D" parent="Geometry/Trees" unique_id=2088937910 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.4340592, 0, -0.90088433, 0, 1, 0, 0.90088433, 0, 0.4340592, 58, 0, -58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree9" unique_id=1150890456]
@@ -3315,7 +3315,7 @@ shape = SubResource("BoxShape3D_gyqeg")
 [node name="Model" parent="Geometry/Trees/Tree9" unique_id=1469744425 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.666077, 0, 0, 0, 8.666077, 0, 0, 0, 8.666077, 0, 0, 0)
 
-[node name="Tree10" type="StaticBody3D" parent="Geometry/Trees" unique_id=1193199383]
+[node name="Tree10" type="StaticBody3D" parent="Geometry/Trees" unique_id=1193199383 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.8454433, 0, 0.5340651, 0, 1, 0, -0.5340651, 0, -0.8454433, 30, 0, -32)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree10" unique_id=1649622147]
@@ -3325,7 +3325,7 @@ shape = SubResource("BoxShape3D_1q8gw")
 [node name="Model" parent="Geometry/Trees/Tree10" unique_id=1441714460 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.57554, 0, 0, 0, 9.57554, 0, 0, 0, 9.57554, 0, 0, 0)
 
-[node name="Tree11" type="StaticBody3D" parent="Geometry/Trees" unique_id=109768425]
+[node name="Tree11" type="StaticBody3D" parent="Geometry/Trees" unique_id=109768425 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.67205316, 0, 0.7405029, 0, 1, 0, -0.7405029, 0, -0.67205316, 58, 0, -30)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree11" unique_id=1514083054]
@@ -3335,7 +3335,7 @@ shape = SubResource("BoxShape3D_sa373")
 [node name="Model" parent="Geometry/Trees/Tree11" unique_id=1453256497 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.34071, 0, 0, 0, 8.34071, 0, 0, 0, 8.34071, 0, 0, 0)
 
-[node name="Tree12" type="StaticBody3D" parent="Geometry/Trees" unique_id=718989543]
+[node name="Tree12" type="StaticBody3D" parent="Geometry/Trees" unique_id=718989543 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.6657534, 0, 0.74617183, 0, 1, 0, -0.74617183, 0, 0.6657534, 28, 0, -8.5)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree12" unique_id=1885650828]
@@ -3345,7 +3345,7 @@ shape = SubResource("BoxShape3D_i3ckv")
 [node name="Model" parent="Geometry/Trees/Tree12" unique_id=1749823340 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.852749, 0, 0, 0, 9.852749, 0, 0, 0, 9.852749, 0, 0, 0)
 
-[node name="Tree13" type="StaticBody3D" parent="Geometry/Trees" unique_id=631146459]
+[node name="Tree13" type="StaticBody3D" parent="Geometry/Trees" unique_id=631146459 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.053219423, 0, -0.99858284, 0, 1, 0, 0.99858284, 0, -0.053219423, -8, 0, -27)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree13" unique_id=2110268507]
@@ -3355,7 +3355,7 @@ shape = SubResource("BoxShape3D_p7jt8")
 [node name="Model" parent="Geometry/Trees/Tree13" unique_id=1189667667 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(10.264143, 0, 0, 0, 10.264143, 0, 0, 0, 10.264143, 0, 0, 0)
 
-[node name="Tree14" type="StaticBody3D" parent="Geometry/Trees" unique_id=636512832]
+[node name="Tree14" type="StaticBody3D" parent="Geometry/Trees" unique_id=636512832 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.87586594, 0, -0.48255453, 0, 1, 0, 0.48255453, 0, 0.87586594, 8, 0, -27)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree14" unique_id=771843694]
@@ -3365,7 +3365,7 @@ shape = SubResource("BoxShape3D_n7eyf")
 [node name="Model" parent="Geometry/Trees/Tree14" unique_id=1069702703 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(8.770962, 0, 0, 0, 8.770962, 0, 0, 0, 8.770962, 0, 0, 0)
 
-[node name="Tree15" type="StaticBody3D" parent="Geometry/Trees" unique_id=1110508835]
+[node name="Tree15" type="StaticBody3D" parent="Geometry/Trees" unique_id=1110508835 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.19055122, 0, 0.98167723, 0, 1, 0, -0.98167723, 0, -0.19055122, -28, 0, 58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree15" unique_id=1162138362]
@@ -3375,7 +3375,7 @@ shape = SubResource("BoxShape3D_kah4r")
 [node name="Model" parent="Geometry/Trees/Tree15" unique_id=83351963 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.461202, 0, 0, 0, 9.461202, 0, 0, 0, 9.461202, 0, 0, 0)
 
-[node name="Tree16" type="StaticBody3D" parent="Geometry/Trees" unique_id=1888529847]
+[node name="Tree16" type="StaticBody3D" parent="Geometry/Trees" unique_id=1888529847 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.21970192, 0, 0.97556704, 0, 1, 0, -0.97556704, 0, -0.21970192, -8, 0, 58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree16" unique_id=647260057]
@@ -3385,7 +3385,7 @@ shape = SubResource("BoxShape3D_o1wfk")
 [node name="Model" parent="Geometry/Trees/Tree16" unique_id=2127820588 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.234362, 0, 0, 0, 9.234362, 0, 0, 0, 9.234362, 0, 0, 0)
 
-[node name="Tree17" type="StaticBody3D" parent="Geometry/Trees" unique_id=1557963858]
+[node name="Tree17" type="StaticBody3D" parent="Geometry/Trees" unique_id=1557963858 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.95520914, 0, 0.29593164, 0, 1, 0, -0.29593164, 0, -0.95520914, 12, 0, 58)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree17" unique_id=1342344855]
@@ -3395,7 +3395,7 @@ shape = SubResource("BoxShape3D_5x508")
 [node name="Model" parent="Geometry/Trees/Tree17" unique_id=1534313884 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(9.071438, 0, 0, 0, 9.071438, 0, 0, 0, 9.071438, 0, 0, 0)
 
-[node name="Tree18" type="StaticBody3D" parent="Geometry/Trees" unique_id=1963931347]
+[node name="Tree18" type="StaticBody3D" parent="Geometry/Trees" unique_id=1963931347 groups=["tree_canopy_trunks"]]
 transform = Transform3D(-0.81729645, 0, 0.5762175, 0, 1, 0, -0.5762175, 0, -0.81729645, 32, 0, 50)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree18" unique_id=2125610883]
@@ -3405,7 +3405,7 @@ shape = SubResource("BoxShape3D_xht5q")
 [node name="Model" parent="Geometry/Trees/Tree18" unique_id=210202939 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(9.665687, 0, 0, 0, 9.665687, 0, 0, 0, 9.665687, 0, 0, 0)
 
-[node name="Tree19" type="StaticBody3D" parent="Geometry/Trees" unique_id=1441905319]
+[node name="Tree19" type="StaticBody3D" parent="Geometry/Trees" unique_id=1441905319 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.5956759, 0, -0.8032249, 0, 1, 0, 0.8032249, 0, 0.5956759, -50, 0, 52)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree19" unique_id=19401766]
@@ -3415,7 +3415,7 @@ shape = SubResource("BoxShape3D_fwqdr")
 [node name="Model" parent="Geometry/Trees/Tree19" unique_id=1417977878 groups=["wind_sway"] instance=ExtResource("13_pffgw")]
 transform = Transform3D(8.927927, 0, 0, 0, 8.927927, 0, 0, 0, 8.927927, 0, 0, 0)
 
-[node name="Tree20" type="StaticBody3D" parent="Geometry/Trees" unique_id=1428570008]
+[node name="Tree20" type="StaticBody3D" parent="Geometry/Trees" unique_id=1428570008 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.62487787, 0, 0.78072256, 0, 1, 0, -0.78072256, 0, 0.62487787, 62, 0, 48)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree20" unique_id=17190666]
@@ -3425,7 +3425,7 @@ shape = SubResource("BoxShape3D_mmhxt")
 [node name="Model" parent="Geometry/Trees/Tree20" unique_id=706471919 groups=["wind_sway"] instance=ExtResource("31_4wmu0")]
 transform = Transform3D(10.363109, 0, 0, 0, 10.363109, 0, 0, 0, 10.363109, 0, 0, 0)
 
-[node name="Tree21" type="StaticBody3D" parent="Geometry/Trees" unique_id=337374122]
+[node name="Tree21" type="StaticBody3D" parent="Geometry/Trees" unique_id=337374122 groups=["tree_canopy_trunks"]]
 transform = Transform3D(0.85380477, 0, -0.52059335, 0, 1, 0, 0.52059335, 0, 0.85380477, 34, 0, 12)
 
 [node name="Collision" type="CollisionShape3D" parent="Geometry/Trees/Tree21" unique_id=1322981818]

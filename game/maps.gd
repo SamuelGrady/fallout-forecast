@@ -9,7 +9,7 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": DEFAULT_ID, "name": "PINECREST", "blurb": "Main Street and its shuttered storefronts.",
 		"scene": "res://levels/pinecrest/level_pinecrest.tscn", "accent": Color("#66dfda"),
 		"preview": "res://assets/ui/title_street.png", "channel": "01"},
-	{"id": "harbor", "name": "HARBOR POINT", "blurb": "Flooded docks and a silent cannery.",
+	{"id": "harbor", "name": "HARBOR POINT", "blurb": "A tidal market, covered docks, and an elevated signal walk.",
 		"scene": "res://levels/harbor/level_harbor.tscn", "accent": Color("#83b8ff"),
 		"preview": "res://assets/ui/harbor.webp", "channel": "02"},
 	{"id": "maple_hollow", "name": "MAPLE HOLLOW", "blurb": "Misty pine woods around an old chapel and cemetery.",

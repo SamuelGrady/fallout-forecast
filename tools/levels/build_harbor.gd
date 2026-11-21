@@ -3,18 +3,25 @@ extends "res://tools/levels/level_builder.gd"
 
 func build() -> void:
 	district = "harbor"
-	container("freight_box", false)
-	container("through_container", true)
-	gantry()
-	beacon()
-	trawler()
+	if "--props" in OS.get_cmdline_user_args():
+		container("freight_box", false)
+		container("through_container", true)
+		gantry()
+		beacon()
+		trawler()
+	else:
+		for id: String in ["freight_box", "through_container", "hammerhead_crane", "harbor_light", "shrimp_boat"]:
+			props[id] = load("res://props/harbor/%s.tscn" % id)
 	begin_map("HarborPoint",true)
 	waterfront()
 	canneries()
 	freight_yard()
+	signal_walk()
+	covered_hall("HarborPatrol", Vector3(-38, 0, 4.4), Vector2(10, 8), "#3c91a0", "HARBOR PATROL")
 	outer_wharf()
 	bait_shop()
 	port_authority()
+	coastal_pines()
 	markers()
 	boundary()
 	bake_map()
@@ -128,44 +135,88 @@ func trawler() -> void:
 
 func waterfront() -> void:
 	section("TidalBasin")
-	var concrete := surface("#afbebb","sidewalk")
-	box(Vector3(0,-0.95,-26),Vector3(128,1.9,76),surface("#d0d6d6","asphalt"))
-	box(Vector3(18,-0.95,46),Vector3(92,1.9,36),concrete)
-	# A walkable tidal bed and two sloped slipways let players recover from
-	# either side of the docks. The water volume ends below the decking.
-	box(Vector3(0,-2.45,0),Vector3(128,0.6,128),concrete)
-	box(Vector3(0,-1.83,46),Vector3(128,0.06,36),surface("#bed9cf","harbor_tide",0.06),false)
-	box(Vector3(0,-1.83,20),Vector3(128,0.06,16),surface("#bed9cf","harbor_tide",0.06),false)
-	var tide := add(part,Area3D.new(),"StandingWater") as Area3D
+	var asphalt := surface("#92a8a4", "asphalt")
+	var concrete := surface("#aac2b6", "sidewalk")
+	box(Vector3(0, -0.95, -26), Vector3(128, 1.9, 76), asphalt)
+	box(Vector3(20, -0.95, 48.5), Vector3(88, 1.9, 31), concrete)
+	# The basin is walkable below the tide. Solid quay skirts close cavities
+	# below the decks, and the marked slipways meet the bed without a lip.
+	box(Vector3(0, -2.15, 38), Vector3(128, 0.62, 52), concrete)
+	var tide_mat := ShaderMaterial.new()
+	tide_mat.shader = load("res://props/harbor/tide.gdshader")
+	tide_mat.set_shader_parameter("ripple_pattern", load("res://assets/textures/harbor_tide.png"))
+	box(Vector3(0, -1.44, 38), Vector3(128, 0.04, 52), tide_mat, false)
+	var tide := add(part, Area3D.new(), "StandingWater") as Area3D
 	tide.collision_layer = 16
 	tide.collision_mask = 0
 	tide.monitoring = false
 	var wet := BoxShape3D.new()
-	wet.size = Vector3(128,1.0,53)
-	var hit := add(tide,CollisionShape3D.new(),"Waterline") as CollisionShape3D
+	wet.size = Vector3(128, 0.70, 52)
+	var hit := add(tide, CollisionShape3D.new(), "Waterline") as CollisionShape3D
 	hit.shape = wet
-	hit.position = Vector3(0,-1.98,38)
-	for p in [Vector3(-32,-1.15,18),Vector3(-12,-1.15,22)]:
-		var tilt := 10.4 if p.x < -20 else -10.4
-		box(p,Vector3(7,0.3,13.6),concrete,true,Vector3(tilt,0,0))
-	for x: float in [-56,-43]:
-		box(Vector3(x,-0.34,34),Vector3(3.8,0.68,44),surface("#e6c997","wood",0.45))
-		for z in range(15,57,7):
-			for edge: float in [-1.85,1.85]:
-				tube(Vector3(x+edge,-0.6,z),0.22,3.3,paint("#5f5050"),1,true)
-	box(Vector3(-42.3,-0.34,54),Vector3(31.5,0.68,4),surface("#e6c997","wood",0.45))
-	# Tide gauge and hazard stripes identify the drivable concrete slip.
-	box(Vector3(-36.2,1.05,11.5),Vector3(0.24,2.1,0.24),paint("#645947"))
-	box(Vector3(-36.2,2.1,11.5),Vector3(3.4,0.86,0.14),paint("#345866"))
-	label("BOAT RAMP",Vector3(-36.2,2.12,11.41),0.35,"#ffe4ac",180,true)
-	for x: float in [-35,-29]:
-		box(Vector3(x,0.021,8.1),Vector3(0.18,0.04,6.7),paint("#d8a858"),false)
-	prop("shrimp_boat",Vector3(-50,-1.27,37),174)
-	prop("shrimp_boat",Vector3(-60,-1.27,22),6)
-	# Sea beyond the map and distant breakwater silhouettes.
-	box(Vector3(0,-2.7,55),Vector3(1200,0.12,1000),surface("#a9bfca","harbor_tide",0.035),false)
+	hit.position = Vector3(0, -1.70, 38)
+
+	for x: float in [-60, -24, 23, 41, 62.5]:
+		slipway(Vector3(x, -1.85, 20), Vector3(x, 0, 11.75), "QUAY EXIT")
+	for x: float in [-13, 23, 57]:
+		slipway(Vector3(x, -1.85, 25), Vector3(x, 0, 33.25), "WHARF EXIT")
+
+	var deck := surface("#dcc496", "wood", 0.45)
+	deckway("WestPier", Vector3(-52, 0, 34.5), Vector2(6.5, 45.5), deck)
+	deckway("RescuePier", Vector3(-34, 0, 22), Vector2(6, 20.5), deck)
+	deckway("WestSeawall", Vector3(-37, 0, 53), Vector2(30.8, 5.5), deck)
+	slipway(Vector3(-46.5, -1.85, 42), Vector3(-46.5, 0, 50.4), "PIER EXIT")
+	slipway(Vector3(-62.25, -1.85, 41), Vector3(-55.18, 0, 41), "PIER EXIT")
+	section("Moorings")
+	prop("shrimp_boat", Vector3(-46.5, -1.05, 34), 174)
+	prop("shrimp_boat", Vector3(-61.5, -1.05, 29), 6)
+	prop("shrimp_boat", Vector3(33, -1.05, 20), 93)
+	box(Vector3(0, -2.7, 55), Vector3(1200, 0.12, 1000), tide_mat, false)
 	for i in 12:
-		box(Vector3(-135+i*22,-1,114+sin(i*1.7)*4),Vector3(22,2.5,4),paint("#758989"),false)
+		box(Vector3(-135 + i * 22, -1, 114 + sin(i * 1.7) * 4), Vector3(22, 2.5, 4), paint("#536f7b"), false)
+
+
+## Surface collision is a filled convex wedge and the visible slab follows its
+## top edge. Ends can overlap the adjoining flat slab slightly for a flush join.
+func ramp(low: Vector3, high: Vector3, width: float, mat: Material, base_y: float) -> void:
+	var rise := high - low
+	var side := Vector3(rise.z, 0, -rise.x).normalized() * width * 0.5
+	var slope := rad_to_deg(atan2(rise.y, Vector2(rise.x, rise.z).length()))
+	var yaw := rad_to_deg(atan2(rise.x, rise.z))
+	var rotation := Vector3(-slope, yaw, 0)
+	box((low + high) * 0.5 - Vector3.UP * 0.09, Vector3(width, 0.18, rise.length()), mat, false, rotation)
+	var shape := ConvexPolygonShape3D.new()
+	var points := PackedVector3Array()
+	for corner: Vector3 in [low + side, low - side, high + side, high - side]:
+		points.append(corner)
+		points.append(Vector3(corner.x, base_y, corner.z))
+	shape.points = points
+	if not bodies.has(part):
+		bodies[part] = add(part, StaticBody3D.new(), "WorldCollision")
+	var collision := add(bodies[part], CollisionShape3D.new(), "SlipHull") as CollisionShape3D
+	collision.shape = shape
+
+
+func slipway(low: Vector3, high: Vector3, caption: String) -> void:
+	section("MarkedSlipway")
+	ramp(low, high, 4.6, surface("#b4bfa5", "sidewalk"), -2.0)
+	var heading := (high - low).normalized()
+	var side := Vector3(heading.z, 0, -heading.x).normalized()
+	var stripe := paint("#ffe087")
+	for edge: float in [-2.03, 2.03]:
+		beam(low + side * edge + Vector3.UP * 0.035, high + side * edge + Vector3.UP * 0.035, 0.16, stripe)
+	var sign_at := high + side * 1.75
+	box(sign_at + Vector3.UP * 0.82, Vector3(0.16, 1.64, 0.16), paint("#3b585f"))
+	var yaw := rad_to_deg(atan2(-heading.x, -heading.z))
+	var face := Vector3(sin(deg_to_rad(yaw)), 0, cos(deg_to_rad(yaw)))
+	box(sign_at + Vector3.UP * 1.57, Vector3(2.4, 0.50, 0.10), paint("#164450"), false, Vector3(0, yaw, 0))
+	label(caption, sign_at + Vector3.UP * 1.57 + face * 0.065, 0.30, "#fff0a8", yaw)
+
+
+func deckway(title: String, at: Vector3, size: Vector2, mat: Material) -> void:
+	section(title)
+	box(at - Vector3.UP * 0.96, Vector3(size.x, 1.92, size.y), surface("#75968f", "quay_steel"))
+	box(at - Vector3.UP * 0.10, Vector3(size.x, 0.20, size.y), mat, false)
 
 
 func canneries() -> void:
@@ -177,7 +228,19 @@ func canneries() -> void:
 		var wall := surface(["#98c4bd","#dc9b73","#abc7c3"][i],"quay_steel",0.26)
 		var steel := paint("#354f59")
 		steel.set_meta("storm_wet_surface", true)
-		box(Vector3(0,4.3,0),Vector3(30,8.6,16),wall)
+		if i == 1:
+			for side: float in [-1, 1]:
+				box(Vector3(side * 14.8, 4.3, 0), Vector3(0.40, 8.6, 16), wall)
+				for end: float in [-7.85, 7.85]:
+					box(Vector3(side * 10.15, 4.3, end), Vector3(9.8, 8.6, 0.30), wall)
+					box(Vector3(0, 6.54, end), Vector3(10.55, 4.12, 0.30), wall)
+				for z: float in [-3.7, 3.7]:
+					freight_stack(Vector3(side * 9.5, 0, z))
+			shelter("CanneryFloor", Vector3(0, 3.0, 0), Vector3(29.2, 6.0, 15.5))
+			label("PACKING FLOOR", Vector3(0, 4.90, 8.18), 0.57, "#ffe1a4")
+			label("RAILHEAD", Vector3(0, 4.90, -8.18), 0.57, "#ffe1a4", 180)
+		else:
+			box(Vector3(0, 4.3, 0), Vector3(30, 8.6, 16), wall)
 		if i == 0:
 			for z: float in [2.7,4.8]:
 				tube(Vector3(-15.32,1.45,z),0.26,2.9,steel,1,true)
@@ -187,7 +250,9 @@ func canneries() -> void:
 		box(Vector3(0,8.9,0),Vector3(30,0.75,11),wall)
 		box(Vector3(0,7.25,8.18),Vector3(26,1.65,0.32),steel,false)
 		label(names[i],Vector3(0,7.3,8.37),0.95,"#ffe1a4")
-		for x: float in [-9,0,9]:
+		for x: float in [-9, 0, 9]:
+			if i == 1 and x == 0.0:
+				continue
 			box(Vector3(x,2.34,8.10),Vector3(6.6,4.68,0.2),paint("#647b7e"),false)
 			for j in 9:
 				box(Vector3(x,0.4+j*0.48,8.24),Vector3(6.4,0.065,0.09),steel,false)
@@ -228,35 +293,117 @@ func freight_yard() -> void:
 	model("roads","construction-barrier",Vector3(56,0,2),3.5,25)
 
 
+func signal_walk() -> void:
+	section("SignalWalk")
+	var cap := surface("#455f6d", "diamond_plate", 0.45)
+	var iron := paint("#28444c")
+	var rails := paint("#e0af65")
+	var z := 0.0
+	var y := 2.85
+	ramp(Vector3(-8, 0, z), Vector3(2.2, y, z), 5.0, cap, -0.18)
+	ramp(Vector3(34, 0, z), Vector3(23.8, y, z), 5.0, cap, -0.18)
+	box(Vector3(13, y - 0.20, z), Vector3(22, 0.40, 5.0), cap)
+	for x: float in [2.6, 12.8, 23.4]:
+		for side: float in [-2.32, 2.32]:
+			box(Vector3(x, 1.25, z + side), Vector3(0.28, 2.5, 0.32), iron)
+	for side: float in [-2.41, 2.41]:
+		box(Vector3(13, y + 0.86, z + side), Vector3(22, 0.18, 0.17), rails, false)
+		box(Vector3(13, y + 0.43, z + side), Vector3(22, 0.86, 0.16), iron, true)
+		for x: float in [2.4, 5.8, 9.3, 12.8, 16.3, 19.8, 23.6]:
+			box(Vector3(x, y + 0.58, z + side), Vector3(0.13, 1.16, 0.15), rails, false)
+		for ends: Array in [[-8, 2.2], [34, 23.8]]:
+			beam(Vector3(ends[0], 0.38, z + side), Vector3(ends[1], y + 0.38, z + side), 0.43, rails, true)
+	box(Vector3(12.7, y + 3.0, z), Vector3(8, 0.23, 5.1), surface("#bf7754", "quay_steel"))
+	for x: float in [9.1, 16.4]:
+		for side: float in [-2.36, 2.36]:
+			box(Vector3(x, y + 1.54, z + side), Vector3(0.22, 3.08, 0.22), iron)
+	shelter("SignalWalkRoof", Vector3(12.7, y + 1.43, z), Vector3(7.9, 2.86, 4.8))
+	label("SIGNAL WALK", Vector3(12.7, y + 3.0, z - 2.66), 0.40, "#ffe8ac", 180)
+	label("SIGNAL WALK", Vector3(12.7, y + 3.0, z + 2.66), 0.40, "#ffe8ac")
+
+
 func outer_wharf() -> void:
-	section("LiftBridge")
-	var iron := paint("#395a60")
-	box(Vector3(0,-0.32,20),Vector3(10,0.64,16.3),surface("#c2d3cb","diamond_plate"))
-	for x: float in [-4.9,4.9]:
-		box(Vector3(x,1.05,20),Vector3(0.2,0.18,16),iron)
-		for z in [12.5,16.5,20.5,24.5,27.5]:
-			box(Vector3(x,0.6,z),Vector3(0.22,1.2,0.22),iron)
-		for z: float in [14,26]:
-			box(Vector3(x,3.6,z),Vector3(0.48,7.2,0.48),iron)
-			beam(Vector3(x,6.9,z),Vector3(x,1,20),0.18,paint("#cc9353"))
-	for z: float in [14,26]:
-		box(Vector3(0,7.1,z),Vector3(10.5,0.45,0.54),iron)
-	section("PilotsWalk")
-	box(Vector3(45,-0.25,20),Vector3(3.4,0.5,16.3),surface("#f0cfab","wood"))
-	for z in [14,19,24,27]:
-		tube(Vector3(46.5,-0.45,z),0.2,2.8,iron,1,true)
-	section("BuoyYard")
-	prop("harbor_light",Vector3(54,0,48))
-	prop("hammerhead_crane",Vector3(-19,0,35),145)
-	prop("through_container",Vector3(-16,0,51),90)
-	prop("freight_box",Vector3(-16,0,58),90)
-	for x in range(8,43,5):
-		for z: float in [29.8,62]:
-			box(Vector3(x,0.03,z),Vector3(2.7,0.035,0.22),paint("#ae754f"),false)
-	for x: float in [-25,-4,18,40,60]:
-		tube(Vector3(x,0.48,28.7),0.42,0.96,iron,1,true)
-		tube(Vector3(x,0.99,28.7),0.55,0.14,paint("#e5ab66"))
-	lamp(Vector3(-18,4,35),"#ffb66c")
+	var iron := paint("#24444e")
+	var ochre := paint("#ebb45e")
+	var deck := surface("#c3aa7c", "wood", 0.45)
+	var plate := surface("#96bbb5", "diamond_plate", 0.35)
+	deckway("FishExchangeIsland", Vector3(2, 0, 25), Vector2(22, 13), deck)
+	deckway("LiftBridge", Vector3(2.25, 0, 16.2), Vector2(12.5, 9.4), plate)
+	deckway("SouthBridge", Vector3(6, 0, 32.5), Vector2(9, 3.6), plate)
+	deckway("ExchangeApron", Vector3(-9.85, 0, 29.65), Vector2(2.65, 7.1), plate)
+	deckway("NetWalk", Vector3(-21, 0, 24.5), Vector2(27, 5.5), deck)
+	deckway("CustomsWalk", Vector3(29.7, 0, 24.5), Vector2(35.5, 5.6), deck)
+	deckway("PilotsWalk", Vector3(47, 0, 22.5), Vector2(7.1, 21.5), plate)
+	slipway(Vector3(-6.5, -1.85, 12.8), Vector3(-6.5, 0, 18.58), "MARKET EXIT")
+	slipway(Vector3(19.3, -1.85, 29.0), Vector3(12.93, 0, 29.0), "MARKET EXIT")
+	slipway(Vector3(35, -1.85, 27.83), Vector3(35, 0, 33.05), "WHARF EXIT")
+	section("LiftBridgePortal")
+	for x: float in [-3.75, 3.75]:
+		for z: float in [12.6, 18.1]:
+			box(Vector3(x, 3.15, z), Vector3(0.46, 6.3, 0.46), iron)
+			beam(Vector3(x, 5.6, z), Vector3(x, 0.7, 15.4), 0.17, ochre)
+		for z: float in [13.6, 17.1]:
+			box(Vector3(x, 0.55, z), Vector3(0.23, 1.1, 0.23), iron)
+	for z: float in [12.6, 18.1]:
+		box(Vector3(0, 6.22, z), Vector3(8.4, 0.42, 0.52), iron)
+	label("02  /  FISH EXCHANGE", Vector3(0, 5.99, 12.24), 0.40, "#ffe8ac", 180)
+
+	covered_hall("FishExchange", Vector3(0, 0, 24.9), Vector2(14, 8.4), "#de785a", "FISH EXCHANGE")
+	covered_hall("RescueBay", Vector3(-34, 0, 20.0), Vector2(5.6, 9.6), "#4d92a0", "RESCUE BAY")
+	covered_hall("NetLoft", Vector3(-52, 0, 47), Vector2(6.3, 9.4), "#ba7456", "NET LOFT")
+	covered_hall("CustomsShed", Vector3(47, 0, 29), Vector2(7, 7.4), "#6ca496", "CUSTOMS")
+	covered_hall("IceMarket", Vector3(24, 0, 44), Vector2(14.0, 11.8), "#c87852", "ICE MARKET")
+
+	section("WharfCover")
+	prop("harbor_light", Vector3(53, 0, 49))
+	prop("hammerhead_crane", Vector3(-17, 0, 49), 115)
+	prop("freight_box", Vector3(-8, 0, 57), 90)
+	prop("through_container", Vector3(41, 0, 45), 90)
+	prop("freight_box", Vector3(34, 0, 55), 90)
+	for at: Vector3 in [Vector3(-48, 0, 54.6), Vector3(8.9, 0, 22.6), Vector3(5, 0, 39),
+			Vector3(14, 0, 53), Vector3(35, 0, 40), Vector3(44, 0, 35), Vector3(55, 0, 37)]:
+		freight_stack(at)
+	for p: Vector3 in [Vector3(-52, 0, 32), Vector3(-34, 0, 27), Vector3(0, 0, 29),
+			Vector3(46, 0, 19), Vector3(53, 0, 44)]:
+		for side: float in [-2.4, 2.4]:
+			tube(p + Vector3(side, 0.44, 0), 0.32, 0.90, iron, 1, true)
+			tube(p + Vector3(side, 0.90, 0), 0.39, 0.13, ochre)
+
+
+func covered_hall(title: String, at: Vector3, size: Vector2, color: String, caption: String) -> void:
+	section(title)
+	part.position = at
+	var frame := paint("#254350")
+	var roof := surface(color, "quay_steel", 0.36)
+	var border := Vector3(size.x, 0.0, size.y)
+	var floor := surface("#adc3af", "sidewalk")
+	box(Vector3(0, 0.018, 0), Vector3(size.x - 0.10, 0.028, size.y - 0.10), floor, false)
+	var half_width := size.x * 0.5
+	for ridge: float in [-1, 1]:
+		box(Vector3(ridge * size.x * 0.25, 3.46, 0), Vector3(size.x * 0.51, 0.23, size.y + 0.25),
+			roof, true, Vector3(0, 0, -ridge * 8))
+	for x: float in [-half_width + 0.36, half_width - 0.36]:
+		for z: float in [-size.y * 0.5 + 0.36, size.y * 0.5 - 0.36]:
+			box(Vector3(x, 1.60, z), Vector3(0.30, 3.2, 0.30), frame)
+			beam(Vector3(x, 2.3, z), Vector3(x * 0.71, 3.12, z), 0.19, frame)
+		box(Vector3(x, 0.55, 0), Vector3(0.24, 1.1, size.y * 0.43), frame)
+		for z: float in [-size.y * 0.28, size.y * 0.28]:
+			box(Vector3(x, 3.03, z), Vector3(0.30, 0.12, 0.64), lit("#fff0ad"), false)
+	for z: float in [-size.y * 0.5, size.y * 0.5]:
+		box(Vector3(0, 3.20, z), Vector3(size.x - 0.35, 0.46, 0.18), frame, false)
+		label(caption, Vector3(0, 3.18, z + signf(z) * 0.102), 0.32, "#ffe8ac", 0 if z > 0.0 else 180)
+	shelter(title + "Roof", Vector3(0, 1.48, 0), border + Vector3(-0.15, 2.96, -0.15))
+	freight_stack(Vector3(size.x * 0.31, 0, 0), true)
+
+
+func freight_stack(at: Vector3, low := false) -> void:
+	var frame := paint("#34525d")
+	var wood := surface("#bb825a", "wood", 0.42)
+	var h := 0.8 if low else 1.30
+	box(at + Vector3.UP * h * 0.5, Vector3(1.9, h, 1.44), wood)
+	for x: float in [-0.68, 0.68]:
+		box(at + Vector3(x, h * 0.5, 0), Vector3(0.13, h + 0.045, 1.48), frame, false)
+	box(at + Vector3(0, 0.065, 0), Vector3(2.1, 0.12, 1.64), frame, false)
 
 
 func bait_shop() -> void:
@@ -279,13 +426,11 @@ func port_authority() -> void:
 	var iron := paint("#344a52")
 	var cream := paint("#dcc5a3")
 	var ochre := paint("#c68b53")
+	deckway("BridgeTenderPier", Vector3(10.25, 0, 17), Vector2(8.05, 11.2), surface("#c6b293", "wood"))
 	section("BridgeTender")
-	box(Vector3(9,-0.36,17),Vector3(5.5,0.72,11.2),surface("#c6b293","wood"))
 	box(Vector3(9,1.4,14.3),Vector3(4.1,2.8,3.6),surface("#8ba69b","quay_steel"))
 	box(Vector3(9,2.03,16.15),Vector3(3.55,0.77,0.12),iron,false)
 	box(Vector3(9,2.93,14.45),Vector3(4.7,0.24,4.15),ochre)
-	# Leave an access walkway along the east side of the control booth.
-	box(Vector3(12,-0.36,17),Vector3(2.4,0.72,11.2),surface("#c6b293","wood"))
 	for x: float in [6.5,12.95]:
 		tube(Vector3(x,-0.66,22.4),0.28,2.9,iron,1,true)
 	section("HarborMastersOffice")
@@ -343,17 +488,71 @@ func port_authority() -> void:
 		box(Vector3(-98,4.2,-86+i*14),Vector3(12,6+i%3*2,11),paint("#73848a"),false)
 
 
+func coastal_pines() -> void:
+	var bark := surface("#69564b", "wood", 0.64)
+	var needlebeds: Array[Material] = [
+		paint("#2c5551"), paint("#386963"), paint("#477863"),
+	]
+	var sites := [
+		Vector3(-52, 0, -31), Vector3(-44, 0, 4.5),
+		Vector3(39, 0, 6.5), Vector3(59, 0, -17),
+		Vector3(7, 0, 51), Vector3(57, 0, 41),
+	]
+	for index in sites.size():
+		section("WindbreakPine%d" % (index + 1))
+		part.position = sites[index]
+		var height := 4.8 + float(index % 3) * 0.34
+		tube(Vector3(0, 2.1, 0), 0.44, 4.2, bark, 0.73, true)
+		tube(Vector3(0, 0.17, 0), 0.78, 0.34, surface("#807d68", "sidewalk", 0.7), 0.96)
+		var foliage := section("Needles", part)
+		foliage.position.y = 2.8
+		foliage.add_to_group("wind_sway", true)
+		var lean := -1.0 if index % 2 else 1.0
+		tube(Vector3(lean * 0.13, 0.50, 0), 2.01, 1.18, needlebeds[0], 0.72, false, Vector3(2, 0, -7 * lean))
+		tube(Vector3(lean * 0.30, 1.30, 0), 1.68, 1.33, needlebeds[1], 0.44, false, Vector3(1, 0, -9 * lean))
+		tube(Vector3(lean * 0.42, height - 3.5, 0), 1.03, 1.55, needlebeds[2], 0.1, false, Vector3(0, 0, -12 * lean))
+		part = foliage.get_parent_node_3d()
+		var canopy := add(part, Area3D.new(), "CanopyShelter") as Area3D
+		canopy.add_to_group("shelter", true)
+		canopy.collision_layer = 8
+		canopy.collision_mask = 0
+		canopy.monitoring = false
+		var cover := CylinderShape3D.new()
+		cover.radius = 1.65
+		cover.height = 2.95
+		var hit := add(canopy, CollisionShape3D.new(), "CanopyShape") as CollisionShape3D
+		hit.shape = cover
+		hit.position = Vector3(0, 1.475, 0)
+
+
 func markers() -> void:
-	points("PlayerSpawns","player_spawn",[Vector2(-45.85,-14.8),Vector2(-44.15,-14.8),Vector2(-45.85,-12.3),Vector2(-44.15,-12.3)])
-	points("EnemySpawns","enemy_spawn",[Vector2(-59,-52),Vector2(-43,-59),Vector2(-5,-60),Vector2(37,-59),Vector2(59,-46),Vector2(60,-13),Vector2(61,32),Vector2(62,58),Vector2(4,61),Vector2(-24,58),Vector2(-56,50),Vector2(-60,-24)])
-	points("CrateSpawns","crate_spawn",[Vector2(-57,-28),Vector2(-23,-28),Vector2(11,-28),Vector2(48,-32),Vector2(-29,-7),Vector2(27,0),Vector2(-43,40),Vector2(0,22),Vector2(32,47),Vector2(-5,53),Vector2(45,25),Vector2(50,39)])
-	for p: Vector2 in [Vector2(-54,-29),Vector2(-26,-28),Vector2(0,-28),Vector2(32,-28),Vector2(-30,5),Vector2(35,8),Vector2(17,34),Vector2(49,40)]:
-		drain(Vector3(p.x,0.02,p.y))
-	shower("IceHouse",Vector3(-48,0,-35))
-	shower("PilotsStore",Vector3(56,0,11))
-	shower("BuoyShed",Vector3(-15,0,51))
-	var grates := (directories.StormDrains as Node3D).get_children()
-	for i: int in [0, 4, 6]:
-	points("StreetSupplySpawns","street_supply_spawn",[Vector2(-38,-24), Vector2(36,-19), Vector2(20,35), Vector2(44,46)],0.06)
-	marker("","boss_anchor","BossAnchor",Vector3(27,18,46))
-	puddles([Vector3(-57,3,-20),Vector3(-33,3,-30),Vector3(-10,3.2,-23),Vector3(2,2,-32),Vector3(30,3,-25),Vector3(55,3,-33),Vector3(-26,3,-3),Vector3(-4,2.5,5),Vector3(34,2.8,0),Vector3(48,2.4,6),Vector3(0,2.5,18),Vector3(12,3.2,34),Vector3(32,3.5,48),Vector3(-1,2,52),Vector3(44,2.5,54),Vector3(-50,2,5)])
+	points("PlayerSpawns", "player_spawn", [Vector2(-39.3, 3.7), Vector2(-36.8, 3.7),
+		Vector2(-39.3, 6.0), Vector2(-36.8, 6.0)])
+	points("EnemySpawns", "enemy_spawn", [Vector2(-59, -52), Vector2(-43, -59), Vector2(-5, -60),
+		Vector2(37, -59), Vector2(59, -46), Vector2(60, -13), Vector2(61, 32), Vector2(62, 58),
+		Vector2(4, 61), Vector2(-21, 58), Vector2(-52, 38), Vector2(-60, -24), Vector2(10, 41),
+		Vector2(35, 36), Vector2(-20, 25)])
+	points("CrateSpawns", "crate_spawn", [Vector2(-57, -28), Vector2(-23, -28), Vector2(11, -28),
+		Vector2(48, -32), Vector2(-26, -1), Vector2(-14, 5), Vector2(-21, 24), Vector2(8.9, 23),
+		Vector2(32, 24.5), Vector2(9, 38), Vector2(50, 39), Vector2(14, 51), Vector2(-49, 53)])
+	for p: Vector2 in [Vector2(-54, -29), Vector2(-26, -28), Vector2(0, -28), Vector2(32, -28),
+			Vector2(-30, 5), Vector2(35, 8), Vector2(17, 34), Vector2(49, 40),
+			Vector2(-29, 23), Vector2(10, 28)]:
+		drain(Vector3(p.x, 0.02, p.y))
+	shower("IceHouse", Vector3(-48, 0, -35))
+	shower("FishExchange", Vector3(-5.5, 0, 26))
+	shower("IceMarket", Vector3(19.5, 0, 44))
+	shower("RescueBay", Vector3(-34.8, 0, 19))
+	points("StreetSupplySpawns", "street_supply_spawn", [Vector2(-38, -24), Vector2(36, -19),
+		Vector2(20, 35), Vector2(44, 46)], 0.06)
+	directories["CrateStations"] = add(scene, Node3D.new(), "CrateStations")
+	marker("CrateStations", "crate_station", "CanneryStation", Vector3(-5, 0, -35)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "BaitShopStation", Vector3(50, 0, 10)).rotation_degrees.y = 90
+	marker("CrateStations", "crate_station", "FishExchangeStation", Vector3(4.5, 0, 24.5))
+	marker("CrateStations", "crate_station", "RescueStation", Vector3(-34.8, 0, 16.6))
+	marker("", "boss_anchor", "BossAnchor", Vector3(36, 16, 49))
+	puddles([Vector3(-57, 3, -20), Vector3(-33, 3, -30), Vector3(-10, 3.2, -23),
+		Vector3(2, 2, -32), Vector3(30, 3, -25), Vector3(55, 3, -33), Vector3(-26, 3, -3),
+		Vector3(-4, 2.5, 5), Vector3(34, 2.8, 0), Vector3(48, 2.4, 6), Vector3(0, 2.2, 15),
+		Vector3(12, 2.5, 35), Vector3(32, 3.5, 48), Vector3(-1, 2, 52), Vector3(44, 2.5, 54),
+		Vector3(-50, 2, 5), Vector3(32, 2, 24.5)])

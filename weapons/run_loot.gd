@@ -1,6 +1,9 @@
 class_name RunLoot
 extends Node3D
 ## Scene authority (peer 1). World ids are scoped to this run.
+const STARTER_KITS := ["pump_shotgun", "spray_rifle", "shield_dome"]
+var starter_chosen := false
+var _starter_claims: Dictionary = {}
 var run_id := 0
 var clock := 0.0
 var _next_id := 0
@@ -23,6 +26,52 @@ func begin(id: int) -> void:
 	run_id = id
 	for player: Node in GameManager.players():
 		holder(player).send_state()
+
+func starter_available() -> bool:
+	return run_id > 0 and not starter_chosen and WeatherManager.wave == 1 and WeatherManager.running
+
+func choose_starter(index: int) -> void:
+	if not starter_available() or not Net.can_send_run_rpc():
+		return
+	if Net.is_host():
+		_grant_starter(run_id, Net.local_id(), index)
+	else:
+		_request_starter.rpc_id(1, run_id, index)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_starter(run: int, index: int) -> void:
+	var peer := multiplayer.get_remote_sender_id()
+	if Net.is_host() and Net.run_peers.has(peer):
+		_grant_starter(run, peer, index)
+
+func _grant_starter(run: int, peer: int, index: int) -> void:
+	if run != run_id or not GameManager.run_active or GameManager.finished or WeatherManager.wave != 1 \
+			or _starter_claims.has(peer) or index < 0 or index >= STARTER_KITS.size():
+		return
+	var player := GameManager.player_for_peer(peer)
+	if player == null:
+		return
+	var inventory := holder(player)
+	var slot := inventory.slots.find(null)
+	if not inventory.can_act() or slot < 0:
+		return
+	_starter_claims[peer] = true
+	var item := make_item(STARTER_KITS[index])
+	inventory.accept_pickup(item)
+	if inventory.slots[slot] == item and inventory.current != slot:
+		inventory.select_slot(slot)
+	else:
+		inventory.send_state()
+	if peer == Net.local_id():
+		_starter_accepted(run)
+	else:
+		_starter_accepted.rpc_id(peer, run)
+
+@rpc("authority", "call_remote", "reliable")
+func _starter_accepted(run: int) -> void:
+	if run == run_id and not starter_chosen:
+		starter_chosen = true
+		Sound.play("pickup")
 
 func _physics_process(delta: float) -> void:
 	if not Net.is_host() or run_id == 0:
@@ -222,7 +271,7 @@ func sync_to_peer(peer: int) -> void:
 	var effects: Array = []
 	for id: int in projectiles:
 		effects.append([id, projectiles[id].snapshot()])
-	_snapshot.rpc_id(peer, run_id, rows, effects, discoveries)
+	_snapshot.rpc_id(peer, run_id, rows, effects, discoveries, _starter_claims.has(peer))
 	for player: Node in GameManager.players():
 		var inventory := holder(player)
 		inventory.sync_equip_to(peer)
@@ -230,7 +279,7 @@ func sync_to_peer(peer: int) -> void:
 			inventory.sync_private_to(peer)
 
 @rpc("authority", "call_remote", "reliable")
-func _snapshot(run: int, rows: Array, effects: Array, found: Array) -> void:
+func _snapshot(run: int, rows: Array, effects: Array, found: Array, chosen: bool) -> void:
 	if run < run_id:
 		return
 	for record: Dictionary in pickups.values():
@@ -240,6 +289,7 @@ func _snapshot(run: int, rows: Array, effects: Array, found: Array) -> void:
 	pickups.clear()
 	projectiles.clear()
 	run_id = run
+	starter_chosen = chosen
 	for row: Array in rows:
 		_spawn(run, row[0], row[1])
 	for row: Array in effects:

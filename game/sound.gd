@@ -1,16 +1,7 @@
 extends Node
 ## Local one-shots and the synchronized storm score.
 
-const MUSIC := [
-	"res://assets/audio/music/music_piano.ogg",
-	"res://assets/audio/music/music_bass.ogg",
-	"res://assets/audio/music/music_drums.ogg",
-	"res://assets/audio/music/music_lead.ogg",
-	"res://assets/audio/music/music_boss.ogg",
-]
-const THRESHOLDS := [0.0, 0.12, 0.32, 0.58]
-## Linear gains allow the stems to build without burying the attack cues.
-const MUSIC_GAIN := 1.7
+const SCORE := ["forecast_theme", "forecast_pulse", "forecast_storm", "forecast_boss"]
 const RAIN_GAIN := 0.50
 const RAIN_BUS := &"Rain"
 ## Mix buses. Rain sits under Ambience; Music ducks under Weapons fire.
@@ -38,7 +29,7 @@ var _layers: Array[AudioStreamPlayer] = []
 var _rain: AudioStreamPlayer
 var _wind: AudioStreamPlayer
 var _rain_filter := AudioEffectLowPassFilter.new()
-var _boss_active := false
+var _in_run := false
 var _rain_gain := 0.0
 var _shelter_mix := 0.0
 var _pressure := 0.0
@@ -51,6 +42,7 @@ const WEB_MAX_SFX := 8
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	for name in BUSES:
 		_add_bus(name, &"Master")
 	var bus := _add_bus(RAIN_BUS, &"Ambience")
@@ -72,6 +64,8 @@ func _ready() -> void:
 		duck.release_ms = 260.0
 		AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
 	WeatherManager.phase_changed.connect(_phase_changed)
+	if not _headless and not Net.dedicated:
+		_start_score.call_deferred()
 
 
 func _add_bus(bus_name: StringName, send: StringName) -> int:
@@ -129,20 +123,16 @@ func _get_sfx(cue: String) -> AudioStream:
 	return stream
 
 
+func _start_score() -> void:
+	for name in SCORE:
+		_layers.append(_loop_wav("res://assets/audio/music/%s.wav" % name, &"Music"))
+
+
 func start_run() -> void:
-	if Net.dedicated or _headless:
+	if Net.dedicated or _headless or _in_run:
 		return
-	var music_bus := &"Music"
+	_in_run = true
 	var rain_bus := RAIN_BUS
-	for i in MUSIC.size():
-		var source: String = MUSIC[i]
-		var stream := load(source).duplicate() as AudioStreamOggVorbis
-		stream.loop = true
-		var voice := _loop(stream, music_bus)
-		# On Web, keep silent stems paused so we aren't decoding 5 OGGs at once.
-		if _web and i > 0:
-			voice.stream_paused = true
-		_layers.append(voice)
 	_rain = _loop_wav("res://assets/audio/sfx/rain.wav", rain_bus)
 	if _web:
 		_rain.stream_paused = true
@@ -152,14 +142,7 @@ func start_run() -> void:
 
 
 func stop_run() -> void:
-	if _layers.is_empty():
-		return
-	for layer in _layers:
-		if is_instance_valid(layer):
-			layer.stop()
-			layer.queue_free()
-	_layers.clear()
-	_boss_active = false
+	_in_run = false
 	for voice in [_rain, _wind]:
 		if is_instance_valid(voice):
 			voice.stop()
@@ -183,8 +166,9 @@ func _loop(stream: AudioStream, bus := &"Master") -> AudioStreamPlayer:
 	var voice := AudioStreamPlayer.new()
 	voice.stream = stream
 	voice.bus = bus
+	voice.process_mode = Node.PROCESS_MODE_ALWAYS if bus == &"Music" else Node.PROCESS_MODE_PAUSABLE
 	if _web:
-		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+		voice.playback_type = AudioServer.PLAYBACK_TYPE_SAMPLE if bus == &"Music" else AudioServer.PLAYBACK_TYPE_STREAM
 	voice.volume_linear = 0.0
 	add_child(voice)
 	voice.play()
@@ -194,44 +178,30 @@ func _loop(stream: AudioStream, bus := &"Master") -> AudioStreamPlayer:
 func _process(delta: float) -> void:
 	if _layers.is_empty():
 		return
+	var blend := 1.0 - exp(-2.5 * delta / maxf(Engine.time_scale, 0.001))
 	var intensity := WeatherManager.storm_intensity
-	var blend := 1.0 - exp(-3.0 * delta)
-	var boss := get_tree().get_first_node_in_group("boss") != null or get_tree().get_first_node_in_group("miniboss") != null
-	# Combat pressure (enemies alive) pushes the drums and lead up on top of
-	# the storm layers, so a quiet Downpour and a packed one sound different.
-	_pressure = lerpf(_pressure, clampf(get_tree().get_nodes_in_group("enemies").size() / 14.0, 0.0, 1.0), blend * 0.5)
-	for i in THRESHOLDS.size():
-		var gain := 0.0 if boss else 0.24 * smoothstep(THRESHOLDS[i], THRESHOLDS[i] + 0.2, intensity)
-		if i == 0 and not boss:
-			gain = 0.20
-		elif i >= 2 and not boss:
-			gain = maxf(gain, 0.24 * _pressure * (1.0 if i == 2 else 0.7))
-		# On Web, decode at most piano + drums (skip bass & lead stems) to keep
-		# single-threaded Vorbis decoding smooth without crackles.
-		if _web and (i == 1 or i == 3):
-			gain = 0.0
-		var v := lerpf(_layers[i].volume_linear, gain * MUSIC_GAIN, blend)
-		_layers[i].volume_linear = v
-		if _web:
-			var want_paused := v < 0.005
-			if _layers[i].stream_paused != want_paused:
-				_layers[i].stream_paused = want_paused
-	var boss_track := _layers.back() as AudioStreamPlayer
-	if boss and not _boss_active:
-		var started := Time.get_ticks_usec()
-		if _web:
-			boss_track.stream_paused = false
-		boss_track.seek(0.0)
-		Perf.mark("boss music started in %.1f ms" % ((Time.get_ticks_usec() - started) / 1000.0))
-	_boss_active = boss
-	var boss_vol := lerpf(boss_track.volume_linear, (0.20 * MUSIC_GAIN) if boss else 0.0, blend)
-	boss_track.volume_linear = boss_vol
-	if _web:
-		var pause_boss := boss_vol < 0.005
-		if boss_track.stream_paused != pause_boss:
-			boss_track.stream_paused = pause_boss
-
 	var player := get_tree().get_first_node_in_group("local_player")
+	var danger := 0.0
+	var boss := false
+	if _in_run:
+		boss = get_tree().get_first_node_in_group("boss") != null or get_tree().get_first_node_in_group("miniboss") != null
+		danger = clampf(get_tree().get_node_count_in_group("enemies") / 13.0, 0.0, 1.0)
+		if player and (player.state == "downed" or player.health <= 30.0):
+			danger = maxf(danger, 0.72)
+	_pressure = lerpf(_pressure, danger, blend * 0.52)
+	var activity := maxf(intensity if _in_run else 0.0, _pressure)
+	var gains := [
+		0.68 if _in_run else 0.78,
+		lerpf(0.30, 0.78, activity) if _in_run else 0.18,
+		smoothstep(0.18, 0.86, activity) * (0.42 if boss else 0.80),
+		0.82 if boss else 0.0,
+	]
+	var overlay_mix := 0.47 if get_tree().paused else 1.0
+	for i in _layers.size():
+		_layers[i].volume_linear = lerpf(_layers[i].volume_linear, gains[i] * overlay_mix, blend)
+	if not _in_run or get_tree().paused:
+		return
+
 	_shelter_mix = lerpf(_shelter_mix, 1.0 if player and player.get("sheltered") else 0.0, blend)
 	_rain_gain = lerpf(_rain_gain, intensity, blend)
 	# Under a roof the rain should still be there, just dull and close.
@@ -299,8 +269,7 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 	voice.volume_db = volume_db
 	voice.pitch_scale = pitch
 	voice.bus = bus
-	if bus == &"UI":
-		voice.process_mode = Node.PROCESS_MODE_ALWAYS
+	voice.process_mode = Node.PROCESS_MODE_ALWAYS if bus == &"UI" else Node.PROCESS_MODE_PAUSABLE
 	if _web:
 		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 		_active_sfx += 1

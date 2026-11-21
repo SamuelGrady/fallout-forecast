@@ -2251,7 +2251,8 @@ mesh = SubResource("ArrayMesh_a87xh")
 
 [node name="ForestNW" type="Node3D" parent="Geometry" unique_id=1858408550]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNW" unique_id=495914427]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNW" unique_id=495914427 groups=["tree_canopy_trunks"]]
+metadata/canopy_radius = 1.8
 
 [node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNW/WorldCollision" unique_id=375497452]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.970726, 1.8, -57.90808)
@@ -2368,7 +2369,8 @@ mesh = SubResource("ArrayMesh_fi5gl")
 
 [node name="ForestNE" type="Node3D" parent="Geometry" unique_id=1380273735]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNE" unique_id=1397718993]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestNE" unique_id=1397718993 groups=["tree_canopy_trunks"]]
+metadata/canopy_radius = 1.8
 
 [node name="Hull" type="CollisionShape3D" parent="Geometry/ForestNE/WorldCollision" unique_id=2081941027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1372046, 1.8, -24.425592)
@@ -2461,7 +2463,8 @@ mesh = SubResource("ArrayMesh_62mc2")
 
 [node name="ForestSW" type="Node3D" parent="Geometry" unique_id=1185419383]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSW" unique_id=263894229]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSW" unique_id=263894229 groups=["tree_canopy_trunks"]]
+metadata/canopy_radius = 1.8
 
 [node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSW/WorldCollision" unique_id=1965988386]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.649654, 1.8, 42.221344)
@@ -2570,7 +2573,8 @@ mesh = SubResource("ArrayMesh_7st10")
 
 [node name="ForestSE" type="Node3D" parent="Geometry" unique_id=1796605579]
 
-[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSE" unique_id=471286640]
+[node name="WorldCollision" type="StaticBody3D" parent="Geometry/ForestSE" unique_id=471286640 groups=["tree_canopy_trunks"]]
+metadata/canopy_radius = 1.8
 
 [node name="Hull" type="CollisionShape3D" parent="Geometry/ForestSE/WorldCollision" unique_id=544018046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1249001, 1.8, 18.53014)

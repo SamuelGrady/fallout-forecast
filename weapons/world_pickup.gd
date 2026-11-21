@@ -17,13 +17,13 @@ func _ready() -> void:
 			visual = ItemCatalog.model(item.id, true)
 			add_child(visual)
 			var marker := Label3D.new()
-			marker.text = ItemCatalog.tier_name(item.id, item.tier)
+			marker.text = ItemCatalog.definition(item.id).display_name.to_upper()
 			marker.modulate = ItemCatalog.tier_color(item.id, item.tier)
 			marker.font = preload("res://assets/fonts/VT323-Regular.ttf")
 			marker.font_size = 32
 			marker.pixel_size = 0.003
 			marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-			marker.position.y = 0.65
+			marker.position.y = 0.66
 			add_child(marker)
 		add_to_group("interactables")
 	else:

@@ -12,6 +12,7 @@ const CAPS := {"shell": 36, "rifle": 200, "nail": 120, "water": 120, "cell": 80,
 const MODELS := "res://weapons/item_models.gd"
 
 const GUNS := {
+	"service_revolver": ["revolver", "service_revolver"],
 	"pump_shotgun": ["shell", "pump_shotgun"], "spray_rifle": ["rifle", "spray_rifle"],
 	"nail_driver": ["nail", "nail_driver"], "hunting_rifle": ["rifle", "hunting_rifle"],
 	"pressure_washer": ["water", "pressure_washer"], "rock_salt": ["shell", "rock_salt"],
@@ -56,7 +57,7 @@ static func definition(id: String) -> ItemDefinition:
 		item.stack_cap = row[2]
 		item.spawn_count = row[3]
 		item.weapon = load("res://weapons/%s.tres" % row[4]) as WeaponData
-	var path := "res://assets/ui/items/%s.png" % id
+	var path := "res://assets/ui/items/%s.png" % ("lucky_penny_revolver" if id == "service_revolver" else id)
 	if ResourceLoader.exists(path):
 		item.icon = load(path) as Texture2D
 	_entries[id] = item
@@ -105,8 +106,8 @@ static func model(id: String, pickup := false) -> Node3D:
 				result.set_meta("muzzle", models.call("muzzle", id))
 		if result == null and pickup and item and item.pickup_visual:
 			result = item.pickup_visual.instantiate() as Node3D
-		if result == null and not pickup and item:
-			result = item.weapon.make_model()
+		if result == null and item and item.weapon:
+			result = _gun_pickup(item.weapon) if pickup else item.weapon.make_model()
 		if result == null:
 			result = placeholder(item.weapon.tracer_color if item else Color("#e5c65b"))
 			result.scale = Vector3(0.34, 0.18, 0.6) if pickup else Vector3(0.15, 0.18, 0.58)
@@ -114,6 +115,33 @@ static func model(id: String, pickup := false) -> Node3D:
 		# mesh/material resources, with independent animations and transforms.
 		_cache_model(key, result)
 	return _scenes[key].instantiate() as Node3D
+
+static func _gun_pickup(data: WeaponData) -> Node3D:
+	var model := data.make_model()
+	if model == null:
+		return null
+	# Display the actual weapon at world scale. Flatten static mesh pivots
+	# before merging, so a drop doesn't pay the first-person model's draw cost.
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		var piece := child as MeshInstance3D
+		var material := piece.material_override as StandardMaterial3D
+		if material:
+			var readable := material.duplicate() as StandardMaterial3D
+			readable.albedo_color = material.albedo_color.lightened(0.13)
+			piece.material_override = readable
+		var at := piece.transform
+		var pivot := piece.get_parent() as Node3D
+		while pivot != model:
+			at = pivot.transform * at
+			pivot = pivot.get_parent() as Node3D
+		if piece.get_parent() != model:
+			piece.reparent(model, false)
+			piece.transform = at
+	var merged := MeshMerge.merge_children(model, false)
+	if merged:
+		merged.position = -merged.mesh.get_aabb().get_center()
+	model.scale *= 1.95
+	return model
 
 static func projectile_model(id: String) -> Node3D:
 	var custom := prop_model(id)

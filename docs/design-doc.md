@@ -173,7 +173,7 @@ The game should look like a horror movie taped off late-night TV in 1987: low re
 
 **Audio**
 
-- A synthwave score in layers (bass, drums, lead) added as `storm_intensity` rises.
+- An original synthwave theme begins on the title screen and continues through the lobby and gameplay. A bass pulse, percussion, and a boss arrangement react to storm intensity, enemy pressure, low health, and boss encounters.
 - A gated-reverb drum hit as each Downpour begins.
 - Rain and wind rise with the storm. Shelter filters the rain and softens the wind.
 - Synthesized radio cues announce the storm countdown, arrival and clearing. Spatial sounds telegraph infected attacks and signal decon spray and shield dome deployment or collapse.
@@ -304,13 +304,17 @@ Remote players and infected interpolate host-relayed movement (15 Hz for infecte
 | --- | --- | --- |
 | Mutation draft | The wave's enemy mutation is rolled and shown on a slim banner; players pick one of three player-mutation cards with 1/2/3 (D-pad) from a strip above the HUD. Solo resolves at once; sessions vote, one per peer. Active mutations are listed with descriptions on the pause screen. | `game/mutation_roll.gd`, `ui/slot_reel.gd`, `ui/pause_menu.gd` |
 | Teammates | Nameplates with distance and health over teammates, drawn through walls; off-screen and behind-you pointers; REVIVE and TURNED states called out. | `ui/teammate_markers.gd` |
-| Lobby and join | Force start for any player. CLOUD PLAY joins the dedicated cloud server (or the SERVER (WSS) address in Settings); player hosting and the LAN browser are gone. The server lobby votes on the map. 4:3 console layout. Protocol v13. | `ui/lobby.gd`, `game/net.gd`, `ui/title.gd` |
+| Lobby and join | Force start for any player. CLOUD PLAY joins the dedicated cloud server or the SERVER (WSS) address in Settings. The server lobby votes on the map. 4:3 console layout. Protocol v14. | `ui/lobby.gd`, `game/net.gd`, `ui/title.gd` |
 | Ending | Boss victory clears the remaining infected, broadcasts the lifted quarantine and bursts sparks over the street; defeat fades to SIGNAL LOST. Results add an epilogue, time on tape, squad mutations, an MVP and an end-of-tape sign-off. | `game/game_manager.gd`, `main.gd`, `ui/results.gd` |
 | UI | VT323 (OFL) VHS font everywhere; default size 20. Loading-tape screen when entering a run. | `assets/fonts/`, `game/scene_loader.gd` |
-| Audio | Soundtrack about 6 dB louder, rain about 5 dB quieter; thunder is a pre-rendered WAV. | `game/sound.gd`, `weather/lightning_fx.gd` |
+| Audio | The original score runs continuously from title to run and crossfades its layers in response to combat and the storm. Web uses browser sample playback for score and thunder. Music dips when the delayed thunder actually plays. | `game/sound.gd`, `weather/lightning_fx.gd`, `tools/audio/gen_forecast_score.py` |
 | Web performance | Fog stays enabled so the first rain no longer recompiles every shader; no dynamic gunshot lights on web; infected merged to one mesh per bone; low-poly torus/sphere defaults; lighter web neon; web-only static prop batching; a still title backdrop on web; small-asset preloading on menus; a shader warm-up behind a TUNING IN card. | `weather/weather_fx.gd`, `props/mesh_merge.gd`, `props/static_batcher.gd`, `game/warmup.gd`, `game/preload.gd` |
 | Telemetry | Every client auto-sends anonymous session, perf (frame histogram, 100 ms+ spikes with the events before them) and run events to fallout-telemetry.drew.place; Settings > SEND TELEMETRY turns it off. Perf overlay stays in Settings; the pause-menu report export is gone. | `game/perf.gd` |
-| Loot and slots | Host-authoritative 5-slot inventory with a bottom-center hotbar, one pickup or swap per interact press, selected-item drop (G or R3), 15 new weapons and items with procedural viewmodels and pickups, scrap currency, scrap stations at landmarks and timed airdrops replacing scattered crates. | weapons/item\_models.gd, ui/item\_hotbar.gd, game/crate\_manager.gd |
+| Starter kits | Each player begins with a Service Revolver. During wave 1, choose one pump shotgun, spray rifle, or two Shield Domes using 1/2/3 or D-pad Left/Up/Right. The host grants the chosen kit once per player. | `weapons/run_loot.gd`, `ui/starter_picker.gd` |
+| Airdrops | Calm announces a drop. It lands early in Drizzle at a reachable outdoor site, aiming for a roughly 22 m crossing. The pallet remains through Downpour and yields an overclocked reward per player plus an ammo box. | `game/crate_manager.gd`, `crates/supply_station.gd` |
+| Loot and slots | Five slots, tap to pick up or swap, and G or R3 to drop the selected item. Ground guns display their 3D models. Scrap stations show three priced offers. Buying adds the chosen item to a slot or stack and drops the displaced selected item if full. Stock rotates after purchase and each Calm. | `weapons/world_pickup.gd`, `ui/item_hotbar.gd`, `game/crate_manager.gd` |
+| Tree cover | Solid trunks block shots. Leafy canopies give rain shelter in Pinecrest, Maple Hollow, and Harbor Point. | `props/tree_shelter.gd`, `levels/` |
+| Harbor Point | A four-way Fish Exchange, walk-through Cannery, raised Signal Walk, and separate rescue and customs routes connect covered fallback spots. Quay ramps and solid pier skirts give players ways out of the tidal basin. | `levels/harbor/level_harbor.tscn`, `tools/levels/build_harbor.gd` |
 | Suits and feats | 31 achievements (3 hidden); 9 unlock suit colours or skins, 4 colours and 2 skins free. Host decides, each player saves their own progress. Feats screen, toasts, results unlock cards; locked suits show their feat in the picker. | game/feats.gd, game/feat\_tracker.gd, ui/feats\_screen.gd, ui/achievement\_toast.gd |
 | HUD | AAA pass at 4:3: no black boxes, icon + thin-bar vitals, compass with red infected dots, wave diamonds, segmented boss bar, idle fade, key-cap prompts, bleed-out ring. Obvious text cut across HUD, popups, banners and menus. | ui/hud.gd, ui/broadcast\_ui.gd, ui/ping\_hud.gd |
 | Enemy tuning | Shield Dome pushes enemies out and blocks acid and spores; same-kind clouds merge instead of stacking. Hailstones turn slowly. Cumulus flies to and hovers about 5 m over one player at a time. | weapons/projectile.gd, enemies/mister/spore\_cloud.gd, enemies/boss/boss\_cumulus.gd |
@@ -413,7 +417,7 @@ Each week ends with both of you playing the gate together in 2+ instances.
 - [ ] PSA screens and recorded voice lines
 - [x] Layered synthwave music and sound from asset packs
 
-  Storm intensity fades in bass, drums and lead over piano. Cumulus has a separate boss track. The gated drum marks each Downpour. Rain and wind change under shelter. Synthesized cues cover storm phases, infected attacks, shield domes, decon, team pings and cassette transport. Credits are in `assets/audio/CREDITS.md`.
+  The theme continues across the title, lobby and run. Storm intensity and combat raise the bass pulse and percussion, while bosses add brass. The gated drum marks each Downpour. Rain and wind change under shelter. Synthesized cues cover storm phases, infected attacks, shield domes, decon, team pings and cassette transport. Credits are in `assets/audio/CREDITS.md`.
 
 **Risks**
 

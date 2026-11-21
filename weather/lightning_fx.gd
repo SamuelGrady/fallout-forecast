@@ -5,9 +5,7 @@ extends Node3D
 ## thunder 0.5-2 s later depending on distance. The seed from the host makes
 ## the bolt shape the same on every client.
 ##
-## The thunder is synthesized once at startup (filtered noise with a crack and
-## a rumble), so it needs no audio file. Swap in a recorded clip later by
-## setting thunder_stream.
+## Web gets a nearfield crack and roll mixed for small speakers.
 
 signal flashed(position: Vector3)
 
@@ -24,6 +22,9 @@ static var _cached_thunder: AudioStreamWAV
 
 func _ready() -> void:
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
+	var web := OS.has_feature("web")
+	if thunder_stream == null and web:
+		thunder_stream = load("res://assets/audio/sfx/thunder_web.wav") as AudioStream
 	if thunder_stream == null:
 		if _cached_thunder == null:
 			# Pre-rendered (same recipe as _make_thunder): synthesizing it here
@@ -35,10 +36,9 @@ func _ready() -> void:
 		thunder_stream = _cached_thunder
 	_thunder_player.stream = thunder_stream
 	_thunder_player.volume_db = Sound.cue_gain("thunder", thunder_volume_db)
-	var web := OS.has_feature("web")
-	_thunder_player.bus = &"Master" if web else &"Ambience"
+	_thunder_player.bus = &"Ambience"
 	if web:
-		_thunder_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+		_thunder_player.playback_type = AudioServer.PLAYBACK_TYPE_SAMPLE
 	add_child(_thunder_player)
 
 	_bolt_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -55,7 +55,6 @@ func _exit_tree() -> void:
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 	Perf.mark("lightning strike")
 	Juice.shake(0.45, position)
-	Juice.duck_music(-8.0, 1.2)
 	var fx := get_parent()
 	if fx and "flash" in fx:
 		fx.flash = Settings.flash_scale()
@@ -77,13 +76,16 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 	var distance := listener.distance_to(position)
 	var delay := clampf(distance / 343.0 * 10.0, 0.5, 2.0)
 	if not Net.dedicated and DisplayServer.get_name() != "headless":
-		var level := thunder_volume_db - clampf(distance / 10.0, 0.0, 8.0)
-		get_tree().create_timer(delay).timeout.connect(_play_thunder.bind(level))
+		var web := OS.has_feature("web")
+		var level := (-5.0 if web else thunder_volume_db) - clampf(distance / 14.0, 0.0, 4.0 if web else 8.0)
+		get_tree().create_timer(delay, false).timeout.connect(_play_thunder.bind(level))
 
 
 func _play_thunder(level: float) -> void:
-	_thunder_player.volume_db = Sound.cue_gain("thunder", level)
+	Juice.duck_music(-8.0, 1.25)
+	_thunder_player.volume_db = level
 	_thunder_player.play()
+	Perf.mark("thunder playback")
 
 
 func _spawn_bolt(ground: Vector3, rng: RandomNumberGenerator) -> void:

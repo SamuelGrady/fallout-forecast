@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Service Revolver"
+shot_sound = "gun_revolver"
+damage = 38.0
+spread_degrees = 0.7
+max_range = 52.0
+fire_interval = 0.32
+reload_time = 1.5
+view_position = Vector3(0.15, -0.15, -0.3)
+muzzle = Vector3(0, 0.05, -0.23)
+gun_model = "service_revolver"
+ads_fov = 55.0
+ads_eye_relief = 0.36

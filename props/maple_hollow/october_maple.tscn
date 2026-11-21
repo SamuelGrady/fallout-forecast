@@ -61,7 +61,8 @@ _surfaces = [{
 
 [node name="OctoberMaple" type="Node3D" unique_id=834468695]
 
-[node name="WorldCollision" type="StaticBody3D" parent="." unique_id=1336097617]
+[node name="WorldCollision" type="StaticBody3D" parent="." unique_id=1336097617 groups=["tree_canopy_trunks"]]
+metadata/canopy_radius = 2.5
 
 [node name="Hull" type="CollisionShape3D" parent="WorldCollision" unique_id=512005399]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.95, 0)

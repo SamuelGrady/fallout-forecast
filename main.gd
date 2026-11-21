@@ -49,6 +49,7 @@ func _ready() -> void:
 		WebMaterials.apply_tree(_level)
 	$WeatherFX.configure_level(_level, map_id)
 	add_child(_level)
+	preload("res://props/tree_shelter.gd").install(_level)
 	if web_materials:
 		WebMaterials.install(get_tree())
 	Perf.mark("map %s inst %.1f ms" % [map_id, (Time.get_ticks_usec() - inst_started) / 1000.0])
@@ -104,6 +105,9 @@ func _ready() -> void:
 		var ping_hud := preload("res://ui/ping_hud.gd").new()
 		ping_hud.system = pings
 		$HUD.add_child(ping_hud)
+		var starter_picker := preload("res://ui/starter_picker.gd").new()
+		starter_picker.loot = loot
+		$HUD.add_child(starter_picker)
 	Net.roster_changed.connect(_sync_players)
 	Net.server_closed.connect(_leave_to_title)
 	GameManager.run_finished.connect(_on_run_finished)

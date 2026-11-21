@@ -12,7 +12,7 @@ const SPRINT_RAISE := 0.15
 
 var slots: Array[ItemInstance] = [null, null, null, null, null]
 var reserves: Dictionary = {}
-var _seeded_ammo: Dictionary = {"shell": true}
+var _seeded_ammo: Dictionary = {"revolver": true}
 var current := 0
 var scrap := 0
 var revision := 0
@@ -55,8 +55,8 @@ func _ready() -> void:
 	player = camera.get_parent().get_parent() as Node3D
 	loot = RunLoot.find(get_tree())
 	if Net.is_host() and loot:
-		slots[0] = loot.make_item("pump_shotgun")
-		reserves["shell"] = ItemCatalog.CAPS.shell
+		slots[0] = loot.make_item("service_revolver")
+		reserves["revolver"] = 24
 		_refresh_equip()
 		if loot.run_id > 0:
 			send_state()
@@ -120,10 +120,6 @@ func _handle_input() -> void:
 	if not can_act():
 		_fire_buffer = 0.0
 		return
-	for slot in SLOT_COUNT:
-		if Input.is_action_just_pressed("weapon_%d" % (slot + 1)):
-			select_slot(slot)
-			return
 	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
 	if wheel != 0:
 		select_slot(posmod(current + wheel, SLOT_COUNT))
@@ -157,11 +153,17 @@ func _handle_input() -> void:
 			start_reload()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Net.dedicated or not player.is_multiplayer_authority():
+	if Net.dedicated or not player.is_multiplayer_authority() or not can_act():
 		return
-	if event.is_action_pressed("drop_item") and selected() and can_act():
+	if event.is_action_pressed("drop_item") and selected():
 		_command("drop")
 		get_viewport().set_input_as_handled()
+		return
+	for slot in SLOT_COUNT:
+		if event.is_action_pressed("weapon_%d" % (slot + 1)):
+			select_slot(slot)
+			get_viewport().set_input_as_handled()
+			return
 
 func fire() -> void:
 	if not Net.can_send_run_rpc() or selected() == null:
