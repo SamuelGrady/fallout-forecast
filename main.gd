@@ -108,6 +108,13 @@ func _ready() -> void:
 		var starter_picker := preload("res://ui/starter_picker.gd").new()
 		starter_picker.loot = loot
 		$HUD.add_child(starter_picker)
+		# Tab / I: live loadout, drag-and-drop hotbar and active mutations.
+		# Added after the pause and dev menus so its _input sees ESC first.
+		var inventory := CanvasLayer.new()
+		inventory.name = "InventoryMenu"
+		inventory.set_script(preload("res://ui/inventory_menu.gd"))
+		inventory.set("starter_picker", starter_picker)
+		add_child(inventory)
 	Net.roster_changed.connect(_sync_players)
 	Net.server_closed.connect(_leave_to_title)
 	GameManager.run_finished.connect(_on_run_finished)
