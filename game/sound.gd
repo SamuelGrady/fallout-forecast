@@ -28,6 +28,27 @@ const CUE_TRIM_DB := {
 const CUE_CAP_DB := {"thunder": -1.0}
 var _last_cue_ms := {}
 
+## Combat heat (0-1): spikes fast on hits, kills, gunfire, explosions and
+## player damage, holds briefly, then decays over ~5 s once the fight quiets.
+## Nearby/total enemies, low health and the storm hold a floor under it.
+const HEAT_HIT := 0.28
+const HEAT_KILL := 0.45
+const HEAT_FIRE := 0.18
+const HEAT_CUES := {"explosion": 0.35, "explosion_big": 0.35, "hit_flesh": 0.30, "suit_beep": 0.20}
+const HEAT_HOLD := 1.0
+const HEAT_DECAY := 0.22
+const NEAR_ENEMY_M := 22.0
+## Music energy attack/release rates (1/s): ~0.5 s up, ~3.5 s down.
+const ATTACK_RATE := 6.0
+const RELEASE_RATE := 0.85
+var _combat_heat := 0.0
+var _heat_hold := 0.0
+var _heat := 0.0
+var _storm := 0.0
+var _boss_mix := 0.0
+var _swarm_floor := 0.0
+var _scan_left := 0.0
+
 var _layers: Array[AudioStreamPlayer] = []
 var _rain: AudioStreamPlayer
 var _wind: AudioStreamPlayer
@@ -35,7 +56,6 @@ var _rain_filter := AudioEffectLowPassFilter.new()
 var _in_run := false
 var _rain_gain := 0.0
 var _shelter_mix := 0.0
-var _pressure := 0.0
 var _last_phase := Vector2i(-1, -1)
 var _web := OS.has_feature("web")
 var _headless := DisplayServer.get_name() == "headless"
@@ -62,11 +82,13 @@ func _ready() -> void:
 		duck.sidechain = &"Weapons"
 		duck.threshold = -19.0
 		duck.ratio = 2.5
-		duck.mix = 0.45
+		duck.mix = 0.28
 		duck.attack_us = 5000.0
 		duck.release_ms = 260.0
 		AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
 	WeatherManager.phase_changed.connect(_phase_changed)
+	# GameManager is a later autoload: connect once the whole tree is up.
+	(func(): GameManager.combat_hit.connect(_on_combat_hit)).call_deferred()
 	if not _headless and not Net.dedicated:
 		_start_score.call_deferred()
 
@@ -154,7 +176,12 @@ func stop_run() -> void:
 	_wind = null
 	_rain_gain = 0.0
 	_shelter_mix = 0.0
-	_pressure = 0.0
+	_combat_heat = 0.0
+	_heat_hold = 0.0
+	_swarm_floor = 0.0
+	_heat = 0.0
+	_storm = 0.0
+	_boss_mix = 0.0
 	_last_phase = Vector2i(-1, -1)
 
 
@@ -181,28 +208,32 @@ func _loop(stream: AudioStream, bus := &"Master") -> AudioStreamPlayer:
 func _process(delta: float) -> void:
 	if _layers.is_empty():
 		return
-	var blend := 1.0 - exp(-2.5 * delta / maxf(Engine.time_scale, 0.001))
+	var real := delta / maxf(Engine.time_scale, 0.001)
+	var blend := 1.0 - exp(-2.5 * real)
 	var intensity := WeatherManager.storm_intensity
 	var player := get_tree().get_first_node_in_group("local_player")
-	var danger := 0.0
-	var boss := false
+	var paused := get_tree().paused
+	var gains := [0.72, 0.18, 0.0, 0.0]
 	if _in_run:
-		boss = get_tree().get_first_node_in_group("boss") != null or get_tree().get_first_node_in_group("miniboss") != null
-		danger = clampf(get_tree().get_node_count_in_group("enemies") / 13.0, 0.0, 1.0)
-		if player and (player.state == "downed" or player.health <= 30.0):
-			danger = maxf(danger, 0.72)
-	_pressure = lerpf(_pressure, danger, blend * 0.52)
-	var activity := maxf(intensity if _in_run else 0.0, _pressure)
-	var gains := [
-		0.68 if _in_run else 0.78,
-		lerpf(0.30, 0.78, activity) if _in_run else 0.18,
-		smoothstep(0.18, 0.86, activity) * (0.42 if boss else 0.80),
-		0.82 if boss else 0.0,
-	]
-	var overlay_mix := 0.47 if get_tree().paused else 1.0
+		var boss := get_tree().get_first_node_in_group("boss") != null or get_tree().get_first_node_in_group("miniboss") != null
+		if not paused:
+			_update_heat(real, player, boss)
+		var e := maxf(_heat, _storm)
+		var storm_layer := maxf(clampf((_heat - 0.08) / 0.35, 0.0, 1.0), clampf((_storm - 0.05) / 0.45, 0.0, 1.0))
+		var overdrive := 0.55 * smoothstep(0.72, 0.95, _heat) * smoothstep(0.55, 0.7, _storm)
+		_boss_mix = lerpf(_boss_mix, 0.95 if boss else overdrive, 1.0 - exp(-(4.0 if boss else 1.5) * real))
+		gains = [
+			lerpf(0.62, 0.34, e),
+			lerpf(0.20, 0.95, smoothstep(0.02, 0.3, e)),
+			storm_layer,
+			_boss_mix,
+		]
+	var overlay_mix := 0.47 if paused else 1.0
 	for i in _layers.size():
-		_layers[i].volume_linear = lerpf(_layers[i].volume_linear, gains[i] * overlay_mix, blend)
-	if not _in_run or get_tree().paused:
+		var goal: float = gains[i] * overlay_mix
+		var rate := 8.0 if goal > _layers[i].volume_linear else 3.0
+		_layers[i].volume_linear = lerpf(_layers[i].volume_linear, goal, 1.0 - exp(-rate * real))
+	if not _in_run or paused:
 		return
 
 	_shelter_mix = lerpf(_shelter_mix, 1.0 if player and player.get("sheltered") else 0.0, blend)
@@ -219,6 +250,69 @@ func _process(delta: float) -> void:
 				_rain.stream_paused = pause_rain
 	if _wind:
 		_wind.volume_linear = smoothstep(0.23, 1.0, _rain_gain) * lerpf(0.27, 0.09, _shelter_mix)
+
+
+## Raw combat heat plus its floors (swarm, low health, boss), then the
+## smoothed heat/storm drives with a fast attack and a slow release.
+func _update_heat(real: float, player: Node, boss: bool) -> void:
+	_heat_hold -= real
+	if _heat_hold <= 0.0:
+		_combat_heat = maxf(0.0, _combat_heat - HEAT_DECAY * real)
+	_scan_left -= real
+	if _scan_left <= 0.0:
+		_scan_left = 0.15
+		var enemies := get_tree().get_nodes_in_group("enemies")
+		var near := 0
+		if player is Node3D:
+			var origin: Vector3 = player.global_position
+			for enemy in enemies:
+				if enemy is Node3D and origin.distance_squared_to(enemy.global_position) < NEAR_ENEMY_M * NEAR_ENEMY_M:
+					near += 1
+		_swarm_floor = maxf(clampf(enemies.size() / 7.0, 0.0, 1.0) * 0.8, clampf(near / 3.0, 0.0, 1.0))
+	var target := maxf(_combat_heat, _swarm_floor)
+	if player and (player.state == "downed" or player.health <= 30.0):
+		target = maxf(target, 0.85)
+	if boss:
+		target = maxf(target, 0.7)
+	_heat = _ramp(_heat, target, real)
+	_storm = _ramp(_storm, _storm_drive(), real)
+
+
+func _ramp(current: float, target: float, real: float) -> float:
+	var rate := ATTACK_RATE if target > current else RELEASE_RATE
+	return lerpf(current, target, 1.0 - exp(-rate * real))
+
+
+## Storm energy: the phase's target as soon as it starts (storm_intensity
+## eases in slowly), Acid Storm on the final wave and beyond; 0 once it ends.
+func _storm_drive() -> float:
+	if not WeatherManager.is_storm_active():
+		return 0.0
+	var target := 0.0
+	match WeatherManager.phase:
+		WeatherManager.Phase.DRIZZLE:
+			target = 0.3
+		WeatherManager.Phase.DOWNPOUR:
+			target = 1.0 if WeatherManager.wave >= WeatherManager.FINAL_WAVE else 0.7
+	return maxf(target, WeatherManager.storm_intensity)
+
+
+func add_combat_heat(amount: float) -> void:
+	if not _in_run:
+		return
+	_combat_heat = minf(1.0, _combat_heat + amount)
+	_heat_hold = HEAT_HOLD
+
+
+func _on_combat_hit(killed: bool, _critical: bool) -> void:
+	add_combat_heat(HEAT_KILL if killed else HEAT_HIT)
+
+
+func _heat_for_cue(cue: String) -> void:
+	if _is_fire(cue):
+		add_combat_heat(HEAT_FIRE)
+	elif HEAT_CUES.has(cue):
+		add_combat_heat(float(HEAT_CUES[cue]))
 
 
 func _phase_changed(phase: int, wave: int) -> void:
@@ -249,6 +343,7 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 	if Net.dedicated or _headless:
 		return
 	_first_play(cue)
+	_heat_for_cue(cue)
 	if cue == "pickup":
 		# Pickups come in bursts after a fight: one soft, varied cue at a time.
 		if _recent(cue, 0.3):
@@ -258,7 +353,7 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 	elif _web and cue != "ui_focus" and _recent(cue, 0.045):
 		return
 	if _web and _is_fire(cue):
-		Juice.duck_music(-3.0, 0.13)
+		Juice.duck_music(-1.5, 0.09)
 	_play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus_for(cue))
 
 
@@ -302,6 +397,7 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 	if Net.dedicated or _headless:
 		return
 	_first_play(cue)
+	_heat_for_cue(cue)
 	if cue == "pickup" and _recent(cue, 0.3):
 		return
 	volume_db = cue_gain(cue, volume_db)
