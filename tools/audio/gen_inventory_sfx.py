@@ -1,7 +1,10 @@
 """Build Fallout Forecast's original surplus weapons and supply cues.
 
-Run from the repository root with Python and NumPy.
+Run from the repository root with Python and NumPy. Pass --pickup-only to
+regenerate just the pickup cue.
 """
+import argparse
+
 import numpy as np
 
 from gen_juice_sfx import SR, env, finish, lowpass, t_axis, write
@@ -35,7 +38,28 @@ def chirps(notes, duration, separation):
     return finish(lowpass(signal, 4500), 0.59)
 
 
+def pickup():
+    """A padded gear latch closing, with a soft wooden body and a short snap."""
+    t = t_axis(0.128)
+    raw = np.random.default_rng(4817).standard_normal(t.size)
+    click = lowpass(raw, 4400) - lowpass(raw, 1050)
+    signal = 0.42 * click * env(t, 0.0031)
+    signal += 0.12 * click * env(t, 0.0026, 0.015)
+    signal += 0.61 * np.sin(2 * np.pi * 184 * t) * env(t, 0.035)
+    signal += 0.18 * np.sin(2 * np.pi * 368 * t) * env(t, 0.016)
+    for note, start, gain in [(520, 0.007, 0.11), (680, 0.024, 0.065)]:
+        signal += gain * np.sin(2 * np.pi * note * (t - start)) * env(t, 0.022, start)
+    signal *= np.minimum(t / 0.0007, 1.0)
+    return finish(signal, 0.76, fade=0.018)
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pickup-only", action="store_true", help="write only pickup.wav")
+    args = parser.parse_args()
+    write("pickup", pickup())
+    if args.pickup_only:
+        return
     cues = {
         "nail_driver": (0.095, 380, 0.028, 3600, 170),
         "hunting_rifle": (0.42, 124, 0.087, 5100, 0),
