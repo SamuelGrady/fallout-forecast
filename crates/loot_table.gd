@@ -9,6 +9,10 @@ extends Resource
 @export var rare_items: Array[String] = ["tarp", "decon", "hunting_rifle", "pressure_washer", "battery_zapper",
 	"flare_launcher", "harpoon", "leaf_blower", "umbrella", "lightning_rod", "bleach_bomb", "bait_radio"]
 @export var cursed_items: Array[String] = ["leaky_nailgun", "boombox_launcher", "lucky_penny_revolver"]
+@export var airdrop_weapons: Array[String] = []
+@export var airdrop_supplies: Array[String] = []
+@export_range(0.0, 1.0, 0.01) var airdrop_cursed_chance := 0.0
+@export_range(0.0, 1.0, 0.01) var airdrop_legendary_chance := 0.0
 
 func pool(tier: int, wave: int) -> Array[String]:
 	var items: Array[String] = []
@@ -26,6 +30,13 @@ func pool(tier: int, wave: int) -> Array[String]:
 		3:
 			items.append("disruptor")
 	return items
+
+func roll_airdrop_weapon() -> String:
+	var roll := RNG.rng.randf()
+	if roll < airdrop_legendary_chance:
+		return "disruptor"
+	var weapons := cursed_items if roll < airdrop_legendary_chance + airdrop_cursed_chance else airdrop_weapons
+	return weapons[RNG.rng.randi_range(0, weapons.size() - 1)]
 
 func display_name(id: String) -> String:
 	var item := ItemCatalog.definition(id)

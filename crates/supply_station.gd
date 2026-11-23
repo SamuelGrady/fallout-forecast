@@ -23,6 +23,7 @@ var _smoke_left := 0.0
 var _show_clock := 0.0
 var _show_queue: Array[Array] = []
 var _active: Array = []
+var _chute_sway_time := 0.0
 var _offer_titles: Array[Label3D] = []
 var _offer_prices: Array[Label3D] = []
 var _offer_items: Array[Node3D] = []
@@ -122,8 +123,10 @@ func _process(delta: float) -> void:
 					Color(0.67, 0.50, 0.35, 0.76), 0.95, 0.7)
 				if not Settings.reduced_flash:
 					create_tween().tween_method(_compass_tint, 1.0, 0.0, 0.6)
-			if _chute:
-				_chute.visible = descent_left > 0.0
+			if _chute and descent_left <= 0.0:
+				_chute_sway_time += delta
+				_chute.rotation.x = sin(_chute_sway_time * 1.15) * 0.024
+				_chute.rotation.z = sin(_chute_sway_time * 0.84) * 0.032
 			_smoke_left -= delta
 			if _smoke_left <= 0.0 and not opened:
 				_smoke_left = 0.4 if OS.has_feature("web") else 0.2

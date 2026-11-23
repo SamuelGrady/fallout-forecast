@@ -4,3 +4,7 @@
 
 [resource]
 script = ExtResource("1")
+airdrop_weapons = Array[String](["hunting_rifle", "pressure_washer", "battery_zapper", "flare_launcher", "harpoon", "leaf_blower"])
+airdrop_supplies = Array[String](["ammo_box", "frag", "shield_dome", "med_tin", "suit_patch", "lightning_rod"])
+airdrop_cursed_chance = 0.2
+airdrop_legendary_chance = 0.08
