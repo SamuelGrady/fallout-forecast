@@ -81,6 +81,8 @@ var is_small := false
 var is_elite := false
 ## Wave 1-4 Mini-Boss tier (0 = regular enemy).
 var miniboss_wave := 0
+## Active ground pickups before regular infected stop dropping scrap.
+const SCRAP_DROP_CAP := 48
 var miniboss_name := ""
 var max_health := 1.0
 var _miniboss_ability_timer := 4.0
@@ -637,16 +639,20 @@ func die() -> void:
 	_dead = true
 	# The spawner owns the drops and tells every peer to make them: a drop is
 	# collected locally by whoever walks over it, so it has to exist everywhere.
+	# Infected only ever drop ground scrap; ammo comes from vending and airdrops.
 	var drops: Array = []
+	var room := get_tree().get_nodes_in_group("ammo_drops").size() < SCRAP_DROP_CAP
 	if miniboss_wave > 0:
-		drops.append([global_position, "supply"])
-		drops.append([global_position + Vector3(0.9, 0.0, 0.0), "health"])
+		# Minibosses always pay out, scattered around the corpse.
+		for i in 3:
+			var offset := Vector3(0.85, 0.0, 0.0).rotated(Vector3.UP, i * TAU / 3.0 + randf() * 0.6)
+			drops.append([global_position + offset, "scrap_large"])
 		GameManager.show_banner("%s DEFEATED" % miniboss_name, Color("ffd56a"), 2.4)
 		Sound.play("reel_land", -6.0, 1.15)
-	elif not is_small and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
-		drops.append([global_position, "ammo"])
-	if miniboss_wave == 0 and not is_small and data.display_name != "Drip" and randf() < 0.4 and get_tree().get_nodes_in_group("ammo_drops").size() < 32:
-		drops.append([global_position + Vector3(0.6, 0.0, 0.0), "health" if randf() < 0.5 else "suit"])
+	elif room and is_elite:
+		drops.append([global_position, "scrap_large"])
+	elif room and (not is_small or randf() < 0.35):
+		drops.append([global_position, "scrap"])
 	if get_parent() and get_parent().has_method("spawn_drop"):
 		for entry in drops:
 			get_parent().spawn_drop(entry[0], str(entry[1]))

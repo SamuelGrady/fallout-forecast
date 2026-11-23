@@ -625,6 +625,10 @@ static func projectile(id: String) -> Node3D:
 			G._cylinder(root, 0.008, 0.58, Vector3.ZERO, G.STEEL, 0.6)
 			_profile(root, 0.016, PackedVector2Array([Vector2(-0.39, 0), Vector2(-0.25, 0.029), Vector2(-0.27, 0), Vector2(-0.24, -0.022)]), G.STEEL)
 			G._cylinder(root, 0.012, 0.05, Vector3(0, 0, 0.265), G.SAFETY_ORANGE)
+			var tip := Marker3D.new()
+			tip.name = "Tip"
+			tip.position.z = -0.39
+			root.add_child(tip)
 			var tail := Marker3D.new()
 			tail.name = "CableStart"
 			tail.position.z = 0.29

@@ -76,7 +76,7 @@ func _apply_deal(enemy: String, dealt: Array) -> void:
 	cards_dealt.emit(enemy_pick, cards)
 	votes_changed.emit(vote_counts)
 	# Nothing left to draft (every player mutation owned): just apply the enemy.
-	if cards.is_empty() and Net.is_host():
+	if cards.is_empty():
 		time_left = 1.5
 
 
@@ -94,6 +94,8 @@ func is_voting() -> bool:
 ## One pick per player per draft; it can be changed until the draft resolves.
 func vote(index: int) -> bool:
 	if stage != "voting" or index < 0 or index >= cards.size():
+		return false
+	if local_pick == index:
 		return false
 	local_pick = index
 	vote_cast.emit(index)
@@ -156,7 +158,9 @@ func _finish_draft() -> void:
 
 
 func _local_input() -> void:
-	if get_tree().paused:
+	if Net.dedicated or get_tree().paused or not MenuState.stack.is_empty():
+		return
+	if get_tree().get_first_node_in_group("mutation_draft_ui") != null:
 		return
 	for i in cards.size():
 		if Input.is_action_just_pressed("weapon_%d" % (i + 1)):

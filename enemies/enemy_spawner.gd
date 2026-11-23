@@ -412,18 +412,12 @@ func _sync_progress(wave: int, left: int, total: int, recovery: float, score: in
 	GameManager.endless_score = score
 
 
+## Free street supply crates are retired: ammo only comes from vending
+## stations and supply drops. Clears any leftovers from an older run.
 func _spawn_street_supplies() -> void:
-	RunLoot.find(get_tree()).clear_supplies()
-	var sites := get_tree().get_nodes_in_group("street_supply_spawn")
-	if sites.is_empty():
-		sites = get_tree().get_nodes_in_group("drain_spawn")
-	if sites.is_empty():
-		sites = get_tree().get_nodes_in_group("crate_spawn")
-	var count := mini(4, sites.size())
-	for i in count:
-		var site := sites[floori(float(i * sites.size()) / count)] as Node3D
-		var point := site.global_position + Vector3.UP * .12
-		spawn_drop(point, "supply", 600.0)
+	var loot := RunLoot.find(get_tree())
+	if Net.is_host() and loot:
+		loot.clear_supplies()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -655,9 +649,14 @@ func _near_players(points: Array) -> Variant:
 
 
 # ------------------------------------------------------------------ network
+const SCRAP_LIFETIME := 45.0
+
 func spawn_drop(at: Vector3, kind := "ammo", expires := 35.0) -> void:
 	var loot := RunLoot.find(get_tree())
 	if Net.is_host() and loot:
+		if kind.begins_with("scrap"):
+			# Scrap lingers so players can sweep it up after clearing a group.
+			expires = maxf(expires, SCRAP_LIFETIME)
 		loot.spawn_pickup(null, at, kind, expires)
 
 

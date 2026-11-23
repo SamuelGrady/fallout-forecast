@@ -46,6 +46,7 @@ var _charge_serial := 0
 var _charge_at := 0.0
 var _pending_action := 0.0
 var _kick := 0.0
+var _harpoon_motion_left := 0.0
 var _bob := 0.0
 var _aim := 0.0
 var _equip_left := 0.0
@@ -106,13 +107,20 @@ func _process(delta: float) -> void:
 	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
 	_jam_left = maxf(0.0, _jam_left - delta)
 	_pending_action = maxf(0.0, _pending_action - delta)
+	_harpoon_motion_left = maxf(0.0, _harpoon_motion_left - delta)
 	if _reload_left > 0.0:
 		_reload_left = maxf(0.0, _reload_left - delta)
 		if _reload_left <= 0.0 and Net.is_host():
 			_finish_reload()
-	if Net.is_host() and not can_act() and (_reload_serial != 0 or _charge_serial != 0):
-		_cancel_actions()
-		send_state(false)
+	if Net.is_host():
+		if not can_act():
+			if _reload_serial != 0 or _charge_serial != 0:
+				_cancel_actions()
+				send_state(false)
+		elif _cooldown <= 0.0 and _reload_serial == 0:
+			var item := selected()
+			if item and item.count == 0 and selected_weapon().mag_size == 1 and selected_reserve() > 0:
+				_start_reload_host()
 	if not player.is_multiplayer_authority() or Net.dedicated:
 		if _remote_view:
 			_remote_view.visible = player.state == "ok"
@@ -163,7 +171,7 @@ func _handle_input() -> void:
 	if wants and _cooldown <= 0.0 and _pending_action <= 0.0 and _jam_left <= 0.0 and _raise_left <= 0.0:
 		if selected().count > 0 and (_reload_left <= 0.0 or data.shell_reload):
 			fire()
-		elif selected_reserve() > 0 and _reload_left <= 0.0:
+		elif data.mag_size != 1 and selected_reserve() > 0 and _reload_left <= 0.0:
 			start_reload()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -495,6 +503,9 @@ func _finish_reload() -> void:
 			_kick = 0.6
 
 func _reload_sound(data: WeaponData) -> void:
+	if data.mechanic == "reel":
+		Sound.play("lever", -11.0, 0.83)
+		return
 	var cue := "reel_tick" if data.shell_reload else ("rifle_reload" if data.automatic else "reload")
 	Sound.play(cue, -12.0 if data.shell_reload else -8.0)
 
@@ -573,18 +584,29 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 	var local := player.is_multiplayer_authority()
 	var data := ItemCatalog.definition(id).weapon
 	var muzzle := _muzzle_position() if local and equipped_id == id else origin + dir * 0.55
-	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted))
+	var muzzle_model: Node3D
+	if data.mechanic == "reel" and equipped_id == id:
+		muzzle_model = _model if local else _remote_view
+		if is_instance_valid(muzzle_model) and muzzle_model.is_inside_tree():
+			muzzle = muzzle_model.to_global(ItemModels.muzzle(id))
+	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
 	if not local:
 		return
 	_pending_action = 0.0
 	if not predicted:
 		_local_shot_motion(id, data, ads)
+	elif data.mechanic == "reel" and equipped_id == id:
+		# Retraction follows the confirmed bolt even when prediction ran earlier.
+		_harpoon_motion_left = ShotFX.HARPOON_DURATION
 
 
 func _local_shot_motion(id: String, data: WeaponData, ads: bool) -> void:
 	_cooldown = data.fire_interval * GameManager.fire_rate_scale()
 	_kick = 1.0
-	_recoil = minf(_recoil + (0.28 if data.pellets > 1 else 0.10), 0.55)
+	var heavy := data.pellets > 1 or data.mechanic == "reel"
+	_recoil = minf(_recoil + (0.28 if heavy else 0.10), 0.55)
+	if data.mechanic == "reel" and equipped_id == id:
+		_harpoon_motion_left = ShotFX.HARPOON_DURATION
 	var recoil_scale := (0.50 if GameManager.has_player_mutation("hyper_focus") else 0.65) if ads else 1.0
 	_camera_kick = minf(_camera_kick + deg_to_rad(data.recoil_degrees) * recoil_scale, deg_to_rad(5.0))
 	_shot_juice(data)
@@ -803,6 +825,7 @@ func _refresh_equip() -> void:
 	_apply_equip(item.id if item else "", item.tier if item else 0)
 	if player.is_multiplayer_authority() and _model_serial != selected_serial():
 		_model_serial = selected_serial()
+		_harpoon_motion_left = 0.0
 		_equip_left = 1.0
 		_aim = 0.0
 
@@ -829,6 +852,9 @@ func _apply_equip(id: String, tier: int) -> void:
 		if player.is_multiplayer_authority():
 			_model = ItemCatalog.model(id)
 			add_child(_model)
+			var spear := _model.get_node_or_null("Harpoon") as Node3D
+			if spear:
+				spear.set_meta("loaded_z", spear.position.z)
 			_model.set_meta("base_scale", _model.scale)
 			if _model is GeometryInstance3D:
 				_model.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -857,9 +883,12 @@ static var _casing_mat: StandardMaterial3D
 var _casings: Array[Node3D] = []
 
 
-## Local feel for every shot: ejected brass, muzzle smoke, a camera roll and
-## shake on heavy guns.
+## Local shot feel: camera roll and shake, with smoke and brass on firearms.
 func _shot_juice(data: WeaponData) -> void:
+	if data.mechanic == "reel":
+		_roll += deg_to_rad(1.65)
+		Juice.shake(0.36)
+		return
 	if data.kind != WeaponData.Kind.HITSCAN or _model == null or OS.has_feature("web") or not data.mechanic in ["", "pin", "hunt", "salt"]:
 		return
 	var heavy := data.pellets > 1
@@ -929,8 +958,10 @@ func _animate(delta: float) -> void:
 	var reload_dip := 0.0
 	var reload_roll := 0.0
 	var reload_push := 0.0
+	var reload_progress := 0.0
 	if _reload_left > 0.0:
-		var t := 1.0 - _reload_left / maxf(_reload_total, 0.01)
+		var t := clampf(1.0 - _reload_left / maxf(_reload_total, 0.01), 0.0, 1.0)
+		reload_progress = t
 		if data.shell_reload:
 			# Shell by shell: rolled to the side, a thumb-push bump per shell.
 			reload_dip = 0.35
@@ -939,6 +970,9 @@ func _animate(delta: float) -> void:
 		elif data.kind == WeaponData.Kind.FLARE:
 			# Break action: barrel tips down, then snaps shut at the end.
 			reload_dip = 1.25 * sin(minf(t / 0.8, 1.0) * PI * 0.5) * (1.0 if t < 0.85 else (1.0 - t) / 0.15)
+		elif data.mechanic == "reel":
+			reload_dip = 0.42 * sin(PI * t)
+			reload_roll = 15.0 * sin(PI * t)
 		else:
 			# Mag swap: tilt and drop, then a sharp bolt rack near the end.
 			reload_dip = sin(minf(t / 0.75, 1.0) * PI) * 0.8
@@ -959,6 +993,19 @@ func _animate(delta: float) -> void:
 	if barrel:
 		# Break action: the barrel tips open for the reload.
 		barrel.rotation.x = -deg_to_rad(42.0) * clampf(reload_dip / 1.25, 0.0, 1.0)
+	if data.mechanic == "reel":
+		var spool := _model.get_node("Spool") as Node3D
+		var spear := _model.get_node("Harpoon") as Node3D
+		var seating := smoothstep(0.65, 1.0, reload_progress)
+		var loaded := selected().count > 0 and _harpoon_motion_left <= 0.0
+		spear.visible = loaded or reload_progress > 0.65
+		spear.position.z = float(spear.get_meta("loaded_z")) + (0.24 * (1.0 - seating) if not loaded else 0.0)
+		if _harpoon_motion_left > ShotFX.HARPOON_HOLD + ShotFX.HARPOON_REEL:
+			spool.rotate_x(-38.0 * delta)
+		elif _harpoon_motion_left > 0.0 and _harpoon_motion_left <= ShotFX.HARPOON_REEL:
+			spool.rotate_x(31.0 * delta)
+		elif _reload_left > 0.0:
+			spool.rotate_x(8.0 * delta)
 
 
 func _build_preview() -> void:

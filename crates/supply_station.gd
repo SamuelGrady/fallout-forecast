@@ -7,6 +7,9 @@ const AMBER := Color("#ffc365")
 const DESCENT := 2.4
 const OFFER_PADS := ["offer_1", "offer_2", "offer_3"]
 const BAY_CENTERS := [-0.62, 0.0, 0.62]
+## Always-stocked ammo refill on every vending cabinet.
+const AMMO_PRICE := 5
+const AMMO_PAD := Vector3(-0.68, 0.56, -0.58)
 var key: String
 var is_drop := false
 var has_double := false
@@ -28,6 +31,7 @@ var _offer_titles: Array[Label3D] = []
 var _offer_prices: Array[Label3D] = []
 var _offer_items: Array[Node3D] = []
 var _offer_rims: Array[StandardMaterial3D] = []
+var _ammo_rim: StandardMaterial3D
 
 func _ready() -> void:
 	add_to_group("compass_marker")
@@ -58,6 +62,7 @@ func _ready() -> void:
 	else:
 		for i in OFFER_PADS.size():
 			_add_pad(OFFER_PADS[i], Vector3(BAY_CENTERS[i], 1.25, -0.58))
+		_add_pad("ammo", AMMO_PAD)
 		if has_double:
 			_add_pad("double", Vector3(0.72, 0.59, -0.61))
 
@@ -76,9 +81,13 @@ func available(mode: String) -> bool:
 		return false
 	if mode == "airdrop":
 		return descent_left <= 0.0 and not opened
+	if mode == "ammo":
+		return not is_drop
 	return not is_drop and (not offer_for(mode).is_empty() or (mode == "double" and has_double and WeatherManager.wave >= 4))
 
 func offer_for(mode: String) -> Array:
+	if mode == "ammo":
+		return ["ammo_box", 0, AMMO_PRICE, 0]
 	var index := OFFER_PADS.find(mode)
 	return offers[index] if index >= 0 and index < offers.size() else []
 
@@ -107,6 +116,10 @@ func set_offers(next: Array) -> void:
 		mount.add_child(item)
 
 func highlight_offer(mode: String, active: bool) -> void:
+	if mode == "ammo":
+		if _ammo_rim:
+			_ammo_rim.albedo_color = AMBER if active else AMBER.darkened(0.55)
+		return
 	var index := OFFER_PADS.find(mode)
 	if index >= 0 and index < _offer_rims.size():
 		_offer_rims[index].albedo_color = AMBER if active else CYAN.darkened(0.57)
@@ -169,9 +182,27 @@ func _build_station() -> void:
 		mount.position = Vector3(x, 1.24, -0.50)
 		_frame.add_child(mount)
 		_offer_items.append(mount)
+	_build_ammo_panel()
 	if has_double:
 		_box(_frame, Vector3(0.72, 0.56, -0.45), Vector3(0.30, 0.25, 0.12), Color("#224353"))
 		_label("2X W4+", Vector3(0.72, 0.56, -0.52), AMBER, 35)
+
+func _build_ammo_panel() -> void:
+	# Lower-left dispenser, mirroring the 2X pad: steel housing, olive ammo tin, rim strip.
+	var x := AMMO_PAD.x - 0.02
+	_box(_frame, Vector3(x, 0.56, -0.45), Vector3(0.30, 0.34, 0.12), Color("#20282c"))
+	_box(_frame, Vector3(x, 0.56, -0.512), Vector3(0.27, 0.30, 0.012), Color("#2c3a3a"))
+	_box(_frame, Vector3(x, 0.685, -0.53), Vector3(0.11, 0.045, 0.035), Color("#3c4b39"))
+	_box(_frame, Vector3(x, 0.71, -0.53), Vector3(0.115, 0.012, 0.038), Color("#f6cf64"))
+	var rim := _box(_frame, Vector3(x, 0.41, -0.52), Vector3(0.30, 0.025, 0.03), AMBER)
+	_ammo_rim = StandardMaterial3D.new()
+	_ammo_rim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ammo_rim.albedo_color = AMBER.darkened(0.55)
+	rim.material_override = _ammo_rim
+	var caption := _label("AMMO
+%d SCRAP" % AMMO_PRICE, Vector3(x, 0.55, -0.525), AMBER, 28)
+	caption.line_spacing = -8.0
+	caption.outline_size = 3
 
 func _build_pallet() -> void:
 	_box(_frame, Vector3(0, 0.20, 0), Vector3(1.70, 0.40, 1.38), Color("#354b53"))

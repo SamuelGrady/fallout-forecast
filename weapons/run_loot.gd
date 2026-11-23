@@ -195,7 +195,13 @@ func _scan_pickups() -> void:
 				remove_pickup(id, player.get_multiplayer_authority())
 				break
 
+const SCRAP_VALUES := {"scrap": 5, "scrap_large": 15}
+
 func _collect_supply(flavor: String, player: Node) -> bool:
+	if SCRAP_VALUES.has(flavor):
+		# Infected salvage: always collectible, shows "+X SCRAP" via earn_scrap.
+		holder(player).earn_scrap(roundi(SCRAP_VALUES[flavor] * GameManager.scrap_pickup_scale()))
+		return true
 	var collected := false
 	if flavor in ["ammo", "supply", "ammo_box"]:
 		collected = holder(player).collect_ammo(flavor == "ammo_box")

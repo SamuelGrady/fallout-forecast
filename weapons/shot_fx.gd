@@ -11,6 +11,110 @@ static var _spark_mesh: BoxMesh
 static var _spark_mats: Array[StandardMaterial3D] = []
 static var _materials := {}
 
+const HARPOON_FLIGHT := 0.07
+const HARPOON_HOLD := 0.18
+const HARPOON_REEL := 0.14
+const HARPOON_DURATION := HARPOON_FLIGHT + HARPOON_HOLD + HARPOON_REEL
+
+
+static func harpoon_shot(parent: Node, muzzle: Vector3, target: Vector3, color: Color, hit_enemy: bool,
+		muzzle_model: Node3D = null, on_contact := Callable()) -> void:
+	var flight := HarpoonFlight.new()
+	flight.name = "HarpoonFlight"
+	flight.process_priority = 1 # Sample the muzzle after the viewmodel animates.
+	flight.muzzle = muzzle
+	flight.contact = target
+	flight.muzzle_model = muzzle_model
+	flight.on_contact = on_contact
+	flight.bolt = ItemModels.projectile("harpoon")
+	flight.add_child(flight.bolt)
+	flight.tip = flight.bolt.get_node("Tip")
+	flight.tail = flight.bolt.get_node("CableStart")
+	for mesh: MeshInstance3D in flight.bolt.find_children("*", "MeshInstance3D", true, false):
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if _streak_mesh == null:
+		_streak_mesh = BoxMesh.new()
+		_streak_mesh.size = Vector3(0.018, 0.018, 1.0)
+	flight.cable = MeshInstance3D.new()
+	flight.cable.name = "WinchCable"
+	flight.cable.mesh = _streak_mesh
+	flight.cable.material_override = _unshaded(color.lerp(Color("#ffd184"), 0.55))
+	flight.cable.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	flight.add_child(flight.cable)
+	parent.add_child(flight)
+	if hit_enemy:
+		flight.anchor = _harpoon_anchor(parent.get_tree(), target)
+		if flight.anchor:
+			flight.anchor_offset = target - flight.anchor.global_position
+	flight._process(0.0)
+
+
+## The visual can follow a nearby capsule using the replicated impact point.
+## When the target dies or has moved out of reach, use the last contact point.
+static func _harpoon_anchor(tree: SceneTree, point: Vector3) -> EnemyBase:
+	var best: EnemyBase
+	var margin := 0.55 if Net.is_online() else 0.12
+	for enemy: EnemyBase in tree.get_nodes_in_group("enemies"):
+		if enemy.is_queued_for_deletion() or enemy.health <= 0.0:
+			continue
+		var capsule := LagComp.capsule_at(enemy, enemy.global_position)
+		var closest := Geometry3D.get_closest_point_to_segment(point, capsule[0], capsule[1])
+		var distance := closest.distance_to(point) - float(capsule[2])
+		if distance < margin:
+			best = enemy
+			margin = distance
+	return best
+
+
+class HarpoonFlight extends Node3D:
+	var muzzle: Vector3
+	var contact: Vector3
+	var muzzle_model: Node3D
+	var on_contact: Callable
+	var anchor: EnemyBase
+	var anchor_offset: Vector3
+	var bolt: Node3D
+	var tip: Node3D
+	var tail: Node3D
+	var cable: MeshInstance3D
+	var age := 0.0
+
+	func _process(delta: float) -> void:
+		var previous := age
+		age += delta
+		if age >= HARPOON_DURATION:
+			queue_free()
+			return
+		if is_instance_valid(muzzle_model) and muzzle_model.is_inside_tree() and not muzzle_model.is_queued_for_deletion():
+			muzzle = muzzle_model.to_global(ItemModels.muzzle("harpoon"))
+		if is_instance_valid(anchor) and not anchor.is_queued_for_deletion():
+			contact = anchor.global_position + anchor_offset
+		if previous < HARPOON_FLIGHT and age >= HARPOON_FLIGHT:
+			if on_contact.is_valid():
+				on_contact.call(contact)
+			if is_instance_valid(anchor) and not anchor.is_queued_for_deletion():
+				anchor.reveal(2.0)
+		var reel_start := HARPOON_FLIGHT + HARPOON_HOLD
+		if previous < reel_start and age >= reel_start:
+			Sound.play_at("reel_tick", muzzle, -12.0, 0.86)
+		var direction := muzzle.direction_to(contact)
+		if direction.is_zero_approx():
+			direction = Vector3.FORWARD
+		var basis := Basis.looking_at(direction, Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT)
+		var head := muzzle.lerp(contact, minf(age / HARPOON_FLIGHT, 1.0))
+		if age > reel_start:
+			var shaft_length := tail.position.z - tip.position.z
+			var dock := muzzle + direction * minf(shaft_length, muzzle.distance_to(contact))
+			head = contact.lerp(dock, smoothstep(reel_start, HARPOON_DURATION, age))
+		bolt.global_transform = Transform3D(basis, head - basis * tip.position)
+		var end := tail.global_position
+		var length := muzzle.distance_to(end)
+		cable.visible = length > 0.015 and (end - muzzle).dot(direction) > 0.0
+		if cable.visible:
+			var cable_dir := (end - muzzle) / length
+			var cable_basis := Basis.looking_at(cable_dir, Vector3.UP if absf(cable_dir.y) < 0.99 else Vector3.RIGHT)
+			cable.global_transform = Transform3D(cable_basis.scaled_local(Vector3(1.5, 1.5, length)), (muzzle + end) * 0.5)
+
 
 static func _unshaded(color: Color) -> StandardMaterial3D:
 	var key := color.to_html()

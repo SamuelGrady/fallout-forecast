@@ -69,9 +69,10 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 	var special_hits: Dictionary = {}
 	var flinches: Dictionary = {}
 	for ray: Vector3 in pellet_rays(dir, seed, spread, data.pellets):
-		var hits := _cast_hits(holder, origin, ray, data.max_range, data.pierce + 1 + GameManager.extra_pierce(), rewind_ms)
+		var passes := data.pierce + 1 + GameManager.extra_pierce()
+		var hits := _cast_hits(holder, origin, ray, data.max_range, passes, rewind_ms)
 		if data.mechanic == "reel":
-			_find_submerged(holder, origin, ray, data.max_range, hits)
+			_find_submerged(holder, origin, ray, data.max_range, passes, hits)
 		var terminal := origin + ray * data.max_range
 		var impact := 0
 		if data.mechanic == "wash":
@@ -83,13 +84,18 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 				continue
 			_clear_hazards(holder, origin, ray, data.max_range, 0.94, true)
 		for hit: Dictionary in hits:
+			if not is_instance_valid(hit.collider):
+				continue
 			var target: Object = hit.collider
+			if target is EnemyBase and target.health <= 0.0:
+				continue
 			var at: Vector3 = hit.position
 			var distance := origin.distance_to(at)
+			var damageable := is_damageable(target)
 			if impact == 0:
 				terminal = at
-				impact = 2 if is_damageable(target) else _surface_impact(target)
-			if not is_damageable(target):
+				impact = 2 if damageable else _surface_impact(target)
+			if not damageable:
 				break
 			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
 			if data.mechanic == "reel" and target.has_method("harpoon_surface"):
@@ -161,19 +167,14 @@ static func _cast_hits(holder: WeaponHolder, origin: Vector3, dir: Vector3, dist
 	for i in passes:
 		var ray := PhysicsRayQueryParameters3D.create(origin, end, 7, exclude)
 		var hit := holder.get_world_3d().direct_space_state.intersect_ray(ray)
-		if hit.is_empty():
-			break
-		if hit.collider.is_in_group("players") and not is_damageable(hit.collider):
+		# Friendly bodies and enemies already killed this frame do not consume a hit.
+		while not hit.is_empty() and ((hit.collider.is_in_group("players") and not is_damageable(hit.collider)) \
+				or (hit.collider is EnemyBase and hit.collider.health <= 0.0)):
 			exclude.append(hit.rid)
-			# Friendly bodies should not use up a penetration.
 			ray.exclude = exclude
 			hit = holder.get_world_3d().direct_space_state.intersect_ray(ray)
-			while not hit.is_empty() and hit.collider.is_in_group("players") and not is_damageable(hit.collider):
-				exclude.append(hit.rid)
-				ray.exclude = exclude
-				hit = holder.get_world_3d().direct_space_state.intersect_ray(ray)
-			if hit.is_empty():
-				break
+		if hit.is_empty():
+			break
 		result.append(hit)
 		if not is_damageable(hit.collider):
 			break
@@ -188,23 +189,35 @@ static func _teammate_ray(holder: WeaponHolder, from: Vector3, dir: Vector3, len
 		return hit
 	return {}
 
-static func _find_submerged(holder: WeaponHolder, origin: Vector3, ray: Vector3, length: float, hits: Array) -> void:
-	var limit := length if hits.is_empty() else origin.distance_to(hits[0].position)
+static func _find_submerged(holder: WeaponHolder, origin: Vector3, ray: Vector3, length: float, passes: int, hits: Array) -> void:
+	const HOOK_RADIUS := 1.15
+	var world := holder.get_world_3d()
+	var cover := world.direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + ray * length, 1))
+	# A shot landing on the near edge of the puddle can still hook its center.
+	var limit := length
+	if not cover.is_empty():
+		var floor_margin := HOOK_RADIUS if (cover.normal as Vector3).y > 0.65 else 0.0
+		limit = minf(length, origin.distance_to(cover.position) + floor_margin)
 	var best: EnemyBase
 	var point := Vector3.ZERO
 	for enemy: EnemyBase in holder.get_tree().get_nodes_in_group("enemies"):
-		if not enemy.has_method("harpoon_surface") or not enemy.get("_submerged"):
+		if enemy.health <= 0.0 or not enemy.has_method("harpoon_surface") or not enemy.get("_submerged"):
 			continue
 		var at := enemy.global_position + Vector3.UP * 0.15
 		var distance := (at - origin).dot(ray)
-		if distance > 0 and distance < limit and (origin + ray * distance).distance_to(at) < 0.72 \
-				and clear_path(holder.get_world_3d(), origin, at):
+		if distance > 0 and distance < limit and origin.distance_to(at) <= length \
+				and (origin + ray * distance).distance_to(at) <= HOOK_RADIUS and clear_path(world, origin, at):
 			best = enemy
 			point = at
 			limit = distance
 	if best:
-		hits.push_front({"collider": best, "position": point})
-		hits.resize(1)
+		var index := 0
+		while index < hits.size() and is_damageable(hits[index].collider) \
+				and (hits[index].position - origin).dot(ray) < limit:
+			index += 1
+		hits.insert(index, {"collider": best, "position": point})
+		if hits.size() > passes:
+			hits.resize(passes)
 
 static func _hit_special(holder: WeaponHolder, enemy: EnemyBase, point: Vector3, ray: Vector3, origin: Vector3, data: WeaponData, damage: float) -> void:
 	match data.mechanic:
@@ -221,11 +234,25 @@ static func _hit_special(holder: WeaponHolder, enemy: EnemyBase, point: Vector3,
 		"zap":
 			_chain(holder, enemy, point, damage * 0.72, 2, true)
 		"reel":
+			if not Net.dedicated:
+				enemy.reveal(2.0)
+			if not _allows_impact(enemy, origin):
+				return
+			enemy.stagger(1.05)
 			var pull := holder.player.global_position - enemy.global_position
 			pull.y = 0.0
-			if _allows_impact(enemy, origin) and pull.length_squared() > 0.001:
-				enemy.stagger(0.8)
-				enemy.knockback(pull.normalized() * 15.0)
+			var distance := pull.length()
+			# EnemyBase slows knockback by 25 m/s². Budget for the first physics
+			# step at full speed and leave room for the player's collision body.
+			const PUSH_DRAG := 25.0
+			var step := enemy.get_physics_process_delta_time() * PUSH_DRAG
+			var travel := maxf(distance - 1.15, 0.0)
+			var stop_speed := sqrt(2.0 * PUSH_DRAG * travel + step * step) - step
+			var strength := minf(clampf(distance * 2.4, 14.0, 28.0), stop_speed)
+			enemy.knockback(pull.normalized() * strength - enemy._push)
+			# Stagger movement only reads the horizontal components of _push.
+			if strength > 0.0 and (enemy.is_on_floor() or is_zero_approx(enemy.velocity.y)):
+				enemy.velocity.y = minf(3.7, strength * 0.5)
 
 static func _chain(holder: WeaponHolder, first: EnemyBase, point: Vector3, damage: float, hops: int, water: bool) -> void:
 	var visited: Array[EnemyBase] = [first]
@@ -329,7 +356,8 @@ static func is_damageable(target: Object) -> bool:
 	return target is EnemyBase or (target is Node and (target.is_in_group("boss_parts") \
 			or (target.is_in_group("players") and target.get("state") == "turned")))
 
-static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool, muzzle_fx := true) -> void:
+static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool, muzzle_fx := true,
+		muzzle_model: Node3D = null) -> void:
 	var data := ItemCatalog.definition(id).weapon
 	if muzzle_fx and not data.shot_sound.is_empty():
 		if local:
@@ -338,11 +366,17 @@ static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, lo
 			Sound.play_at(data.shot_sound, muzzle, -8.0)
 	if data.kind != WeaponData.Kind.HITSCAN:
 		return
-	var stream := data.mechanic in ["wash", "gust", "zap", "reel", "suppress"]
+	var stream := data.mechanic in ["wash", "gust", "zap", "suppress"]
 	if muzzle_fx:
 		ShotFX.puff(parent, muzzle, data.tracer_color, 0.09, 0.07)
 		if not stream:
 			ShotFX.flash(parent, muzzle, data.tracer_color, 3.5)
+	if data.mechanic == "reel":
+		if not traces.is_empty():
+			var impact: int = traces[0][1]
+			ShotFX.harpoon_shot(parent, muzzle, traces[0][0], data.tracer_color, impact == 2,
+					muzzle_model, _harpoon_contact.bind(parent, muzzle, impact))
+		return
 	var surface_contact := 0
 	var contact_at := Vector3.ZERO
 	var sum := Vector3.ZERO
@@ -370,3 +404,15 @@ static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, lo
 		Sound.play_at("hit_flesh", sum / hits, -18.0 + minf(6.0, 2.0 * (hits - 1)))
 	elif surface_contact and not stream:
 		Sound.play_at("reel_tick" if surface_contact == 3 else "step_1", contact_at, -23.0, 1.25)
+
+static func _harpoon_contact(at: Vector3, parent: Node, muzzle: Vector3, impact: int) -> void:
+	match impact:
+		1:
+			ShotFX.puff(parent, at, Color("#bbad99"), 0.10, 0.17)
+			Sound.play_at("step_1", at, -18.0, 0.78)
+		2:
+			ShotFX.puff(parent, at, Color("#b0f580"), 0.10, 0.17)
+			Sound.play_at("hit_flesh", at, -12.0, 0.82)
+		3:
+			ShotFX.sparks(parent, at, (muzzle - at).normalized(), 6)
+			Sound.play_at("reel_tick", at, -14.0, 1.35)
