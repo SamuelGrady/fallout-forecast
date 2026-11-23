@@ -121,6 +121,7 @@ var _slots := ItemHotbar.new()
 var _armory_hot := 0.0
 var _name_left := 0.0
 var _hotbar_hot := 0.0
+var _last_pouch_state := ""
 var _last_slot_state := ""
 var _holder: WeaponHolder
 var _unlock_name := ""
@@ -644,6 +645,12 @@ func _update_weapon(player: Player, delta: float) -> void:
 				_armory_hot = 3.0
 				_name_left = 1.6
 			_last_slot_state = slot_state
+		# Belt pouch counts (frags / domes) wake the hotbar without re-showing the gun name.
+		var pouch_state := str(_slots.pouch_key())
+		if pouch_state != _last_pouch_state:
+			if not _last_pouch_state.is_empty():
+				_hotbar_hot = 3.0
+			_last_pouch_state = pouch_state
 	_hotbar_hot = maxf(0.0, _hotbar_hot - delta)
 	_fade(_slots, _hotbar_hot > 0.0, 0.45, delta)
 	var definition: ItemDefinition = holder.selected_definition() if holder else null

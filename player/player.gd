@@ -705,6 +705,21 @@ func grant(item: String) -> void:
 			loot.spawn_item(id, global_position if at == Vector3.INF else at)
 
 
+## Pouch pickups (frag / shield dome) show the belt count, or FULL at the cap.
+func _interact_text(target: Node) -> String:
+	var pickup := target as WorldPickup
+	if pickup and pickup.item and ItemCatalog.is_pouch(pickup.item.id):
+		var holder := get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
+		if holder:
+			var id := pickup.item.id
+			var cap := ItemCatalog.pouch_cap(id)
+			var label := ItemCatalog.definition(id).display_name
+			if holder.pouch_full(id):
+				return "%s pouch FULL (%d/%d)" % [label, cap, cap]
+			return "Take %s (%d/%d)" % [label, holder.pouch_count(id), cap]
+	return target.get_prompt(self)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _grant_tarp() -> void:
 	if multiplayer.get_remote_sender_id() == 1:
@@ -767,7 +782,7 @@ func _handle_interact(delta: float) -> void:
 		interact_prompt = ""
 		interact_progress = 0.0
 		return
-	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), best.get_prompt(self)]
+	interact_prompt = "[%s] %s" % [BroadcastUI.input_hint("interact"), _interact_text(best)]
 	var need := best.get_hold_time(self)
 	if pressed and not _hold_done:
 		if _hold == 0.0 and best is SupplyInteract:

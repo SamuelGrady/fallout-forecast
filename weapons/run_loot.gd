@@ -52,13 +52,18 @@ func _grant_starter(run: int, peer: int, index: int) -> void:
 	if player == null:
 		return
 	var inventory := holder(player)
-	var slot := inventory.slots.find(null)
-	if not inventory.can_act() or slot < 0:
+	var kit: String = STARTER_KITS[index]
+	# Pouch kits (Shield Dome) go on the belt, so they need no free slot.
+	var pouch := ItemCatalog.is_pouch(kit)
+	var slot := -1 if pouch else inventory.slots.find(null)
+	if not inventory.can_act() or (not pouch and slot < 0) or (pouch and inventory.pouch_full(kit)):
+		if pouch and inventory.can_act():
+			inventory.notify_pouch_full(kit)
 		return
 	_starter_claims[peer] = true
-	var item := make_item(STARTER_KITS[index])
+	var item := make_item(kit)
 	inventory.accept_pickup(item)
-	if inventory.slots[slot] == item and inventory.current != slot:
+	if slot >= 0 and inventory.slots[slot] == item and inventory.current != slot:
 		inventory.select_slot(slot)
 	else:
 		inventory.send_state()
@@ -213,6 +218,8 @@ func claim(run: int, id: int, expected: int, slot: int, player: Node3D) -> bool:
 	if not inventory.can_act() or inventory.current != slot or inventory.selected_serial() != expected:
 		return false
 	var item := node.item
+	if ItemCatalog.is_pouch(item.id):
+		return _claim_pouch(id, node, inventory, player)
 	var replaced := inventory.accept_pickup(item)
 	if replaced == item:
 		return false
@@ -223,6 +230,21 @@ func claim(run: int, id: int, expected: int, slot: int, player: Node3D) -> bool:
 	if ItemCatalog.definition(item.id).is_cursed():
 		GameManager.record_cursed(player, ItemCatalog.definition(item.id).display_name)
 	inventory.send_state()
+	return true
+
+## Frags and domes fill the belt pouch. A full pouch leaves the pickup where it
+## is; a partial fit takes what it can and leaves the rest on the same spot.
+func _claim_pouch(id: int, node: WorldPickup, inventory: WeaponHolder, player: Node3D) -> bool:
+	var item := node.item
+	if inventory.pouch_full(item.id):
+		inventory.notify_pouch_full(item.id)
+		return false
+	var left := inventory.add_pouch(item.id, item.count)
+	var at := node.global_position
+	remove_pickup(id, player.get_multiplayer_authority())
+	if left > 0:
+		spawn_pickup(ItemInstance.new(item.serial, item.id, item.tier, left), at)
+	inventory.send_state(false)
 	return true
 
 func _reachable(node: WorldPickup, player: Node3D, reach: float) -> bool:

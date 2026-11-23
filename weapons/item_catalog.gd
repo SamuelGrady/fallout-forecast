@@ -23,8 +23,8 @@ const GUNS := {
 	"lucky_penny_revolver": ["revolver", "cursed/lucky_penny_revolver"],
 }
 const STACKS := {
-	"frag": ["Frag Grenade", ItemDefinition.Kind.THROWABLE, 4, 2, "bug_bomb"],
-	"shield_dome": ["Shield Dome", ItemDefinition.Kind.THROWABLE, 4, 2, "flare_gun"],
+	"frag": ["Frag Grenade", ItemDefinition.Kind.THROWABLE, 10, 2, "bug_bomb"],
+	"shield_dome": ["Shield Dome", ItemDefinition.Kind.THROWABLE, 5, 2, "flare_gun"],
 	"umbrella": ["Umbrella Stand", ItemDefinition.Kind.THROWABLE, 3, 2, "umbrella"],
 	"bleach_bomb": ["Bleach Bomb", ItemDefinition.Kind.THROWABLE, 3, 2, "bleach_bomb"],
 	"bait_radio": ["Bait Radio", ItemDefinition.Kind.THROWABLE, 3, 2, "bait_radio"],
@@ -33,6 +33,10 @@ const STACKS := {
 	"med_tin": ["Med Tin", ItemDefinition.Kind.CONSUMABLE, 3, 1, "med_tin"],
 	"suit_patch": ["Suit Patch", ItemDefinition.Kind.CONSUMABLE, 3, 1, "suit_patch"],
 }
+## Frags and domes ride in dedicated belt pouches, never in the 5 hotbar slots.
+const POUCH_CAPS := {"frag": 10, "shield_dome": 5}
+## Quick-throw input action per pouch item.
+const POUCH_ACTIONS := {"frag": "throw_grenade", "shield_dome": "throw_dome"}
 static var _entries: Dictionary[String, ItemDefinition] = {}
 static var _icons: Dictionary[String, Texture2D] = {}
 static var _mesh: BoxMesh
@@ -62,6 +66,12 @@ static func definition(id: String) -> ItemDefinition:
 		item.icon = load(path) as Texture2D
 	_entries[id] = item
 	return item
+
+static func is_pouch(id: String) -> bool:
+	return POUCH_CAPS.has(id)
+
+static func pouch_cap(id: String) -> int:
+	return int(POUCH_CAPS.get(id, 0))
 
 static func id_for_weapon_path(path: String) -> String:
 	for id: String in GUNS:

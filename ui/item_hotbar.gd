@@ -2,7 +2,8 @@ class_name ItemHotbar
 extends Control
 ## Five item slots, bottom centre. No filled boxes: an outline on the selected
 ## cell, the item icon, the tier as a coloured underline, a count for
-## consumables, and scrap as an icon + number at the right end.
+## consumables, and scrap as an icon + number at the right end. The Frag
+## Grenade and Shield Dome belt pouches sit stacked above the scrap counter.
 
 const FONT := preload("res://assets/fonts/VT323-Regular.ttf")
 const CELL := Vector2(68, 64)
@@ -10,8 +11,16 @@ const GAP := 5
 ## Whole hotbar: 5 cells and 4 gaps (360 x 64 px in the 960x720 viewport).
 const SIZE := Vector2(CELL.x * 5 + GAP * 4, CELL.y)
 const INK := Color(0.047, 0.078, 0.133, 0.9)
+## Pouch rows right of the slots: [key] icon count/cap.
+const POUCHES := ["frag", "shield_dome"]
+const POUCH_COLORS := {"frag": Color("#ff9f6b"), "shield_dome": Color("#7aeeff")}
+const POUCH_ROW := 21.0
+const POUCH_ICON := 18.0
+const MUTED := Color("#728b92")
 var _state: Array = []
 var _flash := 0.0
+var _pouch: Array = []
+var _pouch_flash: Dictionary = {"frag": 0.0, "shield_dome": 0.0}
 var _scrap_icon := GameIcon.new()
 
 
@@ -30,6 +39,21 @@ func refresh(holder: WeaponHolder) -> void:
 	if _state != data:
 		_state = data
 		queue_redraw()
+	var pouch: Array = []
+	for id: String in POUCHES:
+		pouch.append(holder.pouch_count(id))
+	if _pouch != pouch:
+		if _pouch.size() == pouch.size():
+			for i in POUCHES.size():
+				if pouch[i] != _pouch[i]:
+					_pouch_flash[POUCHES[i]] = 0.9 if pouch[i] > _pouch[i] else 0.35
+		_pouch = pouch
+		queue_redraw()
+
+
+## Belt pouch counts, so the HUD can wake the hotbar when they change.
+func pouch_key() -> Array:
+	return _pouch
 
 
 ## Slot contents without the selection or scrap, so the HUD can tell a pickup
@@ -47,6 +71,10 @@ func _process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta)
 		queue_redraw()
+	for id: String in POUCHES:
+		if _pouch_flash[id] > 0.0:
+			_pouch_flash[id] = maxf(0.0, _pouch_flash[id] - delta)
+			queue_redraw()
 
 
 func _draw() -> void:
@@ -55,6 +83,7 @@ func _draw() -> void:
 	var scrap_text := str(_state[1])
 	draw_string_outline(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, INK)
 	draw_string(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
+	_draw_pouches()
 	for i in WeaponHolder.SLOT_COUNT:
 		var selected: bool = _state[0] == i
 		var at := Vector2(i * (CELL.x + GAP), -4.0 if selected else 0.0)
@@ -89,3 +118,40 @@ func _draw() -> void:
 		if definition.kind != ItemDefinition.Kind.GUN:
 			draw_string_outline(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, 3, INK)
 			draw_string(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, color)
+
+
+func _draw_pouches() -> void:
+	if _pouch.size() != POUCHES.size():
+		return
+	for i in POUCHES.size():
+		var id: String = POUCHES[i]
+		var count: int = _pouch[i]
+		var cap := ItemCatalog.pouch_cap(id)
+		var stocked := count > 0
+		var pulse: float = _pouch_flash[id]
+		var accent: Color = POUCH_COLORS[id]
+		var color := accent.lerp(Color.WHITE, clampf(pulse, 0.0, 1.0) * 0.6) if stocked else MUTED
+		var alpha := 1.0 if stocked else 0.45
+		var x := SIZE.x + 6.0
+		var y := i * POUCH_ROW
+		var key := BroadcastUI.input_hint(ItemCatalog.POUCH_ACTIONS[id])
+		var key_w := FONT.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		draw_string_outline(FONT, Vector2(x, y + 15), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, INK)
+		draw_string(FONT, Vector2(x, y + 15), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.91, 0.91, 0.84, 0.85 if stocked else 0.4))
+		x += key_w + 3.0
+		var icon_rect := Rect2(Vector2(x, y + (POUCH_ROW - POUCH_ICON) * 0.5 - 1.0), Vector2.ONE * POUCH_ICON)
+		if pulse > 0.0:
+			draw_rect(icon_rect.grow(2.0), Color(accent, 0.35 * clampf(pulse, 0.0, 1.0)), false, 1.5)
+		var definition := ItemCatalog.definition(id)
+		if definition and definition.icon:
+			draw_texture_rect(definition.icon, icon_rect, false, Color(1, 1, 1, alpha) if stocked else Color(0.6, 0.66, 0.68, alpha))
+		else:
+			draw_rect(icon_rect.grow(-4.0), Color(color, alpha))
+		x += POUCH_ICON + 3.0
+		var count_text := str(count)
+		draw_string_outline(FONT, Vector2(x, y + 16), count_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 3, INK)
+		draw_string(FONT, Vector2(x, y + 16), count_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, color)
+		x += FONT.get_string_size(count_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		var cap_text := "/%d" % cap
+		draw_string_outline(FONT, Vector2(x, y + 16), cap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, INK)
+		draw_string(FONT, Vector2(x, y + 16), cap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(MUTED, 0.9 if stocked else 0.5))

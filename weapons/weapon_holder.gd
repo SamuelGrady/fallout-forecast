@@ -5,16 +5,27 @@ extends Node3D
 
 signal weapon_changed(data: WeaponData)
 signal fired(data: WeaponData)
+## Local owner only: a pouch item left the belt via quick-throw.
+signal thrown(id: String)
 
 const HIT_MASK := 1 | 4
 const SLOT_COUNT := 5
 const SPRINT_RAISE := 0.15
+## Quick-throw pouches (Frag Grenade / Shield Dome) live outside the 5 slots.
+const THROW_COOLDOWN := 0.35
+const STARTING_FRAGS := 2
+const STARTING_DOMES := 1
 
 var slots: Array[ItemInstance] = [null, null, null, null, null]
 var reserves: Dictionary = {}
 var _seeded_ammo: Dictionary = {"revolver": true}
 var current := 0
 var scrap := 0
+## Belt pouches: host-authoritative, mirrored to the owner in _private_state.
+var grenades := 0
+var domes := 0
+var _throw_cooldown := 0.0
+var _last_throw_at := -1000.0
 var revision := 0
 var _public_revision := -1
 var _private_revision := -1
@@ -57,6 +68,8 @@ func _ready() -> void:
 	if Net.is_host() and loot:
 		slots[0] = loot.make_item("service_revolver")
 		reserves["revolver"] = 24
+		grenades = STARTING_FRAGS
+		domes = STARTING_DOMES
 		_refresh_equip()
 		if loot.run_id > 0:
 			send_state()
@@ -90,6 +103,7 @@ func can_act() -> bool:
 
 func _process(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
+	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
 	_jam_left = maxf(0.0, _jam_left - delta)
 	_pending_action = maxf(0.0, _pending_action - delta)
 	if _reload_left > 0.0:
@@ -155,6 +169,11 @@ func _handle_input() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.dedicated or not player.is_multiplayer_authority() or not can_act():
 		return
+	for id: String in ItemCatalog.POUCH_ACTIONS:
+		if event.is_action_pressed(ItemCatalog.POUCH_ACTIONS[id]):
+			quick_throw(id)
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("drop_item") and selected():
 		_command("drop")
 		get_viewport().set_input_as_handled()
@@ -184,6 +203,113 @@ func fire() -> void:
 			WeaponCombat.play_fx(loot, selected().id, _muzzle_position(), [], true)
 			_local_shot_motion(selected().id, data, ads)
 		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, ads, predict)
+
+## Throw one pouch item straight from the belt; the equipped slot is untouched.
+func quick_throw(id: String) -> void:
+	if not ItemCatalog.is_pouch(id) or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
+			or _throw_cooldown > 0.0 or pouch_count(id) <= 0:
+		return
+	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
+		return
+	_throw_cooldown = THROW_COOLDOWN
+	var origin := camera.global_position
+	var dir := -camera.global_basis.z
+	if Net.is_host():
+		_host_throw(loot.run_id, id, origin, dir, false)
+	else:
+		_play_throw(id, origin, dir)
+		_request_throw.rpc_id(1, loot.run_id, id, origin, dir)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_throw(run: int, id: String, origin: Vector3, dir: Vector3) -> void:
+	if _valid_sender():
+		_host_throw(run, id, origin, dir, true)
+
+func _host_throw(run: int, id: String, origin: Vector3, dir: Vector3, predicted: bool) -> bool:
+	if not Net.is_host() or not can_act() or run != loot.run_id or not ItemCatalog.is_pouch(id) \
+			or player.tarp_raised or pouch_count(id) <= 0:
+		return false
+	# A little looser than the owner's cooldown so jittered packets still land.
+	if loot.clock - _last_throw_at < THROW_COOLDOWN * 0.6:
+		return false
+	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.5 \
+			or origin.distance_to(camera.global_position) > 3.0 \
+			or not WeaponCombat.clear_path(get_world_3d(), camera.global_position, origin):
+		return false
+	dir = dir.normalized()
+	_last_throw_at = loot.clock
+	_set_pouch(id, pouch_count(id) - 1)
+	loot.launch(id, WeaponCombat.throw_origin(get_world_3d(), origin, dir), dir, ItemCatalog.STANDARD, player)
+	_play_throw(id, origin, dir)
+	Net.rpc_to_run(_throw_fx, [loot.run_id, id, origin, dir, predicted])
+	send_state(false)
+	return true
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _throw_fx(run: int, id: String, origin: Vector3, dir: Vector3, predicted: bool) -> void:
+	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id:
+		return
+	if predicted and player.is_multiplayer_authority():
+		return
+	_play_throw(id, origin, dir)
+
+func _play_throw(id: String, origin: Vector3, dir: Vector3) -> void:
+	if Net.dedicated or not ItemCatalog.is_pouch(id):
+		return
+	var local := player.is_multiplayer_authority()
+	WeaponCombat.play_fx(loot, id, origin + dir * 0.45, [], local)
+	if local:
+		_kick = maxf(_kick, 0.45)
+		_camera_kick = minf(_camera_kick + deg_to_rad(0.8), deg_to_rad(5.0))
+		thrown.emit(id)
+
+func pouch_count(id: String) -> int:
+	match id:
+		"frag":
+			return grenades
+		"shield_dome":
+			return domes
+	return 0
+
+func pouch_full(id: String) -> bool:
+	return ItemCatalog.is_pouch(id) and pouch_count(id) >= ItemCatalog.pouch_cap(id)
+
+## Adds up to the pouch cap and returns how many did not fit.
+func add_pouch(id: String, amount: int) -> int:
+	if not ItemCatalog.is_pouch(id) or amount <= 0:
+		return maxi(amount, 0)
+	var fit := clampi(ItemCatalog.pouch_cap(id) - pouch_count(id), 0, amount)
+	_set_pouch(id, pouch_count(id) + fit)
+	return amount - fit
+
+func _set_pouch(id: String, value: int) -> void:
+	value = clampi(value, 0, ItemCatalog.pouch_cap(id))
+	match id:
+		"frag":
+			grenades = value
+		"shield_dome":
+			domes = value
+
+## Host: tell the owner a pouch pickup was refused because it is full.
+func notify_pouch_full(id: String) -> void:
+	if not Net.is_host():
+		return
+	var peer := player.get_multiplayer_authority()
+	if peer == 1:
+		if not Net.dedicated:
+			_show_pouch_full(id)
+	elif Net.run_peers.has(peer):
+		_pouch_full_feedback.rpc_id(peer, loot.run_id, id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _pouch_full_feedback(run: int, id: String) -> void:
+	if multiplayer.get_remote_sender_id() == 1 and run == loot.run_id:
+		_show_pouch_full(id)
+
+func _show_pouch_full(id: String) -> void:
+	var definition := ItemCatalog.definition(id)
+	if definition:
+		Juice.popup("%s POUCH FULL" % definition.display_name.to_upper(), Color("#ff9f6b"))
 
 func start_reload() -> void:
 	_command("reload")
@@ -397,10 +523,26 @@ func _stack_slot(item: ItemInstance) -> int:
 	return -1
 
 func needs_swap(item: ItemInstance) -> bool:
+	if ItemCatalog.is_pouch(item.id):
+		return false
 	return not slots.has(null) and _stack_slot(item) == -1
 
 ## Returns the displaced item, null on placement/stack, or the original on rejection.
-func accept_pickup(item: ItemInstance) -> ItemInstance:
+## Pouch items (frag / shield_dome) never touch the slots: they fill the pouch
+## up to its cap. With return_overflow, whatever did not fit comes back (the
+## same instance with a reduced count, or unchanged when nothing fit). Without
+## it, the overflow is dropped at the player's feet and null is returned, so
+## callers that only expect displaced slot items (vending) never lose it.
+func accept_pickup(item: ItemInstance, return_overflow := false) -> ItemInstance:
+	if ItemCatalog.is_pouch(item.id):
+		var left := add_pouch(item.id, item.count)
+		if left <= 0:
+			return null
+		item.count = left
+		if return_overflow:
+			return item
+		_drop_near(item)
+		return null
 	var stack := _stack_slot(item)
 	if stack >= 0:
 		slots[stack].count += item.count
@@ -435,6 +577,34 @@ func spill() -> void:
 		if at == Vector3.INF:
 			at = player.global_position
 		loot.spawn_pickup(item, at)
+	var spot := 0
+	for id: String in ItemCatalog.POUCH_CAPS:
+		var count := pouch_count(id)
+		if count <= 0:
+			continue
+		_set_pouch(id, 0)
+		var pouch := loot.make_item(id)
+		if pouch == null:
+			continue
+		pouch.count = count
+		var at := loot.ground_at(player, Vector3.BACK.rotated(Vector3.UP, (spot + 0.5) * TAU / SLOT_COUNT) * 0.6)
+		spot += 1
+		if at == Vector3.INF:
+			at = loot.ground_at(player, Vector3.ZERO)
+		if at == Vector3.INF:
+			at = player.global_position
+		loot.spawn_pickup(pouch, at)
+
+## Host: put an item on the ground just in front of the player.
+func _drop_near(item: ItemInstance) -> void:
+	if not Net.is_host() or loot == null:
+		return
+	var at := loot.ground_at(player, -player.global_basis.z * 1.1)
+	if at == Vector3.INF:
+		at = loot.ground_at(player, Vector3.ZERO)
+	if at == Vector3.INF:
+		at = player.global_position
+	loot.spawn_pickup(item, at)
 
 func can_collect_ammo() -> bool:
 	for type: String in _carried_types():
@@ -512,13 +682,13 @@ func sync_private_to(peer: int) -> void:
 	var rows: Array = []
 	for item in slots:
 		rows.append(item.encode() if item else [])
-	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, scrap, _reload_left, _reload_total, _jam_left, _cooldown)
+	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, scrap, grenades, domes, _reload_left, _reload_total, _jam_left, _cooldown)
 
 func sync_equip_to(peer: int) -> void:
 	_equip_state.rpc_id(peer, loot.run_id, revision, equipped_id, equipped_tier)
 
 @rpc("any_peer", "call_remote", "reliable")
-func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, new_scrap: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
+func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, new_scrap: int, frags: int, shield_domes: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
 	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id or rev <= _private_revision or not player.is_multiplayer_authority():
 		return
 	_private_revision = rev
@@ -529,6 +699,8 @@ func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: in
 	reserves = stash
 	current = slot
 	scrap = new_scrap
+	grenades = frags
+	domes = shield_domes
 	_reload_left = reload_left
 	_reload_total = reload_total
 	_jam_left = jam_left
