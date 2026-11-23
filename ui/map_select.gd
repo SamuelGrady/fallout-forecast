@@ -57,8 +57,9 @@ func _ready() -> void:
 	box.add_child(cards)
 	_maps = Maps.available()
 	_maps.append(Maps.RANDOM)
+	var card_size := Vector2(168, 300) if _maps.size() > 4 else Vector2(205, 268)
 	for map in _maps:
-		_build_card(cards, map)
+		_build_card(cards, map, card_size)
 
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -88,9 +89,9 @@ func _ready() -> void:
 	initial.grab_focus()
 
 
-func _build_card(parent: Control, map: Dictionary) -> void:
+func _build_card(parent: Control, map: Dictionary, card_size: Vector2) -> void:
 	var card := Button.new()
-	card.custom_minimum_size = Vector2(205, 268)
+	card.custom_minimum_size = card_size
 	card.pressed.connect(_pick.bind(map.id))
 	BroadcastUI.animate_button(card)
 	parent.add_child(card)
