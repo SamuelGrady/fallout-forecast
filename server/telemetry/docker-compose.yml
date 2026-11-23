@@ -1,7 +1,5 @@
-# Fallout Forecast telemetry collector on ballista. See server/telemetry/README.md.
-# coolify-proxy (caddy-docker-proxy) serves https://fallout-telemetry.drew.place
-# and forwards to port 8080. No host port is published. Data: the named volume
-# fallout-telemetry-data (/data in the container), one JSONL file per day.
+# Fallout Forecast telemetry collector (HTTP on port 8080). See server/telemetry/README.md.
+# Data is stored in the fallout-telemetry-data volume (/data in the container), one JSONL file per day.
 services:
   fallout-telemetry:
     build: .
@@ -11,21 +9,13 @@ services:
     mem_limit: 128m
     cpus: 0.25
     read_only: true
+    ports:
+      - "8080:8080"
     volumes:
       - fallout-telemetry-data:/data
-    networks: [coolify]
-    labels:
-      caddy: fallout-telemetry.drew.place
-      caddy.reverse_proxy: "{{upstreams 8080}}"
-      caddy.request_body.max_size: 64KB
-      caddy_ingress_network: coolify
     logging:
       driver: json-file
       options: {max-size: "5m", max-file: "2"}
 
 volumes:
   fallout-telemetry-data:
-
-networks:
-  coolify:
-    external: true

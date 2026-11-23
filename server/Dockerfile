@@ -1,6 +1,6 @@
 # Fallout Forecast dedicated server (headless Godot, WebSocket on TCP 7777).
 # Build from the repo root:  docker build -f server/Dockerfile -t fallout-server .
-# Targets linux/arm64 (ballista); set GODOT_ARCH=x86_64 for an amd64 host.
+# Defaults to linux/arm64; set GODOT_ARCH=x86_64 for an amd64 host.
 
 FROM debian:bookworm-slim AS godot
 ARG GODOT_VERSION=4.7.2

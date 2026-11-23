@@ -7,7 +7,7 @@ extends Node
 ##
 ## Transport is WebSocketMultiplayerPeer everywhere (so browser builds can
 ## play). Multiplayer is CLOUD PLAY only: the dedicated server listens for ws://
-## on TCP PORT behind Caddy's TLS at CLOUD_URL (wss://). There is no player
+## on TCP PORT behind TLS termination at CLOUD_URL (wss://). There is no player
 ## hosting or LAN discovery any more. Topology is client/server.
 ## Clients can only talk to the host, never to each other, so every
 ## client-to-client message goes client -> host -> clients: see the

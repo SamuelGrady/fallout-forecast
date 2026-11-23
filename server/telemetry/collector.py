@@ -3,7 +3,7 @@
 Accepts POST /v1/events with one JSON event per request (the game sends
 text/plain so browsers skip the CORS preflight) and appends it, with a server
 timestamp, to /data/events-YYYY-MM-DD.jsonl. Write-only from the internet:
-there is no read endpoint; read the files over SSH on ballista.
+there is no read endpoint; read the JSONL files directly from the data volume.
 
 Limits: 64 KB per event, 120 events per IP per 10 minutes, and the data
 directory is capped (oldest day files deleted past MAX_TOTAL_BYTES). Client IPs

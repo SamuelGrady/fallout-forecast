@@ -1,37 +1,36 @@
 # Dedicated server
 
-All multiplayer uses WebSockets (`WebSocketMultiplayerPeer`), so desktop and web builds can play together. The cloud server is `wss://fallout.drew.place/` (`Net.CLOUD_URL`, joined with `Net.join_cloud()`).
+All multiplayer uses WebSockets (`WebSocketMultiplayerPeer`), so desktop and web builds can play together. The default cloud server is `wss://fallout.drew.place/` (`Net.CLOUD_URL`, joined with `Net.join_cloud()`).
 
 ## Run locally
 
-```
+```sh
 godot --headless --path . --audio-driver Dummy -- --server [--port=7777] [--map pinecrest] [--heartbeat=/tmp/fallout-heartbeat]
 ```
 
-The server is peer 1 but is not a player. It logs joins, leaves and runs to stdout. A run starts once every connected player is READY in the lobby. After the results screen, or when everyone leaves, it unloads the run and waits for the next one. Code: `game/dedicated_server.gd`.
+The server is peer 1 but is not a player. It logs joins, leaves, and runs to stdout. A run starts once every connected player is READY in the lobby (or force-started). After the results screen, or when everyone leaves, it unloads the run and waits for the next one. Code: `game/dedicated_server.gd`.
 
 Players vote for a map or RANDOM before starting. The server chooses the winner and breaks ties at random. With no votes, it uses `--map <id>`. The default is Pinecrest, including when the supplied map is unavailable.
 
-Clients join from CLOUD PLAY on the title screen. Settings > SERVER (WSS) can point it at another server, e.g. `ws://127.0.0.1:7777/` for a local one.
+Clients join from **CLOUD PLAY** on the title screen. **Settings > SERVER (WSS)** can point the client at any server, e.g. `ws://127.0.0.1:7777/` for a local instance.
 
-## Docker (ballista, arm64)
+## Docker
 
-The build context is the repo root. BuildKit reads `server/Dockerfile.dockerignore`.
+The build context is the repo root (BuildKit reads `server/Dockerfile.dockerignore`).
 
+```sh
+# ARM64 (default)
+docker build -f server/Dockerfile -t fallout-server .
+
+# AMD64 / x86_64
+docker build -f server/Dockerfile --build-arg GODOT_ARCH=x86_64 -t fallout-server .
+
+# Run locally on port 7777
+docker run --rm -p 7777:7777 fallout-server
 ```
-docker build -f server/Dockerfile -t fallout-server:<git sha> .
-FALLOUT_TAG=<git sha> docker compose -f server/docker-compose.yml up -d
-```
 
-- The image downloads the official Godot 4.7.2 `linux.arm64` binary and checks its SHA512. It builds the `.godot` import cache at build time and runs as an unprivileged user under tini.
-- Liveness: the server rewrites `/tmp/fallout-heartbeat` every 15 s, and the Docker `HEALTHCHECK` fails if the file is older than a minute.
-- Networking: no host port is published. The container is on the `coolify` network, and its `caddy` labels make coolify-proxy serve `fallout.drew.place` with TLS and reverse-proxy the WebSocket to port 7777. `*.drew.place` is a DNS-only wildcard to ballista, so Caddy gets the certificate itself.
-
-### Production deployment on ballista (Coolify)
-
-The live server runs in Coolify on `ballista` as **Fallout Forecast Server** (`ghydxqhpmoruqs6yf4wayosl`), built from `kickofline/fallout-forecast` on `master` using Dockerfile build pack, repository root as the context, `/server/Dockerfile`, and port `7777`.
-
-- **Auto-deploy:** Enabled via the Coolify GitHub App push webhook on `master`. Every push to `master` rebuilds the ARM64 container on `ballista` and also runs the **Dedicated server build** GitHub Actions workflow (`server-build.yml`) to verify Docker health and WebSocket upgrade.
-- **Routing:** `coolify-proxy` terminates TLS for `https://fallout.drew.place` / `wss://fallout.drew.place/` and proxies WebSocket upgrades to port `7777` (while answering plain HTTP probes directly).
-- **Protocol compatibility:** Clients must run the same build as the server. Bump `Net.PROTOCOL` whenever an RPC or a networked scene path changes; mismatched clients are turned away with a message.
-- **Manual/local Docker check:** `server/docker-compose.yml` remains available if you want to build and run the image locally (`docker build -f server/Dockerfile -t fallout-server:<git sha> .`).
+- The image downloads the official Godot 4.7.2 Linux binary (verifying the SHA512 checksum on `arm64`), builds the `.godot` import cache at build time, and runs as an unprivileged user under `tini`.
+- **Liveness:** The server rewrites `/tmp/fallout-heartbeat` every 15 s, and the Docker `HEALTHCHECK` fails if the file is older than a minute.
+- **Reverse proxy & TLS:** Browser builds served over HTTPS require `wss://`. In production, place a TLS-terminating reverse proxy in front of container port `7777` that forwards WebSocket upgrade requests (`Upgrade: websocket`).
+- **CI:** The **Dedicated server build** GitHub Actions workflow (`server-build.yml`) builds the container image and verifies both the healthcheck and WebSocket upgrade handshake.
+- **Protocol compatibility:** Clients must match the server's `Net.PROTOCOL` version. Bump `Net.PROTOCOL` whenever an RPC or networked scene path changes; mismatched clients are turned away with a message.

@@ -9,10 +9,19 @@ godot --headless --export-release Web build/web/index.html
 python -m http.server 8000 --bind 127.0.0.1 --directory build/web
 ```
 
-Open `http://127.0.0.1:8000/` in a desktop browser with WebGL 2. Click **Start game** to enable audio. Click the canvas during a run to capture the mouse. The fullscreen button is available while the mouse is free. Esc releases capture or fullscreen.
+Open `http://127.0.0.1:8000/` in a desktop browser with WebGL 2. Click **PLAY** to enable audio. Click the canvas during a run to capture the mouse. The fullscreen button is available while the mouse is free. `Esc` releases capture or fullscreen.
 
-Web uses the single-threaded Compatibility renderer export and retains Jolt. It uses CPU rain without roof-heightfield collision, fades nearby drops under shelter, and keeps exponential fog. Glow, the VHS screen shader passes, and the PS1 material swap are disabled on web. The REC and timestamp overlay remains. To play online, select **Join Game** and choose the cloud server at `wss://fallout.drew.place/`.
+Web uses the single-threaded Compatibility renderer export and retains Jolt. It uses CPU rain without roof-heightfield collision, fades nearby drops under shelter, and keeps exponential fog. Glow, the VHS screen shader passes, and the PS1 material swap are disabled on web, while the `REC` and timestamp overlay remains. To play online, select **CLOUD PLAY** to join the default cloud server (`wss://fallout.drew.place/`), or point **Settings > SERVER (WSS)** at another server.
 
-The production image builds with `docker build -f web/Dockerfile .` on ARM64 or AMD64. Nginx serves port 8080 with a `/healthz` probe. It serves the HTML with `no-store` and compressed WASM, PCK, and JS from a content-hashed directory. The launcher resolves assets relative to `/fallout/`.
+## Docker & CI
 
-The **Web export** GitHub Actions workflow builds the ARM64 image, checks nginx responses, and uploads the web files as a workflow artifact on pushes to `web-build` and `master`. Production builds run in a separate Coolify app through the existing GitHub App push webhook. See [the rollout steps](deploy.md).
+Build the static container image from the repo root (ARM64 or AMD64):
+
+```sh
+docker build -f web/Dockerfile -t fallout-web .
+docker run --rm -p 8080:8080 fallout-web
+```
+
+Nginx listens on port `8080` with a `/healthz` probe. It serves the HTML with `no-store` and compressed WASM, PCK, and JS from a content-hashed directory. When hosted behind a reverse proxy at a subpath, strip the `/fallout/` prefix before forwarding to port `8080` (the launcher resolves assets relative to `/fallout/`).
+
+The **Web export** GitHub Actions workflow (`web-export.yml`) builds the container image, checks Nginx responses, and uploads the web export as a workflow artifact on pushes to `web-build` and `master`.
