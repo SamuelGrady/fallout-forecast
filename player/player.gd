@@ -234,6 +234,9 @@ func _build_children() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
 		return
+	# The loadout screen owns the cursor: no look, no click-to-recapture.
+	if InventoryMenu.is_open():
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_look(event.relative * Settings.mouse_sensitivity)
 	elif event.is_action_pressed("pause"):
@@ -266,7 +269,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
-	if pad_look != Vector2.ZERO:
+	if pad_look != Vector2.ZERO and not InventoryMenu.is_open():
 		_look(pad_look * pad_look_speed * delta)
 
 	if is_on_floor():

@@ -131,7 +131,7 @@ func _process(delta: float) -> void:
 	_update_throw_preview(delta)
 
 func _handle_input() -> void:
-	if not can_act():
+	if not can_act() or InventoryMenu.is_open():
 		_fire_buffer = 0.0
 		return
 	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
@@ -167,7 +167,7 @@ func _handle_input() -> void:
 			start_reload()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Net.dedicated or not player.is_multiplayer_authority() or not can_act():
+	if Net.dedicated or not player.is_multiplayer_authority() or not can_act() or InventoryMenu.is_open():
 		return
 	for id: String in ItemCatalog.POUCH_ACTIONS:
 		if event.is_action_pressed(ItemCatalog.POUCH_ACTIONS[id]):
@@ -207,7 +207,7 @@ func fire() -> void:
 ## Throw one pouch item straight from the belt; the equipped slot is untouched.
 func quick_throw(id: String) -> void:
 	if not ItemCatalog.is_pouch(id) or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
-			or _throw_cooldown > 0.0 or pouch_count(id) <= 0:
+			or _throw_cooldown > 0.0 or pouch_count(id) <= 0 or InventoryMenu.is_open():
 		return
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		return
@@ -318,12 +318,31 @@ func select_slot(slot: int) -> void:
 	_command("select", slot)
 
 func _command(action: String, slot := -1) -> void:
+	_send_action(action, selected_serial(), slot)
+
+## Move or swap two hotbar slots (an empty target is a plain move). Matching
+## non-gun stacks of the same tier merge up to the stack cap instead.
+func swap_slots(from_slot: int, to_slot: int) -> void:
+	if from_slot < 0 or from_slot >= SLOT_COUNT or to_slot < 0 or to_slot >= SLOT_COUNT \
+			or from_slot == to_slot or slots[from_slot] == null:
+		return
+	# Rides the existing _action RPC (slot packs both indices) so the RPC
+	# table and Net.PROTOCOL stay unchanged.
+	_send_action("swap", slots[from_slot].serial, from_slot * SLOT_COUNT + to_slot)
+
+## Drop whatever is in `slot` (not just the held one) in front of the player.
+func drop_slot(slot: int) -> void:
+	if slot < 0 or slot >= SLOT_COUNT or slots[slot] == null:
+		return
+	_send_action("drop_slot", slots[slot].serial, slot)
+
+func _send_action(action: String, expected: int, slot: int) -> void:
 	if not can_act():
 		return
 	if Net.is_host():
-		_host_action(loot.run_id, action, selected_serial(), slot)
+		_host_action(loot.run_id, action, expected, slot)
 	else:
-		_action.rpc_id(1, loot.run_id, action, selected_serial(), slot)
+		_action.rpc_id(1, loot.run_id, action, expected, slot)
 
 func _valid_sender() -> bool:
 	var sender := multiplayer.get_remote_sender_id()
@@ -343,6 +362,12 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 		_cooldown = maxf(_cooldown, 0.25)
 		_heat = 0.0
 		send_state()
+		return
+	if action == "swap":
+		_host_swap(expected, slot)
+		return
+	if action == "drop_slot":
+		_host_drop_slot(expected, slot)
 		return
 	if expected == 0 or expected != selected_serial():
 		return
@@ -366,6 +391,62 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 				_play_charge(loot.run_id, expected)
 				if not player.is_multiplayer_authority():
 					_play_charge.rpc_id(player.get_multiplayer_authority(), loot.run_id, expected)
+
+## Host: `packed` is from * SLOT_COUNT + to; `expected` is the moved item's serial.
+func _host_swap(expected: int, packed: int) -> void:
+	if packed < 0 or packed >= SLOT_COUNT * SLOT_COUNT:
+		return
+	@warning_ignore("integer_division")
+	var from_slot := packed / SLOT_COUNT
+	var to_slot := packed % SLOT_COUNT
+	var moving := slots[from_slot]
+	if from_slot == to_slot or moving == null or expected == 0 or moving.serial != expected:
+		return
+	var held := selected_serial()
+	var target := slots[to_slot]
+	var definition := ItemCatalog.definition(moving.id)
+	var merged := false
+	if target and definition and definition.kind != ItemDefinition.Kind.GUN \
+			and target.id == moving.id and target.tier == moving.tier:
+		var room := mini(moving.count, definition.stack_cap - target.count)
+		if room > 0:
+			target.count += room
+			moving.count -= room
+			if moving.count <= 0:
+				slots[from_slot] = null
+			merged = true
+	if not merged:
+		slots[from_slot] = target
+		slots[to_slot] = moving
+		# The held item stays in hand wherever it went.
+		if current == from_slot:
+			current = to_slot
+		elif current == to_slot:
+			current = from_slot
+	elif slots[from_slot] == null and current == from_slot:
+		current = to_slot
+	if selected_serial() != held:
+		_cancel_actions()
+		_cooldown = maxf(_cooldown, 0.25)
+		_heat = 0.0
+	send_state(true)
+
+## Host: drop the item in `slot` if it is still the one the owner saw.
+func _host_drop_slot(expected: int, slot: int) -> void:
+	if slot < 0 or slot >= SLOT_COUNT:
+		return
+	var item := slots[slot]
+	if item == null or expected == 0 or item.serial != expected:
+		return
+	var forward := -player.global_basis.z
+	var at := loot.ground_at(player, forward * 1.1)
+	if at == Vector3.INF:
+		at = loot.ground_at(player, Vector3.ZERO)
+	if at.is_finite() and loot.spawn_pickup(item, at) != 0:
+		slots[slot] = null
+		if slot == current:
+			_cancel_actions()
+		send_state(true)
 
 @rpc("any_peer", "call_remote", "reliable")
 func _play_charge(run: int, serial: int) -> void:
@@ -831,7 +912,7 @@ func _animate(delta: float) -> void:
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
 	var aiming: bool = can_act() and not player.get("tarp_raised") \
-			and _reload_left <= 0.0 \
+			and _reload_left <= 0.0 and not InventoryMenu.is_open() \
 			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)

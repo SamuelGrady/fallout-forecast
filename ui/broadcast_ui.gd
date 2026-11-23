@@ -263,8 +263,8 @@ static func button_accent(button: Button, accent: Color, quiet := false) -> void
 
 static func input_hint(action: String) -> String:
 	if Settings.using_gamepad:
-		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "fire":"RT", "reload":"X", "ping":"D-PAD", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT", "throw_grenade":"D-L", "throw_dome":"D-R"}.get(action,"A")
-	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "fire":"LMB", "reload":"R", "ping":"Z", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2", "throw_grenade":"Q", "throw_dome":"F"}.get(action,"ENTER")
+		return {"interact":"Y", "use_item":"LB", "ready_up":"BACK", "drop_item":"R3", "fire":"RT", "reload":"X", "ping":"D-PAD", "pause":"START", "cancel":"B", "vote_1":"LEFT", "vote_2":"RIGHT", "throw_grenade":"D-L", "throw_dome":"D-R", "inventory":"TAB"}.get(action,"A")
+	return {"interact":"E", "use_item":"T", "ready_up":"H", "drop_item":"G", "fire":"LMB", "reload":"R", "ping":"Z", "pause":"ESC", "cancel":"ESC", "vote_1":"1", "vote_2":"2", "throw_grenade":"Q", "throw_dome":"F", "inventory":"TAB"}.get(action,"ENTER")
 
 
 static func reveal(control: Control) -> void:
