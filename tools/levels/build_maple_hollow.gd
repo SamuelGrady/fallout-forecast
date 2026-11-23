@@ -1269,9 +1269,9 @@ func markers() -> void:
 
 	# 3 Crate Stations (Chapel Steps, Ranger Station, Campground)
 	directories["CrateStations"] = add(scene, Node3D.new(), "CrateStations")
-	marker("CrateStations", "crate_station", "ChapelSteps", Vector3(24.0, 0.08, -33.2))
-	marker("CrateStations", "crate_station", "RangerStation", Vector3(-14.0, 0.08, 37.8))
-	marker("CrateStations", "crate_station", "Campground", Vector3(-6.0, 0.08, -37.0))
+	marker("CrateStations", "crate_station", "ChapelSteps", Vector3(20, 0, -37.6)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "RangerStation", Vector3(-7.1, 0, 43.35)).rotation_degrees.y = -90
+	marker("CrateStations", "crate_station", "Campground", Vector3(-14.1, 0, -34.15)).rotation_degrees.y = 180
 
 	# 4 Street Supply Spawns at main woodland junctions
 	directories["StreetSupplySpawns"] = add(scene, Node3D.new(), "StreetSupplySpawns")
