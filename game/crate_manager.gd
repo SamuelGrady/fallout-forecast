@@ -313,6 +313,8 @@ func _purchase(station: SupplyStation, mode: String, offer: Array, player: Node3
 	var inventory := RunLoot.holder(player)
 	if offer.is_empty() or not inventory.can_act() or inventory.scrap < int(offer[2]):
 		return false
+	if ItemCatalog.is_pouch(offer[0]) and inventory.pouch_full(offer[0]):
+		return false
 	var item := _make_graded_item(registry, offer[0], offer[1])
 	if item == null:
 		return false
@@ -327,7 +329,7 @@ func _purchase(station: SupplyStation, mode: String, offer: Array, player: Node3
 		if not drop_at.is_finite():
 			return false
 	var bundle_count := item.count
-	var displaced := inventory.accept_pickup(item)
+	var displaced := inventory.accept_pickup(item, true)
 	if displaced == item and item.count == bundle_count:
 		return false
 	if displaced:

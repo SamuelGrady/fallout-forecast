@@ -18,7 +18,12 @@ func get_prompt(player: Node) -> String:
 	var cost: int = station.price if offer.is_empty() else offer[2]
 	if mode == "double" and GameManager.player_count() < 2:
 		return "Needs 2 players"
-	if RunLoot.holder(player).scrap < cost:
+	var holder := RunLoot.holder(player)
+	if not offer.is_empty() and ItemCatalog.is_pouch(offer[0]) and holder.pouch_full(offer[0]):
+		var full_item := ItemCatalog.definition(offer[0])
+		var cap := ItemCatalog.pouch_cap(offer[0])
+		return "%s pouch FULL (%d/%d)" % [full_item.display_name, cap, cap]
+	if holder.scrap < cost:
 		return "Need %d scrap" % cost
 	var action_label := "Double or nothing"
 	if not offer.is_empty():
