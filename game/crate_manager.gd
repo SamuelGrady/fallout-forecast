@@ -75,7 +75,9 @@ func _physics_process(delta: float) -> void:
 	if not Net.is_host() or not GameManager.run_active or GameManager.finished:
 		return
 	_clock += delta
-	if _pending_drop and WeatherManager.phase == WeatherManager.Phase.DRIZZLE and _clock >= _retry_drop_at:
+	# Drops land during Calm; Drizzle is a fallback if the navmesh wasn't ready.
+	if _pending_drop and _clock >= _retry_drop_at and WeatherManager.phase in [WeatherManager.Phase.CALM,
+			WeatherManager.Phase.MUTATION_ROLL, WeatherManager.Phase.DRIZZLE]:
 		_try_spawn_airdrop()
 	for key: int in _holds.keys():
 		var hold: Dictionary = _holds[key]
@@ -99,15 +101,35 @@ func start_calm() -> void:
 			var cabinet := station as SupplyStation
 			_set_price(cabinet, BASE_PRICE)
 			_restock(cabinet)
-	GameManager.show_banner("OVERCLOCKED SUPPLY DROP IN DRIZZLE", Color("#ffc365"), 3.2)
+	# Wave 1 Calm is starter-pick time; every later Calm gets a between-wave drop.
+	if WeatherManager.wave < 2 or _launched_wave == WeatherManager.wave:
+		return
+	if is_instance_valid(airdrop) and not airdrop.opened:
+		_remove_drop(_run)
+		Net.rpc_to_run(_remove_drop, [_run])
+	var banner: Array = _drop_banner(WeatherManager.wave)
+	GameManager.show_banner(banner[0], banner[1], 3.2)
 	_airdrop_cue()
 	Net.rpc_to_run(_announce_drop, [_run])
-
-func start_drizzle() -> void:
-	if not Net.is_host() or _launched_wave == WeatherManager.wave or is_instance_valid(airdrop):
-		return
 	_pending_drop = true
 	_try_spawn_airdrop()
+
+func _drop_banner(wave: int) -> Array:
+	match LootTable.airdrop_grade(wave):
+		0:
+			return ["SURPLUS SUPPLY DROP INBOUND", BroadcastUI.PAPER.lerp(Color("#ffc365"), 0.35)]
+		1:
+			return ["TUNED SUPPLY DROP INBOUND", BroadcastUI.CYAN]
+		2:
+			return ["OVERCLOCKED SUPPLY DROP INBOUND", Color("#ffc365")]
+		_:
+			return ["APEX SUPPLY DROP INBOUND", Color("#ff884d")]
+
+## The between-wave drop stays through the wave if unopened; this only
+## retries a Calm launch that couldn't find a landing spot yet.
+func start_drizzle() -> void:
+	if Net.is_host() and _pending_drop and _launched_wave != WeatherManager.wave:
+		_try_spawn_airdrop()
 
 func _try_spawn_airdrop() -> void:
 	_retry_drop_at = _clock + 0.5
@@ -246,6 +268,8 @@ func _handle_hold(run: int, key: String, mode: String, step: String, player: Nod
 		"airdrop":
 			_open_airdrop()
 			return true
+		"ammo":
+			return _buy_ammo(station, player)
 		"double":
 			return _open_double(station, player)
 		_:
@@ -346,6 +370,17 @@ func _purchase(station: SupplyStation, mode: String, offer: Array, player: Node3
 	_restock(station, SupplyStation.OFFER_PADS.find(mode))
 	return true
 
+## Ammo is always in stock: no bay is consumed or restocked.
+func _buy_ammo(station: SupplyStation, player: Node) -> bool:
+	var inventory := RunLoot.holder(player)
+	if not inventory.can_act() or not inventory.can_collect_ammo() or inventory.scrap < SupplyStation.AMMO_PRICE:
+		return false
+	if not inventory.collect_ammo(true):
+		return false
+	inventory.spend_scrap(SupplyStation.AMMO_PRICE)
+	_display_roll(station, "ammo_box", 0, "AMMO REFILLED")
+	return true
+
 func _open_double(station: SupplyStation, player: Node) -> bool:
 	var peer := player.get_multiplayer_authority()
 	var waiting: Array = _waiting.get(station.key, [])
@@ -407,18 +442,21 @@ func _reveal(run: int, key: String, id: String, tier: int, title: String) -> voi
 func _open_airdrop() -> void:
 	var registry := RunLoot.find(get_tree())
 	var point := airdrop.global_position
-	var players := GameManager.player_count()
-	var reward_count := players + loot.airdrop_supplies.size()
+	var wave := WeatherManager.wave
+	var weapons := GameManager.player_count() + loot.airdrop_bonus_weapons(wave)
+	var supplies := loot.airdrop_supplies(wave)
+	var tier := loot.airdrop_tier(wave)
+	var reward_count := weapons + supplies.size()
 	var space := registry.get_world_3d().direct_space_state
 	for i in reward_count:
 		var angle := i * TAU / reward_count
 		var offset := Vector3(2.25, 0.0, 0.0).rotated(Vector3.UP, angle)
 		var at := _safe_drop_spot(space, point, offset)
-		if i < players:
-			var weapon := _make_graded_item(registry, loot.roll_airdrop_weapon(), ItemCatalog.OVERCLOCKED)
+		if i < weapons:
+			var weapon := _make_graded_item(registry, loot.roll_airdrop_weapon(wave), tier)
 			registry.spawn_pickup(weapon, at)
 		else:
-			var id := loot.airdrop_supplies[i - players]
+			var id := supplies[i - weapons]
 			if id == "ammo_box":
 				registry.spawn_pickup(null, at, id)
 			else:

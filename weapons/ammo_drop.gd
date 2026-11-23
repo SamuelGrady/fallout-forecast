@@ -1,6 +1,6 @@
 extends Node3D
 ## Presentation for supply pickups, owned by RunLoot.
-@export_enum("ammo", "health", "suit", "supply") var kind := "ammo"
+@export_enum("ammo", "health", "suit", "supply", "scrap", "scrap_large") var kind := "ammo"
 var _age := 0.0
 var _root := Node3D.new()
 var _ring: MeshInstance3D
@@ -8,13 +8,29 @@ var _ring: MeshInstance3D
 static var _mat_cache := {}
 static var _ring_mats := {}
 static var _ring_mesh: TorusMesh
+static var _ring_meshes := {}
+
+const SCRAP_AMBER := Color("#ffb33d")
+const SCRAP_GOLD := Color("#ffd75e")
+const SCRAP_BRASS := Color("#c98d3a")
+const SCRAP_STEEL := Color("#4b4f52")
 
 
 func _ready() -> void:
 	add_child(_root)
-	var colors := {"ammo": Color("#f6cf64"), "health": Color("#ff6e91"), "suit": Color("#66dfda"), "supply": Color("#b5ef82")}
+	var colors := {"ammo": Color("#f6cf64"), "health": Color("#ff6e91"), "suit": Color("#66dfda"), "supply": Color("#b5ef82"),
+		"scrap": SCRAP_AMBER, "scrap_large": SCRAP_GOLD}
 	var accent: Color = colors.get(kind, Color("#f6cf64"))
 	match kind:
+		"scrap":
+			_build_scrap(accent)
+			_add_ring(accent, 0.26, 0.34, 0.75)
+			return
+		"scrap_large":
+			_build_scrap_cache(accent)
+			_add_ring(accent, 0.36, 0.45, 0.85)
+			_add_ring(SCRAP_AMBER, 0.52, 0.57, 0.6)
+			return
 		"health":
 			_build_medkit(accent)
 		"suit":
@@ -36,16 +52,71 @@ func _ready() -> void:
 	add_child(_ring)
 
 
-static func _ring_mat(accent: Color) -> StandardMaterial3D:
-	var key := accent.to_rgba32()
+static func _ring_mat(accent: Color, alpha := 0.45) -> StandardMaterial3D:
+	var key := "%d_%d" % [accent.to_rgba32(), int(round(alpha * 100.0))]
 	if _ring_mats.has(key):
 		return _ring_mats[key]
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	ring_mat.albedo_color = Color(accent.r, accent.g, accent.b, 0.45)
+	ring_mat.albedo_color = Color(accent.r, accent.g, accent.b, alpha)
 	_ring_mats[key] = ring_mat
 	return ring_mat
+
+
+## Flat glowing ground ring; meshes are shared per size.
+func _add_ring(accent: Color, inner: float, outer: float, alpha: float) -> void:
+	var key := "%d_%d" % [int(inner * 100.0), int(outer * 100.0)]
+	var mesh: TorusMesh = _ring_meshes.get(key)
+	if mesh == null:
+		mesh = TorusMesh.new()
+		mesh.rings = 24
+		mesh.ring_segments = 6
+		mesh.inner_radius = inner
+		mesh.outer_radius = outer
+		_ring_meshes[key] = mesh
+	var ring := MeshInstance3D.new()
+	ring.mesh = mesh
+	ring.material_override = _ring_mat(accent, alpha)
+	ring.position.y = 0.04
+	add_child(ring)
+	if _ring == null:
+		_ring = ring
+
+
+func _build_scrap(accent: Color) -> void:
+	# Small salvage bundle: steel plate, glowing brass cog and two bolts.
+	_add_box(_root, Vector3(0, -0.02, 0), Vector3(0.3, 0.05, 0.22), SCRAP_STEEL)
+	_add_box(_root, Vector3(0, 0.005, 0), Vector3(0.32, 0.015, 0.24), accent, 0.9)
+	_add_cog(_root, Vector3(0.02, 0.07, 0.0), 0.1, accent, 1.1)
+	_add_cyl(_root, Vector3(-0.11, 0.06, 0.06), 0.022, 0.12, SCRAP_BRASS, 0.5)
+	_add_cyl(_root, Vector3(-0.11, 0.125, 0.06), 0.036, 0.025, SCRAP_BRASS, 0.5)
+	_add_cyl(_root, Vector3(0.12, 0.05, -0.07), 0.02, 0.1, SCRAP_BRASS, 0.5)
+
+
+func _build_scrap_cache(accent: Color) -> void:
+	# Stacked salvage cache: two plates, a big gold cog, a small cog, bolt bundle.
+	_add_box(_root, Vector3(0, -0.04, 0), Vector3(0.46, 0.06, 0.34), SCRAP_STEEL)
+	_add_box(_root, Vector3(0, -0.005, 0), Vector3(0.48, 0.02, 0.36), SCRAP_AMBER, 1.0)
+	_add_box(_root, Vector3(0.03, 0.04, 0.02), Vector3(0.36, 0.05, 0.26), SCRAP_BRASS, 0.35)
+	_add_cog(_root, Vector3(-0.04, 0.11, 0.0), 0.14, accent, 1.6)
+	_add_cog(_root, Vector3(0.16, 0.09, -0.07), 0.075, SCRAP_AMBER, 1.2)
+	for x in [-0.17, -0.12]:
+		_add_cyl(_root, Vector3(x, 0.12, 0.1), 0.024, 0.16, SCRAP_BRASS, 0.6)
+		_add_cyl(_root, Vector3(x, 0.205, 0.1), 0.04, 0.025, SCRAP_BRASS, 0.6)
+
+
+func _add_cog(parent: Node3D, at: Vector3, radius: float, color: Color, glow: float) -> void:
+	var cog := Node3D.new()
+	cog.position = at
+	parent.add_child(cog)
+	_add_cyl(cog, Vector3.ZERO, radius, radius * 0.4, color, glow)
+	_add_cyl(cog, Vector3.ZERO, radius * 0.35, radius * 0.5, SCRAP_STEEL)
+	for i in 6:
+		var tooth := Node3D.new()
+		tooth.rotation.y = i * TAU / 6.0
+		cog.add_child(tooth)
+		_add_box(tooth, Vector3(radius * 1.08, 0, 0), Vector3(radius * 0.32, radius * 0.4, radius * 0.3), color, glow)
 
 
 func _build_ammo(accent: Color) -> void:

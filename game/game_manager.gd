@@ -196,7 +196,7 @@ const PLAYER_MUTATIONS := {
 	},
 	"magnet_hands": {
 		"name": "MAGNET HANDS",
-		"desc": "Pull pickups from 3x range and refill 60% ammo per drop",
+		"desc": "Pull scrap & pickups from 3x range and gain +25% bonus scrap",
 		"color": Color(0.45, 0.82, 1.0),
 	},
 	"voltaic_veins": {
@@ -270,6 +270,10 @@ func ammo_pickup_fraction() -> float:
 
 func pickup_reach() -> float:
 	return 5.0 if has_player_mutation("magnet_hands") else 1.8
+
+
+func scrap_pickup_scale() -> float:
+	return 1.25 if has_player_mutation("magnet_hands") else 1.0
 
 
 func suit_drain_scale() -> float:
@@ -513,11 +517,11 @@ func _stat(player: Node) -> Dictionary:
 var _volatile_popping := false
 
 
-func record_kill(source: Node, at := Vector3.INF, elite := false, miniboss := false) -> void:
+func record_kill(source: Node, at := Vector3.INF, elite := false, _miniboss := false) -> void:
 	if not is_host() or not source or not source.is_in_group("players"):
 		return
 	_stat(source).kills += 1
-	RunLoot.holder(source).earn_scrap(40 if miniboss else (12 if elite else 5))
+	# Scrap is no longer paid per kill: infected drop ground scrap pickups.
 	if endless:
 		endless_score += 250 if elite else 100
 	# Bio-Siphon: each kill restores health and suit integrity.

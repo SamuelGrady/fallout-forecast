@@ -14,6 +14,13 @@ func get_prompt(player: Node) -> String:
 	if mode == "airdrop":
 		return "Open"
 	var station := get_parent() as SupplyStation
+	if mode == "ammo":
+		var ammo_holder := RunLoot.holder(player)
+		if not ammo_holder.can_collect_ammo():
+			return "Ammo FULL"
+		if ammo_holder.scrap < SupplyStation.AMMO_PRICE:
+			return "Need %d scrap" % SupplyStation.AMMO_PRICE
+		return "Buy Ammo Refill  %d scrap" % SupplyStation.AMMO_PRICE
 	var offer := station.offer_for(mode)
 	var cost: int = station.price if offer.is_empty() else offer[2]
 	if mode == "double" and GameManager.player_count() < 2:
@@ -40,7 +47,7 @@ func action(player: Node, step: String) -> void:
 
 func set_targeted(active: bool) -> void:
 	var station := get_parent() as SupplyStation
-	if station and mode in SupplyStation.OFFER_PADS:
+	if station and (mode in SupplyStation.OFFER_PADS or mode == "ammo"):
 		station.highlight_offer(mode, active)
 	else:
 		super.set_targeted(active)

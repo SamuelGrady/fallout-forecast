@@ -4,7 +4,11 @@
 
 [resource]
 script = ExtResource("1")
+airdrop_basic_weapons = Array[String](["pump_shotgun", "nail_driver", "rock_salt", "spray_rifle"])
 airdrop_weapons = Array[String](["hunting_rifle", "pressure_washer", "battery_zapper", "flare_launcher", "harpoon", "leaf_blower"])
-airdrop_supplies = Array[String](["ammo_box", "frag", "shield_dome", "med_tin", "suit_patch", "lightning_rod"])
-airdrop_cursed_chance = 0.2
-airdrop_legendary_chance = 0.08
+airdrop_supplies_surplus = Array[String](["ammo_box", "med_tin"])
+airdrop_supplies_tuned = Array[String](["ammo_box", "med_tin", "suit_patch", "frag"])
+airdrop_supplies_overclocked = Array[String](["ammo_box", "med_tin", "suit_patch", "frag", "shield_dome"])
+airdrop_supplies_apex = Array[String](["ammo_box", "ammo_box", "med_tin", "suit_patch", "frag", "shield_dome", "lightning_rod"])
+airdrop_cursed_chances = PackedFloat32Array(0, 0.1, 0.22, 0.35)
+airdrop_legendary_chances = PackedFloat32Array(0, 0, 0.1, 0.25)
