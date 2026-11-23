@@ -1,51 +1,91 @@
-extends Label3D
-var amount := 0
-var critical := false
-var killed := false
-var age := 0.0
-var _tween: Tween
+extends Control
+## One screen-space draw list for the run's floating damage numbers.
+
+const STACK_TIME := 0.15
+const POP_TIME := 0.14
+const FADE_START := 0.45
+const LIFETIME := 0.70
+const DRIFT_SPEED := 36.0
+const OUTLINE := Color("#17212c")
+const NORMAL := Color("#f4f5e5")
+const CRITICAL := Color("#ff4f6a")
+
+class Marker:
+	var enemy_id: int
+	var world_position: Vector3
+	var screen_position: Vector2
+	var projected := false
+	var jitter: float
+	var amount := 0
+	var critical := false
+	var age := 0.0
+	var text: String
+
+var _active: Array[Marker] = []
+var _latest: Dictionary[int, Marker] = {}
+var _jitter := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	font = preload("res://assets/fonts/VT323-Regular.ttf")
-	pixel_size = .006
-	billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	# Draw over the enemy that was hit; it spawns at the impact point, which
-	# is often inside the body.
-	no_depth_test = true
-	render_priority = 10
-	outline_modulate = Color("#17212c")
-	outline_size = 10
-	_refresh()
-	_animate()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	process_priority = 1
+	set_process(false)
+
+
+func add_hit(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
+	var marker := _latest.get(enemy_id) as Marker
+	if marker == null or marker.age >= STACK_TIME:
+		marker = Marker.new()
+		marker.enemy_id = enemy_id
+		marker.jitter = _jitter.randf_range(-6.0, 6.0)
+		_active.append(marker)
+		if enemy_id > 0:
+			_latest[enemy_id] = marker
+	marker.world_position = point + Vector3.UP * 0.35
+	marker.amount += amount
+	marker.critical = marker.critical or critical
+	marker.age = 0.0
+	marker.text = str(marker.amount)
+	_project(marker, get_viewport().get_camera_3d())
+	set_process(true)
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
-	age += delta
+	var camera := get_viewport().get_camera_3d()
+	for i in range(_active.size() - 1, -1, -1):
+		var marker := _active[i]
+		marker.age += delta
+		if marker.age >= LIFETIME:
+			if _latest.get(marker.enemy_id) == marker:
+				_latest.erase(marker.enemy_id)
+			_active.remove_at(i)
+		else:
+			_project(marker, camera)
+	if _active.is_empty():
+		set_process(false)
+	queue_redraw()
 
 
-func add_hit(delta_amount: int, is_critical: bool) -> void:
-	amount += delta_amount
-	critical = critical or is_critical
-	age = 0.0
-	_refresh()
-	scale = Vector3.ONE * (1.28 if critical else 1.15)
-	_animate()
+func _project(marker: Marker, camera: Camera3D) -> void:
+	marker.projected = camera != null and not camera.is_position_behind(marker.world_position)
+	if marker.projected:
+		marker.screen_position = camera.unproject_position(marker.world_position)
+		marker.screen_position += Vector2(marker.jitter, -marker.age * DRIFT_SPEED)
 
 
-func _refresh() -> void:
-	text = str(amount)
-	font_size = 74 if critical else 54
-	# Headshots get their own hot red instead of a "!" suffix.
-	modulate = Color("#ff4f6a") if critical else Color("#f4f5e5")
-
-
-func _animate() -> void:
-	if _tween and _tween.is_valid():
-		_tween.kill()
-	modulate.a = 1.0
-	scale = Vector3.ONE * (1.28 if critical else 1.15)
-	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(self, "scale", Vector3.ONE, 0.14)
-	_tween.tween_property(self, "modulate:a", 0.0, 0.25).set_delay(0.45)
-	_tween.chain().tween_callback(queue_free)
+func _draw() -> void:
+	var font := BroadcastUI.FONT
+	var hud_scale := Settings.hud_scale
+	var outline_size := roundi(4.0 * hud_scale)
+	for marker in _active:
+		if not marker.projected:
+			continue
+		var pop := lerpf(1.35, 1.0, minf(marker.age / POP_TIME, 1.0))
+		var font_size := roundi((38 if marker.critical else 28) * hud_scale * pop)
+		var alpha := 1.0 - clampf(inverse_lerp(FADE_START, LIFETIME, marker.age), 0.0, 1.0)
+		var color := Color(CRITICAL if marker.critical else NORMAL, alpha)
+		var width := font.get_string_size(marker.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var at := (marker.screen_position - Vector2(width * 0.5, 0.0)).round()
+		draw_string_outline(font, at, marker.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, Color(OUTLINE, alpha))
+		draw_string(font, at, marker.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

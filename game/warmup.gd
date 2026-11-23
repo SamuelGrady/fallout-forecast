@@ -393,11 +393,10 @@ func _warm_combat_fx(base: Vector3, right: Vector3, up: Vector3) -> void:
 	ShotFX.flash(_holder, base, Color(1.0, 0.7, 0.4), 2.0, 0.3)
 	ShotFX.puff(_holder, base + up * 0.5, Color(1.0, 0.6, 0.2, 0.8), 0.3, 0.4)
 	ShotFX.sparks(_holder, base + up * 0.4, Vector3.UP, 4)
-	var number := Label3D.new()
-	number.set_script(preload("res://weapons/damage_number.gd"))
-	number.set("amount", 12)
-	_holder.add_child(number)
-	number.global_position = base + up * 1.4
+	var numbers := preload("res://weapons/damage_number.gd").new()
+	_holder.add_child(numbers)
+	numbers.add_hit(base + up - right * 0.5, 12, false)
+	numbers.add_hit(base + up + right * 0.5, 24, true)
 	for kind in ["ammo", "health", "suit", "supply"]:
 		var drop := Node3D.new()
 		drop.set_script(preload("res://weapons/ammo_drop.gd"))

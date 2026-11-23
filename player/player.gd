@@ -919,12 +919,12 @@ func _set_exposure(is_sheltered: bool, is_in_puddle: bool) -> void:
 const NET_RATE := 20.0
 ## How often the host resends health, suit, state and the tarp.
 const VITALS_RATE := 0.2
+const DamageNumbers := preload("res://weapons/damage_number.gd")
 
 var _net_left := 0.0
 var _vitals_left := 0.0
 var _exposure_sync_pending := true
-## enemy net id -> the damage number still floating over it.
-var _numbers := {}
+var _numbers: DamageNumbers
 
 
 func _net_step(delta: float) -> void:
@@ -1117,27 +1117,23 @@ func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_
 ## stack into one number, which is why the enemy's net id comes along: the
 ## stacking has to happen on the shooter's machine, whichever peer that is.
 func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
-	var parent := get_tree().current_scene
-	if parent == null:
-		parent = get_parent()
-	if parent == null:
+	if Net.dedicated or not is_inside_tree():
 		return
-	var at := point + Vector3.UP * 0.35
-	if enemy_id > 0:
-		var existing = _numbers.get(enemy_id)
-		if is_instance_valid(existing) and float(existing.get("age")) < 0.12:
-			existing.global_position = at
-			existing.add_hit(amount, critical)
-			return
-	var number := Label3D.new()
-	number.set_script(preload("res://weapons/damage_number.gd"))
-	# Set position, amount and critical before add_child so _ready() spawns in place.
-	number.position = at
-	number.set("amount", amount)
-	number.set("critical", critical)
-	parent.add_child(number)
-	number.global_position = at
-	if enemy_id > 0:
-		if _numbers.size() > 64:
-			_numbers.clear()
-		_numbers[enemy_id] = number
+	if not is_instance_valid(_numbers):
+		var parent := get_tree().current_scene
+		if parent == null:
+			parent = get_parent()
+		_numbers = parent.get_node_or_null("DamageNumbers/Markers") as DamageNumbers
+		if _numbers == null:
+			if DisplayServer.get_name() == "headless":
+				return
+			var layer := CanvasLayer.new()
+			layer.name = "DamageNumbers"
+			# Godot uses sibling indices within a layer. Append under the run
+			# to clear RetroScreen's layer-5 passes and stay below the layer-6 HUD.
+			layer.layer = 5
+			_numbers = DamageNumbers.new()
+			_numbers.name = "Markers"
+			layer.add_child(_numbers)
+			parent.add_child(layer)
+	_numbers.add_hit(point, amount, critical, enemy_id)
