@@ -1,6 +1,11 @@
 class_name WeaponProjectile
 extends Node3D
 ## The host moves, deploys and expires effects. Replicas render host events.
+##
+## Lightning Rod Spike: planted, it charges for data.effect_time (a humming,
+## sparking telegraph on every peer), then the host calls a real strike down
+## on it (WeatherManager.strike_at) and the bolt blasts, stuns and reveals the
+## infected around it. Players are never hurt by their own rod.
 
 var registry: RunLoot
 var seq: int
@@ -23,6 +28,10 @@ var _light: OmniLight3D
 static var _ring: TorusMesh
 static var _hemisphere: SphereMesh
 static var _zone_mats: Dictionary = {}
+
+const ROD_ARC_COLOR := Color(0.62, 0.95, 1.0)
+const ROD_STUN := 1.1
+const ROD_REVEAL := 3.0
 
 func configure(system: RunLoot, key: int, definition_id: String, at: Vector3, motion: Vector3, quality: int, source: Node3D) -> void:
 	registry = system
@@ -75,6 +84,11 @@ func sync_flight(at: Vector3, motion: Vector3) -> void:
 func _physics_process(delta: float) -> void:
 	if deployed:
 		if not Net.is_host():
+			return
+		if id == "lightning_rod":
+			left -= delta
+			if left <= 0.0:
+				_call_down_strike()
 			return
 		if id == "shield_dome":
 			_hold_out_enemies()
@@ -150,9 +164,9 @@ func deploy(at: Vector3, duration: float, angle: float, announce := true) -> voi
 			_make_wall()
 			add_to_group("sandbag_walls")
 		"lightning_rod":
-			if Net.is_host():
-				add_to_group("lightning_rods")
-				WeatherManager.lightning_struck.connect(_strike_rod)
+			add_to_group("lightning_rods")
+			if left <= 0.0:
+				left = maxf(data.effect_time, 0.1)
 	if not Net.dedicated:
 		_build_zone(announce)
 
@@ -207,6 +221,7 @@ func _build_zone(announce: bool) -> void:
 		if id == "lightning_rod":
 			_visual.position = Vector3.ZERO
 			_visual.rotation = Vector3.ZERO
+			_rod_charge_fx()
 		else:
 			_visual.position.y = 0.25
 	if id == "bait_radio":
@@ -222,7 +237,7 @@ func _build_zone(announce: bool) -> void:
 	if announce and id == "shield_dome":
 		Perf.mark("shield dome deploy")
 		Sound.play_at("dome_deploy", global_position, -7.0)
-	elif announce:
+	elif announce and id != "lightning_rod":
 		Sound.play_at("gun_field_deploy", global_position, -13.0)
 	if data.effect_radius <= 0.0:
 		return
@@ -325,9 +340,62 @@ func _contains(point: Vector3) -> bool:
 	return global_position.distance_to(point) <= data.effect_radius \
 			and WeaponCombat.clear_path(get_world_3d(), global_position + Vector3.UP * 0.25, point)
 
-func _strike_rod(at: Vector3, _seed: int) -> void:
-	if not is_queued_for_deletion() and at.is_equal_approx(global_position) and Net.is_host():
-		explode()
+## Every peer: the planted rod's telegraph. A ring sweeps in from the blast
+## radius, sparks spit off the tip and an electric hum climbs until the strike.
+func _rod_charge_fx() -> void:
+	var charge := maxf(left, 0.1)
+	var tip := Vector3.UP * 0.95
+	Sound.play_at("static_power", global_position + tip, -4.0, 0.85)
+	var sweep_mesh := TorusMesh.new()
+	sweep_mesh.inner_radius = 0.9
+	sweep_mesh.outer_radius = 1.0
+	sweep_mesh.rings = 28
+	sweep_mesh.ring_segments = 4
+	var sweep := MeshInstance3D.new()
+	sweep.mesh = sweep_mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.disable_fog = true
+	mat.albedo_color = Color(ROD_ARC_COLOR, 0.35)
+	sweep.material_override = mat
+	sweep.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var radius := maxf(data.effect_radius, 1.0)
+	sweep.scale = Vector3(radius, 0.6, radius)
+	sweep.position.y = 0.08
+	add_child(sweep)
+	var tween := sweep.create_tween().set_parallel(true)
+	tween.tween_property(sweep, "scale", Vector3(0.25, 0.6, 0.25), charge).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(mat, "albedo_color:a", 0.95, charge)
+	# Sparks crackle off the tip, faster as the charge peaks.
+	var spark_tween := create_tween()
+	var steps := 5
+	for i in steps:
+		spark_tween.tween_interval(charge / steps * (1.0 - i * 0.12))
+		spark_tween.tween_callback(func():
+			if is_inside_tree() and registry:
+				ShotFX.sparks(registry, global_position + tip, Vector3.UP, 3 + i))
+	spark_tween.tween_callback(func():
+		if is_inside_tree():
+			Sound.play_at("gun_battery_zapper", global_position + tip, -4.0, 1.4))
+	if not OS.has_feature("web"):
+		_light = OmniLight3D.new()
+		_light.light_color = ROD_ARC_COLOR
+		_light.light_energy = 0.2
+		_light.omni_range = 4.0
+		_light.shadow_enabled = false
+		_light.position = tip
+		add_child(_light)
+		_light.create_tween().tween_property(_light, "light_energy", 2.6, charge).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+
+
+## Host: the charge is done. The sky answers: a real strike on this spot for
+## every peer (bolt, flash, thunder, reveals), then the electric blast.
+func _call_down_strike() -> void:
+	if not Net.is_host() or is_queued_for_deletion():
+		return
+	WeatherManager.strike_at(global_position)
+	explode()
 
 func explode() -> void:
 	if not Net.is_host() or is_queued_for_deletion():
@@ -340,7 +408,11 @@ func explode() -> void:
 	var source: Node = shooter if is_instance_valid(shooter) else null
 	if source:
 		source.begin_hit_batch()
-	var targets := get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts") + GameManager.players()
+	var rod := id == "lightning_rod"
+	var targets := get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("boss_parts")
+	# The rod's bolt is aimed: it never hurts the squad. Frags still do.
+	if not rod:
+		targets += GameManager.players()
 	for target: Node3D in targets:
 		if not WeaponCombat.is_damageable(target):
 			continue
@@ -356,6 +428,9 @@ func explode() -> void:
 			push.y = 0.0
 			var impulse := push.normalized() * data.knockback * falloff * GameManager.explosive_knockback_scale()
 			target.take_blast(damage * falloff, source, at, impulse)
+			if rod and target.health > 0.0:
+				target.stagger(ROD_STUN)
+				target.reveal(ROD_REVEAL)
 		else:
 			target.take_damage(damage * falloff, source)
 	if source:
@@ -371,13 +446,17 @@ func explode() -> void:
 
 func finish(at: Vector3, blast: bool) -> void:
 	hide()
-	if WeatherManager.lightning_struck.is_connected(_strike_rod):
-		WeatherManager.lightning_struck.disconnect(_strike_rod)
 	for group: String in ["active_flares", "dry_weapon_zones", "enemy_lures", "sandbag_walls", "lightning_rods"]:
 		if is_in_group(group):
 			remove_from_group(group)
 	if not Net.dedicated:
-		if blast:
+		if blast and id == "lightning_rod":
+			# The strike itself (LightningFX) brings the bolt, flash, shake
+			# and thunder; this is the electric splash on the ground.
+			Sound.play_at("static_shock", at + Vector3.UP * 0.5, -2.0, 0.8)
+			ShotFX.puff(registry, at + Vector3.UP * 0.3, Color(ROD_ARC_COLOR, 0.8), data.effect_radius * 0.22, 0.32)
+			ShotFX.sparks(registry, at + Vector3.UP * 0.3, Vector3.UP, 16)
+		elif blast:
 			Juice.shake(0.7, at)
 			Sound.play_at("explosion_big" if id == "frag" else "explosion", at)
 			ShotFX.puff(registry, at + Vector3.UP * 0.4, data.tracer_color, data.effect_radius * 0.3, 0.45)

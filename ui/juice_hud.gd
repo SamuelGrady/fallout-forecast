@@ -105,7 +105,8 @@ void fragment(){
 	float y = fract(UV.y * 0.6 - TIME * speed + h(col + 3.0));
 	float streak = smoothstep(0.0, 0.02, y) * (1.0 - smoothstep(0.02, 0.22, y));
 	float lane = 1.0 - smoothstep(0.0, 0.08, abs(fract(UV.x * 34.0) - 0.5) - 0.02);
-	COLOR = vec4(0.75, 0.9, 1.0, streak * lane * amount * step(0.55, h(col + 7.0)) * 0.35);
+	// Fallout rain: the same eerie green as the drops in the world.
+	COLOR = vec4(0.5, 1.0, 0.38, streak * lane * amount * step(0.55, h(col + 7.0)) * 0.38);
 }""")
 	if OS.has_feature("web"):
 		# Zero screen-copy downed vignette on WebGL2 (matches RetroScreen).

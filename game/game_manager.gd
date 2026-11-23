@@ -164,7 +164,7 @@ func has_mutation(id: String) -> bool:
 
 
 # ------------------------------------------------------------------ player mutations
-## Players mutate right alongside the infected: every Mutation Roll grants the
+## Players mutate right alongside the infected: every Mutation Draft grants the
 ## squad a persistent bio-mutation (2 on a Jackpot) that stacks across the run.
 const PLAYER_MUTATIONS := {
 	"acid_blood": {
@@ -417,13 +417,17 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 			crates.start_drizzle()
 		WeatherManager.Phase.CALM:
 			crates.start_calm()
-			if _wave == 3:
-				_drop_milestone("frag", false)
 			# Clear weather: showers refill one charge.
 			if decon_charges < decon_max:
 				_set_decon(decon_charges + 1)
+			# Right after a cleared wave the Mutation Draft opens inside Calm.
+			# It holds the Calm countdown until the result shows.
+			if _wave >= 2:
+				mutations.begin()
 		WeatherManager.Phase.MUTATION_ROLL:
-			mutations.begin()
+			# Legacy phase value (never entered by next_phase any more).
+			if mutations.stage == "":
+				mutations.begin()
 		WeatherManager.Phase.DOWNPOUR:
 			if _wave == WeatherManager.FINAL_WAVE:
 				spawn_boss()
@@ -435,23 +439,11 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 				if endless:
 					endless_score += 500 + 100 * (_wave - WeatherManager.FINAL_WAVE)
 			show_banner("WAVE %d CLEAR" % _wave, Color("#66dfda"), 2.2)
-			var unlocks := {1: "spray_rifle", 2: "shield_dome", 3: "frag"}
-			if newly_cleared and unlocks.has(_wave):
-				_drop_milestone(unlocks[_wave], true)
 			if not endless:
 				mutations.clear()
 			for p in players():
 				if p.has_method("on_clearing"):
 					p.on_clearing()
-
-
-func _drop_milestone(id: String, discover: bool) -> void:
-	var loot := RunLoot.find(get_tree())
-	if discover:
-		loot.milestone(id)
-	for player: Node3D in players():
-		var at := loot.ground_at(player, -player.global_basis.z * 1.6)
-		loot.spawn_item(id, player.global_position if at == Vector3.INF else at)
 
 
 # ------------------------------------------------------------------ interact

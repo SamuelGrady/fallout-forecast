@@ -12,8 +12,10 @@ extends Area3D
 @export var grow_time := 45.0
 ## Seconds to dry from full size once the rain stops.
 @export var dry_time := 25.0
-@export var color := Color(0.44, 0.52, 0.6, 0.66)
-@export var acid_color := Color(0.35, 0.7, 0.2, 0.8)
+## Fallout rain pools green from the first Drizzle: murky toxic green, glowing
+## brighter toward acid_color as the storm builds, and still green as it dries.
+@export var color := Color(0.3, 0.62, 0.27, 0.7)
+@export var acid_color := Color(0.42, 0.88, 0.2, 0.82)
 
 ## 0 = dry, 1 = full size.
 var growth := 0.0
@@ -48,7 +50,7 @@ func _ready() -> void:
 	disc.height = 0.01
 	disc.radial_segments = 20
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	# Reads as a sheet of water against wet asphalt: pale, glossy, sky-lit.
+	# Reads as a sheet of toxic water against wet asphalt: green, glossy, sky-lit.
 	_material.roughness = 0.02
 	_material.metallic = 0.3
 	_material.metallic_specular = 1.0
@@ -114,7 +116,7 @@ func _physics_process(delta: float) -> void:
 	_apply()
 	if not _draw_water:
 		return
-	var base := color.lerp(acid_color, lerpf(0.55, 1.0, intensity) if raining else 0.0)
+	var base := color.lerp(acid_color, clampf(intensity, 0.0, 1.0) if raining else 0.0)
 	if GameManager.has_mutation("undertow"):
 		var pulse := 0.55 + 0.25 * sin(Time.get_ticks_msec() * 0.006)
 		base = base.lerp(Color(0.22, 0.82, 0.9, 0.88), pulse)

@@ -1,14 +1,15 @@
 extends Node
 ## Child of GameManager: the Mutation Draft (replaces the old slot reel).
-## 1. Mutation phase starts: WeatherManager holds the phase. The host rolls the
-##    wave's ENEMY mutation (weighted, not chosen) and deals three PLAYER
-##    mutation cards.
+## 1. Calm starts after a cleared wave (wave 2+): WeatherManager holds Calm
+##    (its countdown pauses). The host rolls the wave's ENEMY mutation
+##    (weighted, not chosen) and deals three PLAYER mutation cards.
 ## 2. Everyone picks one player card with 1 / 2 / 3 (D-pad on a controller).
 ##    Solo, the pick resolves at once; in a session the host tallies one vote
 ##    per peer and resolves when everyone has voted or DRAFT_TIME runs out
 ##    (most votes wins, ties at random, no votes = a random card).
 ## 3. The enemy mutation is active until Clearing; the picked player mutation
-##    joins the squad's list for the run.
+##    joins the squad's list for the run. After the result shows, the hold
+##    lifts and the rest of Calm (shopping, ready-up) plays out as normal.
 ##
 ## The host owns the deck, the timer and the tally; every step is broadcast so
 ## every peer shows the same cards and result.
@@ -135,15 +136,23 @@ func _process(delta: float) -> void:
 	time_left = maxf(0.0, time_left - delta)
 	if stage == "voting":
 		_local_input()
+	if stage == "result" and time_left <= 0.0:
+		# Every peer lifts its own hold once the result has shown, so the Calm
+		# countdown resumes and ready-up opens. The draft never ends Calm.
+		_finish_draft()
+		return
 	if not Net.is_host():
 		return
 	if stage == "voting" and time_left <= 0.0:
 		_resolve()
-	elif stage == "result" and time_left <= 0.0:
-		stage = ""
-		WeatherManager.hold = false
-		if WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
-			WeatherManager.next_phase()
+
+
+func _finish_draft() -> void:
+	stage = ""
+	WeatherManager.hold = false
+	if Net.is_host() and WeatherManager.phase == WeatherManager.Phase.MUTATION_ROLL:
+		# Legacy phase value: go on to the storm like Calm would.
+		WeatherManager.next_phase()
 
 
 func _local_input() -> void:
@@ -217,6 +226,8 @@ func clear() -> void:
 
 func _apply_clear() -> void:
 	active.clear()
+	if stage != "":
+		WeatherManager.hold = false
 	stage = ""
 	cards.clear()
 	mutations_changed.emit(active)

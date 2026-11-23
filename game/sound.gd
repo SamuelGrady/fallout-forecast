@@ -20,9 +20,12 @@ const CUE_TRIM_DB := {
 	"downpour": -3.0, "storm_clear": -4.0, "storm_arrival": -2.0, "storm_countdown": -2.0,
 	"drip_windup": -2.0, "gutter_windup": -2.0, "gutter_skid": -2.0, "mister_windup": -2.0,
 	"hailstone_crash": -3.0, "undertow_lurk": -2.0, "smog_spit": -2.0, "smog_splash": 2.0,
-	"static_blink": 1.0, "thunderhead_fuse": -2.0, "thunder": -3.0,
+	"static_blink": 1.0, "thunderhead_fuse": -2.0, "thunder": 0.0,
 	"vcr_insert": -5.0, "vcr_eject": -2.0, "vcr_whirr": 1.0,
 }
+## Per-cue ceiling overrides for cue_gain (default -10 dB). Thunder has to
+## cut through rain, wind and the score, so it may play much hotter.
+const CUE_CAP_DB := {"thunder": -1.0}
 var _last_cue_ms := {}
 
 var _layers: Array[AudioStreamPlayer] = []
@@ -93,7 +96,7 @@ func _is_fire(cue: String) -> bool:
 
 
 func cue_gain(cue: String, volume_db: float) -> float:
-	return minf(volume_db + float(CUE_TRIM_DB.get(cue, 0.0)), -10.0)
+	return minf(volume_db + float(CUE_TRIM_DB.get(cue, 0.0)), float(CUE_CAP_DB.get(cue, -10.0)))
 
 
 func ui_focus() -> void:
@@ -259,10 +262,26 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 	_play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus_for(cue))
 
 
-func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"Master") -> void:
+## Thunder for a lightning strike. Its own player per strike (overlaps are
+## fine), always STREAM playback on Web (the QOA-compressed WAV must not use
+## sample playback), and never dropped by the Web voice cap or cue dedupe.
+func play_thunder(volume_db := -1.0, pitch := 1.0) -> void:
+	if Net.dedicated or _headless:
+		return
+	_first_play("thunder")
+	var cue := "thunder_web" if _web else "thunder"
+	var stream := _get_sfx(cue)
+	if stream == null:
+		stream = _get_sfx("thunder")
+	Juice.duck_music(-7.0, 1.4)
+	_play_stream(stream, cue_gain("thunder", volume_db), pitch, &"Ambience", true)
+	Perf.mark("thunder playback")
+
+
+func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"Master", priority := false) -> void:
 	if stream == null:
 		return
-	if _web and _active_sfx >= WEB_MAX_SFX:
+	if _web and _active_sfx >= WEB_MAX_SFX and not priority:
 		return
 	var voice := AudioStreamPlayer.new()
 	voice.stream = stream
