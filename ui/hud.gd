@@ -128,6 +128,9 @@ var _unlock_name := ""
 # Centre.
 var _reticle := preload("res://ui/reticle.gd").new()
 var _prompt := KeyPrompt.new()
+# Stat card for the vending bay / ground pickup under the crosshair.
+var _item_card := ItemStatCard.new(ItemStatCard.Layout.ROW, true)
+var _item_card_key := ""
 var _downed := Label.new()
 var _state_flash := 0.0
 var _last_state := ""
@@ -368,6 +371,12 @@ func _build_messages() -> void:
 	# Interact / attack prompt just under the reticle.
 	_anchor(_prompt, Control.PRESET_CENTER, Rect2(-240, 44, 480, 28), Vector2(0.5, 0))
 	_prompt.hide()
+	# Item card right of the reticle, bottom edge above the prompt, growing up
+	# so it never covers the crosshair, the prompt, vitals or the hotbar.
+	_item_card.name = "ItemCard"
+	_anchor(_item_card, Control.PRESET_CENTER, Rect2(58, -104, ItemStatCard.COMPACT_WIDTH, 136), Vector2(0, 1))
+	_item_card.resized.connect(func(): _item_card.pivot_offset = Vector2(0, _item_card.size.y))
+	_item_card.hide()
 	_downed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.hud_text(_downed, BroadcastUI.T_NUM, BroadcastUI.PINK)
 	_anchor(_downed, Control.PRESET_CENTER, Rect2(-200, -96, 400, 40), Vector2(0.5, 0))
@@ -425,6 +434,7 @@ func _process(delta: float) -> void:
 		return
 	_update_vitals(player, delta)
 	_update_weapon(player, delta)
+	_update_item_card(player)
 	_update_teammates(player)
 
 
@@ -690,6 +700,53 @@ func _update_weapon(player: Player, delta: float) -> void:
 		_prompt.visible = true
 	_armory_hot = maxf(0.0, _armory_hot - delta)
 	_fade(_armory, _armory_hot > 0.0 or reloading or jammed or low, 0.35, delta)
+
+
+## Show the compact stat card while the crosshair rests on a vending bay or
+## ground pickup. The card only re-renders when the target signature changes.
+func _update_item_card(player: Player) -> void:
+	var info: Dictionary = {}
+	if player.state == "ok" and not InventoryMenu.is_open() and not GameManager.is_voting():
+		info = player.targeted_item_info()
+	if info.is_empty():
+		if _item_card.visible:
+			_item_card.hide()
+		_item_card_key = ""
+		return
+	var holder := _holder if is_instance_valid(_holder) else null
+	var id := str(info.id)
+	var tier := int(info.get("tier", 0))
+	var price := int(info.get("price", 0))
+	var scrap := holder.scrap if holder else 0
+	info["scrap"] = scrap
+	info["affordable"] = scrap >= price
+	info["pouch_full"] = holder != null and holder.pouch_full(id)
+	info["swap"] = holder != null and _needs_swap(holder, id, tier, int(info.get("count", 0)))
+	var key := "%s|%d|%d|%s|%d|%d|%s|%s|%s" % [info.get("source", ""), id.hash(), tier, price, int(info.get("count", -1)),
+		scrap if price > 0 else 0, info.affordable, info.pouch_full, info.swap]
+	if key != _item_card_key:
+		_item_card_key = key
+		_item_card.configure(info)
+		# Anchored controls only ever grow to their minimum size; drop the top
+		# edge so a shorter card shrinks back (it grows upward from the bottom).
+		_item_card.offset_top = _item_card.offset_bottom - 64.0
+	if not _item_card.visible:
+		_item_card.show()
+		if not Settings.reduced_flash:
+			BroadcastUI.reveal(_item_card)
+
+
+## Mirrors WeaponHolder.needs_swap for an offer that has no ItemInstance yet.
+func _needs_swap(holder: WeaponHolder, id: String, tier: int, count: int) -> bool:
+	var definition := ItemCatalog.definition(id)
+	if definition == null or ItemCatalog.is_pouch(id) or holder.slots.has(null):
+		return false
+	if definition.kind != ItemDefinition.Kind.GUN:
+		var amount := count if count > 0 else definition.spawn_count
+		for other in holder.slots:
+			if other and other.id == id and other.tier == tier and other.count + amount <= definition.stack_cap:
+				return false
+	return true
 
 
 func _on_fired(_data: WeaponData) -> void:

@@ -723,6 +723,27 @@ func _interact_text(target: Node) -> String:
 	return target.get_prompt(self)
 
 
+## What the current interact target sells or holds, for the HUD stat card:
+## {id, tier, price, source[, count]} or {} when it is not an item.
+func targeted_item_info() -> Dictionary:
+	if not is_instance_valid(_hold_target):
+		return {}
+	var pad := _hold_target as SupplyInteract
+	if pad:
+		var station := pad.get_parent() as SupplyStation
+		if station:
+			var offer := station.offer_for(pad.mode)
+			if not offer.is_empty():
+				return {"id": str(offer[0]), "tier": int(offer[1]), "price": int(offer[2]), "source": "vending"}
+			if pad.mode == "ammo":
+				return {"id": "ammo_box", "tier": 0, "price": 5, "source": "vending"}
+		return {}
+	var pickup := _hold_target as WorldPickup
+	if pickup and pickup.item != null:
+		return {"id": pickup.item.id, "tier": pickup.item.tier, "count": pickup.item.count, "price": 0, "source": "pickup"}
+	return {}
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _grant_tarp() -> void:
 	if multiplayer.get_remote_sender_id() == 1:

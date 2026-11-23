@@ -17,22 +17,10 @@ const SCRIM := Color(0.015, 0.03, 0.055, 0.78)
 const CARD_SIZE := Vector2(860, 556)
 const COLUMN_BG := Color(0.03, 0.06, 0.09, 0.72)
 const PREVIEW_SIZE := Vector2i(210, 178)
-const SLOT_HEIGHT := 44.0
+const SLOT_HEIGHT := 38.0
 const AMMO_NAMES := {"shell": "SHELLS", "rifle": "RIFLE", "nail": "NAILS", "water": "WATER",
 	"cell": "CELLS", "flare": "FLARES", "shaft": "SHAFTS", "fuel": "FUEL", "radio": "RADIO",
 	"rocket": "ROCKETS", "revolver": ".38"}
-const KIND_NAMES := ["WEAPON", "THROWABLE", "CONSUMABLE", "DEPLOYABLE"]
-const ITEM_NOTES := {
-	"umbrella": "Plants a rain canopy: everyone under it counts as sheltered.",
-	"bleach_bomb": "Thrown burst that scours the infected caught in it.",
-	"bait_radio": "Tossed lure. The infected chase the noise until it dies.",
-	"sandbag": "Places a waist-high wall of cover in front of you.",
-	"lightning_rod": "Spike that draws lightning strikes to itself.",
-	"med_tin": "Restores health. Only usable while hurt.",
-	"suit_patch": "Repairs suit integrity. Only usable while the suit is torn.",
-	"frag": "Belt pouch grenade. Quick-throw it any time.",
-	"shield_dome": "Belt pouch dome that shelters the squad from rain.",
-}
 
 static var _instance: InventoryMenu
 static var _closed_frame := -1
@@ -65,9 +53,8 @@ var _dome_value: Label
 var _frag_key: Label
 var _dome_key: Label
 
-var _insp_name: Label
-var _insp_sub: Label
-var _insp_stats: RichTextLabel
+var _insp_card: ItemStatCard
+var _insp_slot: Label
 var _equip_button: Button
 var _drop_button: Button
 var _ammo_flow: HFlowContainer
@@ -323,75 +310,25 @@ func _refresh_cards() -> void:
 
 func _refresh_inspector() -> void:
 	var holder := _holder()
-	if holder == null or _insp_name == null:
+	if holder == null or _insp_card == null:
 		return
 	var index := _hovered if _hovered >= 0 else _inspect
 	index = clampi(index, 0, WeaponHolder.SLOT_COUNT - 1)
 	var item := holder.slots[index]
-	var muted := BroadcastUI.MUTED.to_html(false)
 	_equip_button.disabled = item == null or index == holder.current or not holder.can_act()
 	_drop_button.disabled = item == null or not holder.can_act()
 	_equip_button.text = "IN HAND" if item and index == holder.current else "EQUIP"
-	if item == null:
-		_insp_name.text = "SLOT %d  /  EMPTY" % (index + 1)
-		_insp_name.add_theme_color_override("font_color", BroadcastUI.MUTED)
-		_insp_sub.text = "DRAG AN ITEM HERE TO MOVE IT"
-		_insp_stats.text = "[color=#%s]Loot, crates and vending fill empty slots first.[/color]" % muted
+	_insp_slot.text = "SLOT %d" % (index + 1)
+	_insp_slot.add_theme_color_override("font_color", BroadcastUI.CYAN if item and index == holder.current else BroadcastUI.MUTED)
+	var definition := ItemCatalog.definition(item.id) if item else null
+	if definition == null:
+		_insp_card.clear()
 		return
-	var definition := ItemCatalog.definition(item.id)
-	var tier_name := ItemCatalog.tier_name(item.id, item.tier)
-	_insp_name.text = definition.display_name.to_upper()
-	_insp_name.add_theme_color_override("font_color", ItemCatalog.tier_color(item.id, item.tier) if item.tier > 0 or definition.is_cursed() or definition.legendary else BroadcastUI.PAPER)
-	var data := definition.weapon
-	var cells: Array = []
-	var notes := PackedStringArray()
-	if definition.kind == ItemDefinition.Kind.GUN and data:
-		var reserve := int(holder.reserves.get(definition.ammo_type, 0))
-		var cap := int(ItemCatalog.CAPS.get(definition.ammo_type, 0))
-		var damage := data.damage * float(ItemCatalog.DAMAGE_SCALE[clampi(item.tier, 0, 2)])
-		_insp_sub.text = "SLOT %d  /  %s  /  %s AMMO%s" % [index + 1, tier_name, AMMO_NAMES.get(definition.ammo_type, definition.ammo_type.to_upper()), "  /  FULL AUTO" if data.automatic else ""]
-		cells.append(["DMG", ("%d x%d" % [roundi(damage), data.pellets]) if data.pellets > 1 else str(roundi(damage))])
-		if data.charge_time > 0.0:
-			cells.append(["CHARGE", "%.1fs" % data.charge_time])
-		else:
-			cells.append(["RPM", str(roundi(60.0 / maxf(data.fire_interval * GameManager.fire_rate_scale(), 0.01)))])
-		cells.append(["RANGE", "%dm" % roundi(data.max_range)])
-		cells.append(["MAG", "%d/%d" % [item.count, data.mag_size]])
-		cells.append(["RES", "%d/%d" % [reserve, cap]])
-		cells.append(["RELOAD", "%.1fs" % (data.reload_time * GameManager.reload_scale())])
-		if data.shell_reload:
-			notes.append("Loads shell by shell.")
-		if data.pierce > 0:
-			notes.append("Pierces %d %s." % [data.pierce, "target" if data.pierce == 1 else "targets"])
-		if data.held_suit_drain > 0.0:
-			notes.append("Drains your suit while held.")
-		if data.jam_chance > 0.0:
-			notes.append("%d%% jam chance." % roundi(data.jam_chance * 100.0))
-		if data.lucky_kill_chance > 0.0:
-			notes.append("%d%% lucky instant kill." % roundi(data.lucky_kill_chance * 100.0))
-		if definition.legendary:
-			notes.append("Legendary: hold fire to charge.")
-	else:
-		_insp_sub.text = "SLOT %d  /  %s  /  %s" % [index + 1, tier_name, KIND_NAMES[definition.kind]]
-		cells.append(["STACK", "%d/%d" % [item.count, definition.stack_cap]])
-		if data and data.damage > 0.0 and definition.kind == ItemDefinition.Kind.THROWABLE:
-			cells.append(["DMG", str(roundi(data.damage))])
-		if data and data.effect_radius > 0.0:
-			cells.append(["RADIUS", "%.1fm" % data.effect_radius])
-		if data and data.effect_time > 0.0 and definition.kind != ItemDefinition.Kind.CONSUMABLE:
-			cells.append(["LASTS", "%ds" % roundi(data.effect_time)])
-		notes.append(str(ITEM_NOTES.get(item.id, "")))
-	var text := "[table=3]"
-	for cell: Array in cells:
-		text += "[cell][color=#%s]%s[/color] %s   [/cell]" % [muted, cell[0], cell[1]]
-	for _pad in (3 - cells.size() % 3) % 3:
-		text += "[cell] [/cell]"
-	text += "[/table]"
-	var note := " ".join(notes).strip_edges()
-	if not note.is_empty():
-		var tint := Color("#ff8fc8") if definition.is_cursed() else BroadcastUI.MUTED
-		text += "\n[color=#%s]%s[/color]" % [tint.to_html(false), note]
-	_insp_stats.text = text
+	var opts := {"source": "inventory", "count": item.count}
+	if definition.kind == ItemDefinition.Kind.GUN:
+		opts["reserve"] = int(holder.reserves.get(definition.ammo_type, 0))
+		opts["reserve_cap"] = int(ItemCatalog.CAPS.get(definition.ammo_type, 0))
+	_insp_card.set_item(item.id, item.tier, opts)
 
 
 func _refresh_ammo() -> void:
@@ -642,6 +579,7 @@ func _left_column() -> Control:
 
 func _center_column() -> Control:
 	var box := _column(344)
+	box.add_theme_constant_override("separation", 4)
 	var head := HBoxContainer.new()
 	box.add_child(head)
 	var title := _section("HOTBAR")
@@ -650,7 +588,7 @@ func _center_column() -> Control:
 	var help := _label(head, 15, Color(BroadcastUI.MUTED, 0.75))
 	help.text = "DRAG TO MOVE  /  RMB DROP"
 	var slots := VBoxContainer.new()
-	slots.add_theme_constant_override("separation", 4)
+	slots.add_theme_constant_override("separation", 3)
 	box.add_child(slots)
 	for i in WeaponHolder.SLOT_COUNT:
 		var card := _SlotCard.new()
@@ -662,55 +600,36 @@ func _center_column() -> Control:
 	zone.menu = self
 	box.add_child(zone)
 	box.add_child(_inspector())
-	_ammo_flow = HFlowContainer.new()
-	_ammo_flow.add_theme_constant_override("h_separation", 6)
-	_ammo_flow.add_theme_constant_override("v_separation", 4)
-	box.add_child(_ammo_flow)
 	return box.get_parent()
 
 
 func _inspector() -> Control:
-	var panel := PanelContainer.new()
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(BroadcastUI.INK, 0.75)
-	style.border_color = Color(BroadcastUI.CYAN, 0.35)
-	style.border_width_left = 2
-	style.border_width_top = 1
-	style.content_margin_left = 10
-	style.content_margin_right = 8
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
-	panel.add_theme_stylebox_override("panel", style)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 1)
-	panel.add_child(box)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 6)
-	box.add_child(top)
-	_insp_name = _label(top, 24, BroadcastUI.PAPER)
-	_insp_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_insp_name.clip_text = true
-	_equip_button = _small_button(top, "EQUIP", BroadcastUI.CYAN, func():
+	box.add_theme_constant_override("separation", 4)
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_insp_card = ItemStatCard.new(ItemStatCard.Layout.ROW)
+	_insp_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(_insp_card)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	box.add_child(actions)
+	_insp_slot = _label(actions, 16, BroadcastUI.MUTED)
+	_insp_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_equip_button = _small_button(actions, "EQUIP", BroadcastUI.CYAN, func():
 		request_equip(_hovered if _hovered >= 0 else _inspect))
-	_drop_button = _small_button(top, "DROP", BroadcastUI.PINK, func():
+	_drop_button = _small_button(actions, "DROP", BroadcastUI.PINK, func():
 		request_drop(_hovered if _hovered >= 0 else _inspect))
-	_insp_sub = _label(box, 16, BroadcastUI.MUTED)
-	_insp_sub.clip_text = true
-	_insp_stats = RichTextLabel.new()
-	_insp_stats.bbcode_enabled = true
-	_insp_stats.scroll_active = false
-	_insp_stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_insp_stats.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_insp_stats.add_theme_font_override("normal_font", BroadcastUI.FONT)
-	_insp_stats.add_theme_font_size_override("normal_font_size", 18)
-	_insp_stats.add_theme_constant_override("line_separation", -2)
-	box.add_child(_insp_stats)
-	return panel
+	return box
 
 
 func _right_column() -> Control:
 	var box := _column(232)
+	# Carried ammo chips sit above the mutations so the center column can give
+	# the inspector stat card its full height.
+	_ammo_flow = HFlowContainer.new()
+	_ammo_flow.add_theme_constant_override("h_separation", 6)
+	_ammo_flow.add_theme_constant_override("v_separation", 4)
+	box.add_child(_ammo_flow)
 	var title := _label(box, 26, BroadcastUI.CYAN)
 	title.text = "MUTATIONS"
 	_mutation_text = RichTextLabel.new()
@@ -987,12 +906,12 @@ class _SlotCard extends Control:
 				draw_texture_rect(definition.icon, icon_rect, false)
 			var text_x := icon_rect.end.x + 8.0
 			var count_w := 74.0
-			draw_string(font, Vector2(text_x, 20.0), definition.display_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT,
+			draw_string(font, Vector2(text_x, 18.0), definition.display_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT,
 					w - text_x - count_w, 21, BroadcastUI.PAPER)
 			var tier_text := ItemCatalog.tier_name(item.id, item.tier)
-			draw_string(font, Vector2(text_x, 37.0), tier_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, tier_color)
+			draw_string(font, Vector2(text_x, 33.0), tier_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, tier_color)
 			var tier_w := font.get_string_size(tier_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-			draw_rect(Rect2(text_x, 39.0, tier_w, 1.5), Color(tier_color, 0.8))
+			draw_rect(Rect2(text_x, 34.5, tier_w, 1.5), Color(tier_color, 0.8))
 			# Tier strip along the bottom edge.
 			draw_rect(Rect2(tab_w, h - 2.0, w - tab_w, 2.0), Color(tier_color, 0.55 if item.tier > 0 or definition.is_cursed() or definition.legendary else 0.18))
 			var count_text := ""
@@ -1006,10 +925,10 @@ class _SlotCard extends Control:
 			var count_color := BroadcastUI.PAPER
 			if definition.kind == ItemDefinition.Kind.GUN and item.count <= 0:
 				count_color = BroadcastUI.PINK
-			draw_string(font, Vector2(w - count_w - 6.0, 21.0), count_text, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 22, count_color)
-			draw_string(font, Vector2(w - count_w - 6.0, 37.0), count_sub, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 14, BroadcastUI.MUTED)
+			draw_string(font, Vector2(w - count_w - 6.0, 19.0), count_text, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 22, count_color)
+			draw_string(font, Vector2(w - count_w - 6.0, 33.0), count_sub, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 14, BroadcastUI.MUTED)
 			if equipped:
-				draw_string(font, Vector2(text_x + tier_w + 10.0, 37.0), "IN HAND", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BroadcastUI.CYAN)
+				draw_string(font, Vector2(text_x + tier_w + 10.0, 33.0), "IN HAND", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BroadcastUI.CYAN)
 		else:
 			draw_string(font, Vector2(tab_w + 12.0, h * 0.5 + 7.0), "EMPTY", HORIZONTAL_ALIGNMENT_LEFT, -1, 20,
 					Color(BroadcastUI.MUTED, 0.45))
@@ -1039,7 +958,7 @@ class _DropZone extends Control:
 	var _dragging := false
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(0, 32)
+		custom_minimum_size = Vector2(0, 26)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:

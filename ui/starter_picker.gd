@@ -1,20 +1,12 @@
 extends Control
 ## Broadcast "Field Kit" spawn overlay: pick one of three starting weapons via
 ## mouse click, 1/2/3 quick keys, A/D or arrows + Enter/Space, or gamepad.
+## Each card is a shared ItemStatCard (TALL layout) so the starter lineup reads
+## exactly like the inventory inspector and the vending / pickup HUD card.
 
 const KEYS := [KEY_1, KEY_2, KEY_3]
 const KP_KEYS := [KEY_KP_1, KEY_KP_2, KEY_KP_3]
 const PAD_HINTS := ["LEFT", "UP", "RIGHT"]
-const TAGLINES := {
-	"pump_shotgun": "Close-range buckshot burst",
-	"nail_driver": "Fast-firing precision nails",
-	"service_revolver": "Heavy high-impact sidearm",
-}
-const ROLE_TAGS := {
-	"pump_shotgun": "SHOTGUN",
-	"nail_driver": "AUTO NAILER",
-	"service_revolver": "SIDEARM",
-}
 const SCRIM_COLOR := Color(0.03, 0.05, 0.09, 0.72)
 const CARD_SIZE := Vector2(230, 326)
 const SUBTITLE_DEFAULT := "CHOOSE YOUR SIDEARM BEFORE THE STORM HITS"
@@ -26,7 +18,7 @@ var _scrim: ColorRect
 var _frame: PanelContainer
 var _subtitle: Label
 var _footer_hint: Label
-var _cards: Array[PanelContainer] = []
+var _cards: Array[ItemStatCard] = []
 var _parts: Array[Dictionary] = []
 var _card_tweens: Array = []
 
@@ -141,19 +133,8 @@ func _build_ui() -> void:
 	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root_box.add_child(divider)
 
-	# Compute dynamic stat maxima across the starter lineup.
-	var max_power := 1.0
-	var max_rate := 0.1
-	var max_mag := 1.0
-	var defs: Array[ItemDefinition] = []
-	for kit_id: String in RunLoot.STARTER_KITS:
-		var def := ItemCatalog.definition(kit_id)
-		defs.append(def)
-		if def and def.weapon:
-			var w := def.weapon
-			max_power = maxf(max_power, w.damage * float(maxi(1, w.pellets)))
-			max_rate = maxf(max_rate, 1.0 / maxf(w.fire_interval, 0.01))
-			max_mag = maxf(max_mag, float(maxi(1, w.mag_size)))
+	# Normalize the bars across the starter lineup so the three kits contrast.
+	var maxima := ItemStatCard.gun_maxima(RunLoot.STARTER_KITS, 0)
 
 	# Three side-by-side weapon cards.
 	var row := HBoxContainer.new()
@@ -163,7 +144,7 @@ func _build_ui() -> void:
 	root_box.add_child(row)
 
 	for i in RunLoot.STARTER_KITS.size():
-		row.add_child(_build_card(i, RunLoot.STARTER_KITS[i], defs[i], max_power, max_rate, max_mag))
+		row.add_child(_build_card(i, RunLoot.STARTER_KITS[i], maxima))
 
 	# Footer controls hint.
 	_footer_hint = Label.new()
@@ -172,8 +153,11 @@ func _build_ui() -> void:
 	root_box.add_child(_footer_hint)
 
 
-func _build_card(index: int, kit_id: String, def: ItemDefinition, max_power: float, max_rate: float, max_mag: float) -> PanelContainer:
-	var card := PanelContainer.new()
+func _build_card(index: int, kit_id: String, maxima: Dictionary) -> ItemStatCard:
+	var card := ItemStatCard.new(ItemStatCard.Layout.TALL)
+	var opts := maxima.duplicate()
+	opts["badge"] = str(index + 1)
+	card.set_item(kit_id, 0, opts)
 	card.custom_minimum_size = CARD_SIZE
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.focus_mode = Control.FOCUS_NONE
@@ -182,165 +166,29 @@ func _build_card(index: int, kit_id: String, def: ItemDefinition, max_power: flo
 	card.resized.connect(func(): card.pivot_offset = card.size * 0.5)
 	card.mouse_entered.connect(_on_card_hover.bind(index))
 	card.gui_input.connect(_on_card_gui_input.bind(index))
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 7)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(box)
-
-	# Card header: key badge + role tag.
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 8)
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(top)
-
-	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(32, 24)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var key_label := Label.new()
-	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	key_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	BroadcastUI.text(key_label, 18, BroadcastUI.INK)
-	badge.add_child(key_label)
-	top.add_child(badge)
-
-	var role_label := Label.new()
-	role_label.text = str(ROLE_TAGS.get(kit_id, "WEAPON"))
-	role_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	role_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	BroadcastUI.text(role_label, 16, BroadcastUI.MUTED)
-	top.add_child(role_label)
-
-	# Weapon icon well (~64x64).
-	var icon_well := PanelContainer.new()
-	icon_well.custom_minimum_size = Vector2(0, 84)
-	icon_well.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon_well.add_theme_stylebox_override("panel", _icon_well_style())
-	box.add_child(icon_well)
-
-	var icon_center := CenterContainer.new()
-	icon_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon_well.add_child(icon_center)
-
-	if def and def.icon:
-		var tex := TextureRect.new()
-		tex.texture = def.icon
-		tex.custom_minimum_size = Vector2(64, 64)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_center.add_child(tex)
-	else:
-		var fallback := Label.new()
-		fallback.text = kit_id.left(3).to_upper()
-		BroadcastUI.text(fallback, 28, BroadcastUI.CYAN)
-		icon_center.add_child(fallback)
-
-	# Weapon name.
-	var name_label := Label.new()
-	var display_name := def.display_name if def else kit_id.replace("_", " ")
-	name_label.text = display_name.to_upper()
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(name_label, 26, BroadcastUI.PAPER, 2)
-	box.add_child(name_label)
-
-	# Short role tagline.
-	var tagline := Label.new()
-	tagline.text = str(TAGLINES.get(kit_id, ""))
-	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tagline.custom_minimum_size = Vector2(CARD_SIZE.x - 32.0, 38.0)
-	BroadcastUI.text(tagline, 18, BroadcastUI.MUTED)
-	box.add_child(tagline)
-
-	var sep := ColorRect.new()
-	sep.custom_minimum_size = Vector2(0, 1)
-	sep.color = Color(BroadcastUI.MUTED, 0.22)
-	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(sep)
-
-	# Dynamic stat bars read from definition.weapon.
-	var stats_box := VBoxContainer.new()
-	stats_box.add_theme_constant_override("separation", 5)
-	stats_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(stats_box)
-
-	var dmg_ratio := 0.5
-	var rate_ratio := 0.5
-	var mag_ratio := 0.5
-	var dmg_text := "-"
-	var rate_text := "-"
-	var mag_text := "-"
-	if def and def.weapon:
-		var w := def.weapon
-		var pellets := maxi(1, w.pellets)
-		var power := w.damage * float(pellets)
-		var rate := 1.0 / maxf(w.fire_interval, 0.01)
-		var mag := maxi(1, w.mag_size)
-		dmg_ratio = clampf(sqrt(power / max_power), 0.14, 1.0)
-		rate_ratio = clampf(sqrt(rate / max_rate), 0.14, 1.0)
-		mag_ratio = clampf(float(mag) / max_mag, 0.14, 1.0)
-		dmg_text = "%dx%d" % [roundi(w.damage), pellets] if pellets > 1 else "%d" % roundi(w.damage)
-		rate_text = "%.1f/S" % rate
-		mag_text = "%d" % mag
-
-	_add_stat_row(stats_box, "DMG", dmg_ratio, dmg_text, BroadcastUI.AMBER)
-	_add_stat_row(stats_box, "RATE", rate_ratio, rate_text, BroadcastUI.CYAN)
-	_add_stat_row(stats_box, "MAG", mag_ratio, mag_text, BroadcastUI.ACID)
+	card.badge.custom_minimum_size = Vector2(32, 24)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(spacer)
+	card.content.add_child(spacer)
 
 	var cta := Label.new()
 	cta.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.text(cta, 18, BroadcastUI.MUTED)
-	box.add_child(cta)
+	card.content.add_child(cta)
 
 	_cards.append(card)
 	_card_tweens.append(null)
 	_parts.append({
-		"badge": badge,
-		"key": key_label,
-		"role": role_label,
-		"name": name_label,
-		"tagline": tagline,
+		"badge": card.badge,
+		"key": card.badge_label,
+		"role": card.role_label,
+		"name": card.name_label,
+		"tagline": card.tagline_label,
 		"cta": cta,
 	})
 	return card
-
-
-func _add_stat_row(parent: Control, stat_name: String, ratio: float, value_text: String, color: Color) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(row)
-
-	var lbl := Label.new()
-	lbl.text = stat_name
-	lbl.custom_minimum_size = Vector2(36, 0)
-	BroadcastUI.text(lbl, 16, BroadcastUI.MUTED)
-	row.add_child(lbl)
-
-	var bar := ProgressBar.new()
-	bar.max_value = 1.0
-	bar.step = 0.001
-	bar.value = ratio
-	bar.custom_minimum_size = Vector2(0, 8)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	BroadcastUI.thin_bar(bar, color)
-	row.add_child(bar)
-
-	var val := Label.new()
-	val.text = value_text
-	val.custom_minimum_size = Vector2(40, 0)
-	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	BroadcastUI.text(val, 16, BroadcastUI.PAPER)
-	row.add_child(val)
 
 
 # ------------------------------------------------------------------ styling
@@ -374,15 +222,6 @@ func _tag_style() -> StyleBoxFlat:
 	return style
 
 
-func _icon_well_style() -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.02, 0.04, 0.07, 0.78)
-	style.border_color = Color(BroadcastUI.MUTED, 0.18)
-	style.set_border_width_all(1)
-	style.set_content_margin_all(6)
-	return style
-
-
 func _card_style(focused: bool, confirmed := false) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	var border_side := 2 if (focused or confirmed) else 1
@@ -400,16 +239,6 @@ func _card_style(focused: bool, confirmed := false) -> StyleBoxFlat:
 	return style
 
 
-func _badge_style(color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.content_margin_left = 6
-	style.content_margin_right = 6
-	style.content_margin_top = 1
-	style.content_margin_bottom = 1
-	return style
-
-
 func _refresh_hints() -> void:
 	for i in _parts.size():
 		_parts[i].key.text = PAD_HINTS[i] if _pad else str(i + 1)
@@ -424,7 +253,7 @@ func _apply_card_styles(confirmed_index: int) -> void:
 		var parts := _parts[i]
 		_cards[i].add_theme_stylebox_override("panel", _card_style(focused, confirmed))
 		var badge_color := BroadcastUI.AMBER if confirmed else (BroadcastUI.CYAN if focused else Color(BroadcastUI.MUTED, 0.72))
-		parts.badge.add_theme_stylebox_override("panel", _badge_style(badge_color))
+		parts.badge.add_theme_stylebox_override("panel", ItemStatCard.badge_style(badge_color))
 		parts.role.add_theme_color_override("font_color", BroadcastUI.AMBER if (focused or confirmed) else BroadcastUI.MUTED)
 		parts.name.add_theme_color_override("font_color", BroadcastUI.AMBER if confirmed else BroadcastUI.PAPER)
 		parts.tagline.add_theme_color_override("font_color", BroadcastUI.PAPER if (focused or confirmed) else BroadcastUI.MUTED)
