@@ -6,7 +6,7 @@
 script = ExtResource("2_ls84y")
 shot_sound = "gun_rifle"
 display_name = "Spray Rifle"
-damage = 9.0
+damage = 10.0
 spread_degrees = 0.65
 burst_spread = 3.2
 recoil_degrees = 0.7

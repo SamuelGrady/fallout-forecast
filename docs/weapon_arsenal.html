@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fallout Forecast — 3D Weapon & Gear Field Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+    color: var(--foreground, #eef2f6);
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Filter + tier toolbar */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .tab {
+    appearance: none;
+    border: 1px solid var(--border, rgba(255,255,255,0.14));
+    background: var(--card, rgba(255,255,255,0.04));
+    color: var(--muted-foreground, #9aa8b8);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 5px 9px;
+    border-radius: var(--radius, 8px);
+    cursor: pointer;
+    transition: border-color 0.14s, color 0.14s, background 0.14s;
+  }
+  .tab:hover {
+    color: var(--foreground, #eef2f6);
+    border-color: var(--ring, #64e4de);
+  }
+  .tab.active {
+    background: color-mix(in srgb, var(--primary, #64e4de) 16%, var(--card, #111822));
+    color: var(--foreground, #eef2f6);
+    border-color: var(--primary, #64e4de);
+  }
+
+  .tier-group {
+    display: inline-flex;
+    border: 1px solid var(--border, rgba(255,255,255,0.14));
+    border-radius: var(--radius, 8px);
+    overflow: hidden;
+    background: var(--card, rgba(255,255,255,0.04));
+  }
+  .tier-btn {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid var(--border, rgba(255,255,255,0.12));
+    background: transparent;
+    color: var(--muted-foreground, #9aa8b8);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 5px 8px;
+    cursor: pointer;
+  }
+  .tier-btn:last-child { border-right: 0; }
+  .tier-btn.active {
+    background: var(--secondary, rgba(255,255,255,0.12));
+    color: var(--foreground, #eef2f6);
+  }
+  .tier-btn[data-tier="1"].active { color: var(--info, #66dfda); }
+  .tier-btn[data-tier="2"].active { color: var(--warning, #ffc365); }
+
+  /* Hero Inspector */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 620px) {
+    .hero { grid-template-columns: 1fr; }
+  }
+
+  .stage-card, .info-card {
+    background: var(--card, rgba(255,255,255,0.04));
+    border: 1px solid var(--border, rgba(255,255,255,0.12));
+    border-radius: var(--radius, 10px);
+    padding: 16px;
+  }
+
+  .stage-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stage-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stage-label {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground, #9aa8b8);
+  }
+  .stage-controls {
+    display: flex;
+    gap: 4px;
+  }
+  .mini-btn {
+    appearance: none;
+    border: 1px solid var(--border, rgba(255,255,255,0.14));
+    background: var(--secondary, rgba(255,255,255,0.06));
+    color: var(--muted-foreground, #9aa8b8);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    padding: 3px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .mini-btn:hover, .mini-btn.on {
+    color: var(--foreground, #eef2f6);
+    border-color: var(--primary, #64e4de);
+  }
+
+  .canvas-box {
+    position: relative;
+    width: 100%;
+    height: 256px;
+    border-radius: calc(var(--radius, 10px) - 2px);
+    border: 1px solid var(--border, rgba(255,255,255,0.1));
+    background: radial-gradient(ellipse at 50% 42%, rgba(100, 228, 222, 0.10), rgba(8, 13, 20, 0.92) 72%);
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .canvas-box:active { cursor: grabbing; }
+  .canvas-box canvas {
+    display: block;
+    width: 100%;
+    height: 256px;
+  }
+  .drag-hint {
+    position: absolute;
+    left: 10px;
+    bottom: 8px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    color: rgba(230, 240, 250, 0.55);
+    pointer-events: none;
+    letter-spacing: 0.04em;
+  }
+  .tri-count {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    color: rgba(230, 240, 250, 0.45);
+    pointer-events: none;
+  }
+
+  .stage-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    color: var(--muted-foreground, #9aa8b8);
+  }
+  .source-tag {
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--code-background, rgba(255,255,255,0.06));
+    color: var(--foreground, #eef2f6);
+    font-size: 10px;
+  }
+
+  /* Info Panel */
+  .info-card {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  .b-starter  { background: rgba(102, 223, 218, 0.16); color: #66dfda; border-color: rgba(102, 223, 218, 0.35); }
+  .b-firearm  { background: rgba(255, 240, 217, 0.12); color: #f6e7cf; border-color: rgba(255, 240, 217, 0.25); }
+  .b-special  { background: rgba(120, 200, 255, 0.16); color: #7cd4ff; border-color: rgba(120, 200, 255, 0.35); }
+  .b-cursed   { background: rgba(255, 85, 180, 0.16);  color: #ff69be; border-color: rgba(255, 85, 180, 0.42); }
+  .b-legend   { background: rgba(255, 195, 101, 0.18); color: #ffc365; border-color: rgba(255, 195, 101, 0.45); }
+  .b-pouch    { background: rgba(181, 239, 130, 0.15); color: #b5ef82; border-color: rgba(181, 239, 130, 0.35); }
+  .b-gear     { background: rgba(164, 152, 255, 0.16); color: #bcb2ff; border-color: rgba(164, 152, 255, 0.35); }
+  .b-ammo     { background: var(--secondary, rgba(255,255,255,0.08)); color: var(--muted-foreground, #9aa8b8); border-color: var(--border, rgba(255,255,255,0.12)); }
+
+  .weapon-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--foreground, #eef2f6);
+  }
+  .weapon-sub {
+    margin: -6px 0 0;
+    font-size: 12.5px;
+    color: var(--muted-foreground, #9aa8b8);
+  }
+
+  .stat-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .stat-row {
+    display: grid;
+    grid-template-columns: 54px 1fr 78px;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+  }
+  .stat-lbl {
+    color: var(--muted-foreground, #9aa8b8);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .bar-track {
+    height: 7px;
+    border-radius: 99px;
+    background: var(--secondary, rgba(255,255,255,0.08));
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.22s ease;
+  }
+  .stat-val {
+    text-align: right;
+    color: var(--foreground, #eef2f6);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .kv-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .kv {
+    background: var(--code-background, rgba(255,255,255,0.04));
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .kv-k {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground, #9aa8b8);
+  }
+  .kv-v {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--foreground, #eef2f6);
+    margin-top: 1px;
+  }
+
+  .mech-box {
+    background: var(--code-background, rgba(255,255,255,0.04));
+    border-left: 3px solid var(--primary, #64e4de);
+    border-radius: 0 6px 6px 0;
+    padding: 9px 11px;
+    font-size: 12.5px;
+    color: var(--foreground, #eef2f6);
+  }
+  .mech-box.cursed {
+    border-left-color: #ff55b4;
+    background: rgba(255, 85, 180, 0.08);
+  }
+  .mech-box.legendary {
+    border-left-color: #ffc365;
+    background: rgba(255, 195, 101, 0.08);
+  }
+  .mech-head {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground, #9aa8b8);
+    margin-bottom: 3px;
+  }
+
+  /* Arsenal Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 440px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .wcard {
+    appearance: none;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: var(--card, rgba(255,255,255,0.04));
+    border: 1px solid var(--border, rgba(255,255,255,0.11));
+    border-radius: var(--radius, 8px);
+    padding: 8px;
+    cursor: pointer;
+    color: inherit;
+    transition: border-color 0.14s, transform 0.12s, background 0.14s;
+  }
+  .wcard:hover {
+    border-color: var(--ring, #64e4de);
+    transform: translateY(-1px);
+  }
+  .wcard.selected {
+    border-color: var(--primary, #64e4de);
+    background: color-mix(in srgb, var(--primary, #64e4de) 12%, var(--card, #111822));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary, #64e4de) 45%, transparent);
+  }
+  .wcard.is-cursed.selected {
+    border-color: #ff55b4;
+    box-shadow: 0 0 0 1px rgba(255, 85, 180, 0.45);
+  }
+  .wcard.is-legend.selected {
+    border-color: #ffc365;
+    box-shadow: 0 0 0 1px rgba(255, 195, 101, 0.45);
+  }
+  .thumb-wrap {
+    width: 100%;
+    height: 66px;
+    border-radius: 5px;
+    background: radial-gradient(ellipse at 50% 45%, rgba(100, 228, 222, 0.08), rgba(8, 12, 19, 0.85) 80%);
+    overflow: hidden;
+  }
+  .thumb-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 66px;
+  }
+  .wcard-name {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--foreground, #eef2f6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wcard-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 9.5px;
+    color: var(--muted-foreground, #9aa8b8);
+    gap: 4px;
+  }
+  .dot-tag {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="toolbar">
+    <div class="tabs" id="catTabs"></div>
+    <div class="tier-group" id="tierGroup" title="Weapon upgrade tier damage multiplier">
+      <button class="tier-btn active" data-tier="0">Standard</button>
+      <button class="tier-btn" data-tier="1">Tuned +8%</button>
+      <button class="tier-btn" data-tier="2">Overclocked +16%</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="stage-card">
+      <div class="stage-top">
+        <span class="stage-label" id="stageLabel">3D MODEL // PROCEDURAL VIEWMODEL</span>
+        <div class="stage-controls">
+          <button class="mini-btn on" id="btnSpin" title="Toggle auto turntable">Spin</button>
+          <button class="mini-btn" id="btnSide" title="Side profile">Side</button>
+          <button class="mini-btn" id="btnIso" title="3/4 angle">3/4</button>
+          <button class="mini-btn" id="btnZoomIn" title="Zoom in">+</button>
+          <button class="mini-btn" id="btnZoomOut" title="Zoom out">−</button>
+        </div>
+      </div>
+      <div class="canvas-box" id="stageBox">
+        <canvas id="stageCanvas"></canvas>
+        <div class="drag-hint">DRAG TO ORBIT · SCROLL TO ZOOM</div>
+        <div class="tri-count" id="triCount"></div>
+      </div>
+      <div class="stage-footer">
+        <span id="stageOrigin"></span>
+        <span class="source-tag" id="stageSlot"></span>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="badge-row" id="badgeRow"></div>
+      <h2 class="weapon-title" id="wTitle"></h2>
+      <p class="weapon-sub" id="wSub"></p>
+      <div class="stat-bars" id="statBars"></div>
+      <div class="kv-grid" id="kvGrid"></div>
+      <div class="mech-box" id="mechBox">
+        <div class="mech-head" id="mechHead">WHAT IT DOES</div>
+        <div id="mechText"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" id="arsenalGrid"></div>
+</div>
+
+<script>
+(() => {
+  // ------------------------------------------------------------------ Palette (exact colors from gun_models.gd & item_models.gd)
+  const C = {
+    GUNMETAL: '#2b3038', POLYMER: '#1c1f25', STEEL: '#5d6670', WOOD: '#6e4a2c',
+    WOOD_DARK: '#4f3420', BRASS: '#d9b45a', SAFETY_ORANGE: '#ff7a2e',
+    HAZARD_YELLOW: '#f2c53d', TOXIC_GREEN: '#9be04a', NEON_PINK: '#ff4fa3',
+    NEON_TEAL: '#4fe6d8', CREAM: '#f2e1bd', ENAMEL: '#268782', TOMATO: '#cf493b',
+    CANVAS: '#b08a55', INDIGO: '#474263', COPPER: '#bd7453',
+  };
+
+  // ------------------------------------------------------------------ Tiny Software 3D Engine (exact match to Godot procedural builders)
+  const D2R = Math.PI / 180;
+  function hex2rgb(hex) {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  function v3(x,y,z){ return [x,y,z]; }
+  function add3(a,b){ return [a[0]+b[0],a[1]+b[1],a[2]+b[2]]; }
+  function sub3(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+  function mul3(a,s){ return [a[0]*s,a[1]*s,a[2]*s]; }
+  function dot3(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+  function cross3(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+  function len3(a){ return Math.hypot(a[0],a[1],a[2]); }
+  function norm3(a){ const l=len3(a)||1; return [a[0]/l,a[1]/l,a[2]/l]; }
+
+  // Godot Euler YXZ rotation (degrees)
+  function rotEuler(p, deg) {
+    if (!deg || (deg[0]===0 && deg[1]===0 && deg[2]===0)) return p;
+    let [x,y,z] = p;
+    const rx = deg[0]*D2R, ry = deg[1]*D2R, rz = deg[2]*D2R;
+    // Z
+    if (rz) { const c=Math.cos(rz), s=Math.sin(rz); [x,y] = [x*c - y*s, x*s + y*c]; }
+    // X
+    if (rx) { const c=Math.cos(rx), s=Math.sin(rx); [y,z] = [y*c - z*s, y*s + z*c]; }
+    // Y
+    if (ry) { const c=Math.cos(ry), s=Math.sin(ry); [x,z] = [x*c + z*s, -x*s + z*c]; }
+    return [x,y,z];
+  }
+
+  class MeshBuilder {
+    constructor() { this.tris = []; }
+    _pushTri(a, b, c, color, metal=0, glow=0) {
+      this.tris.push({ a, b, c, rgb: hex2rgb(color), metal, glow });
+    }
+    _xform(p, pos, rot, scale, parentOffset) {
+      let v = scale ? [p[0]*scale[0], p[1]*scale[1], p[2]*scale[2]] : p;
+      v = rotEuler(v, rot);
+      v = add3(v, pos);
+      if (parentOffset) v = add3(v, parentOffset);
+      return v;
+    }
+    box(size, pos, color, metal=0, rot=[0,0,0], glow=0, off=null) {
+      const [hx,hy,hz] = [size[0]/2, size[1]/2, size[2]/2];
+      const corners = [
+        [-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],
+        [-hx,-hy, hz],[hx,-hy, hz],[hx,hy, hz],[-hx,hy, hz],
+      ].map(p => this._xform(p, pos, rot, null, off));
+      const faces = [
+        [0,2,1],[0,3,2], // -Z
+        [4,5,6],[4,6,7], // +Z
+        [0,1,5],[0,5,4], // -Y
+        [3,7,6],[3,6,2], // +Y
+        [0,4,7],[0,7,3], // -X
+        [1,2,6],[1,6,5], // +X
+      ];
+      for (const [i,j,k] of faces) this._pushTri(corners[i], corners[j], corners[k], color, metal, glow);
+    }
+    cyl(r, h, pos, color, metal=0, rot=[90,0,0], glow=0, off=null, segs=10) {
+      const hy = h/2;
+      const top = [], bot = [];
+      for (let i=0;i<segs;i++) {
+        const a = i*Math.PI*2/segs;
+        const x = Math.cos(a)*r, z = Math.sin(a)*r;
+        top.push(this._xform([x, hy, z], pos, rot, null, off));
+        bot.push(this._xform([x,-hy, z], pos, rot, null, off));
+      }
+      const ct = this._xform([0, hy,0], pos, rot, null, off);
+      const cb = this._xform([0,-hy,0], pos, rot, null, off);
+      for (let i=0;i<segs;i++) {
+        const j = (i+1)%segs;
+        this._pushTri(bot[i], top[j], top[i], color, metal, glow);
+        this._pushTri(bot[i], bot[j], top[j], color, metal, glow);
+        this._pushTri(ct, top[i], top[j], color, metal, glow);
+        this._pushTri(cb, bot[j], bot[i], color, metal, glow);
+      }
+    }
+    sphere(r, h, pos, color, metal=0, glow=0, off=null, segs=10, rings=6) {
+      const ry = h/2;
+      const pts = [];
+      for (let j=0;j<=rings;j++) {
+        const phi = Math.PI * j / rings;
+        const y = Math.cos(phi)*ry;
+        const rr = Math.sin(phi)*r;
+        const ring = [];
+        for (let i=0;i<segs;i++) {
+          const th = Math.PI*2*i/segs;
+          ring.push(this._xform([Math.cos(th)*rr, y, Math.sin(th)*rr], pos, [0,0,0], null, off));
+        }
+        pts.push(ring);
+      }
+      for (let j=0;j<rings;j++) {
+        for (let i=0;i<segs;i++) {
+          const ni = (i+1)%segs;
+          if (j>0) this._pushTri(pts[j][i], pts[j+1][i], pts[j][ni], color, metal, glow);
+          if (j<rings-1) this._pushTri(pts[j][ni], pts[j+1][i], pts[j+1][ni], color, metal, glow);
+        }
+      }
+    }
+    torus(innerR, outerR, pos, color, metal=0, rot=[0,0,0], off=null) {
+      const R = (innerR+outerR)/2, r = (outerR-innerR)/2;
+      const segs = 14, tube = 6;
+      const rings = [];
+      for (let i=0;i<segs;i++) {
+        const u = i*Math.PI*2/segs;
+        const cu=Math.cos(u), su=Math.sin(u);
+        const ring = [];
+        for (let j=0;j<tube;j++) {
+          const v = j*Math.PI*2/tube;
+          const x = (R + r*Math.cos(v))*cu;
+          const z = (R + r*Math.cos(v))*su;
+          const y = r*Math.sin(v);
+          ring.push(this._xform([x,y,z], pos, rot, null, off));
+        }
+        rings.push(ring);
+      }
+      for (let i=0;i<segs;i++) {
+        const ni=(i+1)%segs;
+        for (let j=0;j<tube;j++) {
+          const nj=(j+1)%tube;
+          this._pushTri(rings[i][j], rings[ni][j], rings[ni][nj], color, metal, 0);
+          this._pushTri(rings[i][j], rings[ni][nj], rings[i][nj], color, metal, 0);
+        }
+      }
+    }
+    // Extruded 2D polygon in (Z, Y) extruded along X width — matches ItemModels._profile
+    profile(width, pts, color, metal=0, off=null) {
+      // Ensure CCW area for clean ear-clipping
+      let area = 0;
+      for (let i=0;i<pts.length;i++) {
+        const a=pts[i], b=pts[(i+1)%pts.length];
+        area += a[0]*b[1] - b[0]*a[1];
+      }
+      const poly = area < 0 ? [...pts].reverse() : [...pts];
+      const hw = width/2;
+      const L = poly.map(([z,y]) => off ? [-hw+off[0], y+off[1], z+off[2]] : [-hw, y, z]);
+      const R = poly.map(([z,y]) => off ? [ hw+off[0], y+off[1], z+off[2]] : [ hw, y, z]);
+      // Simple ear-clipping triangulation
+      const idx = poly.map((_,i)=>i);
+      const tris = [];
+      let guard = 200;
+      while (idx.length > 3 && guard-- > 0) {
+        let clipped = false;
+        for (let i=0;i<idx.length;i++) {
+          const ia = idx[(i-1+idx.length)%idx.length], ib = idx[i], ic = idx[(i+1)%idx.length];
+          const a=poly[ia], b=poly[ib], c=poly[ic];
+          const cross = (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]);
+          if (cross <= 1e-7) continue;
+          let inside = false;
+          for (const k of idx) {
+            if (k===ia||k===ib||k===ic) continue;
+            const p = poly[k];
+            const d1 = (p[0]-b[0])*(a[1]-b[1])-(a[0]-b[0])*(p[1]-b[1]);
+            const d2 = (p[0]-c[0])*(b[1]-c[1])-(b[0]-c[0])*(p[1]-c[1]);
+            const d3 = (p[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(p[1]-a[1]);
+            if (!((d1<0||d2<0||d3<0) && (d1>0||d2>0||d3>0))) { inside = true; break; }
+          }
+          if (!inside) { tris.push([ia,ib,ic]); idx.splice(i,1); clipped=true; break; }
+        }
+        if (!clipped) break;
+      }
+      if (idx.length === 3) tris.push([idx[0], idx[1], idx[2]]);
+      for (const [a,b,c] of tris) {
+        this._pushTri(R[a], R[c], R[b], color, metal, 0);
+        this._pushTri(L[a], L[b], L[c], color, metal, 0);
+      }
+      for (let i=0;i<poly.length;i++) {
+        const j = (i+1)%poly.length;
+        this._pushTri(L[i], R[i], R[j], color, metal, 0);
+        this._pushTri(L[i], R[j], L[j], color, metal, 0);
+      }
+    }
+    // Lathe of revolution [(r, y), ...] — matches ItemModels._turned
+    turned(pts, sides, pos, color, rot=[0,0,0], glow=0, off=null, scale=null) {
+      for (let i=0;i<sides;i++) {
+        const a = i*Math.PI*2/sides, b = (i+1)*Math.PI*2/sides;
+        const ca=Math.cos(a), sa=Math.sin(a), cb=Math.cos(b), sb=Math.sin(b);
+        for (let j=0;j<pts.length-1;j++) {
+          const [r0,y0] = pts[j], [r1,y1] = pts[j+1];
+          const u = this._xform([ca*r0, y0, sa*r0], pos, rot, scale, off);
+          const v = this._xform([cb*r0, y0, sb*r0], pos, rot, scale, off);
+          const w = this._xform([ca*r1, y1, sa*r1], pos, rot, scale, off);
+          const x = this._xform([cb*r1, y1, sb*r1], pos, rot, scale, off);
+          if (r0 > 1e-5) this._pushTri(u, w, v, color, 0.2, glow);
+          if (r1 > 1e-5) this._pushTri(v, w, x, color, 0.2, glow);
+        }
+      }
+    }
+    // Cylinder connecting point a to point b — matches ItemModels._lead
+    lead(a, b, r, color, off=null) {
+      const A = off ? add3(a, off) : a;
+      const B = off ? add3(b, off) : b;
+      const dir = sub3(B, A);
+      const len = len3(dir);
+      if (len < 1e-5) return;
+      const up = norm3(dir);
+      const ref = Math.abs(up[1]) < 0.9 ? [0,1,0] : [1,0,0];
+      const u = norm3(cross3(up, ref));
+      const v = cross3(up, u);
+      const segs = 7;
+      const ra = [], rb = [];
+      for (let i=0;i<segs;i++) {
+        const th = i*Math.PI*2/segs;
+        const offset = add3(mul3(u, Math.cos(th)*r), mul3(v, Math.sin(th)*r));
+        ra.push(add3(A, offset));
+        rb.push(add3(B, offset));
+      }
+      for (let i=0;i<segs;i++) {
+        const j=(i+1)%segs;
+        this._pushTri(ra[i], rb[j], rb[i], color, 0.15, 0);
+        this._pushTri(ra[i], ra[j], rb[j], color, 0.15, 0);
+      }
+    }
+    build() {
+      // Auto-center & normalize scale to unit bounding sphere
+      let min=[1e9,1e9,1e9], max=[-1e9,-1e9,-1e9];
+      for (const t of this.tris) {
+        for (const p of [t.a,t.b,t.c]) {
+          for (let i=0;i<3;i++) { if (p[i]<min[i]) min[i]=p[i]; if (p[i]>max[i]) max[i]=p[i]; }
+        }
+      }
+      const center = [(min[0]+max[0])/2, (min[1]+max[1])/2, (min[2]+max[2])/2];
+      let rad = 0.001;
+      for (const t of this.tris) {
+        for (const p of [t.a,t.b,t.c]) {
+          rad = Math.max(rad, len3(sub3(p, center)));
+        }
+      }
+      const inv = 1 / rad;
+      const tris = this.tris.map(t => ({
+        a: mul3(sub3(t.a, center), inv),
+        b: mul3(sub3(t.b, center), inv),
+        c: mul3(sub3(t.c, center), inv),
+        rgb: t.rgb, metal: t.metal, glow: t.glow,
+      }));
+      return { tris };
+    }
+  }
+
+  // ------------------------------------------------------------------ Exact Procedural Model Builders (all 24 Fallout Forecast weapons/gear)
+  const UP = [0,0,0], AX = [0,0,90];
+  function buildModel(id) {
+    const m = new MeshBuilder();
+    switch (id) {
+      case 'service_revolver':
+      case 'lucky_penny_revolver': {
+        const srv = id === 'service_revolver';
+        const frame = srv ? C.STEEL : C.BRASS;
+        const cyl = srv ? '#596875' : '#b4643c';
+        m.cyl(0.011, 0.11, [0, 0.02, -0.08], frame, 0.8);
+        m.box([0.012, 0.01, 0.1], [0, 0.033, -0.075], frame, 0.8);
+        m.cyl(0.024, 0.045, [0, 0.012, -0.01], cyl, 0.8);
+        m.box([0.028, 0.045, 0.06], [0, 0, 0.03], frame, 0.8);
+        m.box([0.03, 0.08, 0.036], [0, -0.05, 0.06], '#3a2a1c', 0, [-18,0,0]);
+        m.sphere(0.004, 0.008, [0, 0.044, -0.12], '#ffdb73', 0, 0.9);
+        break;
+      }
+      case 'pump_shotgun': {
+        m.box([0.046, 0.062, 0.16], [0,0,0], C.GUNMETAL, 0.55);
+        m.box([0.006, 0.022, 0.06], [0.024, 0.006, -0.01], '#0d0f12');
+        m.cyl(0.011, 0.38, [0, 0.014, -0.27], C.STEEL, 0.75);
+        m.cyl(0.0095, 0.3, [0, -0.017, -0.23], C.GUNMETAL, 0.6);
+        m.cyl(0.012, 0.012, [0, -0.017, -0.385], C.STEEL, 0.75);
+        m.box([0.012, 0.006, 0.37], [0, 0.028, -0.265], C.GUNMETAL, 0.6);
+        m.box([0.052, 0.042, 0.11], [0, -0.016, -0.2], C.WOOD);
+        for (let i=0;i<5;i++) m.box([0.054, 0.006, 0.008], [0, -0.016, -0.16 - i*0.02], C.WOOD_DARK);
+        m.box([0.036, 0.05, 0.08], [0, -0.026, 0.11], C.WOOD, 0, [-14,0,0]);
+        m.box([0.042, 0.07, 0.13], [0, -0.05, 0.21], C.WOOD, 0, [-6,0,0]);
+        m.box([0.044, 0.078, 0.014], [0, -0.056, 0.28], '#16120e', 0, [-6,0,0]);
+        m.box([0.008, 0.006, 0.05], [0, -0.04, 0.03], C.GUNMETAL, 0.6);
+        m.sphere(0.0045, 0.009, [0, 0.034, -0.445], '#ffdb73', 0, 0.9);
+        break;
+      }
+      case 'nail_driver': {
+        const mag = [0, -0.048, -0.066];
+        m.profile(0.065, [[-0.132,-0.018],[-0.119,0.029],[-0.058,0.058],[-0.023,0.051],[-0.002,0.016],[-0.013,-0.018]], C.SAFETY_ORANGE);
+        m.cyl(0.038, 0.016, [0, 0.043, -0.054], C.GUNMETAL, 0.3, UP);
+        m.box([0.032, 0.085, 0.04], [0, -0.035, 0.018], C.POLYMER, 0, [-19,0,0]);
+        m.box([0.042, 0.035, 0.057], [0, 0.002, -0.003], C.TOMATO, 0, [-12,0,0]);
+        m.box([0.026, 0.023, 0.056], [0, -0.017, -0.142], C.STEEL, 0.6);
+        m.box([0.013, 0.012, 0.032], [0, -0.018, -0.181], C.POLYMER);
+        m.cyl(0.049, 0.047, [0,0,0], C.GUNMETAL, 0, UP, 0, mag);
+        m.cyl(0.051, 0.009, [0,-0.02,0], C.SAFETY_ORANGE, 0, UP, 0, mag);
+        m.cyl(0.048, 0.008, [0,0.022,0], C.STEEL, 0.45, UP, 0, mag);
+        m.cyl(0.014, 0.009, [0,0.029,0], C.BRASS, 0.4, UP, 0, mag);
+        m.box([0.069, 0.011, 0.06], [0, 0.008, -0.069], C.CREAM);
+        m.box([0.024, 0.008, 0.026], [0, -0.029, -0.181], C.STEEL, 0.6);
+        break;
+      }
+      case 'spray_rifle': {
+        m.box([0.046, 0.05, 0.2], [0, 0, -0.02], C.GUNMETAL, 0.55);
+        m.box([0.04, 0.036, 0.12], [0, -0.042, 0], C.GUNMETAL, 0.55);
+        m.box([0.03, 0.008, 0.31], [0, 0.029, -0.07], C.POLYMER);
+        for (let i=0;i<7;i++) m.box([0.034, 0.004, 0.012], [0, 0.035, 0.07 - i*0.036], C.STEEL, 0.6);
+        m.box([0.052, 0.05, 0.17], [0, 0, -0.205], C.POLYMER);
+        m.cyl(0.008, 0.13, [0, 0, -0.355], C.STEEL, 0.75);
+        m.box([0.022, 0.03, 0.02], [0, 0.006, -0.305], C.GUNMETAL, 0.6);
+        m.cyl(0.012, 0.04, [0, 0, -0.43], C.POLYMER, 0.5);
+        m.box([0.03, 0.095, 0.045], [0, -0.1, -0.035], C.POLYMER, 0, [12,0,0]);
+        m.box([0.03, 0.07, 0.034], [0, -0.085, 0.058], C.POLYMER, 0, [-22,0,0]);
+        m.cyl(0.013, 0.11, [0, -0.006, 0.135], C.GUNMETAL, 0.5);
+        m.box([0.036, 0.06, 0.09], [0, -0.02, 0.2], C.POLYMER);
+        m.box([0.04, 0.075, 0.012], [0, -0.022, 0.248], '#121418');
+        // Reflex sight
+        m.box([0.03, 0.008, 0.044], [0, 0.037, -0.005], C.GUNMETAL, 0.6);
+        m.box([0.003, 0.036, 0.022], [-0.021, 0.06, -0.008], C.GUNMETAL, 0.6);
+        m.box([0.003, 0.036, 0.022], [ 0.021, 0.06, -0.008], C.GUNMETAL, 0.6);
+        m.box([0.045, 0.0035, 0.022], [0, 0.079, -0.008], C.GUNMETAL, 0.6);
+        m.sphere(0.004, 0.008, [0, 0.06, -0.015], '#ff2620', 0, 1.0);
+        break;
+      }
+      case 'hunting_rifle': {
+        m.profile(0.037, [[-0.219,-0.007],[-0.206,0.007],[0.044,0.008],[0.075,-0.011],[0.067,-0.032],[-0.177,-0.029]], C.WOOD);
+        m.profile(0.042, [[0.047,-0.023],[0.104,-0.012],[0.214,-0.009],[0.22,-0.076],[0.109,-0.062],[0.067,-0.042]], C.WOOD);
+        m.box([0.044, 0.068, 0.012], [0, -0.042, 0.219], C.WOOD_DARK, 0, [-4,0,0]);
+        m.box([0.045, 0.056, 0.023], [0, -0.039, 0.147], C.SAFETY_ORANGE, 0, [-8,0,0]);
+        m.cyl(0.01, 0.402, [0, 0.014, -0.278], C.STEEL, 0.6);
+        m.cyl(0.018, 0.13, [0, 0.011, -0.013], C.GUNMETAL, 0.5);
+        m.cyl(0.02, 0.14, [0, 0.065, -0.033], C.GUNMETAL, 0.5);
+        m.cyl(0.026, 0.028, [0, 0.065, -0.106], C.GUNMETAL, 0.5);
+        m.cyl(0.023, 0.022, [0, 0.065, 0.044], C.POLYMER, 0.2);
+        m.cyl(0.01, 0.013, [0, 0.087, -0.027], C.GUNMETAL, 0.45, UP);
+        m.box([0.019, 0.034, 0.018], [0, 0.037, -0.067], C.GUNMETAL);
+        m.box([0.019, 0.034, 0.018], [0, 0.037,  0.016], C.GUNMETAL);
+        m.cyl(0.01, 0.042, [0, 0.014, 0.028], C.STEEL, 0.6);
+        m.cyl(0.005, 0.034, [0.024, 0.007, 0.031], C.STEEL, 0.7, [0,0,62]);
+        m.cyl(0.01, 0.016, [0.04, -0.001, 0.031], C.WOOD_DARK, 0, AX);
+        break;
+      }
+      case 'rock_salt': {
+        m.profile(0.045, [[-0.068,-0.024],[-0.066,0.015],[0.039,0.02],[0.065,-0.01],[0.04,-0.036],[-0.016,-0.037]], C.GUNMETAL, 0.4);
+        m.profile(0.041, [[0.026,-0.016],[0.084,-0.014],[0.166,-0.026],[0.16,-0.078],[0.09,-0.062],[0.048,-0.042]], C.WOOD);
+        m.box([0.043, 0.052, 0.012], [0, -0.052, 0.165], C.TOMATO, 0, [7,0,0]);
+        for (const s of [-0.016, 0.016]) m.cyl(0.015, 0.31, [s, 0.02, -0.185], C.GUNMETAL, 0.55);
+        m.box([0.06, 0.026, 0.125], [0, 0, -0.13], C.WOOD);
+        m.box([0.007, 0.007, 0.29], [0, 0.033, -0.182], C.STEEL, 0.45);
+        for (const sz of [0.094, 0.12]) {
+          m.cyl(0.009, 0.04, [-0.025, -0.039, sz], C.TOMATO, 0, UP);
+          m.cyl(0.0095, 0.009, [-0.025, -0.02, sz], C.BRASS, 0.5, UP);
+        }
+        m.box([0.005, 0.006, 0.005], [0, 0.039, -0.333], C.BRASS, 0.7);
+        break;
+      }
+      case 'pressure_washer': {
+        const wand = [0, 0.012, -0.103];
+        m.profile(0.062, [[-0.135,-0.008],[-0.12,0.032],[-0.067,0.041],[0.018,0.023],[0.035,-0.001],[0.016,-0.022],[-0.101,-0.025]], C.ENAMEL);
+        m.box([0.036, 0.09, 0.043], [0, -0.047, 0.02], C.POLYMER, 0, [-20,0,0]);
+        m.cyl(0.015, 0.066, [0,0,-0.03], C.BRASS, 0.45, [90,0,0], 0, wand);
+        m.cyl(0.007, 0.21, [0,0,-0.166], C.STEEL, 0.6, [90,0,0], 0, wand);
+        m.turned([[0.005,-0.022],[0.015,-0.003],[0.012,0.015],[0,0.015]], 8, [0,0,-0.281], C.SAFETY_ORANGE, [-90,0,0], 0, wand);
+        m.box([0.02, 0.023, 0.07], [0, -0.074, -0.01], C.ENAMEL, 0, [10,0,0]);
+        m.cyl(0.025, 0.01, [-0.031, 0.007, -0.066], C.CREAM, 0, AX);
+        m.box([0.065, 0.008, 0.069], [0, 0.005, -0.062], C.NEON_TEAL, 0, [0,0,0], 0.45);
+        m.cyl(0.012, 0.023, [0, -0.091, 0.033], C.BRASS, 0.45, UP);
+        break;
+      }
+      case 'battery_zapper': {
+        const cl = [0, 0.037, -0.135];
+        m.box([0.118, 0.094, 0.13], [0, -0.009, -0.001], C.INDIGO);
+        m.box([0.124, 0.014, 0.138], [0, 0.041, -0.001], C.POLYMER);
+        m.box([0.12, 0.031, 0.09], [0, -0.009, 0.007], C.CREAM);
+        m.profile(0.123, [[-0.018,-0.019],[-0.002,-0.006],[-0.009,-0.006],[0.019,0.004],[0.004,-0.01],[0.01,-0.01]], C.TOMATO);
+        for (const sx of [-1, 1]) {
+          const boot = sx < 0 ? C.TOMATO : C.POLYMER;
+          const x = 0.039 * sx;
+          m.cyl(0.009, 0.024, [x, 0.057, -0.04], C.BRASS, 0.5, UP);
+          m.lead([x, 0.064, -0.04], [x, 0.079, -0.095], 0.006, boot);
+          m.lead([x, 0.079, -0.095], [x, 0.04, -0.131], 0.006, boot);
+          m.box([0.021, 0.022, 0.057], [x,0,0], boot, 0, [0,0,0], 0, cl);
+          for (const jaw of [-1,1]) m.box([0.015, 0.005, 0.035], [x, 0.001+jaw*0.006, -0.04], C.COPPER, 0.5, [jaw*9,0,0], 0, cl);
+        }
+        m.box([0.068, 0.012, 0.015], [0, 0.074, 0.015], C.POLYMER);
+        m.box([0.094, 0.013, 0.005], [0, 0.012, 0.066], C.HAZARD_YELLOW);
+        break;
+      }
+      case 'flare_launcher': {
+        const b = [0, 0.028, -0.019];
+        m.turned([[0,0],[0.032,0],[0.032,0.148],[0.041,0.168],[0.041,0.216],[0.03,0.216],[0.027,0.175],[0,0.175]], 10, [0,0,0], C.SAFETY_ORANGE, [-90,0,0], 0, b);
+        m.profile(0.046, [[-0.095,-0.01],[-0.068,0.024],[0.026,0.019],[0.05,-0.004],[0.029,-0.023],[-0.055,-0.03]], C.CREAM);
+        m.box([0.037, 0.095, 0.042], [0, -0.057, 0.036], C.POLYMER, 0, [-20,0,0]);
+        m.cyl(0.042, 0.014, [0,0,-0.201], C.CREAM, 0, [90,0,0], 0, b);
+        m.cyl(0.012, 0.052, [0, 0.002, -0.063], C.BRASS, 0.45, AX);
+        m.cyl(0.034, 0.012, [0,0,-0.03], C.GUNMETAL, 0.4, [90,0,0], 0, b);
+        m.box([0.011, 0.02, 0.016], [0, 0.023, 0.032], C.GUNMETAL, 0.4, [-20,0,0]);
+        break;
+      }
+      case 'harpoon': {
+        const spool = [-0.017, -0.026, -0.063];
+        const spear = [0, 0.038, -0.17];
+        m.profile(0.045, [[-0.275,-0.008],[-0.267,0.015],[-0.023,0.018],[0.055,0.003],[0.058,-0.024],[-0.165,-0.026]], C.ENAMEL);
+        m.box([0.032, 0.08, 0.037], [0, -0.049, 0.026], C.WOOD_DARK, 0, [-21,0,0]);
+        m.cyl(0.044, 0.045, [-0.009,0,0], C.CANVAS, 0, AX, 0, spool);
+        for (const x of [-0.035, 0.017]) m.cyl(0.051, 0.009, [x,0,0], C.TOMATO, 0.25, AX, 0, spool);
+        m.cyl(0.006, 0.337, [0,0,-0.004], C.STEEL, 0.55, [90,0,0], 0, spear);
+        m.profile(0.012, [[-0.225,0],[-0.165,0.017],[-0.175,0.002],[-0.157,-0.012]], C.STEEL, 0.6, spear);
+        m.box([0.013, 0.012, 0.031], [0,0,0.145], C.SAFETY_ORANGE, 0, [0,0,0], 0, spear);
+        m.box([0.017, 0.022, 0.24], [0, 0.023, -0.138], C.GUNMETAL, 0.4);
+        m.box([0.047, 0.015, 0.024], [0, 0.023, -0.244], C.BRASS, 0.6);
+        m.box([0.041, 0.055, 0.069], [0, -0.016, 0.099], C.WOOD, 0, [-10,0,0]);
+        m.box([0.036, 0.026, 0.064], [0, -0.004, 0.053], C.ENAMEL);
+        break;
+      }
+      case 'leaf_blower': {
+        const fan = [-0.053, 0, -0.018];
+        m.cyl(0.081, 0.095, [0, 0, -0.018], C.SAFETY_ORANGE, 0, AX);
+        m.box([0.082, 0.084, 0.082], [0, -0.006, 0.049], C.CREAM);
+        m.turned([[0.035,0],[0.039,0.045],[0.035,0.11],[0.023,0.171],[0.021,0.23],[0.032,0.246],[0.032,0.258],[0.024,0.258],[0,0.23]], 10, [0,-0.012,-0.122], C.GUNMETAL, [-90,0,0]);
+        m.box([0.072, 0.07, 0.074], [0, -0.01, -0.096], C.SAFETY_ORANGE);
+        m.cyl(0.061, 0.015, [0,0,0], C.POLYMER, 0, AX, 0, fan);
+        m.cyl(0.018, 0.015, [-0.012,0,0], C.SAFETY_ORANGE, 0, AX, 0, fan);
+        m.box([0.027, 0.016, 0.104], [0, 0.103, 0.012], C.POLYMER);
+        for (const z of [-0.034, 0.062]) m.box([0.023, 0.058, 0.016], [0, 0.079, z], C.SAFETY_ORANGE, 0, [10,0,0]);
+        m.box([0.02, 0.012, 0.021], [0, 0.113, 0.041], C.TOMATO);
+        break;
+      }
+      case 'disruptor': {
+        const dish = [0, 0.092, -0.157];
+        m.box([0.128, 0.088, 0.195], [0, -0.005, -0.006], C.INDIGO);
+        m.cyl(0.034, 0.012, [-0.064, -0.005, 0.012], C.POLYMER, 0, AX);
+        m.cyl(0.013, 0.006, [-0.071, -0.005, 0.012], C.COPPER, 0.35, AX);
+        m.box([0.131, 0.068, 0.036], [0, -0.004, 0.085], C.CREAM);
+        m.box([0.082, 0.008, 0.006], [0, 0.014, 0.108], C.NEON_TEAL, 0, [0,0,0], 0.85);
+        m.box([0.032, 0.056, 0.031], [0, 0.052, -0.106], C.GUNMETAL, 0, [25,0,0]);
+        m.turned([[0,-0.026],[0.021,-0.024],[0.068,-0.005],[0.09,0.02],[0.09,0.026],[0.079,0.019],[0.06,0.003],[0.019,-0.017],[0,-0.015]], 12, [0,0,0], C.COPPER, [-90,0,0], 0, dish);
+        m.cyl(0.007, 0.106, [0,0,-0.041], C.BRASS, 0.5, [90,0,0], 0, dish);
+        m.cyl(0.013, 0.014, [0,0,-0.092], C.NEON_TEAL, 0, [90,0,0], 0.85, dish);
+        for (const x of [-0.039, 0, 0.039]) {
+          m.cyl(0.013, 0.038, [x, 0.062, -0.028], C.NEON_PINK, 0, UP, 0.9);
+          m.cyl(0.017, 0.009, [x, 0.043, -0.028], C.GUNMETAL, 0.4, UP);
+        }
+        m.box([0.036, 0.055, 0.037], [0, -0.065, 0.04], C.GUNMETAL, 0, [-14,0,0]);
+        break;
+      }
+      case 'leaky_nailgun': {
+        m.box([0.05, 0.07, 0.2], [0, 0.01, -0.04], C.HAZARD_YELLOW);
+        m.box([0.03, 0.05, 0.05], [0, -0.005, -0.17], '#22262b');
+        m.box([0.012, 0.012, 0.06], [0, -0.01, -0.22], C.STEEL, 0.7);
+        m.box([0.034, 0.09, 0.04], [0, -0.065, 0.05], '#22262b', 0, [-14,0,0]);
+        m.box([0.02, 0.1, 0.03], [0, -0.06, -0.12], C.STEEL, 0.6);
+        m.cyl(0.022, 0.08, [0.04, 0.03, 0.02], C.TOXIC_GREEN, 0, [90,0,0], 0.85);
+        break;
+      }
+      case 'boombox_launcher': {
+        m.box([0.18, 0.1, 0.05], [0, 0, 0.02], '#2b2d36');
+        for (const s of [-1, 1]) {
+          m.cyl(0.03, 0.008, [s*0.055, 0, -0.008], '#111215');
+          m.cyl(0.012, 0.01, [s*0.055, 0, -0.01], C.STEEL, 0.6);
+        }
+        m.box([0.05, 0.022, 0.004], [0, 0.02, -0.006], '#0d1012');
+        m.box([0.04, 0.012, 0.005], [0, 0.02, -0.009], C.NEON_TEAL, 0, [0,0,0], 0.9);
+        m.box([0.14, 0.012, 0.012], [0, 0.065, 0.02], C.STEEL, 0.7);
+        m.cyl(0.026, 0.24, [0, 0.085, -0.08], '#3b3f4a', 0.4);
+        m.cyl(0.0275, 0.022, [0, 0.085, -0.19], C.NEON_PINK, 0, [90,0,0], 0.95);
+        break;
+      }
+      case 'frag': {
+        const olive = '#4b5a32', dark = '#333e22';
+        m.sphere(0.032, 0.075, [0,0,0], olive, 0.15);
+        for (let i=0;i<3;i++) m.cyl(0.0335, 0.006, [0, -0.02+i*0.02, 0], dark, 0.1, UP);
+        m.cyl(0.013, 0.022, [0, 0.045, 0], C.STEEL, 0.7, UP);
+        m.box([0.012, 0.07, 0.006], [0, 0.02, -0.036], C.STEEL, 0.7, [-8,0,0]);
+        m.torus(0.008, 0.012, [0.018, 0.05, 0], C.STEEL, 0.7, AX);
+        break;
+      }
+      case 'shield_dome': {
+        m.cyl(0.034, 0.075, [0,0,0], '#d8dee4', 0.5, UP);
+        m.cyl(0.036, 0.014, [0, 0.012, 0], C.NEON_TEAL, 0, UP, 0.95);
+        m.cyl(0.028, 0.016, [0, 0.045, 0], C.GUNMETAL, 0.6, UP);
+        m.cyl(0.016, 0.012, [0, 0.056, 0], C.NEON_TEAL, 0, UP, 1.0);
+        for (let i=0;i<3;i++) {
+          const a = i*Math.PI*2/3;
+          m.box([0.012, 0.03, 0.012], [Math.cos(a)*0.03, -0.045, Math.sin(a)*0.03], C.GUNMETAL, 0.6);
+        }
+        m.box([0.008, 0.02, 0.03], [0.036, 0.02, 0], '#e23b2e');
+        break;
+      }
+      case 'umbrella': {
+        const can = [0, 0.022, -0.074];
+        m.turned([[0,-0.092],[0.027,-0.085],[0.035,-0.056],[0.026,0.028],[0.006,0.124],[0,0.129]], 8, [0,0,0], C.ENAMEL, [-70,0,0], 0, can);
+        m.cyl(0.007, 0.316, [0, 0.017, -0.065], C.STEEL, 0.45, [-70,0,0]);
+        m.cyl(0.04, 0.02, [0, -0.037, 0.084], C.GUNMETAL, 0.3, [-70,0,0]);
+        m.cyl(0.029, 0.015, [0, 0.004, -0.011], C.HAZARD_YELLOW, 0, [-70,0,0], 0, can);
+        m.cyl(0.015, 0.052, [0, -0.03, 0.067], C.POLYMER, 0, [-70,0,0]);
+        break;
+      }
+      case 'bleach_bomb': {
+        m.profile(0.068, [[-0.048,-0.051],[-0.048,0.016],[-0.03,0.051],[0.008,0.052],[0.03,0.022],[0.041,-0.044],[0.034,-0.052]], C.CREAM);
+        m.cyl(0.017, 0.027, [-0.015, 0.063, -0.01], C.TOMATO, 0, UP);
+        m.box([0.07, 0.054, 0.06], [0, -0.014, -0.004], C.ENAMEL);
+        m.lead([0,0.043,0.009],[0,0.051,0.046], 0.008, C.CREAM);
+        m.lead([0,0.051,0.046],[0,0.007,0.056], 0.008, C.CREAM);
+        m.lead([0,0.007,0.056],[0,-0.003,0.031], 0.008, C.CREAM);
+        m.box([0.072, 0.021, 0.021], [0, -0.013, -0.006], C.HAZARD_YELLOW, 0, [45,0,0]);
+        m.box([0.069, 0.007, 0.056], [0, -0.043, -0.004], C.TOXIC_GREEN, 0, [0,0,0], 0.5);
+        break;
+      }
+      case 'bait_radio': {
+        m.box([0.152, 0.097, 0.057], [0, -0.004, 0], C.TOMATO);
+        m.box([0.145, 0.086, 0.005], [0, -0.003, 0.03], C.CREAM);
+        m.cyl(0.031, 0.006, [-0.032, -0.009, 0.034], C.POLYMER);
+        m.box([0.053, 0.017, 0.006], [0.039, 0.017, 0.033], C.GUNMETAL);
+        m.box([0.041, 0.006, 0.005], [0.039, 0.018, 0.037], C.NEON_TEAL, 0, [0,0,0], 0.75);
+        m.cyl(0.0035, 0.115, [-0.049, 0.091, -0.013], C.STEEL, 0.6, [0,0,-12]);
+        m.cyl(0.006, 0.01, [-0.038, 0.145, -0.013], C.BRASS, 0.5, UP);
+        m.box([0.064, 0.008, 0.01], [0.019, 0.061, -0.003], C.POLYMER);
+        break;
+      }
+      case 'sandbag': {
+        m.turned([[0,-0.124],[0.016,-0.119],[0.054,-0.096],[0.064,-0.071],[0.064,0.071],[0.054,0.098],[0.016,0.119],[0,0.124]], 8, [0,0,0], C.CANVAS, AX, 0, null, [0.54,1,1.03]);
+        for (const s of [-1,1]) {
+          m.cyl(0.067, 0.012, [s*0.061, 0, 0], C.WOOD_DARK, 0, AX);
+          m.box([0.023, 0.01, 0.088], [s*0.122, 0, 0], C.CANVAS, 0, [0, s*4, 0]);
+        }
+        m.box([0.068, 0.004, 0.026], [0, 0.034, 0], C.CREAM);
+        break;
+      }
+      case 'lightning_rod': {
+        m.turned([[0,-0.127],[0.009,-0.085],[0.009,0.078],[0.004,0.1],[0,0.111]], 8, [0,0,-0.022], C.COPPER, [-72,0,0]);
+        for (let i=0;i<3;i++) m.cyl(0.024, 0.009, [0, 0.005+0.0037*i, -0.032-0.012*i], C.CREAM, 0.1, [-72,0,0]);
+        for (const s of [-1,1]) {
+          m.lead([0,0.024,-0.093],[s*0.032,0.04,-0.142], 0.005, C.COPPER);
+          m.lead([s*0.032,0.04,-0.142],[s*0.032,0.054,-0.186], 0.004, C.BRASS);
+        }
+        m.cyl(0.0045, 0.144, [0, 0.048, -0.169], C.BRASS, 0.55, [-72,0,0]);
+        m.cyl(0.014, 0.045, [0, -0.012, 0.018], C.POLYMER, 0, [-72,0,0]);
+        m.cyl(0.015, 0.008, [0, -0.007, 0.002], C.HAZARD_YELLOW, 0, [-72,0,0], 0.45);
+        break;
+      }
+      case 'med_tin': {
+        m.box([0.146, 0.052, 0.101], [0, -0.009, 0], C.ENAMEL);
+        m.box([0.151, 0.014, 0.106], [0, 0.017, 0], C.CREAM);
+        m.box([0.059, 0.005, 0.018], [0, 0.026, 0], C.TOMATO, 0, [0,0,0], 0.35);
+        m.box([0.018, 0.005, 0.059], [0, 0.026, 0], C.TOMATO, 0, [0,0,0], 0.35);
+        m.box([0.025, 0.017, 0.008], [0, 0, 0.053], C.BRASS, 0.6);
+        break;
+      }
+      case 'suit_patch': {
+        m.box([0.118, 0.012, 0.15], [0, -0.001, 0], C.CREAM);
+        m.box([0.104, 0.008, 0.125], [-0.002, 0.009, 0.002], C.SAFETY_ORANGE);
+        m.box([0.055, 0.005, 0.055], [-0.002, 0.015, 0], C.POLYMER, 0, [0,45,0]);
+        m.box([0.03, 0.005, 0.03], [-0.002, 0.018, 0], C.HAZARD_YELLOW, 0, [0,45,0], 0.35);
+        m.box([0.031, 0.006, 0.024], [0.04, 0.008, 0.068], C.STEEL, 0.5, [-15,0,0]);
+        break;
+      }
+    }
+    return m.build();
+  }
+
+  // ------------------------------------------------------------------ 3D Renderer (Painter's Algorithm + Blinn-Phong Studio Lighting)
+  const L_KEY = norm3([0.52, 0.72, 0.68]);
+  const L_RIM = norm3([-0.72, 0.42, 0.35]);
+  const L_FILL = norm3([-0.35, -0.55, 0.75]);
+
+  function renderMesh(ctx, mesh, w, h, yaw, pitch, zoom, showFloor=false) {
+    ctx.clearRect(0, 0, w, h);
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const camDist = 2.65 / zoom;
+    const fov = Math.min(w, h) * 1.26;
+    const cx = w * 0.5, cy2 = h * 0.52;
+
+    function project(p) {
+      // Yaw around Y
+      const x1 = p[0]*cy + p[2]*sy;
+      const z1 = -p[0]*sy + p[2]*cy;
+      // Pitch around X
+      const y2 = p[1]*cp - z1*sp;
+      const z2 = p[1]*sp + z1*cp;
+      const depth = camDist - z2;
+      const s = fov / Math.max(depth, 0.25);
+      return [cx + x1*s, cy2 - y2*s, z2, x1, y2];
+    }
+
+    // Subtle turntable ellipse on hero stage
+    if (showFloor) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(100, 228, 222, 0.16)';
+      ctx.lineWidth = 1;
+      for (const rad of [0.68, 1.05]) {
+        ctx.beginPath();
+        for (let i=0;i<=36;i++) {
+          const a = i*Math.PI*2/36;
+          const pt = project([Math.cos(a)*rad, -0.54, Math.sin(a)*rad]);
+          if (i===0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const drawList = [];
+    for (const t of mesh.tris) {
+      const pa = project(t.a), pb = project(t.b), pc = project(t.c);
+      const area = (pb[0]-pa[0])*(pc[1]-pa[1]) - (pb[1]-pa[1])*(pc[0]-pa[0]);
+      if (Math.abs(area) < 0.04) continue; // skip degenerate edge-on slivers
+
+      // View-space normal oriented toward camera (+Z) so every primitive shades cleanly
+      const va = [pa[3], pa[4], pa[2]];
+      const vb = [pb[3], pb[4], pb[2]];
+      const vc = [pc[3], pc[4], pc[2]];
+      let n = norm3(cross3(sub3(vb, va), sub3(vc, va)));
+      if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
+
+      const diff = Math.max(0, dot3(n, L_KEY));
+      const fill = Math.max(0, dot3(n, L_FILL));
+      const rim  = Math.pow(1 - Math.abs(n[2]), 2.0) * Math.max(0.25, dot3(n, L_RIM) + 0.5);
+      const hemi = 0.42 + 0.18 * (n[1] * 0.5 + 0.5);
+      // Blinn-Phong specular toward camera (0,0,1)
+      const H = norm3(add3(L_KEY, [0, 0, 1]));
+      const spec = Math.pow(Math.max(0, dot3(n, H)), t.metal > 0.3 ? 22 : 9) * (0.20 + t.metal * 0.62);
+
+      const shade = t.glow > 0
+        ? Math.min(1.6, 0.95 + t.glow * 0.55)
+        : hemi + diff * 0.85 + fill * 0.24;
+
+      const r = Math.min(255, Math.round(t.rgb[0] * shade + spec * 245 + rim * 42));
+      const g = Math.min(255, Math.round(t.rgb[1] * shade + spec * 250 + rim * 88));
+      const b = Math.min(255, Math.round(t.rgb[2] * shade + spec * 255 + rim * 96));
+
+      drawList.push({
+        z: (pa[2] + pb[2] + pc[2]) / 3,
+        pa, pb, pc,
+        fill: `rgb(${r},${g},${b})`,
+        glow: t.glow,
+      });
+    }
+
+    drawList.sort((u, v) => u.z - v.z);
+    for (const d of drawList) {
+      ctx.beginPath();
+      ctx.moveTo(d.pa[0], d.pa[1]);
+      ctx.lineTo(d.pb[0], d.pb[1]);
+      ctx.lineTo(d.pc[0], d.pc[1]);
+      ctx.closePath();
+      ctx.fillStyle = d.fill;
+      ctx.fill();
+      ctx.strokeStyle = d.fill;
+      ctx.lineWidth = 0.55;
+      ctx.stroke();
+    }
+  }
+
+  // ------------------------------------------------------------------ Complete Weapon & Gear Dataset (from weapons/*.tres, item_catalog.gd, weapon_combat.gd, projectile.gd)
+  const TIER_MULT = [1.0, 1.08, 1.16];
+  const TIER_NAME = ['Standard', 'Tuned', 'Overclocked'];
+
+  const WEAPONS = [
+    // STARTERS
+    {
+      id: 'service_revolver', name: 'Service Revolver', cat: 'starter', badge: 'Starter · Sidearm', bClass: 'b-starter',
+      sub: 'Heavy, accurate six-shooter issued on drop.',
+      kind: 'gun', dmg: 38, pellets: 1, rate: 1/0.32, mag: 6, reload: 1.5, range: 52, spread: 0.7, ammo: '.38 (36)',
+      slot: 'Hotbar Slot', source: 'Starter Kit', dot: '#66dfda',
+      mech: 'Reliable high-damage precision sidearm with tight spread (0.7°) and crisp 1.5s reload. Full damage out to 26m, tapering to 30% at 52m.'
+    },
+    {
+      id: 'pump_shotgun', name: 'Pump Shotgun', cat: 'starter', badge: 'Starter · Shotgun', bClass: 'b-starter',
+      sub: 'Close-range 8-pellet buckshot with shell-by-shell reload.',
+      kind: 'gun', dmg: 12, pellets: 8, rate: 1/0.85, mag: 6, reload: 0.48, shellReload: true, range: 25, spread: 7.0, pierce: 1, kb: 9.0, ammo: 'Shells (36)',
+      slot: 'Hotbar Slot', source: 'Starter Kit / Vending / W2+ Drop', dot: '#66dfda',
+      mech: 'Fires 8 buckshot pellets (96 total burst) that pierce 1 extra target and deliver heavy 9.0 knockback. Reloads 1 shell at a time (0.48s each) and can interrupt reload to fire immediately.'
+    },
+    {
+      id: 'nail_driver', name: 'Nail Driver', cat: 'starter', badge: 'Starter · Auto Nailer', bClass: 'b-starter',
+      sub: 'Rapid-fire roofing nailer that pins infected against nearby walls.',
+      kind: 'gun', dmg: 9, pellets: 1, rate: 1/0.085, mag: 24, reload: 1.65, range: 29, spread: 1.35, auto: true, kb: 1.6, ammo: 'Nails (120)',
+      slot: 'Hotbar Slot', source: 'Starter Kit / Vending / W2+ Drop', dot: '#66dfda',
+      mech: '11.8 rounds/sec automatic nailer (9 dmg, crisp 1.65s reload). Hitting any non-boss infected backed against a wall or cover PINS them in place — staggering for 1.15s and revealing them for 1.4s.'
+    },
+
+    // FIREARMS
+    {
+      id: 'spray_rifle', name: 'Spray Rifle', cat: 'firearm', badge: 'Firearm · Carbine', bClass: 'b-firearm',
+      sub: 'Full-auto carbine with red-dot reflex sight and 40-round mag.',
+      kind: 'gun', dmg: 10, pellets: 1, rate: 1/0.085, mag: 40, reload: 1.8, range: 60, spread: 0.65, auto: true, kb: 0.6, ammo: 'Rifle (200)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2 / W2+ Drop', dot: '#f6e7cf',
+      mech: 'High-capacity workhorse carbine (10 dmg, 11.8/s, 40-round mag) with an open reflex red-dot sight (42° ADS FOV). Sustained fire blooms spread (+3.2°), so burst or ADS for mid-range accuracy.'
+    },
+    {
+      id: 'hunting_rifle', name: 'Hunting Rifle', cat: 'firearm', badge: 'Firearm · Sniper', bClass: 'b-firearm',
+      sub: 'Scoped bolt-action marksman rifle built for piercing headshots.',
+      kind: 'gun', dmg: 68, pellets: 1, rate: 1/1.3, mag: 5, reload: 2.65, range: 104, spread: 0.22, pierce: 3, crit: 2.4, ammo: 'Rifle (200)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2 / W3+ Drop', dot: '#f6e7cf',
+      mech: 'Longest reach in the game (104m) with a 4x scope (27° ADS FOV), 3-enemy line pierce, and a massive 2.4× critical bonus — devastating against Elites, Mini-Bosses, and Cumulus sacs.'
+    },
+    {
+      id: 'rock_salt', name: 'Rock Salt Shotgun', cat: 'firearm', badge: 'Firearm · Stunner', bClass: 'b-firearm',
+      sub: 'Double-barrel salt blaster for massive stagger and crowd peel.',
+      kind: 'gun', dmg: 10, pellets: 9, rate: 1/0.33, mag: 2, reload: 1.75, range: 23, spread: 6.2, kb: 16.0, ammo: 'Shells (36)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2 / W2+ Drop', dot: '#f6e7cf',
+      mech: '9-pellet rapid double-tap (90 burst dmg) with huge 16.0 knockback. Every hit staggers enemies for 0.52s and triggers a 1.8s Salt Stun on Statics, stopping charges cold.'
+    },
+    {
+      id: 'pressure_washer', name: 'Pressure Washer', cat: 'firearm', badge: 'Support · Hydro Lance', bClass: 'b-special',
+      sub: 'Pressurized water stream that drenches foes, clears acid & repairs ally suits.',
+      kind: 'gun', dmg: 7, pellets: 1, rate: 1/0.11, mag: 56, reload: 1.85, range: 12.5, spread: 1.0, auto: true, kb: 5.4, ammo: 'Water (120)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2 / W3+ Drop', dot: '#7cd4ff',
+      mech: 'Continuous 12.5m pressurized jet (7 dmg, 5.4 knockback): DRENCHES enemies (weakening speed & dmg by 35% + revealing), disperses acid spore clouds, AND spraying a teammate repairs +3.5% suit per pulse.'
+    },
+    {
+      id: 'battery_zapper', name: 'Car-Battery Zapper', cat: 'firearm', badge: 'Special · Chain Arc', bClass: 'b-special',
+      sub: 'Jumper-clamp arc caster that chains lightning across puddles.',
+      kind: 'gun', dmg: 23, pellets: 1, rate: 1/0.39, mag: 12, reload: 2.1, range: 22, spread: 0.35, auto: true, ammo: 'Cells (80)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2-3 / W3+ Drop', dot: '#7cd4ff',
+      mech: 'Shocks targets and chains lightning to 2 nearby enemies within 7m (72% dmg, staggering & revealing). If an infected is standing in a puddle, arc reach jumps to 12m and adds up to +3 bonus chain hops!'
+    },
+    {
+      id: 'flare_launcher', name: 'Road Flare Launcher', cat: 'firearm', badge: 'Special · Incendiary', bClass: 'b-special',
+      sub: 'Break-action launcher firing burning, drying illumination flares.',
+      kind: 'gun', dmg: 36, pellets: 1, rate: 1/0.75, mag: 1, reload: 1.35, range: 64, radius: 4.0, dur: 8.0, ammo: 'Flares (12)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 2-3 / W3+ Drop', dot: '#7cd4ff',
+      mech: 'Auto-reloading launcher firing a 36-dmg road flare that burns for 8s in a 4m radius: reveals & ignites infected (18 DPS burn, tier-scaled) AND creates a warm dry zone cutting acid rain suit drain by 75%.'
+    },
+
+    // SPECIALS & LEGENDARY
+    {
+      id: 'harpoon', name: 'Harpoon Gun', cat: 'special', badge: 'Special · Winch Reel', bClass: 'b-special',
+      sub: 'Salvage winch spear that yanks enemies & pulls submerged Undertows.',
+      kind: 'gun', dmg: 78, pellets: 1, rate: 1/0.55, mag: 1, reload: 1.35, range: 40, spread: 0.1, pierce: 1, crit: 1.8, ammo: 'Shafts (10)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 3 / W3+ Drop', dot: '#7cd4ff',
+      mech: 'High-impact barbed spear (78 dmg, 1.8× crit, 1 pierce, auto-reloading winch) that staggers, reveals, and reels struck infected straight toward you — and hooks submerged Undertows right out of their puddles.'
+    },
+    {
+      id: 'leaf_blower', name: 'Leaf Blower', cat: 'special', badge: 'Special · Air Blast', bClass: 'b-special',
+      sub: 'Cone gust cannon that sends swarms flying, staggers & clears all clouds.',
+      kind: 'gun', dmg: 6, pellets: 1, rate: 1/0.2, mag: 52, reload: 1.85, range: 10.5, auto: true, kb: 13.0, ammo: 'Fuel (100)',
+      slot: 'Hotbar Slot', source: 'Vending Bay 3 / W3+ Drop', dot: '#7cd4ff',
+      mech: 'Wide 10.5m forward cone gust: slams every infected in front of you back (13.0 knockback, 0.45s stagger, 1.2s reveal, 6 AoE dmg), disperses BOTH acid & spore clouds, and blunts Thunderhead shockwaves.'
+    },
+    {
+      id: 'disruptor', name: 'Weather-Radio Disruptor', cat: 'special', badge: 'Legendary · EMP Field', bClass: 'b-legend',
+      sub: 'Charged civil-defense dish that plants a damaging, mutation-stripping EMP.',
+      kind: 'gun', dmg: 62, pellets: 1, rate: 1/0.75, mag: 4, reload: 2.1, range: 48, spread: 0.2, charge: 0.55, radius: 7.5, dur: 6.5, ammo: 'Radio (12)',
+      slot: 'Hotbar Slot', source: 'W4+ Vending (5%) / W4-5+ Drops', dot: '#ffc365',
+      mech: 'Hold fire for 0.55s to fire a 62-dmg beam that plants a 7.5m, 6.5s EMP pulse field — stripping all active Enemy Mutations (Armor, Molting, Spores, Splitters, Runners), weakening (-35%), revealing, and dealing 14 DPS shock!'
+    },
+
+    // CURSED
+    {
+      id: 'leaky_nailgun', name: 'Leaky Nailgun', cat: 'cursed', badge: 'Cursed · Acid Auto', bClass: 'b-cursed',
+      sub: 'Overpowered 3-pierce automatic nailer that corrodes your own suit.',
+      kind: 'gun', dmg: 34, pellets: 1, rate: 1/0.22, mag: 24, reload: 2.0, range: 70, spread: 0.8, auto: true, pierce: 3, kb: 2.0, ammo: 'Nails (120)',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      mech: 'Shreds hordes with 34 dmg full-auto nails that pierce 3 infected up to 70m. CURSE: Leaking green tank drains your suit integrity at 2.0%/sec whenever held — even inside dry shelter!'
+    },
+    {
+      id: 'boombox_launcher', name: 'Boombox Launcher', cat: 'cursed', badge: 'Cursed · Rocket', bClass: 'b-cursed',
+      sub: '80s bass rocket launcher with huge blasts — pulls enemies toward you.',
+      kind: 'gun', dmg: 110, pellets: 1, rate: 1/1.1, mag: 4, reload: 2.4, range: 60, radius: 6.5, kb: 14.0, ammo: 'Rockets (10)',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      mech: 'Launches heavy rockets (110 dmg, 6.5m blast radius, 14.0 knockback). CURSE: The bass drop drags every infected within 16m straight toward YOU every time you pull the trigger.'
+    },
+    {
+      id: 'lucky_penny_revolver', name: 'Lucky Penny Revolver', cat: 'cursed', badge: 'Cursed · Gamble', bClass: 'b-cursed',
+      sub: 'Gold snub-nose with a 25% instant-kill roll and 10% jam risk.',
+      kind: 'gun', dmg: 32, pellets: 1, rate: 1/0.38, mag: 6, reload: 1.6, range: 60, spread: 0.5, ammo: '.38 (36)',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      mech: 'Snappy 32-dmg base shots with a 25% chance to deal 9,999 lethal damage (one-shotting Elites & heavies). CURSE: 10% chance per shot to JAM for 2.0 seconds, wasting the round and locking fire.'
+    },
+
+    // GEAR & BELT POUCHES
+    {
+      id: 'frag', name: 'Frag Grenade', cat: 'gear', badge: 'Belt Pouch [Q] · Explosive', bClass: 'b-pouch',
+      sub: 'Quick-throw fragmentation grenade stored off the hotbar.',
+      kind: 'gear', dmg: 90, radius: 6.0, dur: 2.4, stack: 10, kb: 10.0,
+      slot: 'Belt Pouch [Q] (Cap 10)', source: 'Start w/ 2 · Vending / Drops', dot: '#b5ef82',
+      mech: 'Lives in your dedicated belt pouch so it never eats a weapon slot. Quick-throw with [Q] for a 90-damage, 6m explosive blast with 10.0 knockback. Scales with Volatile Rounds mutation.'
+    },
+    {
+      id: 'shield_dome', name: 'Shield Dome', cat: 'gear', badge: 'Belt Pouch [F] · Shelter', bClass: 'b-pouch',
+      sub: 'Instant portable rain shield that weakens & repels infected.',
+      kind: 'gear', dmg: 0, radius: 6.5, dur: 9.0, stack: 5,
+      slot: 'Belt Pouch [F] (Cap 5)', source: 'Start w/ 1 · Vending / Drops', dot: '#b5ef82',
+      mech: 'Dedicated belt pouch quick-throw [F]. Deploys a 6.5m rain-proof shelter bubble for 9s that keeps the squad dry while revealing, weakening (-35% speed & dmg), and physically keeping non-boss infected out.'
+    },
+    {
+      id: 'umbrella', name: 'Umbrella Stand', cat: 'gear', badge: 'Throwable · Dry Bunker', bClass: 'b-gear',
+      sub: 'Long-lasting 35s rain canopy that slowly dries & repairs squad suits.',
+      kind: 'gear', dmg: 0, radius: 4.2, dur: 35.0, stack: 3,
+      slot: 'Hotbar Slot (Stack 3)', source: 'Vending Bay 1', dot: '#bcb2ff',
+      mech: 'Throw onto any street to pop open a wide 4.2m rain canopy lasting 35 seconds — nearly 4× the Shield Dome duration — keeping teammates dry AND gently repairing +2.5% suit integrity per second.'
+    },
+    {
+      id: 'bleach_bomb', name: 'Bleach Bomb', cat: 'gear', badge: 'Throwable · Decon', bClass: 'b-gear',
+      sub: 'Chemical decon jug that scours acid clouds, melts infected & patches suits.',
+      kind: 'gear', dmg: 16, radius: 4.3, dur: 8.0, stack: 3,
+      slot: 'Hotbar Slot (Stack 3)', source: 'W3+ Vending Bay 1', dot: '#bcb2ff',
+      mech: 'Bursts into an 8s, 4.3m sanitizing cloud: deals 16 DPS & reveals infected, dissolves acid spore clouds, AND repairs +10.4% suit integrity per second to teammates standing inside.'
+    },
+    {
+      id: 'bait_radio', name: 'Bait Radio', cat: 'gear', badge: 'Throwable · Lure', bClass: 'b-gear',
+      sub: 'Pocket AM radio that draws every nearby infected to its broadcast.',
+      kind: 'gear', dmg: 0, radius: 20.0, dur: 18.0, stack: 3,
+      slot: 'Hotbar Slot (Stack 3)', source: 'W3+ Vending Bay 1', dot: '#bcb2ff',
+      mech: 'Tossed decoy broadcasting within a huge 20m radius for 18 seconds. Infected abandon players to swarm the radio — perfect setup for a Frag Grenade, Lightning Rod, or safe revive.'
+    },
+    {
+      id: 'sandbag', name: 'Sandbag', cat: 'gear', badge: 'Deployable · Cover', bClass: 'b-gear',
+      sub: 'Places a 90s waist-high fortification wall right in front of you.',
+      kind: 'gear', dmg: 0, radius: 1.8, dur: 90.0, stack: 6,
+      slot: 'Hotbar Slot (Stack 6)', source: 'Vending / Drops (Spawns x3)', dot: '#bcb2ff',
+      mech: 'Drops a solid 1.8m-wide sandbag barricade lasting 90 seconds (spawns in bundles of 3, stacks to 6). Blocks enemy movement & projectiles so you can funnel waves or fortify doorway holds.'
+    },
+    {
+      id: 'lightning_rod', name: 'Lightning Rod Spike', cat: 'gear', badge: 'Deployable · Strike', bClass: 'b-gear',
+      sub: 'Copper survey spike that calls down a squad-safe lightning bolt after 0.9s.',
+      kind: 'gear', dmg: 140, radius: 7.0, dur: 0.9, stack: 3, kb: 11.0,
+      slot: 'Hotbar Slot (Stack 3)', source: 'Vending Bay 3 / W5+ Drop', dot: '#bcb2ff',
+      mech: 'Plant it in front of a horde: it charges for 0.9s and summons an instant high-voltage lightning strike dealing 140 damage across 7m with 11.0 knockback, 1.1s stun, and 3s reveal — never hurts teammates!'
+    },
+    {
+      id: 'med_tin', name: 'Med Tin', cat: 'gear', badge: 'Consumable · Heal', bClass: 'b-gear',
+      sub: 'Enamel field first-aid tin that instantly restores health.',
+      kind: 'gear', heal: 45, stack: 3,
+      slot: 'Hotbar Slot (Stack 3)', source: 'Vending Bay 1 / W2+ Drops', dot: '#bcb2ff',
+      mech: 'Instant self-heal restoring +45 HP on use. Refuses to waste a charge when you are already at full health.'
+    },
+    {
+      id: 'suit_patch', name: 'Suit Patch', cat: 'gear', badge: 'Consumable · Repair', bClass: 'b-gear',
+      sub: 'Peel-and-stick hazmat tape that restores torn suit integrity.',
+      kind: 'gear', repair: 55, stack: 3,
+      slot: 'Hotbar Slot (Stack 3)', source: 'Vending Bay 1 / W3+ Drops', dot: '#bcb2ff',
+      mech: 'Seals acid burns immediately, restoring +55% suit integrity. Essential during Downpour or when running the Leaky Nailgun.'
+    },
+  ];
+
+  const CATS = [
+    { id: 'all',     label: 'All (24)' },
+    { id: 'starter', label: 'Starters (3)' },
+    { id: 'firearm', label: 'Firearms (6)' },
+    { id: 'special', label: 'Specials (3)' },
+    { id: 'cursed',  label: 'Cursed (3)' },
+    { id: 'gear',    label: 'Gear & Pouches (9)' },
+  ];
+
+  // Build all meshes once
+  const MESHES = {};
+  for (const w of WEAPONS) MESHES[w.id] = buildModel(w.id);
+
+  // State
+  let activeCat = 'all';
+  let activeTier = 0;
+  let activeId = 'harpoon';
+  let yaw = 0.72, pitch = 0.24, zoom = 1.08;
+  let autoSpin = true;
+  let dragging = false, lastX = 0, lastY = 0;
+
+  // DOM refs
+  const catTabs = document.getElementById('catTabs');
+  const tierGroup = document.getElementById('tierGroup');
+  const grid = document.getElementById('arsenalGrid');
+  const stageCanvas = document.getElementById('stageCanvas');
+  const stageBox = document.getElementById('stageBox');
+  const ctx = stageCanvas.getContext('2d');
+
+  // Build Category Tabs
+  for (const c of CATS) {
+    const b = document.createElement('button');
+    b.className = 'tab' + (c.id === activeCat ? ' active' : '');
+    b.textContent = c.label;
+    b.onclick = () => {
+      activeCat = c.id;
+      for (const el of catTabs.children) el.classList.toggle('active', el === b);
+      renderGrid();
+      const visible = filtered();
+      if (!visible.some(w => w.id === activeId) && visible.length) selectWeapon(visible[0].id);
+    };
+    catTabs.appendChild(b);
+  }
+
+  // Tier Buttons
+  tierGroup.querySelectorAll('.tier-btn').forEach(btn => {
+    btn.onclick = () => {
+      activeTier = Number(btn.dataset.tier);
+      tierGroup.querySelectorAll('.tier-btn').forEach(x => x.classList.toggle('active', x === btn));
+      renderInfo();
+      renderGrid();
+    };
+  });
+
+  // Stage Buttons
+  const btnSpin = document.getElementById('btnSpin');
+  btnSpin.onclick = () => { autoSpin = !autoSpin; btnSpin.classList.toggle('on', autoSpin); };
+  document.getElementById('btnSide').onclick = () => { yaw = Math.PI * 0.5; pitch = 0.04; autoSpin = false; btnSpin.classList.remove('on'); };
+  document.getElementById('btnIso').onclick = () => { yaw = 0.72; pitch = 0.24; zoom = 1.08; };
+  document.getElementById('btnZoomIn').onclick = () => { zoom = Math.min(2.0, zoom + 0.16); };
+  document.getElementById('btnZoomOut').onclick = () => { zoom = Math.max(0.65, zoom - 0.16); };
+
+  // Pointer Orbit & Wheel Zoom
+  stageBox.addEventListener('pointerdown', e => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    autoSpin = false; btnSpin.classList.remove('on');
+    stageBox.setPointerCapture(e.pointerId);
+  });
+  stageBox.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    yaw += dx * 0.011;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch + dy * 0.011));
+  });
+  stageBox.addEventListener('pointerup', () => { dragging = false; });
+  stageBox.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoom = Math.max(0.65, Math.min(2.0, zoom - e.deltaY * 0.001));
+  }, { passive: false });
+
+  function filtered() {
+    return activeCat === 'all' ? WEAPONS : WEAPONS.filter(w => w.cat === activeCat);
+  }
+
+  function scaledDmg(w) {
+    if (w.kind !== 'gun') return w.dmg || 0;
+    const mult = w.cat === 'cursed' ? 1.0 : TIER_MULT[activeTier];
+    return Math.round(w.dmg * mult * 10) / 10;
+  }
+
+  function selectWeapon(id) {
+    activeId = id;
+    renderInfo();
+    grid.querySelectorAll('.wcard').forEach(el => {
+      el.classList.toggle('selected', el.dataset.id === activeId);
+    });
+  }
+
+  function addBar(parent, label, ratio, valText, color) {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = `<span class="stat-lbl">${label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(Math.max(8, Math.min(100, ratio*100)))}%;background:${color}"></div></div>
+      <span class="stat-val">${valText}</span>`;
+    parent.appendChild(row);
+  }
+
+  function renderInfo() {
+    const w = WEAPONS.find(x => x.id === activeId);
+    if (!w) return;
+    document.getElementById('wTitle').textContent = w.name;
+    document.getElementById('wSub').textContent = w.sub;
+    document.getElementById('stageOrigin').textContent = `Source: ${w.source}`;
+    document.getElementById('stageSlot').textContent = w.slot;
+    document.getElementById('triCount').textContent = `${MESHES[w.id].tris.length} TRIS`;
+
+    // Badges
+    const br = document.getElementById('badgeRow');
+    br.innerHTML = '';
+    const b1 = document.createElement('span');
+    b1.className = `badge ${w.bClass}`;
+    b1.textContent = w.badge;
+    br.appendChild(b1);
+    if (w.kind === 'gun') {
+      const b2 = document.createElement('span');
+      b2.className = 'badge b-ammo';
+      b2.textContent = `Ammo: ${w.ammo}`;
+      br.appendChild(b2);
+      if (activeTier > 0 && w.cat !== 'cursed') {
+        const b3 = document.createElement('span');
+        b3.className = 'badge ' + (activeTier === 2 ? 'b-legend' : 'b-starter');
+        b3.textContent = `${TIER_NAME[activeTier]} (${activeTier===2?'+16%':'+8%'})`;
+        br.appendChild(b3);
+      }
+    } else {
+      const b2 = document.createElement('span');
+      b2.className = 'badge b-ammo';
+      b2.textContent = `Max Stack: ${w.stack}`;
+      br.appendChild(b2);
+    }
+
+    // Stat bars
+    const sb = document.getElementById('statBars');
+    sb.innerHTML = '';
+    const kv = document.getElementById('kvGrid');
+    kv.innerHTML = '';
+
+    if (w.kind === 'gun') {
+      const d = scaledDmg(w);
+      const totalDmg = d * (w.pellets || 1);
+      const dmgTxt = w.pellets > 1 ? `${Math.round(d)}×${w.pellets}` : `${Math.round(d)}`;
+      const dps = Math.round(totalDmg * w.rate);
+      addBar(sb, 'DMG', Math.sqrt(totalDmg / 128), dmgTxt, '#ffc365');
+      addBar(sb, 'RATE', Math.sqrt(w.rate / 12), `${w.rate.toFixed(1)}/s`, '#64e4de');
+      addBar(sb, 'MAG', Math.sqrt(w.mag / 56), `${w.mag}`, '#b5ef82');
+      addBar(sb, 'RANGE', w.range / 104, `${w.range}m`, '#9db5ff');
+
+      const extras = [
+        ['Burst DPS', `${dps}/s`],
+        ['Reload', w.shellReload ? `${w.reload}s/shell` : `${w.reload}s`],
+        ['Mode', w.charge ? `Charge ${w.charge}s` : (w.auto ? 'Full-Auto' : 'Semi')],
+      ];
+      if (w.pierce) extras[2] = ['Pierce', `+${w.pierce} targets`];
+      if (w.crit) extras[0] = ['Crit Mult', `${w.crit}× (${Math.round(d*w.crit)})`];
+      for (const [k, v] of extras) {
+        kv.innerHTML += `<div class="kv"><div class="kv-k">${k}</div><div class="kv-v">${v}</div></div>`;
+      }
+    } else {
+      if (w.heal) {
+        addBar(sb, 'HEAL', w.heal / 100, `+${w.heal} HP`, '#ff69be');
+        addBar(sb, 'STACK', w.stack / 10, `${w.stack}`, '#b5ef82');
+        kv.innerHTML = `
+          <div class="kv"><div class="kv-k">Effect</div><div class="kv-v">+${w.heal} HP</div></div>
+          <div class="kv"><div class="kv-k">Use Time</div><div class="kv-v">Instant</div></div>
+          <div class="kv"><div class="kv-k">Max Stack</div><div class="kv-v">${w.stack}</div></div>`;
+      } else if (w.repair) {
+        addBar(sb, 'SUIT', w.repair / 100, `+${w.repair}%`, '#64e4de');
+        addBar(sb, 'STACK', w.stack / 10, `${w.stack}`, '#b5ef82');
+        kv.innerHTML = `
+          <div class="kv"><div class="kv-k">Effect</div><div class="kv-v">+${w.repair}% Suit</div></div>
+          <div class="kv"><div class="kv-k">Use Time</div><div class="kv-v">Instant</div></div>
+          <div class="kv"><div class="kv-k">Max Stack</div><div class="kv-v">${w.stack}</div></div>`;
+      } else {
+        if (w.dmg > 0) addBar(sb, 'DMG', Math.sqrt(w.dmg / 140), w.id==='bleach_bomb' ? `${w.dmg}/s` : `${w.dmg}`, '#ffc365');
+        if (w.radius) addBar(sb, 'RADIUS', Math.min(1, w.radius / 20), `${w.radius}m`, '#64e4de');
+        if (w.dur) addBar(sb, 'TIME', Math.min(1, Math.sqrt(w.dur / 55)), `${w.dur}s`, '#b5ef82');
+        addBar(sb, 'STACK', w.stack / 10, `${w.stack}`, '#bcb2ff');
+        kv.innerHTML = `
+          <div class="kv"><div class="kv-k">Radius</div><div class="kv-v">${w.radius || 0}m</div></div>
+          <div class="kv"><div class="kv-k">Duration</div><div class="kv-v">${w.dur || 0}s</div></div>
+          <div class="kv"><div class="kv-k">Knockback</div><div class="kv-v">${w.kb ? w.kb.toFixed(0) : 'None'}</div></div>`;
+      }
+    }
+
+    const mb = document.getElementById('mechBox');
+    mb.className = 'mech-box' + (w.cat === 'cursed' ? ' cursed' : (w.id === 'disruptor' ? ' legendary' : ''));
+    document.getElementById('mechHead').textContent = w.cat === 'cursed' ? 'MECHANIC & CURSE' : 'WHAT IT DOES';
+    document.getElementById('mechText').textContent = w.mech;
+  }
+
+  function renderGrid() {
+    grid.innerHTML = '';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (const w of filtered()) {
+      const btn = document.createElement('button');
+      btn.className = 'wcard' + (w.id === activeId ? ' selected' : '') + (w.cat==='cursed' ? ' is-cursed' : '') + (w.id==='disruptor' ? ' is-legend' : '');
+      btn.dataset.id = w.id;
+      const headline = w.kind === 'gun'
+        ? (w.pellets > 1 ? `${Math.round(scaledDmg(w))}×${w.pellets} DMG` : `${Math.round(scaledDmg(w))} DMG`)
+        : (w.heal ? `+${w.heal} HP` : (w.repair ? `+${w.repair}% SUIT` : (w.dmg ? `${w.dmg}${w.id==='bleach_bomb'?'/s':''} DMG` : `${w.radius}m · ${w.dur}s`)));
+      btn.innerHTML = `
+        <div class="thumb-wrap"><canvas></canvas></div>
+        <div class="wcard-name">${w.name}</div>
+        <div class="wcard-meta"><span><span class="dot-tag" style="background:${w.dot}"></span> ${headline}</span><span>${w.kind==='gun' ? w.mag+' MAG' : '×'+w.stack}</span></div>`;
+      btn.onclick = () => selectWeapon(w.id);
+      grid.appendChild(btn);
+
+      // Render crisp 3D thumbnail once
+      const c = btn.querySelector('canvas');
+      const tw = 160, th = 66;
+      c.width = tw * dpr; c.height = th * dpr;
+      const tctx = c.getContext('2d');
+      tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      renderMesh(tctx, MESHES[w.id], tw, th, 0.72, 0.24, 1.18, false);
+    }
+  }
+
+  // Hero animation loop
+  let lastTs = 0;
+  function tick(ts) {
+    const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016);
+    lastTs = ts;
+    if (autoSpin) yaw += dt * 0.72;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = stageBox.getBoundingClientRect();
+    const w = Math.max(200, Math.round(rect.width));
+    const h = 256;
+    if (stageCanvas.width !== Math.round(w * dpr) || stageCanvas.height !== Math.round(h * dpr)) {
+      stageCanvas.width = Math.round(w * dpr);
+      stageCanvas.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderMesh(ctx, MESHES[activeId], w, h, yaw, pitch, zoom, true);
+    requestAnimationFrame(tick);
+  }
+
+  renderInfo();
+  renderGrid();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

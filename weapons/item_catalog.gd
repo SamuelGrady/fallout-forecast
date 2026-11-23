@@ -8,7 +8,7 @@ const TIER_NAMES := ["STANDARD", "TUNED", "OVERCLOCKED"]
 const TIER_COLORS := [Color("#fff0d9"), Color("#66dfda"), Color("#ffc365")]
 const DAMAGE_SCALE := [1.0, 1.08, 1.16]
 const CAPS := {"shell": 36, "rifle": 200, "nail": 120, "water": 120, "cell": 80,
-	"flare": 12, "shaft": 10, "fuel": 100, "radio": 9, "rocket": 10, "revolver": 36}
+	"flare": 12, "shaft": 10, "fuel": 100, "radio": 12, "rocket": 10, "revolver": 36}
 const MODELS := "res://weapons/item_models.gd"
 
 const GUNS := {
@@ -28,7 +28,7 @@ const STACKS := {
 	"umbrella": ["Umbrella Stand", ItemDefinition.Kind.THROWABLE, 3, 2, "umbrella"],
 	"bleach_bomb": ["Bleach Bomb", ItemDefinition.Kind.THROWABLE, 3, 2, "bleach_bomb"],
 	"bait_radio": ["Bait Radio", ItemDefinition.Kind.THROWABLE, 3, 2, "bait_radio"],
-	"sandbag": ["Sandbag", ItemDefinition.Kind.DEPLOYABLE, 4, 2, "sandbag"],
+	"sandbag": ["Sandbag", ItemDefinition.Kind.DEPLOYABLE, 6, 3, "sandbag"],
 	"lightning_rod": ["Lightning Rod Spike", ItemDefinition.Kind.DEPLOYABLE, 3, 1, "lightning_rod"],
 	"med_tin": ["Med Tin", ItemDefinition.Kind.CONSUMABLE, 3, 1, "med_tin"],
 	"suit_patch": ["Suit Patch", ItemDefinition.Kind.CONSUMABLE, 3, 1, "suit_patch"],

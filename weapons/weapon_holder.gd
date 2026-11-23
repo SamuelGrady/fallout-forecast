@@ -54,6 +54,10 @@ var _fire_buffer := 0.0
 var _recoil := 0.0
 var _camera_kick := 0.0
 var _heat := 0.0
+var _visual_heat := 0.0
+var _local_charging := false
+var _local_charge_at := 0.0
+var _effect_cooldowns: Dictionary = {}
 var _hip_fov := 75.0
 var _raise_left := 0.0
 var _sight_point := Vector3.INF
@@ -98,6 +102,50 @@ func reload_remaining() -> float:
 func jammed() -> bool:
 	return _jam_left > 0.0
 
+func is_charging() -> bool:
+	var data := selected_weapon()
+	return _local_charging and data != null and data.charge_time > 0.0 and selected() != null and selected().count > 0
+
+func charge_progress() -> float:
+	if not is_charging():
+		return 0.0
+	var data := selected_weapon()
+	var elapsed := (Time.get_ticks_msec() / 1000.0) - _local_charge_at
+	return clampf(elapsed / maxf(data.charge_time, 0.01), 0.0, 1.0)
+
+## Live angular spread in degrees for Fortnite-style dynamic crosshair projection.
+func current_spread_degrees() -> float:
+	var data := selected_weapon()
+	if data == null or data.kind != WeaponData.Kind.HITSCAN:
+		return 0.0
+	var ads_scale := 0.25 if GameManager.has_player_mutation("hyper_focus") else 0.45
+	var aim_factor := lerpf(1.0, ads_scale, _aim)
+	var heat := maxf(_heat, _visual_heat)
+	var base := data.spread_degrees + data.burst_spread * heat + _recoil * (1.8 if data.pellets > 1 else 1.1)
+	var move_bloom := 0.0
+	if player is CharacterBody3D:
+		var body := player as CharacterBody3D
+		var hspeed := Vector2(body.velocity.x, body.velocity.z).length()
+		move_bloom = clampf(hspeed / 7.2, 0.0, 1.0) * (0.55 if data.pellets > 1 else 0.40)
+		if not body.is_on_floor():
+			move_bloom += 0.85
+	if data.mechanic == "gust":
+		return 10.5
+	if data.mechanic == "wash":
+		return maxf(base * aim_factor, 2.2)
+	return maxf(0.0, (base + move_bloom * (1.0 - _aim * 0.72)) * aim_factor)
+
+## Local throttled micro-popup beside the reticle when a special weapon effect triggers.
+func notify_effect(text: String, color: Color, key := "", cooldown := 0.7) -> void:
+	if Net.dedicated or not player.is_multiplayer_authority():
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	var tag := key if not key.is_empty() else text
+	if now < float(_effect_cooldowns.get(tag, 0.0)):
+		return
+	_effect_cooldowns[tag] = now + cooldown
+	Juice.popup(text, color)
+
 func can_act() -> bool:
 	return loot != null and loot.run_id > 0 and player.state == "ok" and not GameManager.awaiting_tape_choice \
 			and not GameManager.is_voting() and not get_tree().paused
@@ -133,6 +181,7 @@ func _process(delta: float) -> void:
 	camera.rotation.z = _roll
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
+	_visual_heat = move_toward(_visual_heat, 0.0, delta * 1.6)
 	_handle_input()
 	_publish()
 	_animate(delta)
@@ -141,6 +190,7 @@ func _process(delta: float) -> void:
 func _handle_input() -> void:
 	if not can_act() or InventoryMenu.is_open():
 		_fire_buffer = 0.0
+		_local_charging = false
 		return
 	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
 	if wheel != 0:
@@ -148,21 +198,30 @@ func _handle_input() -> void:
 		return
 	var data := selected_weapon()
 	if data == null or player.tarp_raised:
+		_local_charging = false
 		return
 	if Input.is_action_just_pressed("reload"):
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		_fire_buffer = 0.0
+		_local_charging = false
 		return
 	if data.charge_time > 0.0:
 		if Input.is_action_just_pressed("fire"):
-			if selected().count > 0:
+			if selected().count > 0 and _cooldown <= 0.0 and _reload_left <= 0.0:
+				_local_charging = true
+				_local_charge_at = Time.get_ticks_msec() / 1000.0
 				_command("charge")
 			elif selected_reserve() > 0 and _reload_left <= 0.0:
 				start_reload()
+		elif _local_charging and not Input.is_action_pressed("fire"):
+			_local_charging = false
+			fire()
 		if Input.is_action_just_released("fire"):
+			_local_charging = false
 			fire()
 		return
+	_local_charging = false
 	if Input.is_action_just_pressed("fire"):
 		_fire_buffer = 0.15 + _raise_left
 	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
@@ -467,6 +526,7 @@ func _cancel_actions() -> void:
 	_reload_left = 0.0
 	_reload_serial = 0
 	_charge_serial = 0
+	_local_charging = false
 	_fire_buffer = 0.0
 
 func _start_reload_host() -> void:
@@ -572,6 +632,7 @@ func _jam(run: int) -> void:
 func _apply_jam() -> void:
 	if player.is_multiplayer_authority() and not Net.dedicated:
 		Sound.play("jam")
+		notify_effect("JAMMED! (2S)", BroadcastUI.PINK, "jam", 0.4)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _shot_fx(run: int, id: String, origin: Vector3, dir: Vector3, traces: Array, ads: bool, predicted: bool) -> void:
@@ -603,6 +664,8 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 func _local_shot_motion(id: String, data: WeaponData, ads: bool) -> void:
 	_cooldown = data.fire_interval * GameManager.fire_rate_scale()
 	_kick = 1.0
+	_local_charging = false
+	_visual_heat = minf(1.0, _visual_heat + 0.24)
 	var heavy := data.pellets > 1 or data.mechanic == "reel"
 	_recoil = minf(_recoil + (0.28 if heavy else 0.10), 0.55)
 	if data.mechanic == "reel" and equipped_id == id:

@@ -78,11 +78,14 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 		if data.mechanic == "wash":
 			var friendly := _teammate_ray(holder, origin, ray, data.max_range)
 			if not friendly.is_empty() and (hits.is_empty() or friendly.distance < origin.distance_to(hits[0].position)):
-				repair(friendly.collider, 2.4)
+				repair(friendly.collider, 3.5)
+				holder.notify_effect("ALLY SUIT +4%", Color("#66dfda"), "wash_repair", 0.9)
 				traces.append([friendly.position, 1])
-				_clear_hazards(holder, origin, ray, data.max_range, 0.94, true)
+				if _clear_hazards(holder, origin, ray, data.max_range, 0.94, true) > 0:
+					holder.notify_effect("ACID CLEARED", Color("#66dfda"), "acid_clear", 0.8)
 				continue
-			_clear_hazards(holder, origin, ray, data.max_range, 0.94, true)
+			if _clear_hazards(holder, origin, ray, data.max_range, 0.94, true) > 0:
+				holder.notify_effect("ACID CLEARED", Color("#66dfda"), "acid_clear", 0.8)
 		for hit: Dictionary in hits:
 			if not is_instance_valid(hit.collider):
 				continue
@@ -99,8 +102,13 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 				break
 			var falloff := clampf(1.0 - 0.7 * maxf(distance - data.max_range * 0.5, 0.0) / (data.max_range * 0.5), 0.3, 1.0)
 			if data.mechanic == "reel" and target.has_method("harpoon_surface"):
+				var was_submerged := bool(target.get("_submerged"))
 				target.harpoon_surface()
+				if was_submerged:
+					holder.notify_effect("SURFACED!", Color("#66dfda"), "surfaced", 0.4)
 			var amount: float = 9999.0 if lucky else damage * falloff
+			if lucky:
+				holder.notify_effect("LUCKY KILL!", Color("#ffc365"), "lucky", 0.3)
 			if target.has_method("take_bullet"):
 				if target is EnemyBase:
 					var critical: bool = target.take_bullet(amount, at, shooter, hit.get("rewound_pos", Vector3.INF), data.critical_bonus)
@@ -125,6 +133,7 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 				_chain(holder, enemy, at, 18.0, 2, false)
 		if data.mechanic == "suppress":
 			registry.place("disruptor", terminal, dir, item.tier, shooter)
+			holder.notify_effect("EMP FIELD", Color("#ff8fc8"), "emp", 0.6)
 		traces.append([terminal, impact])
 	if not flinches.is_empty():
 		var rows: Array = []
@@ -222,15 +231,21 @@ static func _find_submerged(holder: WeaponHolder, origin: Vector3, ray: Vector3,
 static func _hit_special(holder: WeaponHolder, enemy: EnemyBase, point: Vector3, ray: Vector3, origin: Vector3, data: WeaponData, damage: float) -> void:
 	match data.mechanic:
 		"pin":
-			if (enemy.is_small or enemy.data.display_name in ["Sleet", "Gutter", "Drip"]) and enemy.miniboss_wave == 0 \
-					and not clear_path(holder.get_world_3d(), point, point + ray * 1.4):
+			if enemy.miniboss_wave == 0 and not enemy.is_in_group("boss") \
+					and not clear_path(holder.get_world_3d(), point, point + ray * 1.55):
 				enemy.stagger(1.15)
-				enemy.reveal(1.15)
+				enemy.reveal(1.4)
+				holder.notify_effect("WALL PIN!", Color("#ffc365"), "pin", 0.9)
+		"wash":
+			enemy.weaken(1.2)
+			enemy.reveal(1.5)
+			holder.notify_effect("DRENCHED -35%", Color("#66dfda"), "drench", 1.2)
 		"salt":
 			if _allows_impact(enemy, origin):
 				enemy.stagger(0.52)
 			if enemy.has_method("salt_stun"):
 				enemy.salt_stun()
+				holder.notify_effect("SALT STUN!", Color("#ffc365"), "salt", 0.7)
 		"zap":
 			_chain(holder, enemy, point, damage * 0.72, 2, true)
 		"reel":
@@ -253,6 +268,7 @@ static func _hit_special(holder: WeaponHolder, enemy: EnemyBase, point: Vector3,
 			# Stagger movement only reads the horizontal components of _push.
 			if strength > 0.0 and (enemy.is_on_floor() or is_zero_approx(enemy.velocity.y)):
 				enemy.velocity.y = minf(3.7, strength * 0.5)
+			holder.notify_effect("REELED!", Color("#66dfda"), "reel", 0.5)
 
 static func _chain(holder: WeaponHolder, first: EnemyBase, point: Vector3, damage: float, hops: int, water: bool) -> void:
 	var visited: Array[EnemyBase] = [first]
@@ -287,6 +303,9 @@ static func _chain(holder: WeaponHolder, first: EnemyBase, point: Vector3, damag
 		best.take_damage(damage * pow(0.84, hop), holder.player)
 	if points.size() > 1:
 		GameManager.broadcast_arc(points, Color("#fff267") if water else Color("#7aeeff"))
+		if water:
+			var label := "WET CHAIN x%d!" % points.size() if bonus > 0 else "CHAIN x%d" % points.size()
+			holder.notify_effect(label, Color("#fff267") if bonus > 0 else Color("#66dfda"), "chain", 0.65)
 
 static func _in_water(tree: SceneTree, point: Vector3) -> bool:
 	for puddle: Node3D in tree.get_nodes_in_group("puddles"):
@@ -300,23 +319,28 @@ static func in_cone(world: World3D, from: Vector3, direction: Vector3, to: Vecto
 	return offset.length() <= length and direction.dot(offset.normalized()) >= cosine and clear_path(world, from, to)
 
 static func _gust(holder: WeaponHolder, from: Vector3, dir: Vector3, data: WeaponData, damage: float) -> Array:
-	_clear_hazards(holder, from, dir, data.max_range, 0.82, false)
+	if _clear_hazards(holder, from, dir, data.max_range, 0.80, false) > 0:
+		holder.notify_effect("CLOUD CLEARED", Color("#b5ef82"), "gust_clear", 0.8)
 	var traces: Array = []
 	for enemy: EnemyBase in holder.get_tree().get_nodes_in_group("enemies"):
 		var at := enemy.global_position + Vector3.UP
-		if enemy.health > 0.0 and in_cone(holder.get_world_3d(), from, dir, at, data.max_range, 0.82):
+		if enemy.health > 0.0 and in_cone(holder.get_world_3d(), from, dir, at, data.max_range, 0.80):
 			if enemy.has_method("blunt_shockwave"):
 				enemy.blunt_shockwave()
+				holder.notify_effect("SHOCK BLUNTED!", Color("#b5ef82"), "gust_blunt", 0.8)
 			if _allows_impact(enemy, from):
+				enemy.stagger(0.45)
 				enemy.knockback((at - from).normalized() * data.knockback)
+			enemy.reveal(1.2)
 			enemy.take_damage(damage, holder.player)
 			traces.append([at, 2])
 	if traces.is_empty():
 		traces.append([from + dir * data.max_range, 0])
 	return traces
 
-static func _clear_hazards(holder: WeaponHolder, from: Vector3, dir: Vector3, length: float, cosine: float, acid_only: bool) -> void:
+static func _clear_hazards(holder: WeaponHolder, from: Vector3, dir: Vector3, length: float, cosine: float, acid_only: bool) -> int:
 	var world := holder.get_world_3d()
+	var cleared := 0
 	for cloud: Node3D in holder.get_tree().get_nodes_in_group("spore_clouds"):
 		if (acid_only and not cloud.acid) or cloud.is_queued_for_deletion():
 			continue
@@ -330,6 +354,8 @@ static func _clear_hazards(holder: WeaponHolder, from: Vector3, dir: Vector3, le
 			hit_cone = along > 0.0 and Vector2(closest.x - target.x, closest.z - target.z).length() <= radius + 0.45 and absf(closest.y - target.y) <= 2.2 and clear_path(world, from, target)
 		if hit_cone:
 			GameManager.disperse_cloud(cloud)
+			cleared += 1
+	return cleared
 
 static func repair(player: Node, amount: float) -> void:
 	if player.state == "ok":

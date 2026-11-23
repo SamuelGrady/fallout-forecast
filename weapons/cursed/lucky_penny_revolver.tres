@@ -6,10 +6,10 @@
 script = ExtResource("2_1c2q0")
 shot_sound = "gun_revolver"
 display_name = "Lucky Penny Revolver"
-damage = 28.0
+damage = 32.0
 spread_degrees = 0.5
 max_range = 60.0
-fire_interval = 0.45
+fire_interval = 0.38
 reserve_ammo = 42
 reload_time = 1.6
 lucky_kill_chance = 0.25

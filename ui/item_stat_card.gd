@@ -30,31 +30,54 @@ const CURSED_TINT := Color("#ff8fc8")
 const EMPTY_TEXT := "EMPTY SLOT — PICK UP GEAR OR BUY AT A STATION"
 
 const TAGLINES := {
-	"service_revolver": "Heavy high-impact sidearm",
-	"pump_shotgun": "Close-range buckshot burst",
-	"spray_rifle": "Full-auto mid-range spray",
-	"nail_driver": "Fast-firing precision nails",
-	"hunting_rifle": "Long-range piercing shots",
-	"pressure_washer": "Blasts foes, rinses acid",
-	"rock_salt": "Twin-shell stagger blast",
-	"battery_zapper": "Arcs jump between targets",
-	"flare_launcher": "Lobs flares that burn",
-	"harpoon": "Spears and reels foes in",
-	"leaf_blower": "Gusts the infected back",
-	"disruptor": "Charged jammer bolt",
-	"leaky_nailgun": "Piercing nails, leaky suit",
-	"boombox_launcher": "Rockets that drag foes in",
-	"lucky_penny_revolver": "Lucky kills, random jams",
-	"frag": "Belt grenade, big blast",
-	"shield_dome": "Belt dome shelters squad",
-	"umbrella": "Plants a rain canopy",
-	"bleach_bomb": "Scours infected in a cloud",
-	"bait_radio": "Noise lure pulls the horde",
-	"sandbag": "Drops waist-high cover",
-	"lightning_rod": "Calls strikes to a spike",
-	"med_tin": "Restores health when hurt",
-	"suit_patch": "Repairs a torn suit",
+	"service_revolver": "Accurate heavy sidearm · tight hip & ADS spread",
+	"pump_shotgun": "8-pellet piercing buckshot · shell-by-shell reload",
+	"spray_rifle": "Full-auto 40-rd carbine · red-dot reflex sight",
+	"nail_driver": "Auto nailer · pins infected against nearby walls",
+	"hunting_rifle": "4x scoped bolt rifle · 3-pierce, 2.4x crits",
+	"pressure_washer": "Drenches foes (-35%), clears acid & repairs ally suits",
+	"rock_salt": "Double-barrel stagger blast · hard-stuns Statics",
+	"battery_zapper": "Chains lightning · puddles boost reach & bonus hops",
+	"flare_launcher": "Ignites foes (18 DPS) & dries acid rain (-75%)",
+	"harpoon": "Winch spear reels foes & yanks submerged Undertows",
+	"leaf_blower": "Cone blast pushes hordes, clears clouds & blunts slams",
+	"disruptor": "Hold fire: EMP field strips mutations & weakens foes",
+	"leaky_nailgun": "3-pierce auto nails · CURSE: drains suit -2%/s held",
+	"boombox_launcher": "Huge 110-dmg rockets · CURSE: blasts pull foes to you",
+	"lucky_penny_revolver": "25% instant-kill shots · CURSE: 10% chance to jam 2s",
+	"frag": "Quick-throw belt grenade · 90-dmg explosive blast",
+	"shield_dome": "Belt shelter bubble · blocks rain, repels & weakens foes",
+	"umbrella": "35s rain canopy · keeps squad dry & slowly repairs suits",
+	"bleach_bomb": "Scours foes (16 DPS), clears acid & repairs squad suits",
+	"bait_radio": "Loud noise lure · pulls infected within 20m for 18s",
+	"sandbag": "Deploys 90s waist-high barricade to block choke points",
+	"lightning_rod": "Calls lightning after 0.9s · 140 dmg, stuns (squad-safe)",
+	"med_tin": "Instant medical tin · restores +45 health",
+	"suit_patch": "Emergency seal kit · repairs +55% suit integrity",
 	AMMO_BOX: "Refills reserve ammo for all carried weapons",
+}
+
+## Short live-HUD action/mechanic cues shown under the equipped weapon name.
+const HUD_HINTS := {
+	"nail_driver": "PINS FOES TO WALLS",
+	"hunting_rifle": "PIERCE 3 · 2.4x CRIT",
+	"pressure_washer": "SPRAY ALLY: REPAIR SUIT · CLEARS ACID",
+	"rock_salt": "HEAVY STAGGER · STUNS STATICS",
+	"battery_zapper": "CHAINS FURTHER IN PUDDLES",
+	"flare_launcher": "BURNS FOES · WARM DRY ZONE -75%",
+	"harpoon": "REELS FOES · YANKS UNDERTOWS",
+	"leaf_blower": "CONE PUSH · CLEARS ALL CLOUDS",
+	"disruptor": "HOLD FIRE TO CHARGE · STRIPS MUTATIONS",
+	"leaky_nailgun": "CURSE: -2%/S SUIT DRAIN WHILE HELD",
+	"boombox_launcher": "CURSE: BLASTS PULL FOES TOWARD YOU",
+	"lucky_penny_revolver": "25% LETHAL · 10% JAM",
+	"umbrella": "THROW: 35S DRY CANOPY + SUIT REPAIR",
+	"bleach_bomb": "THROW: CLEARS ACID + REPAIRS SUIT",
+	"bait_radio": "THROW: 20M HORDE LURE (18S)",
+	"sandbag": "LMB: PLACE 90S BARRICADE",
+	"lightning_rod": "LMB: CALL LIGHTNING (SQUAD-SAFE)",
+	"med_tin": "LMB: HEAL +45 HP",
+	"suit_patch": "LMB: REPAIR +55% SUIT",
 }
 
 const ROLE_TAGS := {
@@ -62,14 +85,14 @@ const ROLE_TAGS := {
 	"pump_shotgun": "SHOTGUN",
 	"spray_rifle": "AUTO RIFLE",
 	"nail_driver": "AUTO NAILER",
-	"hunting_rifle": "RIFLE",
-	"pressure_washer": "SPECIAL",
+	"hunting_rifle": "SNIPER",
+	"pressure_washer": "SUPPORT",
 	"rock_salt": "SHOTGUN",
 	"battery_zapper": "SPECIAL",
 	"flare_launcher": "LAUNCHER",
 	"harpoon": "SPECIAL",
 	"leaf_blower": "SPECIAL",
-	"disruptor": "SPECIAL",
+	"disruptor": "LEGENDARY",
 	"leaky_nailgun": "AUTO NAILER",
 	"boombox_launcher": "LAUNCHER",
 	"lucky_penny_revolver": "SIDEARM",
@@ -78,19 +101,19 @@ const ROLE_TAGS := {
 
 const MECHANIC_TRAITS := {
 	"pin": "WALL PIN",
-	"salt": "STAGGER",
-	"zap": "CHAIN ARC",
-	"reel": "REEL PULL",
-	"wash": "CLEARS ACID",
-	"gust": "KNOCKBACK",
-	"burn": "BURN",
-	"suppress": "SUPPRESS",
+	"salt": "STAGGER + STUN",
+	"zap": "WET CHAIN ARC",
+	"reel": "REEL + SURFACE",
+	"wash": "DRENCH + REPAIR",
+	"gust": "CONE PUSH + CLEAR",
+	"burn": "BURN + DRY ZONE",
+	"suppress": "EMP STRIPS MUTATIONS",
 }
 
 ## Non-gun bar maxima (damage, radius in m, duration in s).
 const ITEM_MAX_DAMAGE := 150.0
 const ITEM_MAX_RADIUS := 8.0
-const ITEM_MAX_TIME := 60.0
+const ITEM_MAX_TIME := 90.0
 
 static var _gun_maxima: Dictionary = {}
 
@@ -266,7 +289,11 @@ static func stat_rows(id: String, tier := 0, opts := {}) -> Array:
 	return rows.slice(0, STAT_ROWS)
 
 
-## Compact mechanics line under the bars ("PIERCE 3  /  REEL PULL").
+static func hud_hint(id: String) -> String:
+	return str(HUD_HINTS.get(id, ""))
+
+
+## Compact mechanics line under the bars ("PIERCE 3  /  REEL + SURFACE").
 static func traits(id: String) -> String:
 	var definition := ItemCatalog.definition(id)
 	if definition == null or definition.weapon == null:
@@ -277,7 +304,7 @@ static func traits(id: String) -> String:
 		parts.append("CURSED")
 	if definition.kind == ItemDefinition.Kind.GUN:
 		if data.charge_time > 0.0:
-			parts.append("CHARGE")
+			parts.append("HOLD TO CHARGE")
 		if MECHANIC_TRAITS.has(data.mechanic):
 			parts.append(MECHANIC_TRAITS[data.mechanic])
 		if data.pierce > 0:
@@ -285,11 +312,11 @@ static func traits(id: String) -> String:
 		if data.critical_bonus > 1.0:
 			parts.append("CRIT x%.1f" % data.critical_bonus)
 		if data.pull_radius > 0.0:
-			parts.append("PULL")
+			parts.append("PULLS FOES IN")
 		if data.held_suit_drain > 0.0:
-			parts.append("SUIT DRAIN")
+			parts.append("-2%/S SUIT")
 		if data.lucky_kill_chance > 0.0:
-			parts.append("%d%% LUCKY" % roundi(data.lucky_kill_chance * 100.0))
+			parts.append("%d%% LETHAL" % roundi(data.lucky_kill_chance * 100.0))
 		if data.jam_chance > 0.0:
 			parts.append("%d%% JAM" % roundi(data.jam_chance * 100.0))
 		if data.shell_reload:
@@ -298,6 +325,29 @@ static func traits(id: String) -> String:
 			parts.append("FULL AUTO")
 	elif ItemCatalog.is_pouch(id):
 		parts.append("BELT POUCH [%s]" % BroadcastUI.input_hint(str(ItemCatalog.POUCH_ACTIONS.get(id, "use_item"))))
+		if id == "shield_dome":
+			parts.append("DRY + REPELS FOES")
+		elif id == "frag":
+			parts.append("6M BLAST")
+	else:
+		match id:
+			"umbrella":
+				parts.append("DRY SHELTER")
+				parts.append("+2.5%/S SUIT")
+			"bleach_bomb":
+				parts.append("CLEARS ACID")
+				parts.append("REPAIRS SUIT")
+			"bait_radio":
+				parts.append("20M HORDE LURE")
+			"sandbag":
+				parts.append("BLOCKS PATHS")
+			"lightning_rod":
+				parts.append("SQUAD-SAFE")
+				parts.append("STUN + REVEAL")
+			"med_tin":
+				parts.append("INSTANT HEAL")
+			"suit_patch":
+				parts.append("INSTANT SUIT")
 	return "  /  ".join(parts.slice(0, 3))
 
 

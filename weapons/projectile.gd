@@ -126,7 +126,7 @@ func _physics_process(delta: float) -> void:
 				var scale: float = float(ItemCatalog.DAMAGE_SCALE[tier])
 				hit.collider.take_damage(data.damage * scale, source)
 				if hit.collider is EnemyBase:
-					hit.collider.ignite(3.0, 14.0 * scale, source)
+					hit.collider.ignite(3.0, 18.0 * scale, source)
 			_host_deploy()
 			return
 	if data.kind == WeaponData.Kind.GRENADE and age >= flight_time(data):
@@ -155,6 +155,10 @@ func deploy(at: Vector3, duration: float, angle: float, announce := true) -> voi
 		"shield_dome", "umbrella":
 			_make_shelter()
 			add_to_group("active_flares")
+			if id == "umbrella":
+				add_to_group("repair_weapon_zones")
+		"bleach_bomb":
+			add_to_group("repair_weapon_zones")
 		"flare_launcher":
 			add_to_group("dry_weapon_zones")
 		"bait_radio":
@@ -299,35 +303,44 @@ static func _zone_material(color: Color, alpha: float) -> StandardMaterial3D:
 	return _zone_mats[key]
 
 func _tick_zone() -> void:
-	if id not in ["shield_dome", "flare_launcher", "bleach_bomb", "disruptor"]:
+	if id not in ["shield_dome", "umbrella", "flare_launcher", "bleach_bomb", "disruptor"]:
 		return
 	var source: Node = shooter if is_instance_valid(shooter) else null
-	if source:
-		source.begin_hit_batch()
-	for enemy: EnemyBase in get_tree().get_nodes_in_group("enemies"):
-		var at := enemy.global_position + Vector3.UP
-		if not _contains(at):
-			continue
-		match id:
-			"shield_dome":
-				enemy.reveal(0.65)
-				enemy.weaken(0.6)
-				var away := enemy.global_position - global_position
-				away.y = 0.0
-				if not enemy.has_method("blocks_impact") or not enemy.blocks_impact(global_position):
-					enemy.knockback(away.normalized() * 3.5)
-			"disruptor":
-				enemy.suppress_mutations(0.45)
-				enemy.reveal(0.65)
-			"flare_launcher", "bleach_bomb":
-				enemy.reveal(0.65)
-				var dps: float = 14.0 * float(ItemCatalog.DAMAGE_SCALE[tier]) if id == "flare_launcher" else data.damage
-				if id == "flare_launcher":
-					enemy.ignite(2.5, dps, source)
-				else:
-					enemy.take_damage(dps * 0.25, source)
-	if source:
-		source.end_hit_batch()
+	var scale := float(ItemCatalog.DAMAGE_SCALE[tier])
+	if id != "umbrella":
+		if source:
+			source.begin_hit_batch()
+		for enemy: EnemyBase in get_tree().get_nodes_in_group("enemies"):
+			var at := enemy.global_position + Vector3.UP
+			if not _contains(at):
+				continue
+			match id:
+				"shield_dome":
+					enemy.reveal(0.65)
+					enemy.weaken(0.6)
+					var away := enemy.global_position - global_position
+					away.y = 0.0
+					if not enemy.has_method("blocks_impact") or not enemy.blocks_impact(global_position):
+						enemy.knockback(away.normalized() * 3.5)
+				"disruptor":
+					enemy.suppress_mutations(0.6)
+					enemy.weaken(0.6)
+					enemy.reveal(0.65)
+					enemy.take_damage(14.0 * scale * 0.25, source)
+				"flare_launcher", "bleach_bomb":
+					enemy.reveal(0.65)
+					var dps: float = 18.0 * scale if id == "flare_launcher" else data.damage
+					if id == "flare_launcher":
+						enemy.ignite(2.5, dps, source)
+					else:
+						enemy.take_damage(dps * 0.25, source)
+		if source:
+			source.end_hit_batch()
+	if id == "umbrella":
+		for target: Node3D in GameManager.players():
+			var offset := target.global_position - global_position
+			if Vector2(offset.x, offset.z).length() <= data.effect_radius and absf(offset.y) < 2.7:
+				WeaponCombat.repair(target, 0.625)
 	if id == "bleach_bomb":
 		for target: Node3D in GameManager.players():
 			if _contains(target.global_position + Vector3.UP):
@@ -446,7 +459,7 @@ func explode() -> void:
 
 func finish(at: Vector3, blast: bool) -> void:
 	hide()
-	for group: String in ["active_flares", "dry_weapon_zones", "enemy_lures", "sandbag_walls", "lightning_rods"]:
+	for group: String in ["active_flares", "dry_weapon_zones", "repair_weapon_zones", "enemy_lures", "sandbag_walls", "lightning_rods"]:
 		if is_in_group(group):
 			remove_from_group(group)
 	if not Net.dedicated:
@@ -502,5 +515,15 @@ static func protects(point: Vector3, tree: SceneTree) -> bool:
 static func dries(point: Vector3, tree: SceneTree) -> bool:
 	for zone: WeaponProjectile in tree.get_nodes_in_group("dry_weapon_zones"):
 		if zone._contains(point):
+			return true
+	return false
+
+static func repairing(point: Vector3, tree: SceneTree) -> bool:
+	for zone: WeaponProjectile in tree.get_nodes_in_group("repair_weapon_zones"):
+		if zone.id == "umbrella":
+			var offset := point - zone.global_position
+			if Vector2(offset.x, offset.z).length() <= zone.data.effect_radius and absf(offset.y) < 2.7:
+				return true
+		elif zone._contains(point):
 			return true
 	return false

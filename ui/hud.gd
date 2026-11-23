@@ -113,6 +113,7 @@ var _static_text := Label.new()
 var _vitals_hot := 0.0
 # Ammo (bottom right) and the hotbar.
 var _armory := VBoxContainer.new()
+var _weapon_hint := Label.new()
 var _weapon := Label.new()
 var _ammo := Label.new()
 var _reserve := Label.new()
@@ -120,6 +121,7 @@ var _pips := preload("res://ui/ammo_pips.gd").new()
 var _slots := ItemHotbar.new()
 var _armory_hot := 0.0
 var _name_left := 0.0
+var _hint_left := 0.0
 var _hotbar_hot := 0.0
 var _last_pouch_state := ""
 var _last_slot_state := ""
@@ -331,7 +333,12 @@ func _vital_row(icon: GameIcon, kind: String, color: Color, bar: ProgressBar, ba
 func _build_armory() -> void:
 	_armory.alignment = BoxContainer.ALIGNMENT_END
 	_armory.add_theme_constant_override("separation", 0)
-	_anchor(_armory, Control.PRESET_BOTTOM_RIGHT, Rect2(-190, -110, 170, 86), Vector2(1, 1))
+	_anchor(_armory, Control.PRESET_BOTTOM_RIGHT, Rect2(-320, -128, 300, 104), Vector2(1, 1))
+	_weapon_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	BroadcastUI.hud_text(_weapon_hint, BroadcastUI.T_META - 1, BroadcastUI.CYAN)
+	_weapon_hint.clip_text = true
+	_weapon_hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_armory.add_child(_weapon_hint)
 	_weapon.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	BroadcastUI.hud_text(_weapon, BroadcastUI.T_BODY - 2)
 	_weapon.clip_text = true
@@ -554,17 +561,32 @@ func _update_vitals(player: Player, delta: float) -> void:
 	_health_text.text = str(roundi(player.health))
 	_update_damage(player, delta)
 	var hazard: String = player.acid_hazard() if player.state in ["ok", "downed"] else ""
+	var leaky: bool = player.state == "ok" and player.holding_leaky
+	var repairing_zone: bool = player.state == "ok" and player.suit_integrity < 100.0 and WeaponProjectile.repairing(player.global_position + Vector3.UP, get_tree())
+	var flare_dry: bool = player.state == "ok" and hazard == "rain" and WeaponProjectile.dries(player.global_position + Vector3.UP, get_tree())
 	var protected := hazard == "shelter"
-	var breach := hazard in ["rain", "puddle"] and _suit.value < 25.0
-	_status_icon.visible = not hazard.is_empty()
-	_status_icon.kind = "shelter" if protected else "rain"
+	var breach := (hazard in ["rain", "puddle"] or leaky) and _suit.value < 25.0
+	var show_status := not hazard.is_empty() or leaky or repairing_zone
+	_status_icon.visible = show_status
+	_status_icon.kind = "shelter" if (protected or repairing_zone or flare_dry) and not leaky else "rain"
 	var pulse := 1.0 if Settings.reduced_flash else 0.65 + 0.35 * sin(_clock * 6.0)
-	_status_icon.color = BroadcastUI.CYAN if protected else (BroadcastUI.PINK if hazard == "puddle" or breach else BroadcastUI.ACID)
-	_status_icon.modulate.a = pulse if breach else 1.0
-	_hazard_text.visible = _status_icon.visible
-	_hazard_text.text = {"shelter": "DRY", "puddle": "ACID POOL", "rain": "ACID RAIN"}.get(hazard, "")
-	_hazard_text.add_theme_color_override("font_color", _status_icon.color)
-	_suit_icon.color = BroadcastUI.PINK.lerp(BroadcastUI.CYAN, pulse) if breach else BroadcastUI.CYAN
+	var status_color: Color = BroadcastUI.CYAN if protected else (BroadcastUI.PINK if hazard == "puddle" or breach else BroadcastUI.ACID)
+	var status_label: String = {"shelter": "DRY", "puddle": "ACID POOL", "rain": "ACID RAIN"}.get(hazard, "")
+	if leaky:
+		status_color = BroadcastUI.PINK
+		status_label = (status_label + " · SUIT LEAK") if not status_label.is_empty() else "SUIT LEAK"
+	elif flare_dry:
+		status_color = BroadcastUI.AMBER
+		status_label = "FLARE DRY -75%"
+	elif repairing_zone:
+		status_color = BroadcastUI.CYAN
+		status_label = "SUIT REPAIR"
+	_status_icon.color = status_color
+	_status_icon.modulate.a = pulse if (breach or leaky) else 1.0
+	_hazard_text.visible = show_status
+	_hazard_text.text = status_label
+	_hazard_text.add_theme_color_override("font_color", status_color)
+	_suit_icon.color = BroadcastUI.PINK.lerp(BroadcastUI.CYAN, pulse) if (breach or leaky) else BroadcastUI.CYAN
 	_decon_text.text = str(GameManager.decon_charges)
 	_tarp_icon.visible = player.has_tarp
 	_tarp_key.visible = player.has_tarp
@@ -578,7 +600,7 @@ func _update_vitals(player: Player, delta: float) -> void:
 		_static_icon.color = BroadcastUI.AMBER if ready else BroadcastUI.MUTED
 		_static_text.text = "%d%%" % roundi(player.static_charge * 100.0)
 	_vitals_hot = maxf(0.0, _vitals_hot - delta)
-	var hot := hazard in ["rain", "puddle"] or _vitals_hot > 0.0 or player.health < player.max_health * 0.5 or _suit.value < 50.0 or player.state != "ok"
+	var hot := hazard in ["rain", "puddle"] or leaky or repairing_zone or _vitals_hot > 0.0 or player.health < player.max_health * 0.5 or _suit.value < 50.0 or player.state != "ok"
 	_fade(_vitals, hot, 0.45, delta)
 	_update_center(player, delta)
 
@@ -652,8 +674,9 @@ func _update_weapon(player: Player, delta: float) -> void:
 		if slot_state != _last_slot_state:
 			if not _last_slot_state.is_empty():
 				_hotbar_hot = 3.0
-				_armory_hot = 3.0
-				_name_left = 1.6
+				_armory_hot = 3.5
+				_name_left = 2.4
+				_hint_left = 4.5
 			_last_slot_state = slot_state
 		# Belt pouch counts (frags / domes) wake the hotbar without re-showing the gun name.
 		var pouch_state := str(_slots.pouch_key())
@@ -667,11 +690,53 @@ func _update_weapon(player: Player, delta: float) -> void:
 	_armory.visible = player.state == "ok" and definition != null
 	_reticle.reload = 0.0
 	_reticle.jammed = false
+	_reticle.charging = false
+	_reticle.charge = 0.0
+	_reticle.ads_tight = false
 	if not _armory.visible:
+		_reticle.style = _reticle.Style.CROSS
+		_reticle.target_spread = 6.0
 		return
 	var item: ItemInstance = holder.selected()
+	var data: WeaponData = definition.weapon
 	var is_gun := definition.kind == ItemDefinition.Kind.GUN
+	# Fortnite-style dynamic angular spread crosshair projection.
+	var fov := holder.camera.fov if holder and holder.camera else 75.0
+	var vh := maxf(get_viewport().get_visible_rect().size.y, 1.0)
+	var spread_deg := holder.current_spread_degrees()
+	var spread_px := (vh * 0.5) * tan(deg_to_rad(spread_deg)) / maxf(tan(deg_to_rad(fov * 0.5)), 0.01)
+	if data.charge_time > 0.0:
+		_reticle.style = _reticle.Style.CHARGE
+		_reticle.target_spread = clampf(spread_px, 12.0, 26.0)
+	elif data.pellets > 1:
+		_reticle.style = _reticle.Style.SHOTGUN
+		_reticle.target_spread = clampf(spread_px, 14.0, 92.0)
+	elif data.mechanic in ["wash", "gust"]:
+		_reticle.style = _reticle.Style.STREAM
+		_reticle.target_spread = clampf(spread_px, 18.0, 84.0)
+	elif data.kind != WeaponData.Kind.HITSCAN:
+		_reticle.style = _reticle.Style.LAUNCHER
+		_reticle.target_spread = 15.0
+	else:
+		_reticle.style = _reticle.Style.CROSS
+		_reticle.target_spread = clampf(spread_px, 4.5, 74.0)
+	_reticle.charging = holder.is_charging()
+	_reticle.charge = holder.charge_progress()
+	_reticle.ads_tight = holder._aim > 0.5 and spread_deg <= 0.45
+
 	_name_left = maxf(0.0, _name_left - delta)
+	_hint_left = maxf(0.0, _hint_left - delta)
+	var hint_text := ItemStatCard.hud_hint(definition.id)
+	var persist_hint := definition.is_cursed() or data.charge_time > 0.0 or not is_gun
+	_weapon_hint.visible = not hint_text.is_empty() and (_hint_left > 0.0 or persist_hint)
+	if _weapon_hint.visible:
+		_weapon_hint.text = hint_text
+		var hint_col := ItemStatCard.CURSED_TINT if definition.is_cursed() else (BroadcastUI.AMBER if definition.legendary else BroadcastUI.CYAN)
+		if _weapon_hint.get_theme_color("font_color") != hint_col:
+			_weapon_hint.add_theme_color_override("font_color", hint_col)
+		var base_alpha := 0.78 if persist_hint else 0.0
+		_weapon_hint.modulate.a = maxf(base_alpha, clampf(_hint_left * 1.5, 0.0, 1.0))
+
 	_weapon.modulate.a = clampf(_name_left * 2.0, 0.0, 1.0)
 	if _name_left > 0.0:
 		_weapon.text = _unlock_name if not _unlock_name.is_empty() else definition.display_name.to_upper()
@@ -699,7 +764,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 		_prompt.show_prompt(BroadcastUI.input_hint("reload"), "RELOAD", BroadcastUI.AMBER)
 		_prompt.visible = true
 	_armory_hot = maxf(0.0, _armory_hot - delta)
-	_fade(_armory, _armory_hot > 0.0 or reloading or jammed or low, 0.35, delta)
+	_fade(_armory, _armory_hot > 0.0 or reloading or jammed or low or _reticle.charging or persist_hint, 0.35, delta)
 
 
 ## Show the compact stat card while the crosshair rests on a vending bay or
