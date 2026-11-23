@@ -1,7 +1,7 @@
 class_name RunLoot
 extends Node3D
 ## Scene authority (peer 1). World ids are scoped to this run.
-const STARTER_KITS := ["pump_shotgun", "spray_rifle", "shield_dome"]
+const STARTER_KITS := ["pump_shotgun", "nail_driver", "service_revolver"]
 var starter_chosen := false
 var _starter_claims: Dictionary = {}
 var run_id := 0
@@ -52,21 +52,39 @@ func _grant_starter(run: int, peer: int, index: int) -> void:
 	if player == null:
 		return
 	var inventory := holder(player)
-	var kit: String = STARTER_KITS[index]
-	# Pouch kits (Shield Dome) go on the belt, so they need no free slot.
-	var pouch := ItemCatalog.is_pouch(kit)
-	var slot := -1 if pouch else inventory.slots.find(null)
-	if not inventory.can_act() or (not pouch and slot < 0) or (pouch and inventory.pouch_full(kit)):
-		if pouch and inventory.can_act():
-			inventory.notify_pouch_full(kit)
+	if not inventory.can_act():
+		return
+	var kit_id: String = STARTER_KITS[index]
+	var slot0 := inventory.slots[0]
+	var replace_slot0 := slot0 == null or slot0.id == "service_revolver"
+	var fallback_slot := -1 if replace_slot0 else inventory.slots.find(null)
+	if not replace_slot0 and fallback_slot < 0:
+		return
+	var item := make_item(kit_id)
+	if item == null:
 		return
 	_starter_claims[peer] = true
-	var item := make_item(kit)
-	inventory.accept_pickup(item)
-	if slot >= 0 and inventory.slots[slot] == item and inventory.current != slot:
-		inventory.select_slot(slot)
-	else:
+	if replace_slot0:
+		inventory.slots[0] = item
+		var definition := ItemCatalog.definition(item.id)
+		if definition and definition.kind == ItemDefinition.Kind.GUN and not definition.ammo_type.is_empty():
+			var cap: int = int(ItemCatalog.CAPS[definition.ammo_type])
+			var starter: int = cap if item.id == "service_revolver" else mini(cap, maxi(definition.weapon.mag_size * 2, int(cap * 0.5)))
+			inventory._seeded_ammo[definition.ammo_type] = true
+			inventory.reserves[definition.ammo_type] = mini(cap, maxi(int(inventory.reserves.get(definition.ammo_type, 0)), starter))
+		inventory.current = 0
+		inventory._cancel_actions()
 		inventory.send_state()
+	else:
+		inventory.accept_pickup(item)
+		if item.id == "service_revolver":
+			var cap: int = int(ItemCatalog.CAPS["revolver"])
+			inventory._seeded_ammo["revolver"] = true
+			inventory.reserves["revolver"] = cap
+		if inventory.slots[fallback_slot] == item and inventory.current != fallback_slot:
+			inventory.select_slot(fallback_slot)
+		else:
+			inventory.send_state()
 	if peer == Net.local_id():
 		_starter_accepted(run)
 	else:
