@@ -20,7 +20,13 @@ func get_prompt(player: Node) -> String:
 		return "Needs 2 players"
 	if RunLoot.holder(player).scrap < cost:
 		return "Need %d scrap" % cost
-	return "%s  %d scrap" % ["Double or nothing" if mode == "double" else "Buy", cost]
+	var action_label := "Double or nothing"
+	if not offer.is_empty():
+		var item := ItemCatalog.definition(offer[0])
+		action_label = "Buy %s" % item.display_name
+		if item.spawn_count > 1:
+			action_label += " ×%d" % item.spawn_count
+	return "%s  %d scrap" % [action_label, cost]
 
 func action(player: Node, step: String) -> void:
 	var station := get_parent() as SupplyStation

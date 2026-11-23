@@ -1,152 +1,182 @@
 extends Node3D
-## Local lightning effects for WeatherManager.lightning_struck: a sky flash
-## (through the parent WeatherFX), a jagged bolt at the strike, outlines on
-## every enemy within reveal_radius of the local camera for reveal_time, and
-## thunder 0.5-2 s later depending on distance. The seed from the host makes
-## the bolt shape the same on every client.
+## Local lightning effects for WeatherManager.lightning_struck: a soft sky lift
+## (through the parent WeatherFX), a crisp branching bolt with a ground flash
+## and shock ring at the strike, outlines on the infected near the strike, and
+## thunder right behind it. The seed from the host makes the bolt shape the
+## same on every client.
 ##
-## Web gets a nearfield crack and roll mixed for small speakers.
+## Thunder goes through Sound (a fresh stream-mode player per strike, owned by
+## the Sound autoload), so overlapping strikes, a freed LightningFX or the Web
+## audio path can't drop it. Close strikes crack almost at once (~0.05 s);
+## distant ones lag slightly (up to 0.35 s) and sit a few dB lower.
 
 signal flashed(position: Vector3)
 
-@export var reveal_radius := 40.0
-@export var reveal_time := 2.0
-@export var bolt_time := 0.25
-@export var thunder_stream: AudioStream
-@export var thunder_volume_db := -10.0
+@export var reveal_radius := 22.0
+@export var reveal_time := 2.5
+@export var bolt_time := 0.32
+## Peak thunder level for a strike at the listener, before Sound's trims.
+@export var thunder_volume_db := -1.0
 
-var _thunder_player := AudioStreamPlayer.new()
-var _bolt_material := StandardMaterial3D.new()
-static var _cached_thunder: AudioStreamWAV
+const CORE_COLOR := Color(0.93, 1.0, 0.97, 0.99)
+const SHEATH_COLOR := Color(0.55, 0.95, 1.0, 0.32)
+const IMPACT_COLOR := Color(0.7, 1.0, 0.55, 0.6)
+
+static var _segment_mesh: BoxMesh
+static var _ring_mesh: TorusMesh
 
 
 func _ready() -> void:
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
-	var web := OS.has_feature("web")
-	if thunder_stream == null and web:
-		thunder_stream = load("res://assets/audio/sfx/thunder_web.wav") as AudioStream
-	if thunder_stream == null:
-		if _cached_thunder == null:
-			# Pre-rendered (same recipe as _make_thunder): synthesizing it here
-			# took ~100 ms on desktop and far longer in WebAssembly.
-			if ResourceLoader.exists("res://assets/audio/sfx/thunder.wav"):
-				_cached_thunder = load("res://assets/audio/sfx/thunder.wav")
-			else:
-				_cached_thunder = _make_thunder()
-		thunder_stream = _cached_thunder
-	_thunder_player.stream = thunder_stream
-	_thunder_player.volume_db = Sound.cue_gain("thunder", thunder_volume_db)
-	_thunder_player.bus = &"Ambience"
-	if web:
-		_thunder_player.playback_type = AudioServer.PLAYBACK_TYPE_SAMPLE
-	add_child(_thunder_player)
-
-	_bolt_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_bolt_material.albedo_color = Color(0.9, 0.95, 1.0)
-	_bolt_material.disable_fog = true
+	if _segment_mesh == null:
+		_segment_mesh = BoxMesh.new()
+		_segment_mesh.size = Vector3.ONE
+	if _ring_mesh == null:
+		_ring_mesh = TorusMesh.new()
+		_ring_mesh.inner_radius = 0.86
+		_ring_mesh.outer_radius = 1.0
+		_ring_mesh.rings = 28
+		_ring_mesh.ring_segments = 4
 
 
 func _exit_tree() -> void:
-	_thunder_player.stop()
 	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
 		WeatherManager.lightning_struck.disconnect(_on_lightning_struck)
 
 
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless":
+		return
 	Perf.mark("lightning strike")
 	Juice.shake(0.45, position)
 	var fx := get_parent()
 	if fx and "flash" in fx:
-		fx.flash = Settings.flash_scale()
-		fx.light_strike(position)
+		fx.flash = maxf(fx.flash, Settings.flash_scale())
 	flashed.emit(position)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = strike_seed
 	_spawn_bolt(position, rng)
+	_spawn_impact(position)
+
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.global_position.distance_to(position) <= reveal_radius and enemy.has_method("reveal"):
+			enemy.reveal(reveal_time)
 
 	var listener := position
 	var camera := get_viewport().get_camera_3d()
 	if camera:
 		listener = camera.global_position
-		for enemy in get_tree().get_nodes_in_group("enemies"):
-			if enemy.global_position.distance_to(listener) <= reveal_radius and enemy.has_method("reveal"):
-				enemy.reveal(reveal_time)
-
 	var distance := listener.distance_to(position)
-	var delay := clampf(distance / 343.0 * 10.0, 0.5, 2.0)
-	if not Net.dedicated and DisplayServer.get_name() != "headless":
-		var web := OS.has_feature("web")
-		var level := (-5.0 if web else thunder_volume_db) - clampf(distance / 14.0, 0.0, 4.0 if web else 8.0)
-		get_tree().create_timer(delay, false).timeout.connect(_play_thunder.bind(level))
-
-
-func _play_thunder(level: float) -> void:
-	Juice.duck_music(-8.0, 1.25)
-	_thunder_player.volume_db = level
-	_thunder_player.play()
-	Perf.mark("thunder playback")
+	# Sound travels ~343 m/s: close strikes crack right away, far ones lag a touch.
+	var delay := clampf(0.05 + distance / 343.0, 0.05, 0.35)
+	var level := thunder_volume_db - clampf(distance / 18.0, 0.0, 7.0)
+	var pitch := rng.randf_range(0.93, 1.06)
+	# Bound to the Sound autoload so the cue survives this node being freed.
+	get_tree().create_timer(delay, false).timeout.connect(Sound.play_thunder.bind(level, pitch))
 
 
 func _spawn_bolt(ground: Vector3, rng: RandomNumberGenerator) -> void:
-	if Net.dedicated or DisplayServer.get_name() == "headless":
-		return
 	var bolt := Node3D.new()
 	add_child(bolt)
-	var top := ground + Vector3(rng.randf_range(-6.0, 6.0), 60.0, rng.randf_range(-6.0, 6.0))
-	var segments := 9
-	var previous := top
+	var top := ground + Vector3(rng.randf_range(-7.0, 7.0), 60.0, rng.randf_range(-7.0, 7.0))
+	var segments := 12
+	var points: Array[Vector3] = [top]
 	for i in range(1, segments + 1):
 		var t := float(i) / segments
 		var point := top.lerp(ground, t)
 		if i < segments:
-			point += Vector3(rng.randf_range(-2.5, 2.5), 0.0, rng.randf_range(-2.5, 2.5))
-		_add_segment(bolt, previous, point, 0.25 * (1.0 - t * 0.5))
-		previous = point
-	get_tree().create_timer(bolt_time).timeout.connect(bolt.queue_free)
+			var jag := 2.8 * (1.0 - t * 0.6)
+			point += Vector3(rng.randf_range(-jag, jag), rng.randf_range(-0.8, 0.8), rng.randf_range(-jag, jag))
+		points.append(point)
+	for i in range(1, points.size()):
+		var t := float(i) / segments
+		_add_channel(bolt, points[i - 1], points[i], lerpf(0.2, 0.09, t))
+	# Forks: thinner, shorter, tapering off the main channel.
+	var forks := rng.randi_range(2, 4)
+	for f in forks:
+		var start_index := rng.randi_range(2, segments - 3)
+		var from: Vector3 = points[start_index]
+		var away := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
+		var steps := rng.randi_range(2, 4)
+		var width := 0.08
+		for s in steps:
+			var to := from + away * rng.randf_range(1.6, 3.4) + Vector3.DOWN * rng.randf_range(2.0, 4.2) \
+					+ Vector3(rng.randf_range(-0.8, 0.8), 0.0, rng.randf_range(-0.8, 0.8))
+			_add_channel(bolt, from, to, width)
+			from = to
+			width *= 0.65
+	# Flicker like a real return stroke: on, off, on, fade.
+	var tween := bolt.create_tween()
+	tween.tween_interval(0.06)
+	tween.tween_callback(bolt.hide)
+	tween.tween_interval(0.035)
+	tween.tween_callback(bolt.show)
+	tween.tween_interval(maxf(bolt_time - 0.2, 0.05))
+	tween.tween_method(_fade_pieces.bind(bolt.get_children()), 0.0, 1.0, 0.1)
+	tween.tween_callback(bolt.queue_free)
 
 
-func _add_segment(parent: Node3D, from: Vector3, to: Vector3, width: float) -> void:
+func _fade_pieces(value: float, pieces: Array) -> void:
+	for piece in pieces:
+		if is_instance_valid(piece):
+			(piece as GeometryInstance3D).transparency = value
+
+
+## One channel piece: a bright core with a faint wider sheath around it.
+func _add_channel(parent: Node3D, from: Vector3, to: Vector3, width: float) -> void:
+	_add_segment(parent, from, to, width, ShotFX._unshaded(CORE_COLOR))
+	_add_segment(parent, from, to, width * 3.2, ShotFX._unshaded(SHEATH_COLOR))
+
+
+func _add_segment(parent: Node3D, from: Vector3, to: Vector3, width: float, material: Material) -> void:
+	var length := from.distance_to(to)
+	if length < 0.01:
+		return
 	var segment := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(width, from.distance_to(to), width)
-	box.material = _bolt_material
-	segment.mesh = box
+	segment.mesh = _segment_mesh
+	segment.material_override = material
 	segment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(segment)
 	segment.global_position = (from + to) * 0.5
-	var up := (to - from).normalized()
+	var up := (to - from) / length
 	var side := up.cross(Vector3.FORWARD)
 	if side.length_squared() < 0.001:
 		side = up.cross(Vector3.RIGHT)
-	segment.global_basis = Basis(side.normalized(), up, side.normalized().cross(up)).orthonormalized()
+	side = side.normalized()
+	segment.global_basis = Basis(side * width, up * length, side.cross(up).normalized() * width)
 
 
-## A few seconds of thunder: a sharp crack, then a low rumble that rolls off.
-func _make_thunder() -> AudioStreamWAV:
-	var web := OS.has_feature("web")
-	var rate := 11025 if web else 22050
-	var seconds := 2.5 if web else 4.0
-	var count := int(rate * seconds)
-	var data := PackedByteArray()
-	data.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1987
-	var low := 0.0
-	var lower := 0.0
-	for i in count:
-		var t := float(i) / rate
-		var white := rng.randf_range(-1.0, 1.0)
-		low += (white - low) * 0.08      # rumble
-		lower += (low - lower) * 0.05    # deeper rumble
-		var crack := white * exp(-t * 18.0) * 0.6
-		var roll := 1.0 + 0.5 * sin(t * 5.0 + sin(t * 1.3) * 2.0)
-		var rumble := (low * 2.5 + lower * 4.0) * exp(-t * 0.9) * minf(t * 20.0, 1.0) * roll
-		var sample := clampf(crack + rumble, -1.0, 1.0)
-		data.encode_s16(i * 2, int(sample * 32000.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = rate
-	wav.stereo = false
-	wav.data = data
-	return wav
+## Ground impact: an expanding shock ring, sparks, a short puff and (desktop)
+## a brief local light that fades out instead of a full-scene sun pop.
+func _spawn_impact(at: Vector3) -> void:
+	var world := get_tree().current_scene
+	if world == null:
+		world = self
+	var ring := MeshInstance3D.new()
+	ring.mesh = _ring_mesh
+	ring.material_override = ShotFX._unshaded(IMPACT_COLOR)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ring)
+	ring.global_position = at + Vector3.UP * 0.08
+	ring.scale = Vector3(0.4, 0.5, 0.4)
+	var tween := ring.create_tween().set_parallel(true)
+	tween.tween_property(ring, "scale", Vector3(6.5, 0.5, 6.5), 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "transparency", 1.0, 0.38)
+	tween.chain().tween_callback(ring.queue_free)
+	ShotFX.sparks(world, at + Vector3.UP * 0.2, Vector3.UP, 14)
+	ShotFX.puff(world, at + Vector3.UP * 0.25, Color(CORE_COLOR, 0.7), 0.7, 0.25)
+	if OS.has_feature("web"):
+		return
+	var light := OmniLight3D.new()
+	light.light_color = Color(0.78, 0.92, 1.0)
+	light.light_energy = 7.0 * Settings.flash_scale()
+	light.omni_range = 18.0
+	light.omni_attenuation = 1.4
+	light.shadow_enabled = false
+	add_child(light)
+	light.global_position = at + Vector3.UP * 2.5
+	var fade := light.create_tween()
+	fade.tween_interval(0.05)
+	fade.tween_property(light, "light_energy", 0.0, 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	fade.tween_callback(light.queue_free)

@@ -15,6 +15,9 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": "maple_hollow", "name": "MAPLE HOLLOW", "blurb": "Misty pine woods around an old chapel and cemetery.",
 		"scene": "res://levels/maple_hollow/level_maple_hollow.tscn", "accent": Color("#ff9a75"),
 		"preview": "res://assets/ui/maple_hollow.webp", "channel": "03"},
+	{"id": "sandbox", "name": "TEST RANGE", "blurb": "Blank checkerboard floor for dev testing.",
+		"scene": "res://levels/sandbox/level_sandbox.tscn", "accent": Color("#ffba42"),
+		"preview": "", "channel": "DEV", "dev_only": true},
 ]
 const RANDOM := {"id": RANDOM_ID, "name": "RANDOM", "blurb": "Tune to any available channel.",
 	"accent": Color("#ff5689"), "preview": "", "channel": "??"}
@@ -23,7 +26,7 @@ const RANDOM := {"id": RANDOM_ID, "name": "RANDOM", "blurb": "Tune to any availa
 static func available() -> Array[Dictionary]:
 	var maps: Array[Dictionary] = []
 	for entry in ENTRIES:
-		if ResourceLoader.exists(entry.scene, "PackedScene"):
+		if _is_playable(entry):
 			maps.append(entry)
 	return maps
 
@@ -36,8 +39,13 @@ static func entry(id: String) -> Dictionary:
 
 
 static func is_available(id: String) -> bool:
-	var map := entry(id)
-	return not map.is_empty() and ResourceLoader.exists(map.scene, "PackedScene")
+	return _is_playable(entry(id))
+
+
+static func _is_playable(map: Dictionary) -> bool:
+	return (not map.is_empty()
+		and (OS.is_debug_build() or not map.get("dev_only", false))
+		and ResourceLoader.exists(map.scene, "PackedScene"))
 
 
 static func fallback(id: String) -> String:
@@ -46,7 +54,7 @@ static func fallback(id: String) -> String:
 
 static func resolve(id: String) -> String:
 	if id == RANDOM_ID:
-		var maps := available()
+		var maps := available().filter(func(map: Dictionary) -> bool: return not map.get("dev_only", false))
 		if not maps.is_empty():
 			var choice: Dictionary = maps.pick_random()
 			return choice.id

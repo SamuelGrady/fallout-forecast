@@ -546,10 +546,10 @@ func markers() -> void:
 	points("StreetSupplySpawns", "street_supply_spawn", [Vector2(-38, -24), Vector2(36, -19),
 		Vector2(20, 35), Vector2(44, 46)], 0.06)
 	directories["CrateStations"] = add(scene, Node3D.new(), "CrateStations")
-	marker("CrateStations", "crate_station", "CanneryStation", Vector3(-5, 0, -35)).rotation_degrees.y = 180
-	marker("CrateStations", "crate_station", "BaitShopStation", Vector3(50, 0, 10)).rotation_degrees.y = 90
-	marker("CrateStations", "crate_station", "FishExchangeStation", Vector3(4.5, 0, 24.5))
-	marker("CrateStations", "crate_station", "RescueStation", Vector3(-34.8, 0, 16.6))
+	marker("CrateStations", "crate_station", "CanneryStation", Vector3(12.5, 0, -38.03)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "BaitShopStation", Vector3(53.85, 0, 10.26)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "FishExchangeStation", Vector3(-5.7, 0, 23.7)).rotation_degrees.y = -90
+	marker("CrateStations", "crate_station", "RescueStation", Vector3(-35.6, 0, 22.1)).rotation_degrees.y = -90
 	marker("", "boss_anchor", "BossAnchor", Vector3(36, 16, 49))
 	puddles([Vector3(-57, 3, -20), Vector3(-33, 3, -30), Vector3(-10, 3.2, -23),
 		Vector3(2, 2, -32), Vector3(30, 3, -25), Vector3(55, 3, -33), Vector3(-26, 3, -3),

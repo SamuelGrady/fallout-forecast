@@ -6,15 +6,18 @@ const PRICE_STEP := 5
 const DOUBLE_WINDOW := 2.0
 const STATION_TABLE := preload("res://crates/loot_table.tres")
 const VENDING_POOLS := [
-	["med_tin", "suit_patch", "sandbag", "bleach_bomb"],
-	["pump_shotgun", "nail_driver", "rock_salt", "spray_rifle"],
-	["shield_dome", "hunting_rifle", "battery_zapper", "flare_launcher", "lightning_rod", "umbrella"],
+	["med_tin", "suit_patch", "frag", "shield_dome", "umbrella", "bleach_bomb", "bait_radio"],
+	["pump_shotgun", "spray_rifle", "nail_driver", "rock_salt", "hunting_rifle", "pressure_washer",
+		"battery_zapper", "flare_launcher"],
+	["lightning_rod", "harpoon", "leaf_blower", "flare_launcher", "battery_zapper",
+		"boombox_launcher", "leaky_nailgun", "lucky_penny_revolver"],
 ]
-const VENDING_PRICES := [8, 14, 22]
+const VENDING_PRICES := [6, 11, 18]
+const VENDING_LEGENDARY_CHANCE := 0.05
 const EARLY_VENDING_POOLS := [
-	["med_tin", "suit_patch"],
-	["pump_shotgun", "spray_rifle"],
-	["shield_dome", "umbrella"],
+	["med_tin", "suit_patch", "frag", "shield_dome", "umbrella"],
+	["pump_shotgun", "spray_rifle", "nail_driver", "rock_salt", "hunting_rifle", "pressure_washer"],
+	["lightning_rod", "harpoon", "leaf_blower", "flare_launcher", "battery_zapper"],
 ]
 
 var loot: LootTable = STATION_TABLE
@@ -269,31 +272,48 @@ func _price(run: int, key: String, cost: int) -> void:
 
 func _restock(station: SupplyStation, sold := -1) -> void:
 	var offers := station.offers.duplicate()
+	var wave := WeatherManager.wave
+	var stock := EARLY_VENDING_POOLS if wave <= 2 else VENDING_POOLS
 	if sold < 0:
-		offers.resize(VENDING_POOLS.size())
-	for i in VENDING_POOLS.size():
+		offers.resize(stock.size())
+	for i in stock.size():
 		if sold >= 0 and i != sold:
 			continue
 		var previous: String = station.offers[i][0] if i < station.offers.size() else ""
-		var stock := EARLY_VENDING_POOLS if WeatherManager.wave < 4 else VENDING_POOLS
 		var pool: Array = stock[i].filter(func(id: String): return id != previous)
-		var tier := ItemCatalog.TUNED if i == 2 and WeatherManager.wave > 1 else ItemCatalog.STANDARD
+		var id: String = pool[_vending_rng.randi_range(0, pool.size() - 1)]
+		if i == 2 and wave >= 4 and previous != "disruptor" and _vending_rng.randf() < VENDING_LEGENDARY_CHANCE:
+			id = "disruptor"
 		_offer_serial += 1
-		offers[i] = [pool[_vending_rng.randi_range(0, pool.size() - 1)], tier, VENDING_PRICES[i], _offer_serial]
+		offers[i] = [id, _vending_tier(i, wave), VENDING_PRICES[i], _offer_serial]
 	station.set_offers(offers)
 	Net.rpc_to_run(_stock, [_run, station.key, offers])
+
+func _vending_tier(bay: int, wave: int) -> int:
+	if (bay == 2 and wave >= 2) or (bay == 1 and wave >= 4):
+		return ItemCatalog.OVERCLOCKED
+	if bay == 2 or (bay == 1 and wave >= 2):
+		return ItemCatalog.TUNED
+	return ItemCatalog.STANDARD
 
 @rpc("authority", "call_remote", "reliable")
 func _stock(run: int, key: String, offers: Array) -> void:
 	if run == _run and stations.has(key):
 		stations[key].set_offers(offers)
 
+func _make_graded_item(registry: RunLoot, id: String, tier: int) -> ItemInstance:
+	var item := registry.make_item(id, tier)
+	if item:
+		# Vending and airdrop upgrades apply even when the weapon is cursed.
+		item.tier = tier
+	return item
+
 func _purchase(station: SupplyStation, mode: String, offer: Array, player: Node3D) -> bool:
 	var registry := RunLoot.find(get_tree())
 	var inventory := RunLoot.holder(player)
 	if offer.is_empty() or not inventory.can_act() or inventory.scrap < int(offer[2]):
 		return false
-	var item := registry.make_item(offer[0], offer[1])
+	var item := _make_graded_item(registry, offer[0], offer[1])
 	if item == null:
 		return false
 	var drop_at := Vector3.INF
@@ -306,10 +326,19 @@ func _purchase(station: SupplyStation, mode: String, offer: Array, player: Node3
 			drop_at = registry.ground_at(player, Vector3.ZERO)
 		if not drop_at.is_finite():
 			return false
+	var bundle_count := item.count
 	var displaced := inventory.accept_pickup(item)
+	if displaced == item and item.count == bundle_count:
+		return false
 	if displaced:
-		registry.spawn_pickup(displaced, drop_at)
+		# A pouch can accept part of a bundle without swapping a hotbar item.
+		if not drop_at.is_finite():
+			drop_at = registry.ground_at(player, Vector3.ZERO)
+		registry.spawn_pickup(displaced, drop_at if drop_at.is_finite() else player.global_position)
 	inventory.scrap -= int(offer[2])
+	var definition := ItemCatalog.definition(item.id)
+	if definition.is_cursed():
+		GameManager.record_cursed(player, definition.display_name)
 	inventory.send_state()
 	_display_roll(station, item.id, item.tier, "DISPENSED")
 	_restock(station, SupplyStation.OFFER_PADS.find(mode))
@@ -376,29 +405,35 @@ func _reveal(run: int, key: String, id: String, tier: int, title: String) -> voi
 func _open_airdrop() -> void:
 	var registry := RunLoot.find(get_tree())
 	var point := airdrop.global_position
-	var pool := loot.pool(1, WeatherManager.wave).filter(func(id: String): return ItemCatalog.definition(id) != null)
-	# Air freight has a separate chance at the crate-exclusive legendary.
 	var players := GameManager.player_count()
+	var reward_count := players + loot.airdrop_supplies.size()
 	var space := registry.get_world_3d().direct_space_state
-	for i in players:
-		var id := "disruptor" if RNG.chance(0.025) else _pick(pool)
-		var angle := i * TAU / players
-		var offset := Vector3(1.5, 0.0, 0.0).rotated(Vector3.UP, angle)
+	for i in reward_count:
+		var angle := i * TAU / reward_count
+		var offset := Vector3(2.25, 0.0, 0.0).rotated(Vector3.UP, angle)
 		var at := _safe_drop_spot(space, point, offset)
-		registry.spawn_item(id, at, ItemCatalog.OVERCLOCKED)
-	registry.spawn_pickup(null, _safe_drop_spot(space, point, Vector3(0.0, 0.0, 1.4)), "ammo_box")
+		if i < players:
+			var weapon := _make_graded_item(registry, loot.roll_airdrop_weapon(), ItemCatalog.OVERCLOCKED)
+			registry.spawn_pickup(weapon, at)
+		else:
+			var id := loot.airdrop_supplies[i - players]
+			if id == "ammo_box":
+				registry.spawn_pickup(null, at, id)
+			else:
+				registry.spawn_item(id, at)
 	_remove_drop(_run)
 	Net.rpc_to_run(_remove_drop, [_run])
 
 func _safe_drop_spot(space: PhysicsDirectSpaceState3D, center: Vector3, offset: Vector3) -> Vector3:
 	var eye := center + Vector3.UP * 0.7
-	var start := eye + offset
-	if not space.intersect_ray(PhysicsRayQueryParameters3D.create(eye, start, 1)).is_empty():
-		return center + Vector3.UP * 0.06
-	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(start, start - Vector3.UP * 5.0, 1))
-	if hit.is_empty():
-		return center + Vector3.UP * 0.06
-	return (hit.position as Vector3) + Vector3.UP * 0.06
+	for distance: float in [1.0, 0.65]:
+		var start := eye + offset * distance
+		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(eye, start, 1)).is_empty():
+			continue
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(start, start - Vector3.UP * 5.0, 1))
+		if not hit.is_empty():
+			return (hit.position as Vector3) + Vector3.UP * 0.06
+	return center + Vector3.UP * 0.06
 
 func sync_to_peer(peer: int) -> void:
 	var cabinets: Dictionary = {}

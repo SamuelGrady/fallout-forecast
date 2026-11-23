@@ -3,28 +3,42 @@ extends Node3D
 ## rain particles that follow the active camera (and stop on roofs), fog,
 ## and a darker sky and sun as the storm builds. Nothing here is networked;
 ## each client draws its own weather.
+##
+## All rain is fallout green: eerie green from the first Drizzle, vivid
+## radioactive green in the Acid Storm. Lightning lifts the sky, ambient and
+## sun gently and fades them out smoothly (LightningFX adds a local light at
+## the strike) instead of blowing out the sky or swinging the sun around.
 
 @export_group("Rain")
 @export var max_drops := 8000
 @export var area_size := 50.0
 @export var spawn_height := 18.0
 @export var fall_speed := 22.0
-@export var rain_color := Color(0.75, 0.82, 0.9, 0.35)
-@export var acid_color := Color(0.55, 1.0, 0.3, 0.45)
+@export var rain_color := Color(0.42, 0.92, 0.36, 0.42)
+@export var acid_color := Color(0.55, 1.0, 0.25, 0.55)
 
 @export_group("Fog")
 ## Fog density at storm_intensity 0, 0.3, 0.7, 1.0 (Clear, Drizzle, Downpour, Acid Storm).
 @export var fog_density_curve := PackedFloat32Array([0.0, 0.012, 0.035, 0.04])
 @export var fog_color := Color(0.42, 0.38, 0.52)
 @export var acid_fog_color := Color(0.18, 0.32, 0.12)
+## Sickly green the fog leans toward as the storm builds (a light touch, so
+## silhouettes stay readable).
+@export var storm_fog_tint := Color(0.33, 0.45, 0.3)
+@export_range(0.0, 1.0) var storm_fog_tint_amount := 0.3
 
 @export_group("Light")
 @export var min_sky_energy := 0.35
 @export var min_sun_energy := 0.15
 
-## Lightning flash, 0-1. LightningFX sets it; it fades on its own.
+## Lightning flash, 0-1 (already scaled by Settings.flash_scale()). LightningFX
+## sets it; it fades on its own with a soft tail.
 var flash := 0.0
-@export var flash_fade := 4.0
+@export var flash_fade := 2.6
+## How much a full flash lifts the sky, ambient light and sun.
+@export var flash_sky := 0.85
+@export var flash_ambient := 0.4
+@export var flash_sun := 0.5
 
 var _rain: GPUParticles3D
 var _web_rain: CPUParticles3D
@@ -45,10 +59,6 @@ var _wind_rest: Array[Basis] = []
 var _wind_materials: Array[ShaderMaterial] = []
 var _wind_clock := 0.0
 var _wind_was_active := false
-var _sun_rest := Basis.IDENTITY
-var _sun_color := Color.WHITE
-var _sun_blur := 0.0
-var _strike_frames := 0
 var _warming_rain := false
 
 const WET_TEXTURES := [
@@ -72,6 +82,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	flash = maxf(flash - flash_fade * delta, 0.0)
+	# Smoothstep: a quick bright peak that eases out instead of snapping off.
+	var glow := flash * flash * (3.0 - 2.0 * flash)
 	var intensity := WeatherManager.storm_intensity
 	_update_wet_surfaces(intensity)
 	_update_wind(intensity, delta)
@@ -115,40 +127,13 @@ func _process(delta: float) -> void:
 		if blackout:
 			fog = fog * 1.4 + minf(intensity, .3) * .036
 		_environment.fog_density = fog * (0.65 if flare_cover else 1.0)
-		_environment.fog_light_color = fog_color.lerp(acid_fog_color, acid)
-		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 3.0
-		_environment.ambient_light_energy = _base_ambient_energy * lerpf(1.0, darken, minf(intensity / .3, 1.0))
-		if _strike_frames > 0:
-			_environment.ambient_light_energy *= 1.0 - 0.28 * Settings.flash_scale()
-		_environment.fog_density *= 1.0 - flash * 0.6
+		var storm_tint := fog_color.lerp(storm_fog_tint, storm_fog_tint_amount * minf(intensity / 0.7, 1.0))
+		_environment.fog_light_color = storm_tint.lerp(acid_fog_color, acid)
+		_environment.background_energy_multiplier = lerpf(_base_sky_energy, min_sky_energy, minf(intensity / 0.7, 1.0)) * darken + glow * flash_sky
+		_environment.ambient_light_energy = _base_ambient_energy * (lerpf(1.0, darken, minf(intensity / .3, 1.0)) + glow * flash_ambient)
+		_environment.fog_density *= 1.0 - glow * 0.25
 	if _sun:
-		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) * darken + flash * 1.65
-		if _strike_frames > 0:
-			_sun.light_energy += 2.7 * Settings.flash_scale()
-			_strike_frames -= 1
-		elif _sun.basis != _sun_rest:
-			_sun.basis = _sun_rest
-			_sun.light_color = _sun_color
-			_sun.shadow_blur = _sun_blur
-
-
-## Use the existing shadow-casting sun for two rendered frames. Its shadow
-## variant stays resident, while the light swings around to the strike.
-func light_strike(at: Vector3) -> void:
-	if OS.has_feature("web") or _sun == null:
-		return
-	var camera := get_viewport().get_camera_3d()
-	if camera == null:
-		return
-	var direction := at - camera.global_position
-	direction.y = 0.0
-	if direction.length_squared() < 1.0:
-		direction = Vector3.BACK
-	direction = direction.normalized() + Vector3.UP * 0.7
-	_sun.look_at(_sun.global_position - direction)
-	_sun.light_color = Color("#dfeaff")
-	_sun.shadow_blur = 0.15
-	_strike_frames = 2
+		_sun.light_energy = lerpf(_base_sun_energy, min_sun_energy, minf(intensity / 0.7, 1.0)) * darken + glow * flash_sun
 
 
 func warm_rain(value: bool) -> void:
@@ -321,7 +306,7 @@ func _build_web_rain() -> void:
 	shader.code = """shader_type spatial;
 render_mode unshaded, cull_disabled, blend_mix, depth_draw_never;
 
-uniform vec4 rain_color : source_color = vec4(0.75, 0.82, 0.9, 0.35);
+uniform vec4 rain_color : source_color = vec4(0.42, 0.92, 0.36, 0.42);
 uniform float hole_active = 0.0;
 uniform vec3 hole_min = vec3(0.0);
 uniform vec3 hole_max = vec3(0.0);
@@ -408,9 +393,6 @@ func configure_level(level: Node3D, map_id: String) -> void:
 			_environment.sdfgi_enabled = false
 	if _sun:
 		_base_sun_energy = _sun.light_energy
-		_sun_rest = _sun.basis
-		_sun_color = _sun.light_color
-		_sun_blur = _sun.shadow_blur
 		if _web_rain:
 			# Disable real-time sun shadow map on WebGL2: cuts full-scene geometry
 			# draw calls in half while keeping directional lighting and fog intact.

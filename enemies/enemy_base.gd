@@ -66,7 +66,7 @@ var _net_has_target := false
 
 static var _last_headshot_ms := 0
 static var _visibility_material: ShaderMaterial
-static var _reveal_material: StandardMaterial3D
+static var _reveal_material: ShaderMaterial
 static var _hit_material: StandardMaterial3D
 static var _attack_material: StandardMaterial3D
 var _reveal_left := 0.0
@@ -508,17 +508,24 @@ static func spawn_death_fragments(parent: Node, at: Vector3, throw_vec: Vector3,
 		tween.tween_callback(fragment.queue_free)
 
 
-## Local only: explicit through-wall reveal outline (lightning strikes, Flare Gun).
+## Local only: explicit through-wall reveal (lightning strikes, Flare Gun).
+## A faint electric silhouette with brighter grazing edges, drawn through
+## walls. (The old grown, front-culled hull with no depth test filled the whole
+## body with flat cyan, which read as a blown-out glow.)
 func reveal(duration: float) -> void:
 	if _reveal_material == null:
-		_reveal_material = StandardMaterial3D.new()
-		_reveal_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_reveal_material.albedo_color = Color(0.55, 0.96, 1.0)
-		_reveal_material.grow = true
-		_reveal_material.grow_amount = 0.055
-		_reveal_material.cull_mode = BaseMaterial3D.CULL_FRONT
-		_reveal_material.no_depth_test = true
-		_reveal_material.disable_fog = true
+		var shader := Shader.new()
+		shader.code = """shader_type spatial;
+render_mode unshaded, cull_back, depth_test_disabled, depth_draw_never, blend_add, fog_disabled;
+uniform vec4 rim_color : source_color = vec4(0.55, 0.96, 1.0, 1.0);
+void fragment() {
+	float facing = clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0);
+	float rim = pow(1.0 - facing, 2.0);
+	ALBEDO = rim_color.rgb;
+	ALPHA = clamp(0.16 + rim * 0.85, 0.0, 1.0) * rim_color.a;
+}"""
+		_reveal_material = ShaderMaterial.new()
+		_reveal_material.shader = shader
 	_reveal_left = maxf(_reveal_left, duration)
 	_refresh_overlay()
 
