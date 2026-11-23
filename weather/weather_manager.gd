@@ -305,13 +305,15 @@ func _receive_intensity(value: float) -> void:
 
 
 func _apply_phase(new_phase: Phase, new_wave: int, time_left: float) -> void:
-	Perf.mark("phase %s wave %d" % [PHASE_NAMES[new_phase], new_wave])
+	var changed := not running or new_phase != phase or new_wave != wave
 	phase = new_phase
 	wave = new_wave
 	phase_time_left = time_left
 	running = true
 	target_intensity = _target_for(new_phase, new_wave)
-	phase_changed.emit(phase, wave)
+	if changed:
+		Perf.mark("phase %s wave %d" % [PHASE_NAMES[new_phase], new_wave])
+		phase_changed.emit(phase, wave)
 
 
 func _target_for(p: Phase, w: int) -> float:

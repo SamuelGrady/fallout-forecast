@@ -36,6 +36,7 @@ var awaiting_tape_choice := false
 var endless := false
 var endless_score := 0
 var _waves_survived := 0
+var _drafted_wave := 0
 var _run_id := 0
 var last_results := {}
 var map_id := Maps.DEFAULT_ID
@@ -78,6 +79,7 @@ func start_run() -> void:
 		return
 	finished = false
 	_waves_survived = 0
+	_drafted_wave = 0
 	_set_tape_state(false, false, false)
 	_run_id += 1
 	_run_started_ms = Time.get_ticks_msec()
@@ -422,7 +424,8 @@ func _on_phase_changed(phase: int, _wave: int) -> void:
 				_set_decon(decon_charges + 1)
 			# Right after a cleared wave the Mutation Draft opens inside Calm.
 			# It holds the Calm countdown until the result shows.
-			if _wave >= 2:
+			if _wave >= 2 and _drafted_wave < _wave:
+				_drafted_wave = _wave
 				mutations.begin()
 		WeatherManager.Phase.MUTATION_ROLL:
 			# Legacy phase value (never entered by next_phase any more).
