@@ -33,7 +33,7 @@ var _leaving := false
 
 func _ready() -> void:
 	theme = BroadcastUI.theme()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	BroadcastUI.backdrop(self)
 
@@ -70,6 +70,8 @@ func _ready() -> void:
 	_build_actions(right)
 
 	_build_chat(root_box)
+	TouchInput.layout_changed.connect(_layout_touch_actions)
+	_layout_touch_actions()
 
 	Net.chat_received.connect(_on_chat)
 	Net.roster_changed.connect(_refresh)
@@ -306,6 +308,12 @@ func _build_actions(parent: Control) -> void:
 	_leave_button = _button(row, "LEAVE", _on_leave)
 	_leave_button.custom_minimum_size = Vector2(142, 44)
 	BroadcastUI.button_role(_leave_button, false, true)
+
+
+func _layout_touch_actions() -> void:
+	var height := maxf(44.0, 44.0 * TouchInput.units_per_css_pixel()) if TouchInput.enabled else 44.0
+	for button in [_ready_button, _force_button, _leave_button]:
+		button.custom_minimum_size.y = height
 
 
 func _build_chat(parent: Control) -> void:

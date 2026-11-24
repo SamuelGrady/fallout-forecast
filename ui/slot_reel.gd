@@ -547,7 +547,10 @@ func _refresh_hints() -> void:
 	for i in _parts.size():
 		_parts[i].key.text = PAD_HINTS[i] if _pad else str(i + 1)
 	if _footer_hint:
-		_footer_hint.text = "[D-PAD] QUICK VOTE  ·  [STICK] BROWSE  ·  [A] DRAFT" if _pad else "CLICK CARD  ·  [1/2/3]  ·  [A/D] + ENTER"
+		if TouchInput.enabled and not _pad:
+			_footer_hint.text = "TAP A CARD TO VOTE"
+		else:
+			_footer_hint.text = "[D-PAD] QUICK VOTE  ·  [STICK] BROWSE  ·  [A] DRAFT" if _pad else "CLICK CARD  ·  [1/2/3]  ·  [A/D] + ENTER"
 
 
 func _apply_card_styles() -> void:
@@ -582,6 +585,9 @@ func _apply_card_styles() -> void:
 		elif is_voted:
 			parts.cta.text = "> VOTED" if multi else "> SELECTED"
 			parts.cta.add_theme_color_override("font_color", BroadcastUI.CYAN)
+		elif TouchInput.enabled and not _pad:
+			parts.cta.text = "TAP TO DRAFT"
+			parts.cta.add_theme_color_override("font_color", BroadcastUI.CYAN if is_focused else Color(BroadcastUI.MUTED, 0.72))
 		elif is_focused:
 			parts.cta.text = "[%s] / [A] TO DRAFT" % key_text if _pad else "CLICK / [%s] TO DRAFT" % key_text
 			parts.cta.add_theme_color_override("font_color", BroadcastUI.CYAN)
@@ -700,7 +706,7 @@ func _restore_mouse_capture() -> void:
 	if MenuState.stack.is_empty() and not get_tree().paused \
 			and not InventoryMenu.is_open() and GameManager.run_active \
 			and not GameManager.finished and not GameManager.awaiting_tape_choice:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		TouchInput.capture_pointer()
 
 
 func _populate_threat_banner(enemy: String) -> void:
@@ -795,7 +801,7 @@ func _on_dealt(enemy: String, cards: Array) -> void:
 			_set_interactive(true)
 			if not InventoryMenu.is_open():
 				_claimed_cursor = true
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+				TouchInput.release_pointer()
 		else:
 			_set_interactive(false)
 	else:
@@ -928,7 +934,7 @@ func _process(delta: float) -> void:
 			if not InventoryMenu.is_open():
 				_claimed_cursor = true
 				if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
-					Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+					TouchInput.release_pointer()
 		else:
 			_set_interactive(false)
 	elif roll.stage == "result":

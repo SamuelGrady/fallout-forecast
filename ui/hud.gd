@@ -161,6 +161,7 @@ func _ready() -> void:
 	_build_forecast()
 	_build_vitals()
 	_build_armory()
+	TouchInput.layout_changed.connect(_layout_hotbar)
 	_build_messages()
 	_reticle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_layout.add_child(_reticle)
@@ -358,19 +359,31 @@ func _build_armory() -> void:
 	_armory.add_child(_ignore(_pips))
 	# The 5-slot hotbar sits bottom centre, between the vitals and the ammo.
 	_slots.name = "Hotbar"
-	_slots.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_slots.offset_left = -ItemHotbar.SIZE.x * 0.5
-	_slots.offset_right = ItemHotbar.SIZE.x * 0.5
-	_slots.offset_top = -24 - ItemHotbar.SIZE.y
-	_slots.offset_bottom = -24
-	_slots.pivot_offset = Vector2(ItemHotbar.SIZE.x * 0.5, ItemHotbar.SIZE.y)
-	_slots.scale = Vector2.ONE * minf(Settings.hud_scale, 1.0)
 	_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layout.add_child(_slots)
+	_layout_hotbar()
 	_loadout_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	BroadcastUI.hud_text(_loadout_hint, BroadcastUI.T_META, BroadcastUI.PAPER)
 	_anchor(_loadout_hint, Control.PRESET_CENTER_BOTTOM, Rect2(-150, -24, 300, 22), Vector2(0.5, 1))
 	_loadout_hint.hide()
+
+
+func hotbar() -> ItemHotbar:
+	return _slots
+
+
+func _layout_hotbar() -> void:
+	var touch := TouchInput.enabled and TouchInput.landscape
+	_slots.set_touch_layout(touch)
+	var bar_size := ItemHotbar.TOUCH_SIZE if touch else ItemHotbar.SIZE
+	_slots.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_slots.offset_left = -bar_size.x * 0.5
+	_slots.offset_right = bar_size.x * 0.5
+	_slots.offset_top = -24 - bar_size.y
+	_slots.offset_bottom = -24
+	_slots.pivot_offset = Vector2(bar_size.x * 0.5, bar_size.y)
+	var bar_scale := maxf(1.0, 44.0 * TouchInput.units_per_css_pixel() / bar_size.y) if touch else minf(Settings.hud_scale, 1.0)
+	_slots.scale = Vector2.ONE * bar_scale
 
 
 func _build_messages() -> void:
@@ -434,7 +447,7 @@ func _fade(control: CanvasItem, hot: bool, idle: float, delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
-	_loadout_hint.visible = InventoryMenu.can_open()
+	_loadout_hint.visible = not TouchInput.enabled and InventoryMenu.can_open()
 	if _loadout_hint.visible:
 		_loadout_hint.text = "[%s] LOADOUT" % BroadcastUI.input_hint("inventory")
 	_banner_left = maxf(0.0, _banner_left - delta)
@@ -489,7 +502,7 @@ func _update_forecast(delta: float) -> void:
 	_tape_counter.visible = GameManager.endless
 	if _tape_counter.visible:
 		_tape_counter.text = "CNT  %08d" % GameManager.endless_score
-	_ready_hint.visible = GameManager.can_ready_up()
+	_ready_hint.visible = not TouchInput.enabled and GameManager.can_ready_up()
 	if _ready_hint.visible:
 		var count := "  %d/%d" % [GameManager.ready_count, GameManager.player_count()] if GameManager.player_count() > 1 else ""
 		_ready_hint.show_prompt(BroadcastUI.input_hint("ready_up"), "READY" + count, BroadcastUI.CYAN)
@@ -632,9 +645,9 @@ func _update_center(player: Player, delta: float) -> void:
 	_reticle.bleed = player.bleed_left / maxf(player.bleed_out_time, 0.01) if player.state == "downed" else 0.0
 	_reticle.bleed_seconds = ceili(player.bleed_left)
 	if interacting:
-		_prompt.show_prompt(key, prompt.to_upper())
+		_prompt.show_prompt("USE" if TouchInput.enabled else key, prompt.to_upper())
 	elif player.state == "turned":
-		_prompt.show_prompt(BroadcastUI.input_hint("fire"), "ATTACK", Color(0.55, 1.0, 0.3))
+		_prompt.show_prompt("BITE" if TouchInput.enabled else BroadcastUI.input_hint("fire"), "ATTACK", Color(0.55, 1.0, 0.3))
 	_prompt.visible = interacting or player.state == "turned"
 	var spectating := player.state == "out" and SpectatorView.has_target(get_tree(), player)
 	_downed.visible = (player.state == "turned" and _state_flash > 0.0) or (player.state == "out" and not spectating)
@@ -693,7 +706,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 				_hotbar_hot = 3.0
 			_last_pouch_state = pouch_state
 	_hotbar_hot = maxf(0.0, _hotbar_hot - delta)
-	_fade(_slots, _hotbar_hot > 0.0 or (holder != null and not holder.active_pouch.is_empty()), 0.45, delta)
+	_fade(_slots, TouchInput.enabled or _hotbar_hot > 0.0 or (holder != null and not holder.active_pouch.is_empty()), 0.45, delta)
 	var definition: ItemDefinition = holder.selected_definition() if holder else null
 	_armory.visible = player.state == "ok" and definition != null
 	_reticle.reload = 0.0

@@ -53,6 +53,8 @@ func _ready() -> void:
 func _add_button(row: Control, button: Button, caption: String, keep_playing: bool) -> void:
 	button.text = caption
 	button.custom_minimum_size = Vector2(204, 48)
+	if TouchInput.enabled:
+		button.custom_minimum_size.y = maxf(48.0, 44.0 * TouchInput.units_per_css_pixel())
 	BroadcastUI.animate_button(button)
 	button.pressed.connect(GameManager.choose_tape.bind(keep_playing))
 	row.add_child(button)
@@ -65,7 +67,7 @@ func _refresh() -> void:
 	if not open:
 		_can_choose = false
 		if was_open and MenuState.stack.is_empty() and not Net.dedicated:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			TouchInput.capture_pointer()
 		return
 
 	if not was_open:
@@ -83,4 +85,4 @@ func _refresh() -> void:
 		_prompt.text = "WAITING ON %s" % str(info.get("name", "HOST")).to_upper()
 	_can_choose = can_choose
 	_prompt.visible = not _prompt.text.is_empty()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()

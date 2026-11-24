@@ -43,11 +43,13 @@ var _seconds := 0
 
 func _ready() -> void:
 	theme = BroadcastUI.theme()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_add_full_rect(_playback, self)
 	_build_street_backdrop()
 	_build_playback_menu()
+	TouchInput.layout_changed.connect(_layout_touch_menu)
+	_layout_touch_menu()
 	_build_tape_loader()
 
 	_transport.bus = &"UI"
@@ -215,6 +217,16 @@ func _build_playback_menu() -> void:
 	var suit_back := _button(_suit, "BACK", _on_back, 40)
 	BroadcastUI.button_role(suit_back, false, true)
 	_playback.hide()
+
+
+func _layout_touch_menu() -> void:
+	var touch := TouchInput.enabled
+	var target := maxf(44.0, 44.0 * TouchInput.units_per_css_pixel()) if touch else 44.0
+	for button in _menu_buttons():
+		button.custom_minimum_size.y = target
+	_menu.position = Vector2(500, 112) if touch and TouchInput.landscape else Vector2(104, 328)
+	_settings_panel.position.x = 274.0 if touch and not TouchInput.landscape else 492.0
+	_suit_panel.position.x = _settings_panel.position.x
 
 
 func _process(delta: float) -> void:
