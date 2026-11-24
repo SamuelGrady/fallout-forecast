@@ -45,10 +45,10 @@ func _cloudburst_attack(aim: Vector3, amount: float) -> void:
 	if _cast_rain_ring:
 		# Four pools close off straight exits. The eye and diagonal gaps are dry.
 		for direction in [forward, across, -forward, -across]:
-			GameManager.spawn_spore(start, aim + direction * 5.8, 1.65, amount, true, self)
+			GameManager.spawn_spore(start, aim + direction * 5.8, 1.65, amount, true, self, true)
 	else:
 		# The rain front sweeps across the player's lane at three marked timings.
 		for step in 3:
 			var landing := aim + across * ((step - 1) * 6.8)
-			GameManager.spawn_spore(start, landing, 1.15 + step * 0.28, amount, true, self)
+			GameManager.spawn_spore(start, landing, 1.15 + step * 0.28, amount, true, self, true)
 	_cast_rain_ring = not _cast_rain_ring
