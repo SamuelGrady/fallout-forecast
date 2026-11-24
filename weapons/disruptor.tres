@@ -6,6 +6,7 @@
 script = ExtResource("1")
 display_name = "Weather-Radio Disruptor"
 shot_sound = "gun_disruptor"
+deploy_sound = "gun_field_deploy"
 kind = 0
 mechanic = "suppress"
 damage = 62.0

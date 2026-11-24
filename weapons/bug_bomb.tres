@@ -4,7 +4,8 @@
 
 [resource]
 script = ExtResource("2_uslrf")
-shot_sound = "throw_bomb"
+shot_sound = "gun_frag_throw"
+blast_sound = "gun_frag_blast"
 display_name = "Frag Grenade"
 kind = 2
 damage = 90.0

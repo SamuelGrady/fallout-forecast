@@ -6,6 +6,7 @@
 script = ExtResource("1")
 display_name = "Bait Radio"
 shot_sound = "gun_bait_radio"
+deploy_sound = "gun_bait_activate"
 kind = 2
 mechanic = "bait_radio"
 damage = 0.0

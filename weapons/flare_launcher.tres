@@ -6,6 +6,7 @@
 script = ExtResource("1")
 display_name = "Road Flare Launcher"
 shot_sound = "gun_flare_launcher"
+deploy_sound = "gun_flare"
 kind = 1
 mechanic = "burn"
 damage = 36.0

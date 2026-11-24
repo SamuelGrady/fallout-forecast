@@ -6,6 +6,7 @@
 script = ExtResource("1")
 display_name = "Bleach Bomb"
 shot_sound = "gun_bleach_bomb"
+deploy_sound = "gun_bleach_burst"
 kind = 2
 mechanic = "bleach_bomb"
 damage = 16.0

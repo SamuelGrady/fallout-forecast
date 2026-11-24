@@ -4,7 +4,8 @@
 
 [resource]
 script = ExtResource("2_m6jxt")
-shot_sound = "throw_bomb"
+shot_sound = "gun_dome_throw"
+deploy_sound = "gun_dome_expand"
 display_name = "Shield Dome"
 kind = 1
 damage = 0.0

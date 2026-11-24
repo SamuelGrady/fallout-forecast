@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("2_adw4l")
-shot_sound = "shot_boombox"
+shot_sound = "gun_boombox_launcher"
 display_name = "Boombox Launcher"
 kind = 3
 damage = 110.0

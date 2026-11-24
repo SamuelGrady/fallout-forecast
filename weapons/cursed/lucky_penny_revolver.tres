@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("2_1c2q0")
-shot_sound = "gun_revolver"
+shot_sound = "gun_lucky_penny_revolver"
 display_name = "Lucky Penny Revolver"
 damage = 32.0
 spread_degrees = 0.5
