@@ -2,40 +2,41 @@ extends Node3D
 ## Boss_Cumulus (wave 5): a bloated spore cloud over the district that makes its
 ## own Acid Storm.
 ## - Three glowing sacs. Each one destroyed lowers storm_intensity a step
-##   (1.0 -> 0.7 -> 0.3 -> 0.0) and drops the boss 4 m lower.
+##   (1.0 -> 0.8 -> 0.55 -> 0.35) and drops the boss 4 m lower.
 ## - With all sacs gone the core's shell breaks and it can be killed.
 ## - It heals while rain falls on it (faster the harder it rains), unless a
 ##   Flare Gun flare burned near it in the last few seconds.
-## - Lobs spores and calls in Misters and Drips. The exposed core backs off
-##   and cycles through faster, marked salvos.
+## - Lobs spores and calls in Misters, Drips, and Gutters. The exposed core
+##   backs off and cycles through faster, marked salvos.
 ## Host runs all of it; the parts are built the same way on every peer.
 
 signal defeated
 
 const BossPart := preload("res://enemies/boss/boss_part.gd")
-const STORM_STEPS := [0.7, 0.3, 0.0]
+const BOSS_SCALE := 1.42
+const STORM_STEPS := [0.8, 0.55, 0.35]
 
-@export var sac_health := 300.0
-@export var core_health := 800.0
-@export var heal_per_second := 10.0
-@export var spore_interval := 2.6
-@export var summon_interval := 14.0
+@export var sac_health := 540.0
+@export var core_health := 1400.0
+@export var heal_per_second := 18.0
+@export var spore_interval := 1.9
+@export var summon_interval := 10.5
 @export var drift_radius := 10.0
 ## Cumulus hunts: it drifts to hang roughly above a player (offset by
 ## HOVER_OFFSET so it isn't straight overhead). In co-op it moves on to the
 ## next player after hanging FOCUS_TIME s over the current one; travel time
 ## does not count. It eases up to FOLLOW_SPEED * CATCH_UP when far away, slows
 ## as it arrives, and never strays more than LEASH m from the boss_anchor.
-@export var follow_speed := 6.5
+@export var follow_speed := 8.2
 @export var hover_offset := 5.0
 @export var leash := 150.0
 const FOCUS_TIME := 10.0
 const CATCH_UP := 1.6
 const ACCEL := 4.5
 const ARRIVED := 8.0
-const CORE_STANDOFF := 15.0
-const CORE_DRIFT := 1.4
-const CORE_ATTACK_INTERVAL := 1.95
+const CORE_STANDOFF := 18.0
+const CORE_DRIFT := 5.4
+const CORE_ATTACK_INTERVAL := 1.35
 @export var drop_per_sac := 4.0
 
 var part_health: Array[float] = [0.0, 0.0, 0.0, 0.0]  # sacs 0-2, core 3
@@ -61,6 +62,8 @@ var _cloud_material := StandardMaterial3D.new()
 var _sac_material := StandardMaterial3D.new()
 var _core_material := StandardMaterial3D.new()
 var _core_rings: Node3D
+var _storm_crown_outer: MeshInstance3D
+var _storm_crown_inner: MeshInstance3D
 var _entrance_left := 1.8
 var _center := Vector3.ZERO
 var _focus: Node3D
@@ -84,7 +87,7 @@ func _ready() -> void:
 	add_to_group("boss")
 	_anchor = global_position
 	_center = Vector3(_anchor.x, 0.0, _anchor.z)
-	_height = _anchor.y + 16.0
+	_height = _anchor.y + 18.0
 	_orbit_radius = hover_offset
 	var scale_hp := GameManager.enemy_health_scale() if GameManager.has_method("enemy_health_scale") else 1.0
 	for i in 3:
@@ -93,7 +96,7 @@ func _ready() -> void:
 	part_health = part_max.duplicate()
 	_build()
 	scale = Vector3.ONE * 0.15
-	create_tween().tween_property(self, "scale", Vector3.ONE, 1.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	create_tween().tween_property(self, "scale", Vector3.ONE * BOSS_SCALE, 1.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if Net.is_host():
 		WeatherManager.strike_lightning()
 
@@ -106,7 +109,8 @@ func _build() -> void:
 	_cloud_material.roughness = 1.0
 	_cloud_material.disable_fog = true
 	_cloud_material.emission_enabled = true
-	_cloud_material.emission = Color(0.12, 0.2, 0.08)
+	_cloud_material.emission = Color(0.16, 0.28, 0.1)
+	_cloud_material.emission_energy_multiplier = 1.6
 	if _cloud_mesh == null:
 		_cloud_mesh = _build_cloud_mesh()
 	var cloud := MeshInstance3D.new()
@@ -114,14 +118,40 @@ func _build() -> void:
 	cloud.material_override = _cloud_material
 	_body.add_child(cloud)
 
+	var outer_crown_mat := StandardMaterial3D.new()
+	outer_crown_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	outer_crown_mat.albedo_color = Color(1.0, 0.2, 0.36)
+	outer_crown_mat.emission_enabled = true
+	outer_crown_mat.emission = Color(1.0, 0.16, 0.34)
+	outer_crown_mat.emission_energy_multiplier = 2.8
+	_storm_crown_outer = MeshInstance3D.new()
+	_storm_crown_outer.mesh = _ring_mesh(6.4, 6.95)
+	_storm_crown_outer.position = Vector3(0.0, 0.9, 0.0)
+	_storm_crown_outer.rotation = Vector3(0.22, 0.0, -0.18)
+	_storm_crown_outer.material_override = outer_crown_mat
+	_body.add_child(_storm_crown_outer)
+
+	var inner_crown_mat := StandardMaterial3D.new()
+	inner_crown_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	inner_crown_mat.albedo_color = Color(0.78, 1.0, 0.24)
+	inner_crown_mat.emission_enabled = true
+	inner_crown_mat.emission = Color(0.7, 1.0, 0.18)
+	inner_crown_mat.emission_energy_multiplier = 2.4
+	_storm_crown_inner = MeshInstance3D.new()
+	_storm_crown_inner.mesh = _ring_mesh(5.1, 5.55)
+	_storm_crown_inner.position = Vector3(0.0, 1.15, 0.0)
+	_storm_crown_inner.rotation = Vector3(-0.26, 0.35, 0.2)
+	_storm_crown_inner.material_override = inner_crown_mat
+	_body.add_child(_storm_crown_inner)
+
 	_sac_material.albedo_color = Color(0.85, 1.0, 0.3)
 	_sac_material.emission_enabled = true
 	_sac_material.emission = Color(0.6, 1.0, 0.2)
-	_sac_material.emission_energy_multiplier = 2.2
+	_sac_material.emission_energy_multiplier = 2.8
 	var halo_mat := StandardMaterial3D.new()
 	halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	halo_mat.albedo_color = Color(0.82, 1.0, 0.32, 0.72)
+	halo_mat.albedo_color = Color(0.82, 1.0, 0.32, 0.82)
 	for i in 3:
 		var a := TAU * i / 3.0
 		var sac := _make_part("Sac%d" % i, i, 1.7, Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0), _sac_material)
@@ -135,7 +165,7 @@ func _build() -> void:
 	_core_material.albedo_color = Color(1.0, 0.3, 0.6)
 	_core_material.emission_enabled = true
 	_core_material.emission = Color(1.0, 0.2, 0.5)
-	_core_material.emission_energy_multiplier = 1.6
+	_core_material.emission_energy_multiplier = 2.2
 	var core := _make_part("Core", 3, 2.2, Vector3(0, -1.8, 0), _core_material)
 	_parts.append(core)
 	_core_rings = Node3D.new()
@@ -144,10 +174,18 @@ func _build() -> void:
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ring_mat.albedo_color = Color("#ff5689")
-	for tilt in [Vector3(0.4, 0, 0.2), Vector3(-0.5, 0.3, 0.7)]:
+	ring_mat.emission_enabled = true
+	ring_mat.emission = Color("#ff3868")
+	ring_mat.emission_energy_multiplier = 2.8
+	for ring_spec in [
+		[2.75, 3.0, Vector3(0.4, 0, 0.2)],
+		[2.75, 3.0, Vector3(-0.5, 0.3, 0.7)],
+		[3.35, 3.68, Vector3(0.15, 0.6, -0.55)],
+		[3.9, 4.22, Vector3(-0.35, -0.4, 0.25)],
+	]:
 		var rmesh := MeshInstance3D.new()
-		rmesh.mesh = _ring_mesh(2.75, 3.0)
-		rmesh.rotation = tilt
+		rmesh.mesh = _ring_mesh(float(ring_spec[0]), float(ring_spec[1]))
+		rmesh.rotation = ring_spec[2]
 		rmesh.material_override = ring_mat
 		_core_rings.add_child(rmesh)
 
@@ -222,7 +260,19 @@ static func _ring_mesh(inner: float, outer: float) -> TorusMesh:
 func _process(delta: float) -> void:
 	_t += delta
 	_body.rotation.y += delta * 0.15
-	_sac_material.emission_energy_multiplier = 2.0 + sin(_t * 5.0) * 1.1
+	if _storm_crown_outer:
+		_storm_crown_outer.rotation.y -= delta * 1.15
+		_storm_crown_outer.rotation.z = -0.18 + sin(_t * 1.4) * 0.1
+	if _storm_crown_inner:
+		_storm_crown_inner.rotation.y += delta * 1.55
+		_storm_crown_inner.rotation.x = -0.26 + cos(_t * 1.7) * 0.1
+	var sac_orbit := _t * (0.55 + 0.22 * (3 - sacs_left))
+	for i in mini(3, _parts.size()):
+		var sac := _parts[i] as Node3D
+		if is_instance_valid(sac) and sac.visible:
+			var a := TAU * i / 3.0 + sac_orbit
+			sac.position = Vector3(cos(a) * 5.0, -1.2, sin(a) * 5.0)
+	_sac_material.emission_energy_multiplier = 2.6 + sin(_t * 5.0) * 1.3
 	for i in _sac_halos.size():
 		var halo := _sac_halos[i]
 		if is_instance_valid(halo):
@@ -233,8 +283,8 @@ func _process(delta: float) -> void:
 	if _core_rings and _core_rings.visible:
 		_core_rings.rotation.y += delta * 2.2
 		_core_rings.rotation.x += delta * 1.1
-		_core_material.emission_energy_multiplier = 2.6 + sin(_t * 7.5) * 1.2
-	_cloud_material.emission = Color(0.65, 0.28, 0.08) if is_burning() else Color(0.12, 0.2, 0.08)
+		_core_material.emission_energy_multiplier = 3.2 + sin(_t * 7.5) * 1.5
+	_cloud_material.emission = Color(0.75, 0.3, 0.1) if is_burning() else Color(0.16, 0.28, 0.1)
 	# Clients only draw it: position, part health and the burn timer ride one
 	# unreliable packet ten times a second, the kill is sent reliably below.
 	if Net.is_host() and Net.is_online():
@@ -258,7 +308,8 @@ func _process(delta: float) -> void:
 	_follow_focus(delta)
 	var drift_radius_now := CORE_DRIFT if core_exposed() else hover_offset
 	_orbit_radius = move_toward(_orbit_radius, drift_radius_now, delta * 3.0)
-	var drift := Vector3(cos(_t * 0.35), 0, sin(_t * 0.35)) * _orbit_radius
+	var drift_rate := 0.85 if core_exposed() else 0.35
+	var drift := Vector3(cos(_t * drift_rate), 0, sin(_t * drift_rate)) * _orbit_radius
 	global_position = _center + drift + Vector3(0, _height + sin(_t * 0.8) * 0.6, 0)
 	# Rain heals it, unless a flare is burning nearby.
 	_burn_left -= delta
@@ -269,7 +320,7 @@ func _process(delta: float) -> void:
 				part_health[i] = minf(part_health[i] + heal, part_max[i])
 	_spore_timer -= delta
 	if _spore_timer <= 0.0:
-		_spore_timer = CORE_ATTACK_INTERVAL if core_exposed() else spore_interval
+		_spore_timer = CORE_ATTACK_INTERVAL if core_exposed() else maxf(1.35, spore_interval - 0.22 * (3 - sacs_left))
 		_fire_at_player()
 	_summon_timer -= delta
 	if _summon_timer <= 0.0:
@@ -346,6 +397,20 @@ func _pop_sac(i: int) -> void:
 	part.visible = false
 	part.collision_layer = 0
 	WeatherManager.set_intensity_override(STORM_STEPS[2 - sacs_left])
+	# Retaliation burst: 3-glob acid ring, ambient lightning flash, and reinforcement summon.
+	var players := get_tree().get_nodes_in_group("players").filter(func(p): return p.get("state") == "ok")
+	if not players.is_empty():
+		var target: Node3D = players.pick_random()
+		var base_angle := randf() * TAU
+		for k in 3:
+			var a := base_angle + TAU * k / 3.0
+			var aim := target.global_position + Vector3(cos(a) * 3.8, 0.0, sin(a) * 3.8)
+			GameManager.spawn_spore(part.global_position, aim, 1.35, 12.0, true, self)
+	if WeatherManager.has_method("strike_ambient_lightning"):
+		WeatherManager.call("strike_ambient_lightning")
+	else:
+		WeatherManager.strike_lightning()
+	_summon()
 	if sacs_left == 0:
 		_shatter_shell()
 
@@ -482,8 +547,10 @@ func _fire_at_player() -> void:
 	var start := global_position + Vector3.DOWN * 3.0
 	var aim := target.global_position
 	if not core_exposed():
-		aim += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
-		GameManager.spawn_spore(start, aim, 1.8, 8.0)
+		var count := 1 + (3 - sacs_left)
+		for k in count:
+			var spread := Vector3(randf_range(-2.6, 2.6), 0.0, randf_range(-2.6, 2.6)) if k > 0 else Vector3(randf_range(-1.8, 1.8), 0.0, randf_range(-1.8, 1.8))
+			GameManager.spawn_spore(start, aim + spread, 1.45, 11.0, true, self)
 		return
 	var toward_player := aim - global_position
 	toward_player.y = 0.0
@@ -491,19 +558,25 @@ func _fire_at_player() -> void:
 	var across := toward_player.cross(Vector3.UP)
 	match _core_pattern:
 		0:
-			# Downburst: force the player out of one spot with lingering acid.
-			GameManager.spawn_spore(start, aim, 1.35, 8.0, true, self)
+			# Downburst Ring: center acid glob + 3 surrounding triangle acid globs.
+			GameManager.spawn_spore(start, aim, 1.15, 13.0, true, self)
+			var base_angle := atan2(toward_player.z, toward_player.x)
+			for k in 3:
+				var a := base_angle + TAU * k / 3.0
+				var offset := Vector3(cos(a) * 4.2, 0.0, sin(a) * 4.2)
+				GameManager.spawn_spore(start, aim + offset, 1.45, 13.0, true, self)
 		1:
-			# Crosswind: three staggered impact markers across the firing lane.
-			for step in 3:
-				GameManager.spawn_spore(start, aim + across * ((step - 1) * 5.4), 1.2 + step * 0.25, 8.0, false, self)
+			# Crosswind Barrage: 4 staggered globs across the firing lane.
+			for step in 4:
+				GameManager.spawn_spore(start, aim + across * ((step - 1.5) * 4.4), 1.05 + step * 0.18, 13.0, true, self)
 		2:
-			# Squall: lead a moving target along their route, with time to turn.
+			# Predictive Squall: direct glob + 2 predictive acid lead globs along target velocity.
 			var travel := (target as CharacterBody3D).velocity if target is CharacterBody3D else Vector3.ZERO
 			travel.y = 0.0
 			var along := travel.normalized() if travel.length_squared() > 1.0 else toward_player
-			GameManager.spawn_spore(start, aim, 1.15, 8.0, false, self)
-			GameManager.spawn_spore(start, aim + along * 5.5, 1.65, 8.0, true, self)
+			GameManager.spawn_spore(start, aim, 1.05, 13.0, false, self)
+			GameManager.spawn_spore(start, aim + along * 4.0, 1.3, 13.0, true, self)
+			GameManager.spawn_spore(start, aim + along * 7.5, 1.55, 13.0, true, self)
 	_core_pattern = (_core_pattern + 1) % 3
 
 
@@ -511,6 +584,11 @@ func _summon() -> void:
 	var spawner := get_parent()
 	if spawner == null or not spawner.has_method("spawn"):
 		return
-	for k in 2:
-		var scene: PackedScene = spawner.mister_scene if k == 0 else spawner.drip_scene
-		spawner.spawn(scene)
+	var scenes: Array[PackedScene] = [
+		spawner.mister_scene,
+		spawner.mister_scene if core_exposed() else spawner.drip_scene,
+		spawner.gutter_scene,
+	]
+	for scene in scenes:
+		if scene != null:
+			spawner.spawn(scene)
