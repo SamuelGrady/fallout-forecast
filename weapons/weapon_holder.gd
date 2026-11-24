@@ -19,7 +19,7 @@ const POUCH_ORDER := ["frag", "shield_dome"]
 
 var slots: Array[ItemInstance] = [null, null, null, null, null]
 var reserves: Dictionary = {}
-var _seeded_ammo: Dictionary = {"revolver": true}
+var _seeded_ammo: Dictionary = {}
 var current := 0
 var active_pouch := ""
 var scrap := 0
@@ -84,10 +84,6 @@ func _ready() -> void:
 	player = camera.get_parent().get_parent() as Node3D
 	loot = RunLoot.find(get_tree())
 	if Net.is_host() and loot:
-		slots[0] = loot.make_item("service_revolver")
-		reserves["revolver"] = 24
-		grenades = STARTING_FRAGS
-		domes = STARTING_DOMES
 		_refresh_equip()
 		if loot.run_id > 0:
 			send_state()

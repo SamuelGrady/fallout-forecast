@@ -28,7 +28,7 @@ func begin(id: int) -> void:
 		holder(player).send_state()
 
 func starter_available() -> bool:
-	return run_id > 0 and not starter_chosen and WeatherManager.wave == 1 and WeatherManager.running
+	return run_id > 0 and not starter_chosen and WeatherManager.running
 
 func choose_starter(index: int) -> void:
 	if not starter_available() or not Net.can_send_run_rpc():
@@ -45,7 +45,7 @@ func _request_starter(run: int, index: int) -> void:
 		_grant_starter(run, peer, index)
 
 func _grant_starter(run: int, peer: int, index: int) -> void:
-	if run != run_id or not GameManager.run_active or GameManager.finished or WeatherManager.wave != 1 \
+	if run != run_id or not GameManager.run_active or GameManager.finished \
 			or _starter_claims.has(peer) or index < 0 or index >= STARTER_KITS.size():
 		return
 	var player := GameManager.player_for_peer(peer)
@@ -64,6 +64,8 @@ func _grant_starter(run: int, peer: int, index: int) -> void:
 	if item == null:
 		return
 	_starter_claims[peer] = true
+	inventory.grenades = mini(ItemCatalog.pouch_cap("frag"), inventory.grenades + WeaponHolder.STARTING_FRAGS)
+	inventory.domes = mini(ItemCatalog.pouch_cap("shield_dome"), inventory.domes + WeaponHolder.STARTING_DOMES)
 	if replace_slot0:
 		inventory.slots[0] = item
 		var definition := ItemCatalog.definition(item.id)
