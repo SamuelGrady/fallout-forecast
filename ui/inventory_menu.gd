@@ -1,6 +1,6 @@
 class_name InventoryMenu
 extends CanvasLayer
-## Tab / I loadout screen: the survivor on the left, a drag-and-drop hotbar in
+## Live loadout screen: the survivor on the left, a drag-and-drop hotbar in
 ## the middle and the run's active mutations on the right.
 ##
 ## Like a co-op survival inventory it never pauses the tree. It frees the
@@ -31,6 +31,8 @@ var starter_picker: Control
 var _card: PanelContainer
 var _cards: Array = []
 var _inspect := -1
+var _swap_from := -1
+var _swap_serial := -1
 var _signature := ""
 
 var _model: SurvivorModel
@@ -66,10 +68,18 @@ static func is_open() -> bool:
 	return is_instance_valid(_instance) and _instance.visible
 
 
-## The pause menu skips an ESC that this screen used (open, or closed by it
-## during this same frame), so one key press never closes and pauses at once.
-static func blocks_pause() -> bool:
+## Input polling still sees handled events, including ones that close the menu.
+static func blocks_gameplay_actions() -> bool:
 	return is_open() or _closed_frame == Engine.get_process_frames()
+
+static func can_open() -> bool:
+	return is_instance_valid(_instance) and not _instance.visible and not _instance._should_close() \
+		and not (is_instance_valid(_instance.starter_picker) and _instance.starter_picker.is_visible_in_tree())
+
+static func open_from_gamepad() -> void:
+	if can_open():
+		Settings.using_gamepad = true
+		_instance.open()
 
 
 func _ready() -> void:
@@ -99,24 +109,28 @@ func _input(event: InputEvent) -> void:
 		if event.is_action_pressed("inventory") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
 			get_viewport().set_input_as_handled()
 			if not event.is_echo():
-				close()
-
-		elif event is InputEventJoypadButton and event.is_pressed() and get_viewport().gui_get_focus_owner() == null:
-			_cards[_inspect].grab_focus()
+				Settings.using_gamepad = event is InputEventJoypadButton
+				if _swap_from >= 0 and event is InputEventJoypadButton and event.is_action_pressed("ui_cancel"):
+					_clear_swap()
+					_focus_slot()
+				else:
+					close()
+		elif event is InputEventJoypadButton and event.is_pressed():
+			Settings.using_gamepad = true
+			if get_viewport().gui_get_focus_owner() == null:
+				_focus_slot()
+			if event.is_action_pressed("reload"):
+				get_viewport().set_input_as_handled()
+				_swap_with_gamepad()
+			elif event.is_action_pressed("drop_item"):
+				get_viewport().set_input_as_handled()
+				if _swap_from < 0:
+					request_drop(_inspect)
 		return
-	if event.is_action_pressed("inventory") and not event.is_echo() and _can_open():
+	if event.is_action_pressed("inventory") and not event.is_echo() and can_open():
 		get_viewport().set_input_as_handled()
+		Settings.using_gamepad = false
 		open()
-
-
-func _can_open() -> bool:
-	if get_tree().paused or not MenuState.stack.is_empty() or GameManager.awaiting_tape_choice \
-			or GameManager.is_voting() or not GameManager.run_active:
-		return false
-	if is_instance_valid(starter_picker) and starter_picker.is_visible_in_tree():
-		return false
-	var player := _player()
-	return player != null and player.state in ["ok", "downed"] and _holder() != null
 
 
 func _should_close() -> bool:
@@ -142,7 +156,7 @@ func open() -> void:
 	_set_preview_active(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if Settings.using_gamepad:
-		_cards[_inspect].grab_focus()
+		_focus_slot()
 	BroadcastUI.reveal(_card)
 	Sound.play("ui_click")
 
@@ -152,6 +166,7 @@ func close() -> void:
 		return
 	if get_viewport() and get_viewport().gui_is_dragging():
 		get_viewport().gui_cancel_drag()
+	_clear_swap()
 	visible = false
 	_closed_frame = Engine.get_process_frames()
 	_set_preview_active(false)
@@ -164,7 +179,7 @@ func close() -> void:
 func toggle() -> void:
 	if visible:
 		close()
-	elif _can_open():
+	elif can_open():
 		open()
 
 
@@ -184,6 +199,39 @@ func _process(delta: float) -> void:
 
 
 # ------------------------------------------------------------------ actions (slot cards call these)
+func _focus_slot() -> void:
+	_cards[_inspect].grab_focus()
+
+
+func _clear_swap() -> void:
+	if _swap_from < 0:
+		return
+	_swap_from = -1
+	_swap_serial = -1
+	_refresh_cards()
+	_refresh_inspector()
+
+
+func _swap_with_gamepad() -> void:
+	var holder := _holder()
+	if holder == null or not holder.can_act():
+		return
+	_focus_slot()
+	if _swap_from >= 0:
+		var source := _swap_from
+		var item := holder.slots[source]
+		var serial := _swap_serial
+		_clear_swap()
+		if item and item.serial == serial and source != _inspect:
+			request_swap(source, _inspect)
+	elif holder.slots[_inspect]:
+		_swap_from = _inspect
+		_swap_serial = holder.slots[_inspect].serial
+		_refresh_cards()
+		_refresh_inspector()
+		Sound.ui_focus()
+
+
 func request_swap(from_slot: int, to_slot: int) -> void:
 	var holder := _holder()
 	if holder == null or from_slot == to_slot:
@@ -199,16 +247,18 @@ func request_drop(slot: int) -> void:
 	var holder := _holder()
 	if holder == null or slot < 0 or slot >= WeaponHolder.SLOT_COUNT or holder.slots[slot] == null:
 		return
+	_clear_swap()
 	holder.drop_slot(slot)
+	_refresh_state()
 	Sound.play("ui_tick", -6.0, 0.8)
 
 
 func request_equip(slot: int) -> void:
 	var holder := _holder()
-	if holder == null or holder.slots[slot] == null:
+	if holder == null or holder.slots[slot] == null or _swap_from >= 0:
 		return
 	_inspect = slot
-	if holder.current != slot:
+	if holder.current != slot or not holder.active_pouch.is_empty():
 		holder.select_slot(slot)
 		Sound.play("ui_click")
 	_refresh_cards()
@@ -275,8 +325,8 @@ func _refresh_state() -> void:
 	var holder := _holder()
 	if holder == null:
 		return
-	var parts := PackedStringArray([str(holder.current), str(holder.scrap), str(holder.grenades),
-		str(holder.domes), str(holder.can_act())])
+	var parts := PackedStringArray([str(holder.current), holder.active_pouch, str(holder.scrap),
+		str(holder.grenades), str(holder.domes), str(holder.can_act())])
 	for item in holder.slots:
 		parts.append("%d:%s:%d:%d" % [item.serial, item.id, item.tier, item.count] if item else "-")
 	var types := holder.reserves.keys()
@@ -289,6 +339,10 @@ func _refresh_state() -> void:
 	_signature = signature
 	if _inspect < 0 or _inspect >= WeaponHolder.SLOT_COUNT:
 		_inspect = holder.current
+	if _swap_from >= 0:
+		var source := holder.slots[_swap_from]
+		if source == null or source.serial != _swap_serial or not holder.can_act():
+			_clear_swap()
 	_refresh_cards()
 	_refresh_inspector()
 	_refresh_ammo()
@@ -306,8 +360,9 @@ func _refresh_cards() -> void:
 		card.definition = ItemCatalog.definition(item.id) if item else null
 		card.tooltip_text = card.definition.display_name if card.definition else "Empty slot"
 		card.mouse_default_cursor_shape = Control.CURSOR_DRAG if item else Control.CURSOR_POINTING_HAND
-		card.equipped = i == holder.current
+		card.equipped = i == holder.current and holder.active_pouch.is_empty()
 		card.inspected = i == _inspect
+		card.swap_source = i == _swap_from
 		card.queue_redraw()
 
 
@@ -317,12 +372,23 @@ func _refresh_inspector() -> void:
 		return
 	var index := clampi(_inspect, 0, WeaponHolder.SLOT_COUNT - 1)
 	var item := holder.slots[index]
-	_equip_button.disabled = item == null or index == holder.current or not holder.can_act()
-	_drop_button.disabled = item == null or not holder.can_act()
-	_equip_button.text = "IN HAND" if item and index == holder.current else "EQUIP"
-	var target := _drop_button if _equip_button.disabled else _equip_button
+	var focused := get_viewport().gui_get_focus_owner()
+	var in_hand := index == holder.current and holder.active_pouch.is_empty()
+	var can_change := item != null and holder.can_act() and _swap_from < 0
+	_equip_button.disabled = not can_change or in_hand
+	_drop_button.disabled = not can_change
+	_equip_button.text = "IN HAND" if item and in_hand else "EQUIP"
 	for card: Control in _cards:
+		var target: Control = card
+		if not _equip_button.disabled:
+			target = _equip_button
+		elif not _drop_button.disabled:
+			target = _drop_button
 		card.focus_neighbor_bottom = card.get_path_to(target)
+	for button in [_equip_button, _drop_button]:
+		button.focus_neighbor_top = button.get_path_to(_cards[index])
+	if (focused == _equip_button and _equip_button.disabled) or (focused == _drop_button and _drop_button.disabled):
+		_focus_slot()
 	var definition := ItemCatalog.definition(item.id) if item else null
 	if definition == null:
 		_insp_card.clear("EMPTY SLOT")
@@ -387,6 +453,11 @@ func _refresh_belt() -> void:
 
 func _refresh_input_hints() -> void:
 	_close_hint.text = "[%s] CLOSE" % BroadcastUI.input_hint("cancel")
+	if Settings.using_gamepad:
+		if _swap_from >= 0:
+			_close_hint.text = "CHOOSE SLOT   [X] PLACE   [B] CANCEL"
+		else:
+			_close_hint.text = "[D-PAD] INSPECT   [A] EQUIP   [X] MOVE   [R3] DROP   [B] CLOSE"
 	_frag_key.text = BroadcastUI.input_hint("throw_grenade")
 	_dome_key.text = BroadcastUI.input_hint("throw_dome")
 
@@ -597,8 +668,6 @@ func _center_column() -> Control:
 		var card: Control = _cards[i]
 		card.focus_neighbor_left = card.get_path_to(_cards[posmod(i - 1, _cards.size())])
 		card.focus_neighbor_right = card.get_path_to(_cards[(i + 1) % _cards.size()])
-	_drop_button.focus_neighbor_top = _drop_button.get_path_to(_cards[0])
-	_equip_button.focus_neighbor_top = _equip_button.get_path_to(_cards[0])
 	return box.get_parent()
 
 
@@ -824,6 +893,7 @@ class _SlotCard extends Control:
 	var definition: ItemDefinition
 	var equipped := false
 	var inspected := false
+	var swap_source := false
 	var _hover := false
 	var _drop_hover := false
 	var _dragging := false
@@ -838,6 +908,7 @@ class _SlotCard extends Control:
 	func _get_drag_data(_at: Vector2) -> Variant:
 		if item == null:
 			return null
+		menu._clear_swap()
 		set_drag_preview(menu.make_drag_preview(index))
 		Sound.play("ui_tick", -10.0, 1.3)
 		return {"inventory_slot": index}
@@ -921,7 +992,10 @@ class _SlotCard extends Control:
 			draw_line(size * 0.5 - Vector2(4, 0), size * 0.5 + Vector2(4, 0), Color(BroadcastUI.MUTED, 0.5), 2)
 		var border := Color(BroadcastUI.MUTED, 0.3)
 		var width := 1.0
-		if _drop_hover:
+		if swap_source:
+			border = BroadcastUI.AMBER
+			width = 2.0
+		elif _drop_hover:
 			border = BroadcastUI.CYAN
 			width = 2.0
 		elif inspected:

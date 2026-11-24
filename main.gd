@@ -108,7 +108,7 @@ func _ready() -> void:
 		var starter_picker := preload("res://ui/starter_picker.gd").new()
 		starter_picker.loot = loot
 		$HUD.add_child(starter_picker)
-		# Tab / I: live loadout, drag-and-drop hotbar and active mutations.
+		# Live loadout, drag-and-drop hotbar and active mutations.
 		# Added after the pause and dev menus so its _input sees ESC first.
 		var inventory := CanvasLayer.new()
 		inventory.name = "InventoryMenu"

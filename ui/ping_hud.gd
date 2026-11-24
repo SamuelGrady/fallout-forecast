@@ -70,7 +70,8 @@ func _local() -> Player:
 
 func _can_ping(player: Player) -> bool:
 	return is_instance_valid(player) and player.is_multiplayer_authority() and player.state in ["ok", "downed"] \
-		and not _run_ended and GameManager.mutations.stage == "" and not get_tree().paused
+		and not _run_ended and GameManager.mutations.stage == "" and not get_tree().paused \
+		and not InventoryMenu.blocks_gameplay_actions()
 
 
 # ------------------------------------------------------------------ input

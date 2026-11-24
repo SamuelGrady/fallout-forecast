@@ -278,13 +278,14 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= gravity * delta
 		_coyote_timer -= delta
 
-	if Input.is_action_just_pressed("jump"):
+	var loadout_input := InventoryMenu.blocks_gameplay_actions()
+	if not loadout_input and Input.is_action_just_pressed("jump"):
 		_jump_buffer_timer = jump_buffer
 	else:
 		_jump_buffer_timer -= delta
 
 	# Crouch: hold to crouch, stay down while something is overhead. Downed = flat.
-	if Input.is_action_pressed("crouch"):
+	if not loadout_input and Input.is_action_pressed("crouch"):
 		is_crouching = true
 	elif is_crouching and _can_stand():
 		is_crouching = false
@@ -357,8 +358,8 @@ func _physics_process(delta: float) -> void:
 	_landing_check()
 	_update_shelter()
 
-	_handle_interact(delta)
-	if Input.is_action_just_pressed("ready_up") and state == "ok" and not GameManager.is_voting():
+	_handle_interact(delta, loadout_input)
+	if not loadout_input and Input.is_action_just_pressed("ready_up") and state == "ok" and not GameManager.is_voting():
 		GameManager.ready_up()
 	if state == "turned":
 		_melee_left -= delta
@@ -368,7 +369,7 @@ func _physics_process(delta: float) -> void:
 				_melee()
 			else:
 				_request_melee.rpc_id(1)
-	if has_tarp and state == "ok" and not GameManager.is_voting() and Input.is_action_just_pressed("use_item"):
+	if not loadout_input and has_tarp and state == "ok" and not GameManager.is_voting() and Input.is_action_just_pressed("use_item"):
 		_set_tarp(not tarp_raised)
 
 
@@ -751,8 +752,8 @@ func _grant_tarp() -> void:
 
 
 # ------------------------------------------------------------------ interact
-func _handle_interact(delta: float) -> void:
-	var pressed := Input.is_action_pressed("interact")
+func _handle_interact(delta: float, loadout_input: bool) -> void:
+	var pressed := not loadout_input and Input.is_action_pressed("interact")
 	var best: Interactable = null
 	var best_score := INF
 	if state != "turned" and not GameManager.is_voting():

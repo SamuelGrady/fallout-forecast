@@ -119,6 +119,7 @@ var _ammo := Label.new()
 var _reserve := Label.new()
 var _pips := preload("res://ui/ammo_pips.gd").new()
 var _slots := ItemHotbar.new()
+var _loadout_hint := Label.new()
 var _armory_hot := 0.0
 var _name_left := 0.0
 var _hint_left := 0.0
@@ -366,6 +367,10 @@ func _build_armory() -> void:
 	_slots.scale = Vector2.ONE * minf(Settings.hud_scale, 1.0)
 	_slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layout.add_child(_slots)
+	_loadout_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	BroadcastUI.hud_text(_loadout_hint, BroadcastUI.T_META, BroadcastUI.PAPER)
+	_anchor(_loadout_hint, Control.PRESET_CENTER_BOTTOM, Rect2(-150, -24, 300, 22), Vector2(0.5, 1))
+	_loadout_hint.hide()
 
 
 func _build_messages() -> void:
@@ -429,6 +434,9 @@ func _fade(control: CanvasItem, hot: bool, idle: float, delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_loadout_hint.visible = InventoryMenu.can_open()
+	if _loadout_hint.visible:
+		_loadout_hint.text = "[%s] LOADOUT" % BroadcastUI.input_hint("inventory")
 	_banner_left = maxf(0.0, _banner_left - delta)
 	_banner.visible = _banner_left > 0.0
 	if _banner.visible:

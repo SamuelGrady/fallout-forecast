@@ -1,9 +1,15 @@
 extends CanvasLayer
 
+const LOADOUT_HOLD := 0.4
+
 var _panel := PanelContainer.new()
 var _resume_button: Button
 var _remote := Label.new()
 var _remote_layer := CanvasLayer.new()
+var _loadout_hint: Label
+var _start_held := false
+var _start_device := -1
+var _start_time := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -46,11 +52,10 @@ func _ready() -> void:
 	rule.custom_minimum_size = Vector2(0, 1)
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(rule)
-	var footer := Label.new()
-	footer.text = "[TAB / I]  LOADOUT & MUTATIONS"
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BroadcastUI.text(footer, 18, BroadcastUI.MUTED)
-	box.add_child(footer)
+	_loadout_hint = Label.new()
+	_loadout_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	BroadcastUI.text(_loadout_hint, 18, BroadcastUI.MUTED)
+	box.add_child(_loadout_hint)
 	visible = false
 	BroadcastUI.text(_remote, 30, BroadcastUI.CYAN)
 	BroadcastUI.back_label(_remote)
@@ -86,26 +91,55 @@ func _button(box: Control, text: String, action: Callable) -> Button:
 	return button
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton and event.is_action("pause"):
+		if _start_held and event.device == _start_device and event.is_released():
+			get_viewport().set_input_as_handled()
+			_start_held = false
+			if not event.is_canceled() and _start_time < LOADOUT_HOLD and InventoryMenu.can_open():
+				_toggle_pause()
+			return
+		if event.is_pressed() and InventoryMenu.can_open() and not GameManager.global_paused:
+			get_viewport().set_input_as_handled()
+			Settings.using_gamepad = true
+			_start_held = true
+			_start_device = event.device
+			_start_time = 0.0
+			return
 	var pause_pressed := event.is_action_pressed("pause")
 	var cancel_open_menu := visible and event.is_action_pressed("ui_cancel")
 	if not GameManager.awaiting_tape_choice and (pause_pressed or cancel_open_menu) and not event.is_echo():
 		# ESC closes an open loadout screen instead of pausing.
-		if InventoryMenu.blocks_pause():
+		if InventoryMenu.blocks_gameplay_actions():
 			return
 		if not MenuState.stack.is_empty() and MenuState.stack.back() != self:
 			return
 		get_viewport().set_input_as_handled()
-		Sound.play("ui_click")
-		if visible:
-			_resume()
-		elif GameManager.global_paused:
-			# Someone else paused: ESC resumes for everyone.
-			GameManager.request_pause(false)
-		else:
-			MenuState.open(self)
-			BroadcastUI.reveal(_panel)
-			GameManager.request_pause(true)
-			_remote.visible = false
+		_toggle_pause()
+
+func _process(delta: float) -> void:
+	if visible:
+		_loadout_hint.text = "[%s]  LOADOUT & MUTATIONS" % BroadcastUI.input_hint("inventory")
+	if not _start_held or _start_time >= LOADOUT_HOLD:
+		return
+	if not InventoryMenu.can_open() or GameManager.global_paused:
+		_start_time = LOADOUT_HOLD
+		return
+	_start_time += delta
+	if _start_time >= LOADOUT_HOLD:
+		InventoryMenu.open_from_gamepad()
+
+func _toggle_pause() -> void:
+	Sound.play("ui_click")
+	if visible:
+		_resume()
+	elif GameManager.global_paused:
+		# Someone else paused: ESC resumes for everyone.
+		GameManager.request_pause(false)
+	else:
+		MenuState.open(self)
+		BroadcastUI.reveal(_panel)
+		GameManager.request_pause(true)
+		_remote.visible = false
 
 func focus_default() -> void:
 	_resume_button.grab_focus()

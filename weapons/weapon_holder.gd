@@ -56,6 +56,7 @@ var _bob := 0.0
 var _aim := 0.0
 var _equip_left := 0.0
 var _fire_buffer := 0.0
+var _loadout_fire_blocked := false
 var _recoil := 0.0
 var _camera_kick := 0.0
 var _heat := 0.0
@@ -203,7 +204,10 @@ func _process(delta: float) -> void:
 	_update_throw_preview(delta)
 
 func _handle_input() -> void:
-	if not can_act() or InventoryMenu.is_open():
+	var loadout_input := InventoryMenu.blocks_gameplay_actions()
+	if loadout_input:
+		_loadout_fire_blocked = Input.is_action_pressed("fire") or Input.is_action_just_released("fire")
+	if not can_act() or loadout_input:
 		_fire_buffer = 0.0
 		_local_charging = false
 		return
@@ -216,8 +220,10 @@ func _handle_input() -> void:
 		return
 	if not Input.is_action_pressed("fire"):
 		_pouch_fire_latched = false
+	var block_fire := _loadout_fire_blocked
+	_loadout_fire_blocked = block_fire and Input.is_action_pressed("fire")
 	if _pouch_ack_left > 0.0:
-		if not _pending_pouch.is_empty() and Input.is_action_just_pressed("fire") and not player.tarp_raised:
+		if not block_fire and not _pending_pouch.is_empty() and Input.is_action_just_pressed("fire") and not player.tarp_raised:
 			_fire_buffer = _pouch_ack_left
 		return
 	var data := selected_weapon()
@@ -226,6 +232,10 @@ func _handle_input() -> void:
 		return
 	if Input.is_action_just_pressed("reload") and active_pouch.is_empty():
 		start_reload()
+	if block_fire:
+		# A trigger pressed in loadout must return to neutral before firing or
+		# releasing a charged shot in gameplay.
+		return
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		_fire_buffer = 0.0
 		_local_charging = false
@@ -269,7 +279,7 @@ func _handle_input() -> void:
 			start_reload()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Net.dedicated or not player.is_multiplayer_authority() or not can_act() or InventoryMenu.is_open():
+	if Net.dedicated or not player.is_multiplayer_authority() or not can_act() or InventoryMenu.blocks_gameplay_actions():
 		return
 	for id: String in ItemCatalog.POUCH_ACTIONS:
 		if event.is_action_pressed(ItemCatalog.POUCH_ACTIONS[id]):
