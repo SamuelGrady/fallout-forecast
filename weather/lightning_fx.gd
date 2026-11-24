@@ -1,9 +1,12 @@
 extends Node3D
-## Local lightning effects for WeatherManager.lightning_struck: a soft sky lift
-## (through the parent WeatherFX), a crisp branching bolt with a ground flash
-## and shock ring at the strike, outlines on the infected near the strike, and
-## thunder right behind it. The seed from the host makes the bolt shape the
-## same on every client.
+## Local lightning effects for WeatherManager:
+## - lightning_struck (item / targeted strikes): a sky lift (through parent
+##   WeatherFX), a crisp branching bolt with a ground flash and tactical shock
+##   ring, outlines on infected near the strike, and loud thunder.
+## - ambient_lightning_struck (natural storm lightning): an atmospheric bolt,
+##   softer sky flash and shake, subtle ground flash/sparks without the tactical
+##   ring, and softer rolling thunder — never revealing or hurting enemies.
+## The seed from the host makes the bolt shape the same on every client.
 ##
 ## Thunder goes through Sound (a fresh stream-mode player per strike, owned by
 ## the Sound autoload), so overlapping strikes, a freed LightningFX or the Web
@@ -28,6 +31,7 @@ static var _ring_mesh: TorusMesh
 
 func _ready() -> void:
 	WeatherManager.lightning_struck.connect(_on_lightning_struck)
+	WeatherManager.ambient_lightning_struck.connect(_on_ambient_lightning_struck)
 	if _segment_mesh == null:
 		_segment_mesh = BoxMesh.new()
 		_segment_mesh.size = Vector3.ONE
@@ -42,6 +46,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if WeatherManager.lightning_struck.is_connected(_on_lightning_struck):
 		WeatherManager.lightning_struck.disconnect(_on_lightning_struck)
+	if WeatherManager.ambient_lightning_struck.is_connected(_on_ambient_lightning_struck):
+		WeatherManager.ambient_lightning_struck.disconnect(_on_ambient_lightning_struck)
 
 
 func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
@@ -57,12 +63,32 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = strike_seed
 	_spawn_bolt(position, rng)
-	_spawn_impact(position)
+	_spawn_impact(position, true)
 
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if enemy.global_position.distance_to(position) <= reveal_radius and enemy.has_method("reveal"):
 			enemy.reveal(reveal_time)
 
+	_schedule_thunder(position, rng, 0.0)
+
+
+func _on_ambient_lightning_struck(position: Vector3, strike_seed: int) -> void:
+	if Net.dedicated or DisplayServer.get_name() == "headless":
+		return
+	Perf.mark("ambient lightning strike")
+	Juice.shake(0.22, position)
+	var fx := get_parent()
+	if fx and "flash" in fx:
+		fx.flash = maxf(fx.flash, 0.65 * Settings.flash_scale())
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = strike_seed
+	_spawn_bolt(position, rng)
+	_spawn_impact(position, false)
+	_schedule_thunder(position, rng, -3.0)
+
+
+func _schedule_thunder(position: Vector3, rng: RandomNumberGenerator, volume_offset_db: float = 0.0) -> void:
 	var listener := position
 	var camera := get_viewport().get_camera_3d()
 	if camera:
@@ -70,7 +96,7 @@ func _on_lightning_struck(position: Vector3, strike_seed: int) -> void:
 	var distance := listener.distance_to(position)
 	# Sound travels ~343 m/s: close strikes crack right away, far ones lag a touch.
 	var delay := clampf(0.05 + distance / 343.0, 0.05, 0.35)
-	var level := thunder_volume_db - clampf(distance / 18.0, 0.0, 7.0)
+	var level := thunder_volume_db + volume_offset_db - clampf(distance / 18.0, 0.0, 7.0)
 	var pitch := rng.randf_range(0.93, 1.06)
 	# Bound to the Sound autoload so the cue survives this node being freed.
 	get_tree().create_timer(delay, false).timeout.connect(Sound.play_thunder.bind(level, pitch))
@@ -147,31 +173,32 @@ func _add_segment(parent: Node3D, from: Vector3, to: Vector3, width: float, mate
 	segment.global_basis = Basis(side * width, up * length, side.cross(up).normalized() * width)
 
 
-## Ground impact: an expanding shock ring, sparks, a short puff and (desktop)
-## a brief local light that fades out instead of a full-scene sun pop.
-func _spawn_impact(at: Vector3) -> void:
+## Ground impact: optional expanding tactical shock ring, sparks, a short puff
+## and (desktop) a brief local light that fades out instead of a full-scene sun pop.
+func _spawn_impact(at: Vector3, show_ring: bool = true) -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		world = self
-	var ring := MeshInstance3D.new()
-	ring.mesh = _ring_mesh
-	ring.material_override = ShotFX._unshaded(IMPACT_COLOR)
-	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(ring)
-	ring.global_position = at + Vector3.UP * 0.08
-	ring.scale = Vector3(0.4, 0.5, 0.4)
-	var tween := ring.create_tween().set_parallel(true)
-	tween.tween_property(ring, "scale", Vector3(6.5, 0.5, 6.5), 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(ring, "transparency", 1.0, 0.38)
-	tween.chain().tween_callback(ring.queue_free)
-	ShotFX.sparks(world, at + Vector3.UP * 0.2, Vector3.UP, 14)
-	ShotFX.puff(world, at + Vector3.UP * 0.25, Color(CORE_COLOR, 0.7), 0.7, 0.25)
+	if show_ring:
+		var ring := MeshInstance3D.new()
+		ring.mesh = _ring_mesh
+		ring.material_override = ShotFX._unshaded(IMPACT_COLOR)
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(ring)
+		ring.global_position = at + Vector3.UP * 0.08
+		ring.scale = Vector3(0.4, 0.5, 0.4)
+		var tween := ring.create_tween().set_parallel(true)
+		tween.tween_property(ring, "scale", Vector3(6.5, 0.5, 6.5), 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(ring, "transparency", 1.0, 0.38)
+		tween.chain().tween_callback(ring.queue_free)
+	ShotFX.sparks(world, at + Vector3.UP * 0.2, Vector3.UP, 14 if show_ring else 8)
+	ShotFX.puff(world, at + Vector3.UP * 0.25, Color(CORE_COLOR, 0.7), 0.7 if show_ring else 0.45, 0.25)
 	if OS.has_feature("web"):
 		return
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.78, 0.92, 1.0)
-	light.light_energy = 7.0 * Settings.flash_scale()
-	light.omni_range = 18.0
+	light.light_energy = (7.0 if show_ring else 4.5) * Settings.flash_scale()
+	light.omni_range = 18.0 if show_ring else 14.0
 	light.omni_attenuation = 1.4
 	light.shadow_enabled = false
 	add_child(light)

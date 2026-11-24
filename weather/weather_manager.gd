@@ -9,21 +9,28 @@ extends Node
 ## Until GameManager exists, auto_cycle runs the phases on its own timers.
 ## GameManager can set auto_cycle = false and drive it with set_phase().
 ##
-## Lightning is item-driven: nothing strikes on its own. A planted Lightning
-## Rod Spike (weapons/projectile.gd), the boss, or dev tools call strike_at()
-## on the host, which sends one RPC with the position and a seed so every
-## client's flash, bolt, outlines and thunder line up.
+## Lightning has two distinct paths:
+## - Natural ambient storm lightning escalates in frequency across waves while
+##   a storm is active (auto_lightning). The host calls strike_ambient_lightning(),
+##   emitting ambient_lightning_struck and replicating via _strike with a negative
+##   seed so clients render atmospheric bolts, flashes, and thunder without
+##   revealing or damaging enemies.
+## - Item-driven lightning (planted Lightning Rod Spikes in weapons/projectile.gd
+##   and targeted dev-menu strikes) calls strike_at() / trigger_lightning_strike(),
+##   emitting lightning_struck with a positive seed to trigger enemy reveals,
+##   tactical shock rings, Static reactions, and conductors damage/kills.
 ##
 ## The Mutation Draft runs at the start of Calm (wave 2+), not as its own
 ## phase. While it holds the cycle the Calm countdown is paused, so the squad
 ## still gets its full Calm once the draft resolves.
 ##
 ## Debug (debug builds, host only): F1 skips to the next phase, F2 jumps to
-## wave 5, F6 strikes lightning now.
+## wave 5, F6 strikes ambient lightning now.
 
 signal phase_changed(phase: Phase, wave: int)
 signal storm_changed(state: StormState, intensity: float)
 signal lightning_struck(position: Vector3, strike_seed: int)
+signal ambient_lightning_struck(position: Vector3, strike_seed: int)
 
 ## MUTATION_ROLL is no longer entered (the draft runs inside Calm); it stays in
 ## the enum so existing references and replicated phase values keep working.
@@ -41,6 +48,7 @@ const ENEMY_BUFF := [1.0, 1.0, 1.3, 1.5]
 const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 
 @export var auto_cycle := true
+@export var auto_lightning := true
 @export var calm_duration := 30.0
 ## Wave 1 starts faster: the playtest sat through 30 s of nothing.
 @export var first_calm_duration := 12.0
@@ -52,8 +60,8 @@ const SUIT_LOSS_PER_SECOND := [0.0, 1.0, 4.0, 6.0]
 @export var clearing_duration := 15.0
 ## How fast storm_intensity eases toward its target, in intensity per second.
 @export var intensity_ramp := 0.1
-## Strikes without a target (boss, dev menu) land at a random spot inside
-## this half-size around a spawn site.
+## Strikes without a target (ambient storm, boss, dev menu) land at a random spot
+## inside this half-size around a spawn site.
 @export var lightning_area := 60.0
 
 var phase: Phase = Phase.CALM
@@ -64,6 +72,7 @@ var running := false
 var storm_intensity := 0.0
 var target_intensity := 0.0
 var storm_state: StormState = StormState.CLEAR
+var _lightning_timer := 0.0
 
 ## While true the current phase doesn't time out (mutation roll vote, boss alive).
 var hold := false
@@ -86,6 +95,12 @@ func _process(delta: float) -> void:
 	storm_state = _state_for(storm_intensity)
 	if storm_intensity != before or storm_state != before_state:
 		storm_changed.emit(storm_state, storm_intensity)
+
+	if running and auto_lightning and Net.is_host() and is_storm_active() and storm_intensity >= 0.25:
+		_lightning_timer -= delta
+		if _lightning_timer <= 0.0:
+			strike_ambient_lightning()
+			_lightning_timer = mean_lightning_interval() * randf_range(0.78, 1.22)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -142,6 +157,7 @@ func stop() -> void:
 	intensity_override = -1.0
 	target_intensity = 0.0
 	storm_intensity = 0.0
+	_lightning_timer = 0.0
 	phase = Phase.CALM
 	wave = 1
 
@@ -176,37 +192,75 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 	_apply_phase(new_phase, new_wave, duration)
 
 
-## Host: strike lightning at `at`, or at a random spot near a spawn site when
-## no position is given (boss storm, dev menu, F6).
+## Mean seconds between natural ambient storm lightning bolts for a given wave
+## and storm intensity. Shrinks each wave and intensifies in Downpour / Acid
+## Storm (and further under Heavy Weather).
+func mean_lightning_interval(for_wave: int = wave, intensity: float = storm_intensity) -> float:
+	var base: float
+	match for_wave:
+		1:
+			base = 18.0
+		2:
+			base = 13.0
+		3:
+			base = 9.5
+		4:
+			base = 6.8
+		5:
+			base = 4.4
+		_:
+			if for_wave < 1:
+				base = 18.0
+			else:
+				base = maxf(2.6, 4.4 - 0.45 * (for_wave - FINAL_WAVE))
+	var t := clampf((intensity - 0.25) / 0.75, 0.0, 1.0)
+	var interval := base * lerpf(1.75, 1.0, t)
+	if wave_modifier() == WavePlan.HEAVY_WEATHER:
+		interval *= 0.68
+	return interval
+
+
+## Host: strike lightning at `at` (targeted/item strike), or trigger an ambient
+## storm bolt near a spawn site when no position is given (boss storm, dev menu, F6).
 func strike_lightning(at: Variant = null) -> void:
 	if not Net.is_host():
 		return
 	if at is Vector3:
 		strike_at(at)
+	else:
+		strike_ambient_lightning()
+
+
+## Host: trigger an ambient storm lightning bolt (purely atmospheric — never
+## reveals or damages enemies, and never pulls onto enemies for conductors).
+## Replicated via _strike with a negative seed to preserve Net.PROTOCOL == 19.
+func strike_ambient_lightning(at: Variant = null) -> void:
+	if not Net.is_host():
 		return
-	var sites := get_tree().get_nodes_in_group("enemy_spawn")
-	if sites.is_empty():
-		sites = get_tree().get_nodes_in_group("player_spawn")
-	var site := sites.pick_random() as Node3D if not sites.is_empty() else null
-	var center := site.global_position if site else Vector3.ZERO
-	var spread := lightning_area * (.11 if wave_modifier() == WavePlan.HEAVY_WEATHER else .32)
-	var position := center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
-	# Conductors mutation: pull most strikes near an infected so the chain jump matters.
-	if GameManager.has_mutation("conductors") and randf() < 0.65:
-		var enemies := get_tree().get_nodes_in_group("enemies")
-		if not enemies.is_empty():
-			var chosen: Node3D = enemies.pick_random()
-			position = chosen.global_position + Vector3(randf_range(-3.5, 3.5), 0.0, randf_range(-3.5, 3.5))
-	strike_at(position)
+	var position: Vector3
+	if at is Vector3:
+		position = at
+	else:
+		var sites := get_tree().get_nodes_in_group("enemy_spawn")
+		if sites.is_empty():
+			sites = get_tree().get_nodes_in_group("player_spawn")
+		var site := sites.pick_random() as Node3D if not sites.is_empty() else null
+		var center := site.global_position if site else Vector3.ZERO
+		var spread := lightning_area * (0.11 if wave_modifier() == WavePlan.HEAVY_WEATHER else 0.32)
+		position = center + Vector3(randf_range(-spread, spread), 0.0, randf_range(-spread, spread))
+	var strike_seed := maxi(1, absi(randi()))
+	if Net.is_online():
+		Net.rpc_to_all(_strike, [position, -strike_seed])
+	ambient_lightning_struck.emit(position, strike_seed)
 
 
-## Host: call a lightning strike down exactly at `at` on every client
-## (Lightning Rod Spike, boss, dev tools). Emits lightning_struck locally and
-## replicates the position and bolt seed.
+## Host: call a targeted/item lightning strike down exactly at `at` on every
+## client (Lightning Rod Spike, targeted dev tools). Emits lightning_struck
+## locally with a positive seed and replicates the position and bolt seed.
 func strike_at(at: Vector3) -> void:
 	if not Net.is_host():
 		return
-	var strike_seed := randi()
+	var strike_seed := maxi(1, absi(randi()))
 	# rpc() needs a live peer, so solo strikes come straight off the signal.
 	if Net.is_online():
 		Net.rpc_to_all(_strike, [at, strike_seed])
@@ -220,7 +274,10 @@ func trigger_lightning_strike(at: Vector3) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _strike(position: Vector3, strike_seed: int) -> void:
-	lightning_struck.emit(position, strike_seed)
+	if strike_seed < 0:
+		ambient_lightning_struck.emit(position, -strike_seed)
+	else:
+		lightning_struck.emit(position, strike_seed)
 
 
 ## Host: send the current phase to one peer (call when a player joins mid-run).
@@ -314,6 +371,8 @@ func _apply_phase(new_phase: Phase, new_wave: int, time_left: float) -> void:
 	running = true
 	target_intensity = _target_for(new_phase, new_wave)
 	if changed:
+		if new_phase == Phase.DRIZZLE or new_phase == Phase.DOWNPOUR:
+			_lightning_timer = mean_lightning_interval(new_wave, maxf(target_intensity, 0.3)) * randf_range(0.55, 0.95)
 		Perf.mark("phase %s wave %d" % [PHASE_NAMES[new_phase], new_wave])
 		phase_changed.emit(phase, wave)
 
