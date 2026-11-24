@@ -858,19 +858,19 @@ var _hazard_seq := 0
 
 
 ## Host: a glob on an arc, simulated on every peer; only the host's hazard hurts.
-func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false, source: Node = null) -> void:
+func spawn_spore(from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid := false, source: Node = null, cloudburst := false) -> void:
 	_hazard_seq += 1
 	if _online():
-		Net.rpc_to_run(_spawn_spore, [_hazard_seq, from, to, flight, damage_per_second, acid])
-	_make_spore(_hazard_seq, from, to, flight, damage_per_second, acid, source)
+		Net.rpc_to_run(_spawn_spore, [_hazard_seq, from, to, flight, damage_per_second, acid, cloudburst])
+	_make_spore(_hazard_seq, from, to, flight, damage_per_second, acid, source, cloudburst)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _spawn_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool) -> void:
-	_make_spore(id, from, to, flight, damage_per_second, acid, null)
+func _spawn_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool, cloudburst: bool) -> void:
+	_make_spore(id, from, to, flight, damage_per_second, acid, null, cloudburst)
 
 
-func _make_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool, source: Node) -> void:
+func _make_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_second: float, acid: bool, source: Node, cloudburst: bool) -> void:
 	var world := _world()
 	if world == null:
 		return
@@ -879,6 +879,7 @@ func _make_spore(id: int, from: Vector3, to: Vector3, flight: float, damage_per_
 	spore.acid = acid
 	spore.hazard_id = id
 	spore.source = source
+	spore.cloudburst = cloudburst
 	world.add_child(spore)
 	spore.launch(from, to, flight)
 

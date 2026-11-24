@@ -10,8 +10,8 @@ extends Node3D
 ##
 ## On web (see WebMaterials) main.gd hides the world from the camera until
 ## the first stage has drawn one small swatch per distinct shader key in the
-## run (plus a copy inside a temporary omni light for the lit variant), a few
-## per frame. Then "district" shows the real level for two frames.
+## run (plus a copy inside a temporary omni light for the lit variant).
+## Web warms one key per frame before "district" draws the real level.
 
 signal finished
 
@@ -468,7 +468,12 @@ func _queue_surfaces() -> void:
 				_queue_material(mesh.surface_get_material(i), kind, source)
 	_surface_total = _surface_queue.size()
 	Perf.mark("warm-up %d surface keys" % _surface_total)
-	_draw_surface_batch()
+	if _web:
+		# Draw the HUD, puddle and bolt samples before the first surface batch.
+		_set_holder_layers()
+		_hold = 1
+	else:
+		_draw_surface_batch()
 
 
 func _queue_material(material: Material, kind: String, source: MultiMesh) -> void:
@@ -498,7 +503,7 @@ func _draw_surface_batch() -> void:
 	if camera == null:
 		_surface_queue.clear()
 		return
-	var per_frame := 2 if _web else 8
+	var per_frame := 1 if _web else 8
 	var forward := -camera.global_basis.z
 	var right := camera.global_basis.x
 	var up := camera.global_basis.y
@@ -521,7 +526,7 @@ func _draw_surface_batch() -> void:
 	SceneLoader.set_stage("TUNING IN...", 0.60 + 0.38 * (float(done) / maxf(1.0, _surface_total)) / STAGES.size(), "SURFACES %d / %d" % [done, _surface_total])
 	if _label:
 		_label.text = "TUNING IN...  SURFACES %d / %d" % [done, _surface_total]
-	_hold = 2 if _web else 1
+	_hold = 1
 
 
 func _add_swatch(entry: Dictionary, at: Vector3) -> void:

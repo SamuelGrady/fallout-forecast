@@ -10,6 +10,8 @@ const VENDING_POOLS := [
 		"boombox_launcher", "leaky_nailgun", "lucky_penny_revolver"],
 ]
 const VENDING_PRICES := [6, 11, 18]
+## Two regular scrap pickups buy a Tuned primary during the first intermission.
+const WAVE_TWO_PRIMARY_PRICE := 10
 const VENDING_LEGENDARY_CHANCE := 0.05
 const EARLY_VENDING_POOLS := [
 	["med_tin", "suit_patch", "frag", "shield_dome", "umbrella"],
@@ -327,7 +329,8 @@ func _restock(station: SupplyStation, sold := -1) -> void:
 		if i == 2 and wave >= 4 and previous != "disruptor" and _vending_rng.randf() < VENDING_LEGENDARY_CHANCE:
 			id = "disruptor"
 		_offer_serial += 1
-		offers[i] = [id, _vending_tier(i, wave), VENDING_PRICES[i], _offer_serial]
+		var price := WAVE_TWO_PRIMARY_PRICE if wave == 2 and i == 1 else int(VENDING_PRICES[i])
+		offers[i] = [id, _vending_tier(i, wave), price, _offer_serial]
 	station.set_offers(offers)
 	Net.rpc_to_run(_stock, [_run, station.key, offers])
 
