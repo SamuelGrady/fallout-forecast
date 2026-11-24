@@ -106,9 +106,9 @@ func skip_wait() -> void:
 	if not Net.is_host() or hold or not (phase == Phase.CALM or phase == Phase.CLEARING):
 		return
 	if phase_time_left > 3.0:
-		_apply_phase(phase, wave, 3.0)
 		if Net.is_online():
 			Net.rpc_to_all(_receive_phase, [phase, wave, 3.0])
+		_apply_phase(phase, wave, 3.0)
 
 
 ## Host: force storm_intensity toward `value` (-1 to go back to the phase's
@@ -161,7 +161,9 @@ func next_phase() -> void:
 		set_phase((phase + 1) as Phase, wave)
 
 
-## Host: jump to a phase. Sends it to every client.
+## Host: jump to a phase. Sends it to every client before firing local
+## phase_changed listeners so downstream RPCs (mutation draft, supply drop,
+## banners) arrive after clients already see the new phase and wave.
 func set_phase(new_phase: Phase, new_wave: int) -> void:
 	if not Net.is_host():
 		push_warning("WeatherManager.set_phase called on a client")
@@ -169,9 +171,9 @@ func set_phase(new_phase: Phase, new_wave: int) -> void:
 	var duration := _duration_for(new_phase)
 	if new_phase == Phase.CALM and new_wave == 1:
 		duration = first_calm_duration
-	_apply_phase(new_phase, new_wave, duration)
 	if Net.is_online():
 		Net.rpc_to_all(_receive_phase, [new_phase, new_wave, duration])
+	_apply_phase(new_phase, new_wave, duration)
 
 
 ## Host: strike lightning at `at`, or at a random spot near a spawn site when
