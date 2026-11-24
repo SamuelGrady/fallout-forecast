@@ -33,9 +33,11 @@ RUN godot --headless --import \
 
 RUN set -eu; \
     cd /export; \
+    cp /project/web/fallout.webmanifest /project/web/install-*.png .; \
     version=$(sha256sum ./* | sha256sum | cut -c1-32); \
     mkdir -p "/site/$version"; \
-    sed "/<head>/a\  <base href=\"./$version/\">" game.html > /site/index.html; \
+    sed -e "/<head>/a\  <base href=\"./$version/\">" \
+        -e '/<\/head>/i\  <link rel="manifest" href="fallout.webmanifest">' game.html > /site/index.html; \
     rm game.html; \
     mv ./* "/site/$version/"; \
     gzip -k -9 "/site/$version/game.wasm" "/site/$version/game.pck" "/site/$version/game.js"

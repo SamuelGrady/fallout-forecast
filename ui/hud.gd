@@ -384,6 +384,15 @@ func _layout_hotbar() -> void:
 	_slots.pivot_offset = Vector2(bar_size.x * 0.5, bar_size.y)
 	var bar_scale := maxf(1.0, 44.0 * TouchInput.units_per_css_pixel() / bar_size.y) if touch else minf(Settings.hud_scale, 1.0)
 	_slots.scale = Vector2.ONE * bar_scale
+	# Ammo sits above the hotbar's extended scrap and pouch area, and above
+	# the action buttons in the touch layout.
+	var clearance := 24.0 + (bar_size.y + 8.0) * bar_scale
+	if touch:
+		clearance = maxf(clearance, 175.0 * TouchInput.units_per_css_pixel())
+	var height := _armory.size.y
+	_armory.offset_top = -clearance - 12.0 - height
+	_armory.offset_bottom = -clearance - 12.0
+	_armory.pivot_offset = _armory.size
 
 
 func _build_messages() -> void:

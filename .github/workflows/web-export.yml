@@ -45,6 +45,12 @@ jobs:
           check_asset game.wasm application/wasm
           check_asset game.pck application/octet-stream
           check_asset game.js application/javascript
+          grep -Fq 'rel="manifest" href="fallout.webmanifest"' "$RUNNER_TEMP/index.html"
+          curl -fsS -D "$RUNNER_TEMP/manifest.headers" "$url/$version/fallout.webmanifest" |
+            jq -e '.start_url == "../" and .scope == "../" and .display == "standalone"'
+          grep -Fqi 'Content-Type: application/manifest+json' "$RUNNER_TEMP/manifest.headers"
+          curl -fsS -o /dev/null "$url/$version/install-192.png"
+          curl -fsS -o /dev/null "$url/$version/install-512.png"
           mkdir "$RUNNER_TEMP/fallout-web"
           docker cp fallout-web-ci:/usr/share/nginx/html/index.html "$RUNNER_TEMP/fallout-web"
           docker cp "fallout-web-ci:/usr/share/nginx/html/$version" "$RUNNER_TEMP/fallout-web"

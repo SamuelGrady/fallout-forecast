@@ -226,6 +226,22 @@
       border-color: var(--cyan);
       transform: scale(1.02);
     }
+    #install-tip {
+      margin-top: 10px;
+      color: var(--paper);
+      font-size: 18px;
+      text-align: center;
+    }
+
+    #install-tip p { margin: 0 0 4px; }
+    #install-tip button {
+      padding: 4px 10px;
+      border: 1px solid var(--cyan);
+      background: var(--panel);
+      color: var(--paper);
+      font: inherit;
+    }
+
     button:focus-visible, #download:focus-visible {
       outline: 2px solid var(--cyan);
       outline-offset: 3px;
@@ -336,6 +352,11 @@
           <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
         </div>
         <button id="controls" type="button">CONTROLS: AUTO</button>
+        <div id="install-tip" hidden>
+          <p id="install-instructions" hidden></p>
+          <button id="install-app" type="button" hidden>INSTALL GAME</button>
+          <button id="dismiss-install" type="button">DISMISS</button>
+        </div>
         <p id="status" role="status"></p>
         <div class="osd bottom-left">CH 03</div>
         <div class="osd bottom-right">HI-FI STEREO</div>
@@ -418,6 +439,28 @@
     } catch (_) {}
     let inRun = false;
     let browserCallback;
+    const installTip = document.getElementById("install-tip");
+    const installApp = document.getElementById("install-app");
+    const installInstructions = document.getElementById("install-instructions");
+    const installedMode = matchMedia("(display-mode: standalone)");
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const hasManifest = Boolean(document.querySelector('link[rel="manifest"]'));
+    let installPrompt;
+    let installDismissed = false;
+    try { installDismissed = localStorage.getItem("fallout-install-dismissed") === "yes"; } catch (_) {}
+
+    function updateInstall(landscape) {
+      installTip.hidden = !hasManifest || inRun || backdrop.hidden || installDismissed ||
+        installedMode.matches || navigator.standalone || !(isIOS || coarse.matches || navigator.maxTouchPoints > 0);
+      installApp.hidden = !installPrompt;
+      installInstructions.hidden = Boolean(installPrompt);
+      installInstructions.textContent = isIOS
+        ? "Install from Safari: Share → Add to Home Screen."
+        : "Install from your browser menu: Add to Home Screen.";
+      const parent = !landscape && !rotate.hidden ? document.getElementById("rotate-card") : document.getElementById("launch");
+      if (installTip.parentElement !== parent) parent.append(installTip);
+    }
 
     const touchMode = () => preference === "touch" ||
       (preference === "auto" && (coarse.matches || (anyCoarse.matches && navigator.maxTouchPoints > 0)));
@@ -431,6 +474,7 @@
       document.body.classList.toggle("touch-mode", touch);
       document.body.classList.toggle("in-run", inRun);
       rotate.hidden = !touch || landscape;
+      updateInstall(landscape);
       const controlsLabel = "CONTROLS: " + preference.toUpperCase();
       controls.textContent = controlsLabel;
       rotateControls.textContent = controlsLabel;
@@ -466,6 +510,38 @@
     };
     controls.addEventListener("click", cycleControls);
     rotateControls.addEventListener("click", cycleControls);
+    window.addEventListener("beforeinstallprompt", event => {
+      if (!(coarse.matches || navigator.maxTouchPoints > 0)) return;
+      event.preventDefault();
+      installPrompt = event;
+      updateLayout();
+    });
+    installApp.addEventListener("click", async () => {
+      const prompt = installPrompt;
+      if (!prompt) return;
+      installPrompt = null;
+      installApp.disabled = true;
+      try {
+        const choice = await prompt.prompt();
+        if (choice?.outcome === "accepted") installDismissed = true;
+      } catch (_) {
+        // Fall back to the browser menu if the saved prompt expired.
+      } finally {
+        installApp.disabled = false;
+        updateLayout();
+      }
+    });
+    function dismissInstall() {
+      installDismissed = true;
+      try { localStorage.setItem("fallout-install-dismissed", "yes"); } catch (_) {}
+      updateLayout();
+    }
+    document.getElementById("dismiss-install").addEventListener("click", dismissInstall);
+    window.addEventListener("appinstalled", () => {
+      installPrompt = null;
+      dismissInstall();
+    });
+    installedMode.addEventListener("change", updateLayout);
     new ResizeObserver(resizeCanvas).observe(document.getElementById("safe-area"));
     window.addEventListener("resize", resizeCanvas);
     window.addEventListener("orientationchange", resizeCanvas);
@@ -556,6 +632,7 @@
         });
         gameRunning = true;
         backdrop.hidden = true;
+        updateLayout();
         bezel.hidden = false;
         fullscreen.hidden = !document.fullscreenEnabled;
         updateAudio();
