@@ -30,15 +30,27 @@ func _ready() -> void:
 
 
 func _on_browser_change(args: Array) -> void:
-	interrupt()
-	enabled = bool(args[0])
-	landscape = bool(args[1])
-	foreground = bool(args[2])
-	_css_height = float(args[3])
-	_backing_scale = maxf(float(args[4]), 1.0)
+	var new_enabled := bool(args[0])
+	var new_landscape := bool(args[1])
+	var new_foreground := bool(args[2])
+	var new_css_height := float(args[3])
+	var new_backing_scale := maxf(float(args[4]), 1.0)
+	var changed := new_enabled != enabled or new_landscape != landscape or new_foreground != foreground \
+		or not is_equal_approx(new_css_height, _css_height) or not is_equal_approx(new_backing_scale, _backing_scale)
+	if not changed:
+		return
+	var lose_touch := not new_enabled or not new_landscape or not new_foreground
+	var mode_flipped := new_enabled != enabled or new_landscape != landscape
+	enabled = new_enabled
+	landscape = new_landscape
+	foreground = new_foreground
+	_css_height = new_css_height
+	_backing_scale = new_backing_scale
 	get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND if enabled else Window.CONTENT_SCALE_ASPECT_KEEP
-	if enabled:
-		release_pointer()
+	if lose_touch or mode_flipped:
+		interrupt()
+	if enabled and Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	layout_changed.emit()
 
 
@@ -65,8 +77,8 @@ func units_per_css_pixel() -> float:
 	return get_viewport().get_visible_rect().size.y / maxf(_css_height, 1.0) if _css_height > 0.0 else 1.0
 
 
-func look_delta(screen_relative: Vector2) -> Vector2:
-	return screen_relative * (3.0 * Settings.mouse_sensitivity / _backing_scale)
+func look_delta(css_relative: Vector2) -> Vector2:
+	return css_relative * (3.0 * Settings.mouse_sensitivity)
 
 
 func capture_pointer() -> void:

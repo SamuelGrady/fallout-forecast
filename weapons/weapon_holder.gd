@@ -333,6 +333,48 @@ func select_pouch(id: String) -> void:
 		_pouch_ack_left = 0.75
 	_send_action("select_pouch", 0, POUCH_ORDER.find(target))
 
+func find_touch_look_target(base_cone_deg := 6.2) -> Dictionary:
+	if camera == null or not is_inside_tree():
+		return {}
+	return WeaponCombat.find_aim_assist_target(
+		self, camera.global_position, -camera.global_basis.z,
+		lerpf(base_cone_deg, base_cone_deg * 0.72, _aim), false
+	)
+
+
+func _assist_shot_dir(origin: Vector3, dir: Vector3) -> Vector3:
+	var fwd := dir.normalized()
+	if not (TouchInput.gameplay_active or TouchInput.enabled):
+		return fwd
+	var data := selected_weapon()
+	if not active_pouch.is_empty() or data == null:
+		return fwd
+	var max_bend_deg := 3.8
+	var item := selected()
+	if data.pellets > 1 or data.mechanic in ["wash", "gust"]:
+		max_bend_deg = 4.2
+	elif (item != null and item.id == "hunting_rifle") or (_aim > 0.5 and not data.automatic and data.pellets == 1):
+		max_bend_deg = 3.2
+	var assist := WeaponCombat.find_aim_assist_target(self, origin, fwd, max_bend_deg + 1.5, data.mechanic == "reel")
+	if assist.is_empty():
+		return fwd
+	var shot_point: Vector3 = assist["shot_point"]
+	var want := (shot_point - origin).normalized()
+	var theta := acos(clampf(fwd.dot(want), -1.0, 1.0))
+	if theta <= 0.0001:
+		return fwd
+	var dist: float = float(assist["distance"])
+	var weight: float = float(assist["weight"])
+	var eff_deg := max_bend_deg * clampf((dist - 0.8) / 1.7, 0.4, 1.0)
+	var max_bend := deg_to_rad(eff_deg)
+	var limit := max_bend if theta <= max_bend else max_bend * smoothstep(0.0, 1.0, weight)
+	var bend := minf(theta * 0.90, limit)
+	var axis := fwd.cross(want)
+	if axis.length_squared() <= 0.00000001 or bend <= 0.0:
+		return fwd
+	return fwd.rotated(axis.normalized(), bend).normalized()
+
+
 func fire() -> void:
 	if not Net.can_send_run_rpc() or not can_act() or _pouch_ack_left > 0.0:
 		return
@@ -342,7 +384,7 @@ func fire() -> void:
 	if selected() == null:
 		return
 	_fire_buffer = 0.0
-	var dir := -camera.global_basis.z
+	var dir := _assist_shot_dir(camera.global_position, -camera.global_basis.z)
 	if Net.is_host():
 		_host_shot(loot.run_id, selected_serial(), camera.global_position, dir, _aim > 0.5, 0)
 	else:

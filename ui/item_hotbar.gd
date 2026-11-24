@@ -47,7 +47,7 @@ func touch_cell_at(viewport_position: Vector2) -> int:
 		return -1
 	var at := get_global_transform().affine_inverse() * viewport_position
 	for i in WeaponHolder.SLOT_COUNT + POUCHES.size():
-		if Rect2(Vector2(i * (CELL.x + GAP), 0), CELL).has_point(at):
+		if Rect2(Vector2(i * (CELL.x + GAP) - GAP * 0.5, -8.0), Vector2(CELL.x + GAP, CELL.y + 16.0)).has_point(at):
 			return i
 	return -1
 

@@ -395,6 +395,142 @@ static func is_damageable(target: Object) -> bool:
 	return target is EnemyBase or (target is Node and (target.is_in_group("boss_parts") \
 			or (target.is_in_group("players") and target.get("state") == "turned")))
 
+
+static func target_aim_profile(node: Node3D, allow_submerged := false) -> Dictionary:
+	if not is_instance_valid(node) or not node.is_inside_tree() or node.is_queued_for_deletion():
+		return {}
+	if node is EnemyBase:
+		var enemy := node as EnemyBase
+		if enemy.health <= 0.0 or enemy._dead:
+			return {}
+		if enemy.get("_submerged") == true:
+			if not allow_submerged or not enemy.has_method("harpoon_surface"):
+				return {}
+			var foot := enemy.global_position + Vector3.UP * 0.15
+			return {
+				"node": enemy,
+				"chest_point": foot,
+				"min_y": foot.y,
+				"max_y": foot.y,
+				"radius": 0.6,
+			}
+		if (enemy.collision_layer & 4) == 0:
+			return {}
+		var cap_node := enemy.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		var cap := cap_node.shape as CapsuleShape3D if cap_node else null
+		var base_h := cap.height if cap else 1.8
+		var base_r := cap.radius if cap else 0.4
+		var full_h := base_h * absf(enemy.scale.y)
+		var world_r := base_r * maxf(absf(enemy.scale.x), absf(enemy.scale.z))
+		var base_pos := enemy.global_position
+		var cname := enemy.data.display_name.to_lower() if enemy.data else ""
+		var chest_ratio := 0.63 if cname == "thunderhead" else 0.64
+		var min_ratio := 0.58 if cname == "thunderhead" else 0.62
+		var max_ratio := 0.68 if cname == "thunderhead" else 0.86
+		return {
+			"node": enemy,
+			"chest_point": base_pos + Vector3.UP * (full_h * chest_ratio),
+			"min_y": base_pos.y + full_h * min_ratio,
+			"max_y": base_pos.y + full_h * max_ratio,
+			"radius": world_r,
+		}
+	if node.is_in_group("boss_parts"):
+		var col := node as CollisionObject3D
+		if not node.visible or col == null or (col.collision_layer & 4) == 0:
+			return {}
+		var boss: Node = node.get("boss")
+		var raw_idx: Variant = node.get("index")
+		if not (raw_idx is int) or not is_instance_valid(boss) or boss.get("dead") == true:
+			return {}
+		var idx: int = raw_idx
+		var healths: Array = boss.get("part_health") as Array
+		if healths == null or idx < 0 or idx >= healths.size() or float(healths[idx]) <= 0.0:
+			return {}
+		if idx >= 3 and boss.call("core_exposed") != true:
+			return {}
+		var part_r := (1.7 if idx < 3 else 2.2) * maxf(absf(node.global_basis.get_scale().x), 0.1)
+		var center := node.global_position
+		return {
+			"node": node,
+			"chest_point": center,
+			"min_y": center.y - part_r * 0.25,
+			"max_y": center.y + part_r * 0.25,
+			"radius": part_r,
+		}
+	if node.is_in_group("players") and node.get("state") == "turned":
+		var pcol := node as CollisionObject3D
+		var phealth: Variant = node.get("health")
+		if pcol == null or (pcol.collision_layer & 4) == 0 or not ((phealth is float or phealth is int) and float(phealth) > 0.0):
+			return {}
+		var base_pos := node.global_position
+		return {
+			"node": node,
+			"chest_point": base_pos + Vector3.UP * 1.15,
+			"min_y": base_pos.y + 1.10,
+			"max_y": base_pos.y + 1.55,
+			"radius": 0.4,
+		}
+	return {}
+
+
+static func find_aim_assist_target(holder: WeaponHolder, origin: Vector3, forward: Vector3, max_cone_deg: float, allow_submerged := false) -> Dictionary:
+	if holder == null or not holder.is_inside_tree() or not is_instance_valid(holder.player):
+		return {}
+	if not holder.active_pouch.is_empty() or holder.player.tarp_raised or holder.player.state != "ok":
+		return {}
+	var data := holder.selected_weapon()
+	if data == null or not (data.kind in [WeaponData.Kind.HITSCAN, WeaponData.Kind.ROCKET, WeaponData.Kind.FLARE]):
+		return {}
+	var max_range := data.max_range if data.kind == WeaponData.Kind.HITSCAN else 38.0
+	var fwd := forward.normalized()
+	if fwd.length_squared() < 0.5:
+		return {}
+	var tree := holder.get_tree()
+	var world := holder.get_world_3d()
+	var candidates: Array[Node3D] = []
+	for group_name: String in ["enemies", "boss_parts", "players"]:
+		for item in tree.get_nodes_in_group(group_name):
+			var node := item as Node3D
+			if node != null and node != holder.player:
+				candidates.append(node)
+	var best: Dictionary = {}
+	var best_score := INF
+	for cand in candidates:
+		var prof := target_aim_profile(cand, allow_submerged)
+		if prof.is_empty():
+			continue
+		var chest: Vector3 = prof["chest_point"]
+		var along := (chest - origin).dot(fwd)
+		if along <= 0.35 or along > max_range:
+			continue
+		var ray_y := origin.y + fwd.y * along
+		var shot_point := Vector3(chest.x, clampf(ray_y, float(prof["min_y"]), float(prof["max_y"])), chest.z)
+		var to_shot := shot_point - origin
+		var dist := to_shot.length()
+		if dist <= 0.35 or dist > max_range:
+			continue
+		var theta := acos(clampf(fwd.dot(to_shot / dist), -1.0, 1.0))
+		var body_angle := atan2(float(prof["radius"]) * 0.75, maxf(dist, 0.5))
+		var cone := minf(deg_to_rad(max_cone_deg) + body_angle, deg_to_rad(max_cone_deg * 1.65))
+		if theta > cone:
+			continue
+		if world != null and not clear_path(world, origin, shot_point):
+			continue
+		var score := theta / maxf(cone, 0.0001) + 0.15 * (dist / maxf(max_range, 1.0))
+		if score < best_score:
+			best_score = score
+			best = {
+				"target": cand,
+				"chest_point": chest,
+				"shot_point": shot_point,
+				"distance": dist,
+				"angle": theta,
+				"cone": cone,
+				"body_angle": body_angle,
+				"weight": 1.0 - clampf(theta / maxf(cone, 0.0001), 0.0, 1.0),
+			}
+	return best
+
 static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, local: bool, muzzle_fx := true,
 		muzzle_model: Node3D = null) -> void:
 	var data := ItemCatalog.definition(id).weapon

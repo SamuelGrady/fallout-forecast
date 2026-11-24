@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <title>$GODOT_PROJECT_NAME</title>
   $GODOT_HEAD_INCLUDE
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,6 +40,10 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+      overscroll-behavior: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
       background: var(--surround);
     }
     @supports (height: 100dvh) { :root { --height: 100dvh; } }
@@ -57,8 +61,8 @@
       height: 100%;
       display: block;
       outline: 0;
+      touch-action: none;
     }
-    .touch-mode.in-run #canvas { touch-action: none; }
     #bezel {
       position: absolute;
       top: 50%;
@@ -233,7 +237,7 @@
       text-transform: uppercase;
       color: var(--cyan);
     }
-    #fullscreen, #audio, #controls {
+    #fullscreen, #audio, #controls, #rotate-controls {
       min-height: 44px;
       color: var(--paper);
       background: rgba(20, 35, 45, .92);
@@ -255,7 +259,7 @@
       z-index: 4;
     }
     #audio { bottom: auto; top: .65rem; }
-    #fullscreen:hover, #audio:hover, #controls:hover {
+    #fullscreen:hover, #audio:hover, #controls:hover, #rotate-controls:hover {
       background: #24424f;
       color: var(--cyan);
       border-color: var(--cyan);
@@ -265,14 +269,53 @@
     #rotate {
       position: absolute;
       inset: 0;
-      z-index: 3;
+      z-index: 10;
       display: grid;
-      place-content: center;
+      place-items: center;
+      padding: 1.25rem;
+      background: rgba(5, 9, 15, .96);
+    }
+    #rotate-card {
+      width: min(100%, 24rem);
+      padding: 1.8rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .85rem;
       text-align: center;
-      padding: 1rem;
-      background: rgba(5, 9, 15, .95);
+      background: radial-gradient(circle at 50% 35%, #142838 0%, var(--ink) 78%);
+      border: 2px solid rgba(102, 223, 218, .48);
+      border-left: 4px solid var(--cyan);
+      box-shadow: 0 0 48px rgba(0, 0, 0, .88);
+    }
+    #rotate-icon {
+      width: 64px;
+      height: 64px;
       color: var(--cyan);
-      font-size: clamp(1.6rem, 8vmin, 2.5rem);
+      animation: tilt-phone 2.2s ease-in-out infinite;
+    }
+    @keyframes tilt-phone {
+      0%, 22% { transform: rotate(0deg); }
+      52%, 78% { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #rotate-icon { animation: none; transform: rotate(-90deg); }
+    }
+    #rotate-title {
+      margin: 0;
+      font-size: clamp(1.75rem, 7vw, 2.3rem);
+      line-height: 1.0;
+      letter-spacing: .06em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    #rotate-sub {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: .06em;
+      color: var(--muted);
+      text-transform: uppercase;
     }
   </style>
 </head>
@@ -295,7 +338,19 @@
         <div class="osd bottom-right">HI-FI STEREO</div>
       </main>
     </div>
-    <div id="rotate" role="status" hidden>ROTATE TO LANDSCAPE</div>
+    <div id="rotate" role="status" hidden>
+      <div id="rotate-card">
+        <svg id="rotate-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <rect x="20" y="10" width="24" height="44" rx="4" />
+          <line x1="28" y1="49" x2="36" y2="49" stroke-linecap="round" />
+          <path d="M12 31a20 20 0 0 1 8-16" stroke="#b8e56d" stroke-linecap="round" />
+          <polyline points="14 14 21 15 19 21" stroke="#b8e56d" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p id="rotate-title">ROTATE PHONE TO LANDSCAPE</p>
+        <p id="rotate-sub">TURN YOUR DEVICE SIDEWAYS TO PLAY</p>
+        <button id="rotate-controls" type="button">CONTROLS: AUTO</button>
+      </div>
+    </div>
     <button id="fullscreen" type="button" hidden>FULLSCREEN</button>
     <button id="audio" type="button" hidden>ENABLE AUDIO</button>
   </div>
@@ -348,8 +403,10 @@
     const status = document.getElementById("status");
     const fullscreen = document.getElementById("fullscreen");
     const controls = document.getElementById("controls");
+    const rotateControls = document.getElementById("rotate-controls");
     const rotate = document.getElementById("rotate");
     const coarse = matchMedia("(pointer: coarse)");
+    const anyCoarse = matchMedia("(any-pointer: coarse)");
     const modes = ["auto", "touch", "mouse"];
     let preference = "auto";
     try {
@@ -360,7 +417,7 @@
     let browserCallback;
 
     const touchMode = () => preference === "touch" ||
-      (preference === "auto" && coarse.matches && navigator.maxTouchPoints > 0);
+      (preference === "auto" && (coarse.matches || (anyCoarse.matches && navigator.maxTouchPoints > 0)));
 
     function updateLayout() {
       const width = canvas.clientWidth;
@@ -370,9 +427,11 @@
       const touch = touchMode();
       document.body.classList.toggle("touch-mode", touch);
       document.body.classList.toggle("in-run", inRun);
-      rotate.hidden = !inRun || !touch || landscape;
-      controls.textContent = "CONTROLS: " + preference.toUpperCase();
-      if (browserCallback) browserCallback(touch, landscape, document.hasFocus() &&
+      rotate.hidden = !touch || landscape;
+      const controlsLabel = "CONTROLS: " + preference.toUpperCase();
+      controls.textContent = controlsLabel;
+      rotateControls.textContent = controlsLabel;
+      if (browserCallback) browserCallback(touch, landscape,
         document.visibilityState === "visible", height, canvas.height / height);
     }
 
@@ -397,20 +456,24 @@
         updateLayout();
       },
     };
-    controls.addEventListener("click", () => {
+    const cycleControls = () => {
       preference = modes[(modes.indexOf(preference) + 1) % modes.length];
       try { localStorage.setItem("fallout-controls", preference); } catch (_) {}
       updateLayout();
-    });
+    };
+    controls.addEventListener("click", cycleControls);
+    rotateControls.addEventListener("click", cycleControls);
     new ResizeObserver(resizeCanvas).observe(document.getElementById("safe-area"));
     window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
+    if (screen.orientation && typeof screen.orientation.addEventListener === "function") {
+      screen.orientation.addEventListener("change", resizeCanvas);
+    }
     window.addEventListener("blur", updateLayout);
     window.addEventListener("focus", updateLayout);
     document.addEventListener("visibilitychange", () => { updateLayout(); updateAudio(); });
-    // Godot's Web template forwards touchcancel as a release. Cancel the
-    // gesture before the template sees that release.
-    canvas.addEventListener("touchcancel", updateLayout, { capture: true, passive: true });
     coarse.addEventListener("change", updateLayout);
+    anyCoarse.addEventListener("change", updateLayout);
     resizeCanvas();
     // DOWNLOAD: point straight at the matching desktop build when we can tell the OS.
     (function () {

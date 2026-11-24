@@ -83,6 +83,8 @@ var is_elite := false
 var miniboss_wave := 0
 ## Active ground pickups before regular infected stop dropping scrap.
 const SCRAP_DROP_CAP := 48
+const BONUS_DROP_CHANCE := 0.05
+const BONUS_DROP_KINDS := ["ammo", "health", "suit"]
 var miniboss_name := ""
 var max_health := 1.0
 var _miniboss_ability_timer := 4.0
@@ -646,7 +648,7 @@ func die() -> void:
 	_dead = true
 	# The spawner owns the drops and tells every peer to make them: a drop is
 	# collected locally by whoever walks over it, so it has to exist everywhere.
-	# Infected only ever drop ground scrap; ammo comes from vending and airdrops.
+	# Infected drop ground scrap and have a 5% chance to drop ammo, health, or suit.
 	var drops: Array = []
 	var room := get_tree().get_nodes_in_group("ammo_drops").size() < SCRAP_DROP_CAP
 	if miniboss_wave > 0:
@@ -660,6 +662,10 @@ func die() -> void:
 		drops.append([global_position, "scrap_large"])
 	elif room and (not is_small or randf() < 0.35):
 		drops.append([global_position, "scrap"])
+	if room and randf() < BONUS_DROP_CHANCE:
+		var bonus_kind: String = BONUS_DROP_KINDS[randi() % BONUS_DROP_KINDS.size()]
+		var bonus_offset := Vector3(0.55, 0.0, 0.0).rotated(Vector3.UP, randf() * TAU)
+		drops.append([global_position + bonus_offset, bonus_kind])
 	if get_parent() and get_parent().has_method("spawn_drop"):
 		for entry in drops:
 			get_parent().spawn_drop(entry[0], str(entry[1]))

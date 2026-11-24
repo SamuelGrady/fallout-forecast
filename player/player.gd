@@ -135,6 +135,8 @@ var _hold_target: Interactable
 var _hold := 0.0
 var _hold_done := false
 var _melee_left := 0.0
+var _touch_look_linger := 0.0
+var _last_touch_look_delta := Vector2.ZERO
 var _shown_state := ""
 var _tarp_area: Area3D
 var _tarp_shape: CollisionShape3D
@@ -247,8 +249,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		TouchInput.capture_pointer()
 
 
-func touch_look(screen_relative: Vector2) -> void:
-	_look(TouchInput.look_delta(screen_relative))
+func touch_look(css_relative: Vector2) -> void:
+	var delta_look := TouchInput.look_delta(css_relative)
+	if TouchInput.gameplay_active and state == "ok" and not look_locked:
+		_touch_look_linger = 0.10
+		_last_touch_look_delta = delta_look
+		var holder := get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
+		if holder:
+			var assist := holder.find_touch_look_target(6.2)
+			if not assist.is_empty():
+				var w := smoothstep(0.0, 1.0, float(assist["weight"]))
+				var strength := 0.38 if aiming else 0.33
+				delta_look *= 1.0 - strength * w
+	_look(delta_look)
 
 
 func _process(delta: float) -> void:
@@ -277,6 +290,7 @@ func _physics_process(delta: float) -> void:
 	var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if pad_look != Vector2.ZERO and not InventoryMenu.is_open():
 		_look(pad_look * pad_look_speed * delta)
+	_apply_touch_aim_magnetism(delta)
 
 	if is_on_floor():
 		_coyote_timer = coyote_time
@@ -878,6 +892,44 @@ func _look(amount: Vector2) -> void:
 	var limit := deg_to_rad(max_pitch_degrees)
 	_pitch = clampf(_pitch - amount.y, -limit, limit)
 	head.rotation.x = _pitch
+
+
+func _apply_touch_aim_magnetism(delta: float) -> void:
+	_touch_look_linger = maxf(0.0, _touch_look_linger - delta)
+	if not TouchInput.gameplay_active or state != "ok" or look_locked or InventoryMenu.is_open() or GameManager.is_voting():
+		return
+	var move_weight := clampf(TouchInput.movement.length(), 0.0, 1.0) * 0.85
+	var drag_weight := clampf(_touch_look_linger / 0.10, 0.0, 1.0)
+	var active_weight := maxf(move_weight, drag_weight)
+	if active_weight <= 0.01:
+		return
+	var holder := get_node_or_null("Head/Camera3D/WeaponHolder") as WeaponHolder
+	if holder == null:
+		return
+	var assist := holder.find_touch_look_target(5.5)
+	if assist.is_empty():
+		return
+	var v: Vector3 = (assist["shot_point"] as Vector3) - camera.global_position
+	var flat_len := sqrt(v.x * v.x + v.z * v.z)
+	if flat_len < 0.01 and absf(v.y) < 0.01:
+		return
+	var target_yaw := atan2(-v.x, -v.z)
+	var delta_yaw := wrapf(target_yaw - rotation.y, -PI, PI)
+	var target_pitch := atan2(v.y, maxf(flat_len, 0.001))
+	var delta_pitch := target_pitch - head.rotation.x
+	if _touch_look_linger > 0.0 and absf(_last_touch_look_delta.x) > 0.008 and (-_last_touch_look_delta.x) * delta_yaw < 0.0:
+		return
+	var angle: float = float(assist["angle"])
+	var cone: float = maxf(float(assist["cone"]), 0.0001)
+	var inner := deg_to_rad(0.35)
+	if angle <= inner:
+		return
+	var pull_weight := smoothstep(0.0, 0.25, angle / cone) * smoothstep(0.0, 1.0, float(assist["weight"]))
+	var omega_yaw := minf(deg_to_rad(18.0) * active_weight * pull_weight, 0.45 * absf(delta_yaw) / maxf(delta, 0.001))
+	var omega_pitch := deg_to_rad(7.5) * active_weight * pull_weight
+	var step_yaw := move_toward(0.0, delta_yaw, omega_yaw * delta)
+	var step_pitch := move_toward(0.0, delta_pitch, omega_pitch * delta)
+	_look(Vector2(-step_yaw, -step_pitch))
 
 
 func _apply_height() -> void:
