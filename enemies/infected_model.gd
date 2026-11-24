@@ -13,6 +13,9 @@ var _anticipation := 0.0
 var _mutation_root := Node3D.new()
 var _spore_sacs: Array[MeshInstance3D] = []
 var _molt_plates: Array[Node3D] = []
+var _miniboss_halo: MeshInstance3D
+var _miniboss_ground_ring: MeshInstance3D
+var _miniboss_nodes: Array[MeshInstance3D] = []
 
 ## Outfits a Drip can spawn in: [shirt, pants, accent]. Picked per instance
 ## so a horde isn't a row of clones.
@@ -45,6 +48,8 @@ func _ready() -> void:
 	for bone in [_body, _head, _jaw] + limbs + _elbows + _knees:
 		if bone:
 			MeshMerge.merge_children(bone, not _web_model)
+	if _enemy.miniboss_wave > 0:
+		_build_miniboss_mantle()
 	_body.add_child(_mutation_root)
 	_apply_mutations()
 	if GameManager.mutations:
@@ -291,6 +296,92 @@ static func _shared_material(color: Color, glow: bool, metallic: float) -> Stand
 
 static var _unit_box: BoxMesh
 static var _web_model := OS.has_feature("web")
+static var _miniboss_halo_mesh: TorusMesh
+static var _miniboss_ground_mesh: TorusMesh
+static var _miniboss_node_mesh: SphereMesh
+static var _miniboss_halo_material: StandardMaterial3D
+static var _miniboss_ground_material: StandardMaterial3D
+static var _miniboss_node_material: StandardMaterial3D
+
+
+func _build_miniboss_mantle() -> void:
+	if _miniboss_halo_mesh == null:
+		_miniboss_halo_mesh = TorusMesh.new()
+		_miniboss_halo_mesh.inner_radius = 0.48
+		_miniboss_halo_mesh.outer_radius = 0.62
+		_miniboss_halo_mesh.rings = 24
+		_miniboss_halo_mesh.ring_segments = 8
+	if _miniboss_halo_material == null:
+		_miniboss_halo_material = StandardMaterial3D.new()
+		_miniboss_halo_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_miniboss_halo_material.albedo_color = Color(1.0, 0.36, 0.14)
+		_miniboss_halo_material.emission_enabled = true
+		_miniboss_halo_material.emission = Color(1.0, 0.24, 0.12)
+		_miniboss_halo_material.emission_energy_multiplier = 2.6
+	if _miniboss_node_mesh == null:
+		_miniboss_node_mesh = SphereMesh.new()
+		_miniboss_node_mesh.radius = 1.0
+		_miniboss_node_mesh.height = 1.9
+		_miniboss_node_mesh.radial_segments = 10
+		_miniboss_node_mesh.rings = 6
+	if _miniboss_node_material == null:
+		_miniboss_node_material = StandardMaterial3D.new()
+		_miniboss_node_material.albedo_color = Color(1.0, 0.48, 0.18)
+		_miniboss_node_material.emission_enabled = true
+		_miniboss_node_material.emission = Color(1.0, 0.28, 0.12)
+		_miniboss_node_material.emission_energy_multiplier = 2.4
+	if _miniboss_ground_mesh == null:
+		_miniboss_ground_mesh = TorusMesh.new()
+		_miniboss_ground_mesh.inner_radius = 0.92
+		_miniboss_ground_mesh.outer_radius = 1.16
+		_miniboss_ground_mesh.rings = 28
+		_miniboss_ground_mesh.ring_segments = 6
+	if _miniboss_ground_material == null:
+		_miniboss_ground_material = StandardMaterial3D.new()
+		_miniboss_ground_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_miniboss_ground_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_miniboss_ground_material.albedo_color = Color(1.0, 0.22, 0.12, 0.62)
+
+	var crown := Node3D.new()
+	crown.name = "MinibossMantle"
+	_body.add_child(crown)
+
+	_miniboss_halo = MeshInstance3D.new()
+	_miniboss_halo.name = "MinibossHalo"
+	_miniboss_halo.mesh = _miniboss_halo_mesh
+	_miniboss_halo.material_override = _miniboss_halo_material
+	_miniboss_halo.position = Vector3(0.0, 2.15, 0.0)
+	_miniboss_halo.rotation = Vector3(0.28, 0.0, 0.14)
+	if _web_model:
+		_miniboss_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	crown.add_child(_miniboss_halo)
+
+	_miniboss_nodes.clear()
+	for spec in [
+		[Vector3(-0.34, 1.58, 0.28), 0.16],
+		[Vector3(0.34, 1.58, 0.28), 0.16],
+		[Vector3(0.0, 1.72, 0.32), 0.2],
+		[Vector3(0.0, 1.32, 0.34), 0.18],
+	]:
+		var node_mesh := MeshInstance3D.new()
+		node_mesh.mesh = _miniboss_node_mesh
+		node_mesh.material_override = _miniboss_node_material
+		node_mesh.position = spec[0]
+		node_mesh.scale = Vector3.ONE * float(spec[1])
+		node_mesh.set_meta("base_scale", float(spec[1]))
+		if _web_model:
+			node_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		crown.add_child(node_mesh)
+		_miniboss_nodes.append(node_mesh)
+
+	_miniboss_ground_ring = MeshInstance3D.new()
+	_miniboss_ground_ring.name = "MinibossGroundAura"
+	_miniboss_ground_ring.mesh = _miniboss_ground_mesh
+	_miniboss_ground_ring.material_override = _miniboss_ground_material
+	_miniboss_ground_ring.position = Vector3(0.0, 0.06, 0.0)
+	if _web_model:
+		_miniboss_ground_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_miniboss_ground_ring)
 
 
 func _build_miniboss_trappings(wave: int) -> void:
@@ -403,3 +494,16 @@ func _process(delta: float) -> void:
 	for i in _spore_sacs.size():
 		var pulse := 1.0 + 0.14 * sin(_clock * 1.4 + i * 1.3)
 		_spore_sacs[i].scale = Vector3.ONE * pulse
+	if is_instance_valid(_miniboss_halo):
+		_miniboss_halo.rotation.y += delta * 2.4
+		_miniboss_halo.rotation.z = 0.14 + sin(_clock * 1.1) * 0.15
+		_miniboss_halo.scale = Vector3.ONE * (1.0 + 0.1 * sin(_clock * 1.8))
+	for i in _miniboss_nodes.size():
+		var node_mesh := _miniboss_nodes[i]
+		if is_instance_valid(node_mesh):
+			var base_s := float(node_mesh.get_meta("base_scale", 0.16))
+			node_mesh.scale = Vector3.ONE * (base_s * (1.0 + 0.18 * sin(_clock * 2.0 + i * 1.4)))
+	if is_instance_valid(_miniboss_ground_ring):
+		_miniboss_ground_ring.rotation.y -= delta * 0.9
+		var aura_p := 1.0 + 0.08 * sin(_clock * 1.5)
+		_miniboss_ground_ring.scale = Vector3(aura_p, 1.0, aura_p)

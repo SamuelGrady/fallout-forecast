@@ -95,8 +95,8 @@ const MINIBOSS_NAMES := {
 	3: "CLOUDBURST",
 	4: "VOLT GOLIATH",
 }
-const MINIBOSS_HP_MULT := {1: 4.5, 2: 4.2, 3: 4.5, 4: 5.5}
-const MINIBOSS_SCALES := {1: 1.85, 2: 1.8, 3: 1.85, 4: 1.95}
+const MINIBOSS_HP_MULT := {1: 6.5, 2: 6.2, 3: 7.2, 4: 8.0}
+const MINIBOSS_SCALES := {1: 2.35, 2: 2.3, 3: 2.5, 4: 2.6}
 
 
 func _ready() -> void:
@@ -112,13 +112,13 @@ func _ready() -> void:
 			_visibility_material = ShaderMaterial.new()
 			_visibility_material.shader = preload("res://enemies/visibility.gdshader")
 		_refresh_overlay.call_deferred()
-	var mult := 0.3 if is_small else (float(MINIBOSS_HP_MULT.get(miniboss_wave, 4.5)) if miniboss_wave > 0 else (2.2 if is_elite else 1.0))
+	var mult := 0.3 if is_small else (float(MINIBOSS_HP_MULT.get(miniboss_wave, 6.5)) if miniboss_wave > 0 else (2.2 if is_elite else 1.0))
 	max_health = data.max_health * GameManager.enemy_health_scale() * mult
 	health = max_health
 	if miniboss_wave > 0:
 		add_to_group("miniboss")
 		miniboss_name = str(MINIBOSS_NAMES.get(miniboss_wave, "ALPHA INFECTED"))
-		scale = Vector3.ONE * float(MINIBOSS_SCALES.get(miniboss_wave, 1.85))
+		scale = Vector3.ONE * float(MINIBOSS_SCALES.get(miniboss_wave, 2.35))
 		_miniboss_ability_timer = 4.0
 	elif is_small:
 		scale = Vector3.ONE * 0.6
@@ -210,6 +210,8 @@ func speed_multiplier() -> float:
 	var m := WeatherManager.enemy_buff() * (GameManager.enemy_speed_scale() if _suppressed_left <= 0.0 else 1.0)
 	if is_elite:
 		m *= 1.12
+	if miniboss_wave > 0:
+		m *= 1.18
 	if _molt_boost_left > 0.0 and _suppressed_left <= 0.0:
 		m *= 1.45
 	if _slow_left > 0.0:
@@ -221,7 +223,12 @@ func speed_multiplier() -> float:
 
 ## Attack damage multiplier: storm and flare weaken only.
 func damage_multiplier() -> float:
-	return WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0) * (1.2 if is_elite else 1.0)
+	var m := WeatherManager.enemy_buff() * (0.65 if _weaken_left > 0.0 else 1.0)
+	if is_elite:
+		m *= 1.2
+	if miniboss_wave > 0:
+		m *= 1.35
+	return m
 
 
 ## Status timers decay once per physics frame, even when a subclass and the
@@ -805,6 +812,8 @@ func make_corpse(throw_vec: Vector3) -> void:
 
 
 func stagger(duration: float) -> void:
+	if miniboss_wave > 0:
+		duration *= 0.45
 	if _stagger_left <= 0.0:
 		Sound.play_at("turned", global_position + Vector3.UP, -12.0, randf_range(0.65, 0.8))
 	_stagger_left = maxf(_stagger_left, duration)
