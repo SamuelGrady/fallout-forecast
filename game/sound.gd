@@ -4,32 +4,55 @@ extends Node
 const SCORE := ["forecast_theme", "forecast_pulse", "forecast_storm", "forecast_boss"]
 const RAIN_GAIN := 0.50
 const RAIN_BUS := &"Rain"
-## Mix buses. Rain sits under Ambience; Music ducks under Weapons fire.
-const BUSES := [&"Music", &"Weapons", &"Threats", &"UI", &"Ambience"]
+## Rain sits under Ambience; Weapons feeds the desktop Music sidechain.
+const BUSES := [&"Music", &"Weapons", &"Threats", &"UI", &"Ambience", &"Foley"]
 const UI_CUES := ["pickup", "lever", "reel_land", "crate_open", "decon", "revive", "storm_countdown",
-	"storm_arrival", "storm_clear", "incoming_group", "suit_beep", "kill_confirm", "multikill", "vhs_glitch"]
-const AMBIENCE_CUES := ["downpour", "decon_spray", "dome_deploy", "dome_collapse"]
+	"storm_arrival", "storm_clear", "incoming_group", "suit_beep", "kill_confirm", "multikill",
+	"vhs_glitch", "gun_supply_drop"]
+const AMBIENCE_CUES := ["downpour", "decon_spray", "dome_deploy", "dome_collapse",
+	"gun_dome_expand", "gun_bleach_burst", "gun_field_deploy", "gun_flare"]
+const FOLEY_CUES := ["reload", "rifle_reload", "shotgun_pump", "jam",
+	"gun_frag_throw", "gun_dome_throw", "gun_umbrella", "gun_umbrella_open",
+	"gun_bleach_bomb", "gun_bait_radio", "gun_bait_activate", "gun_sandbag",
+	"gun_lightning_rod", "gun_med_tin", "gun_suit_patch"]
+const NON_FIRE_GUN_CUES := [
+	"gun_frag_throw", "gun_frag_blast", "gun_dome_throw", "gun_dome_expand",
+	"gun_umbrella", "gun_umbrella_open", "gun_bleach_bomb", "gun_bleach_burst",
+	"gun_bait_radio", "gun_bait_activate", "gun_sandbag", "gun_lightning_rod",
+	"gun_med_tin", "gun_suit_patch", "gun_flare", "gun_field_deploy",
+	"gun_supply_drop", "gun_bait_loop", "gun_disruptor_charge",
+]
+const ATTACK_TELLS := ["drip_windup", "gutter_windup", "mister_windup", "sleet_leap",
+	"hailstone_charge", "smog_spit", "static_shock", "undertow_emerge", "thunderhead_fuse"]
+const PLAYER_ALERTS := ["player_hurt", "downed", "turned", "revive", "suit_beep", "ping_revive", "ping_danger"]
 const CUE_SOURCE := {"ui_focus": "reel_tick", "ui_tick": "reel_tick"}
 ## Source-level trims measured from the decoded files, before local/3D gains.
 const CUE_TRIM_DB := {
 	"ui_click": -4.0, "ui_focus": -2.0,
 	"gun_shotgun": -2.0, "gun_revolver": 1.0, "gun_rifle": -2.0,
+	"gun_boombox_launcher": -1.5, "gun_leaky_nailgun": -0.5, "gun_lucky_penny_revolver": 0.5,
 	"gun_nail_driver": 4.0, "gun_hunting_rifle": 3.5, "gun_harpoon": 4.5,
 	"gun_battery_zapper": 4.5, "gun_flare_launcher": 3.5, "gun_rock_salt": 3.0,
 	"gun_leaf_blower": 2.5, "gun_pressure_washer": 2.0, "gun_disruptor": 2.5,
+	"gun_frag_throw": 0.0, "gun_frag_blast": -3.0, "gun_dome_throw": 0.0,
+	"gun_dome_expand": -3.0, "gun_umbrella_open": -2.5, "gun_bleach_burst": -2.5,
+	"gun_bait_activate": -1.0,
 	"shot_shotgun": -1.5, "shot_nailgun": 1.5, "shot_rifle": 2.5, "shot_boombox": 0.0,
 	"explosion": -3.0, "explosion_big": -3.0, "hit_flesh": -4.0, "reload": -4.0,
 	"turned": -4.0, "decon_spray": -3.0, "dome_deploy": -3.0, "dome_collapse": -3.0,
 	"downpour": -3.0, "storm_clear": -4.0, "storm_arrival": -2.0, "storm_countdown": -2.0,
-	"drip_windup": -2.0, "gutter_windup": -2.0, "gutter_skid": -2.0, "mister_windup": -2.0,
-	"hailstone_crash": -3.0, "undertow_lurk": -2.0, "smog_spit": -2.0, "smog_splash": 2.0,
-	"static_blink": 1.0, "thunderhead_fuse": -2.0, "thunder": 0.0,
+	"drip_windup": 3.0, "gutter_windup": 5.0, "gutter_skid": -2.0, "mister_windup": 5.0,
+	"sleet_leap": 2.0, "hailstone_crash": -3.0, "undertow_lurk": -2.0, "smog_spit": 2.0,
+	"smog_splash": 2.0, "static_blink": 1.0, "thunderhead_fuse": -2.0, "thunder": 0.0,
+	"player_hurt": 1.0,
 	"vcr_insert": -5.0, "vcr_eject": -2.0, "vcr_whirr": 1.0,
 }
 ## Per-cue ceiling overrides for cue_gain (default -10 dB; weapon fire and
 ## thunder must cut cleanly through rain, wind and the darksynth score).
-const CUE_CAP_DB := {"thunder": -1.0}
+const CUE_CAP_DB := {"thunder": -1.0, "player_hurt": -7.0}
 const WEAPON_CAP_DB := -1.0
+const CLOSE_TELL_M := 12.0
+const TELL_HOLD := 0.32
 var _last_cue_ms := {}
 
 ## Combat heat (0-1): spikes fast on hits, kills, gunfire, explosions and
@@ -38,7 +61,7 @@ var _last_cue_ms := {}
 const HEAT_HIT := 0.28
 const HEAT_KILL := 0.45
 const HEAT_FIRE := 0.18
-const HEAT_CUES := {"explosion": 0.35, "explosion_big": 0.35, "hit_flesh": 0.30, "suit_beep": 0.20}
+const HEAT_CUES := {"explosion": 0.35, "explosion_big": 0.35, "gun_frag_blast": 0.35, "hit_flesh": 0.30, "suit_beep": 0.20}
 const HEAT_HOLD := 1.0
 const HEAT_DECAY := 0.22
 const NEAR_ENEMY_M := 22.0
@@ -61,12 +84,17 @@ var _rain_filter := AudioEffectLowPassFilter.new()
 var _in_run := false
 var _rain_gain := 0.0
 var _shelter_mix := 0.0
+var _tell_left := 0.0
+var _tell_mix := 0.0
 var _last_phase := Vector2i(-1, -1)
 var _web := OS.has_feature("web")
 var _headless := DisplayServer.get_name() == "headless"
 var _stream_cache := {}
-var _active_sfx := 0
+
+enum WebPriority { BACKGROUND, STANDARD, ACTION, FOREGROUND }
 const WEB_MAX_SFX := 8
+const WEB_BACKGROUND_LIMIT := 5
+var _web_voices: Dictionary[AudioStreamPlayer, int] = {}
 
 
 func _ready() -> void:
@@ -74,6 +102,7 @@ func _ready() -> void:
 	for name in BUSES:
 		_add_bus(name, &"Master")
 	var bus := _add_bus(RAIN_BUS, &"Ambience")
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index(&"Foley"), -2.0)
 	# On single-threaded Web, bus DSP effects burn main-thread audio budget and
 	# cause buffer underrun crackles; keep desktop effects intact.
 	if not _web:
@@ -91,6 +120,9 @@ func _ready() -> void:
 		duck.attack_us = 3000.0
 		duck.release_ms = 220.0
 		AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
+	else:
+		# Leave room for stacked attacks on the Web mixer without desktop DSP.
+		AudioServer.set_bus_volume_db(AudioServer.get_bus_index(&"Weapons"), -3.0)
 	WeatherManager.phase_changed.connect(_phase_changed)
 	# GameManager is a later autoload: connect once the whole tree is up.
 	(func(): GameManager.combat_hit.connect(_on_combat_hit)).call_deferred()
@@ -113,17 +145,24 @@ func bus_for(cue: String) -> StringName:
 		return &"Weapons"
 	if cue in UI_CUES or cue.begins_with("ui_") or cue.begins_with("vcr_") or cue.begins_with("ping_"):
 		return &"UI"
-	if cue in AMBIENCE_CUES or cue.begins_with("step_") or cue.begins_with("splash_"):
+	if cue in FOLEY_CUES or cue.begins_with("step_") or cue.begins_with("splash_") \
+			or cue.begins_with("casing_") or cue.begins_with("impact_"):
+		return &"Foley"
+	if cue in AMBIENCE_CUES:
 		return &"Ambience"
 	return &"Threats"
 
 
 func _is_fire(cue: String) -> bool:
+	if cue in NON_FIRE_GUN_CUES:
+		return false
 	return cue.begins_with("shot_") or cue.begins_with("gun_") or cue == "throw_bomb"
 
 
 func cue_gain(cue: String, volume_db: float) -> float:
 	var default_cap := WEAPON_CAP_DB if _is_fire(cue) else -10.0
+	if cue in ATTACK_TELLS:
+		default_cap = -6.0
 	return minf(volume_db + float(CUE_TRIM_DB.get(cue, 0.0)), float(CUE_CAP_DB.get(cue, default_cap)))
 
 
@@ -182,6 +221,8 @@ func stop_run() -> void:
 	_wind = null
 	_rain_gain = 0.0
 	_shelter_mix = 0.0
+	_tell_left = 0.0
+	_tell_mix = 0.0
 	_combat_heat = 0.0
 	_heat_hold = 0.0
 	_swarm_floor = 0.0
@@ -219,6 +260,9 @@ func _process(delta: float) -> void:
 	var intensity := WeatherManager.storm_intensity
 	var player := get_tree().get_first_node_in_group("local_player")
 	var paused := get_tree().paused
+	_tell_left = maxf(0.0, _tell_left - real)
+	var tell_active := _tell_left > 0.0 and not paused
+	_tell_mix = lerpf(_tell_mix, 1.0 if tell_active else 0.0, 1.0 - exp(-(24.0 if tell_active else 7.0) * real))
 	var gains := [0.72, 0.18, 0.0, 0.0]
 	if _in_run:
 		var boss := get_tree().get_first_node_in_group("boss") != null or get_tree().get_first_node_in_group("miniboss") != null
@@ -235,7 +279,7 @@ func _process(delta: float) -> void:
 			storm_layer,
 			_boss_mix,
 		]
-	var overlay_mix := 0.47 if paused else 1.0
+	var overlay_mix := 0.47 if paused else lerpf(1.0, 0.66, _tell_mix)
 	for i in _layers.size():
 		var goal: float = gains[i] * overlay_mix
 		var rate := 8.0 if goal > _layers[i].volume_linear else 3.0
@@ -249,14 +293,14 @@ func _process(delta: float) -> void:
 	if not _web:
 		_rain_filter.cutoff_hz = lerpf(16000.0, 1500.0, _shelter_mix)
 	if _rain:
-		var rvol := _rain_gain * lerpf(0.4, 0.22 if _web else 0.32, _shelter_mix) * RAIN_GAIN
+		var rvol := _rain_gain * lerpf(0.4, 0.22 if _web else 0.32, _shelter_mix) * RAIN_GAIN * lerpf(1.0, 0.68, _tell_mix)
 		_rain.volume_linear = rvol
 		if _web:
 			var pause_rain := rvol < 0.005
 			if _rain.stream_paused != pause_rain:
 				_rain.stream_paused = pause_rain
 	if _wind:
-		_wind.volume_linear = smoothstep(0.23, 1.0, _rain_gain) * lerpf(0.27, 0.09, _shelter_mix)
+		_wind.volume_linear = smoothstep(0.23, 1.0, _rain_gain) * lerpf(0.27, 0.09, _shelter_mix) * lerpf(1.0, 0.68, _tell_mix)
 
 
 func _is_calm_phase() -> bool:
@@ -379,14 +423,13 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 		pitch *= randf_range(0.92, 1.12)
 	elif _web and cue != "ui_focus" and not is_fire and _recent(cue, 0.045):
 		return
-	if _web and is_fire:
+	var bus := bus_for(cue)
+	var priority := _web_priority(cue, bus, 0.0, true)
+	if _play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus, priority) and _web and is_fire:
 		Juice.duck_music(-2.5, 0.11)
-	_play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus_for(cue), is_fire)
 
 
-## Thunder for a lightning strike. Its own player per strike (overlaps are
-## fine), always STREAM playback on Web (the QOA-compressed WAV must not use
-## sample playback), and never dropped by the Web voice cap or cue dedupe.
+## Thunder uses a fresh stream per strike, including its brighter Web render.
 func play_thunder(volume_db := -1.0, pitch := 1.0) -> void:
 	if Net.dedicated or _headless:
 		return
@@ -395,16 +438,44 @@ func play_thunder(volume_db := -1.0, pitch := 1.0) -> void:
 	var stream := _get_sfx(cue)
 	if stream == null:
 		stream = _get_sfx("thunder")
-	Juice.duck_music(-7.0, 1.4)
-	_play_stream(stream, cue_gain("thunder", volume_db), pitch, &"Ambience", true)
-	Perf.mark("thunder playback")
+	if _play_stream(stream, cue_gain("thunder", volume_db), pitch, &"Ambience", WebPriority.FOREGROUND):
+		Juice.duck_music(-7.0, 1.4)
+		Perf.mark("thunder playback")
 
 
-func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"Master", priority := false) -> void:
-	if stream == null:
-		return
-	if _web and _active_sfx >= WEB_MAX_SFX and not priority:
-		return
+func _web_priority(cue: String, bus: StringName, distance: float, local: bool) -> int:
+	if distance <= CLOSE_TELL_M and (cue in ATTACK_TELLS or cue in PLAYER_ALERTS):
+		return WebPriority.FOREGROUND
+	if cue == "ui_click" or (_is_fire(cue) and (local or distance <= 20.0)):
+		return WebPriority.ACTION
+	if bus == &"Foley" or cue in ["ui_focus", "ui_tick", "vhs_glitch", "enemy_death"]:
+		return WebPriority.BACKGROUND
+	return WebPriority.STANDARD
+
+
+func _admit_web_voice(priority: int) -> bool:
+	if priority == WebPriority.BACKGROUND and _web_voices.size() >= WEB_BACKGROUND_LIMIT:
+		return false
+	if _web_voices.size() < WEB_MAX_SFX:
+		return true
+	# Keep the oldest voice in each tier first in line for replacement.
+	var victim: AudioStreamPlayer
+	var lowest := priority + 1 if priority == WebPriority.FOREGROUND else priority
+	for voice in _web_voices:
+		if _web_voices[voice] < lowest:
+			victim = voice
+			lowest = _web_voices[voice]
+	if victim == null:
+		return false
+	_web_voices.erase(victim)
+	victim.stop()
+	victim.queue_free()
+	return true
+
+
+func _play_stream(stream: AudioStream, volume_db: float, pitch: float, bus: StringName, priority: int) -> bool:
+	if stream == null or (_web and not _admit_web_voice(priority)):
+		return false
 	var voice := AudioStreamPlayer.new()
 	voice.stream = stream
 	voice.volume_db = volume_db
@@ -413,34 +484,38 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch := 1.0, bus := &"
 	voice.process_mode = Node.PROCESS_MODE_ALWAYS if bus == &"UI" else Node.PROCESS_MODE_PAUSABLE
 	if _web:
 		voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
-		_active_sfx += 1
-		voice.tree_exited.connect(func(): _active_sfx = maxi(0, _active_sfx - 1))
+		_web_voices[voice] = priority
+		voice.tree_exited.connect(func(): _web_voices.erase(voice))
 	add_child(voice)
 	voice.finished.connect(voice.queue_free)
 	voice.play()
+	return true
 
 
 func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) -> void:
-	if Net.dedicated or _headless:
+	if Net.dedicated or _headless or volume_db <= -65.0:
 		return
 	_first_play(cue)
 	_heat_for_cue(cue)
 	if cue == "pickup" and _recent(cue, 0.3):
 		return
 	volume_db = cue_gain(cue, volume_db)
+	var bus := bus_for(cue)
+	var camera := get_viewport().get_camera_3d()
+	var distance := camera.global_position.distance_to(position) if camera else 0.0
+	var close_tell := camera != null and distance <= CLOSE_TELL_M and cue in ATTACK_TELLS
 	if _web:
-		if _active_sfx >= WEB_MAX_SFX or _recent(cue, 0.06):
+		if distance > 42.0:
+			return
+		var priority := _web_priority(cue, bus, distance, false)
+		var spatial_key := "near:" + cue if priority >= WebPriority.ACTION else "far:" + cue
+		if cue != "pickup" and _recent(spatial_key, 0.06):
 			return
 		# On Web, approximate 3D distance attenuation in a lightweight 2D stream
 		# to avoid expensive WebGL/WASM HRTF/spatial mixing overhead.
-		var cam := get_viewport().get_camera_3d()
-		var atten := 0.0
-		if cam:
-			var d := cam.global_position.distance_to(position)
-			if d > 42.0:
-				return
-			atten = -clampf(d * 0.45, 0.0, 22.0)
-		_play_stream(_get_sfx(cue), volume_db + atten, pitch, bus_for(cue))
+		var atten := -clampf(distance * 0.45, 0.0, 22.0)
+		if _play_stream(_get_sfx(cue), volume_db + atten, pitch, bus, priority) and close_tell:
+			_tell_left = TELL_HOLD
 		return
 	var world := get_tree().current_scene
 	if not world:
@@ -452,7 +527,7 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 		return
 	voice.volume_db = volume_db
 	voice.pitch_scale = pitch
-	voice.bus = bus_for(cue)
+	voice.bus = bus
 	voice.max_distance = 45.0
 	# Distant sounds lose their highs (built-in air absorption), so a
 	# teammate's gunfire down the street sounds far away.
@@ -462,3 +537,5 @@ func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) ->
 	voice.global_position = position
 	voice.finished.connect(voice.queue_free)
 	voice.play()
+	if close_tell:
+		_tell_left = TELL_HOLD
