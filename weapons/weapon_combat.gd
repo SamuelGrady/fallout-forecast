@@ -106,8 +106,9 @@ static func resolve(holder: WeaponHolder, item: ItemInstance, origin: Vector3, d
 				target.harpoon_surface()
 				if was_submerged:
 					holder.notify_effect("SURFACED!", Color("#66dfda"), "surfaced", 0.4)
-			var amount: float = 9999.0 if lucky else damage * falloff
-			if lucky:
+			var lucky_hit := lucky and not is_boss_target(target)
+			var amount: float = 9999.0 if lucky_hit else damage * falloff
+			if lucky_hit:
 				holder.notify_effect("LUCKY KILL!", Color("#ffc365"), "lucky", 0.3)
 			if target.has_method("take_bullet"):
 				if target is EnemyBase:
@@ -344,14 +345,19 @@ static func _clear_hazards(holder: WeaponHolder, from: Vector3, dir: Vector3, le
 	for cloud: Node3D in holder.get_tree().get_nodes_in_group("spore_clouds"):
 		if (acid_only and not cloud.acid) or cloud.is_queued_for_deletion():
 			continue
-		var target := cloud.global_position + Vector3.UP * 0.25
-		var hit_cone := in_cone(world, from, dir, target, length, cosine)
-		if not hit_cone:
-			var offset := target - from
-			var along := clampf(offset.dot(dir), 0.0, length)
-			var closest := from + dir * along
-			var radius: float = float(cloud.get("radius")) if cloud.get("radius") != null else 2.0
-			hit_cone = along > 0.0 and Vector2(closest.x - target.x, closest.z - target.z).length() <= radius + 0.45 and absf(closest.y - target.y) <= 2.2 and clear_path(world, from, target)
+		var positions: Array = cloud.lobe_world_positions() if cloud.has_method("lobe_world_positions") else [cloud.global_position]
+		var radius: float = float(cloud.get("radius")) if cloud.get("radius") != null else 2.0
+		var hit_cone := false
+		for pos: Vector3 in positions:
+			var target := pos + Vector3.UP * 0.25
+			hit_cone = in_cone(world, from, dir, target, length, cosine)
+			if not hit_cone:
+				var offset := target - from
+				var along := clampf(offset.dot(dir), 0.0, length)
+				var closest := from + dir * along
+				hit_cone = along > 0.0 and Vector2(closest.x - target.x, closest.z - target.z).length() <= radius + 0.45 and absf(closest.y - target.y) <= 2.2 and clear_path(world, from, target)
+			if hit_cone:
+				break
 		if hit_cone:
 			GameManager.disperse_cloud(cloud)
 			cleared += 1
@@ -375,6 +381,13 @@ static func pellet_rays(dir: Vector3, seed: int, spread_degrees: float, count: i
 		var radius := sqrt(rng.randf()) * spread
 		rays.append((dir + (side * cos(angle) + up * sin(angle)) * tan(radius)).normalized())
 	return rays
+
+static func is_boss_target(target: Object) -> bool:
+	if not is_instance_valid(target):
+		return false
+	if target is EnemyBase and (target as EnemyBase).miniboss_wave > 0:
+		return true
+	return target is Node and ((target as Node).is_in_group("boss_parts") or (target as Node).is_in_group("boss"))
 
 static func is_damageable(target: Object) -> bool:
 	if not is_instance_valid(target) or not target.has_method("take_damage"):

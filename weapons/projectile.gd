@@ -385,8 +385,13 @@ func _tick_zone() -> void:
 			if _contains(target.global_position + Vector3.UP):
 				WeaponCombat.repair(target, 2.6)
 		for cloud: Node3D in get_tree().get_nodes_in_group("spore_clouds"):
-			if cloud.get("acid") and not cloud.is_queued_for_deletion() and _contains(cloud.global_position + Vector3.UP * 0.25):
-				GameManager.disperse_cloud(cloud)
+			if not cloud.get("acid") or cloud.is_queued_for_deletion():
+				continue
+			var positions: Array = cloud.lobe_world_positions() if cloud.has_method("lobe_world_positions") else [cloud.global_position]
+			for pos: Vector3 in positions:
+				if _contains(pos + Vector3.UP * 0.25):
+					GameManager.disperse_cloud(cloud)
+					break
 
 func _contains(point: Vector3) -> bool:
 	return global_position.distance_to(point) <= data.effect_radius \

@@ -908,7 +908,8 @@ func disperse_cloud(cloud: Node) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _disperse_cloud(id: int) -> void:
 	for cloud: Node in get_tree().get_nodes_in_group("spore_clouds"):
-		if cloud.hazard_id == id:
+		var matched: bool = cloud.has_hazard_id(id) if cloud.has_method("has_hazard_id") else cloud.hazard_id == id
+		if matched:
 			cloud.queue_free()
 			break
 
