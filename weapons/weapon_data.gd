@@ -34,6 +34,9 @@ enum Kind { HITSCAN, FLARE, GRENADE, ROCKET, PLACE, USE }
 @export var burst_spread := 0.0
 
 @export_group("Projectile")
+## Positional one-shots for live deployment and detonation.
+@export var deploy_sound := ""
+@export var blast_sound := "explosion"
 @export var fuse := 0.0
 @export var projectile_speed := 30.0
 @export var projectile_gravity := 1.0

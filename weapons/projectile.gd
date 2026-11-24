@@ -240,9 +240,8 @@ func _build_zone(announce: bool) -> void:
 		audio.play()
 	if announce and id == "shield_dome":
 		Perf.mark("shield dome deploy")
-		Sound.play_at("dome_deploy", global_position, -7.0)
-	elif announce and id != "lightning_rod":
-		Sound.play_at("gun_field_deploy", global_position, -13.0)
+	if announce and not data.deploy_sound.is_empty():
+		Sound.play_at(data.deploy_sound, global_position, -10.0)
 	if data.effect_radius <= 0.0:
 		return
 	if _ring == null:
@@ -390,7 +389,7 @@ func _rod_charge_fx() -> void:
 				ShotFX.sparks(registry, global_position + tip, Vector3.UP, 3 + i))
 	spark_tween.tween_callback(func():
 		if is_inside_tree():
-			Sound.play_at("gun_battery_zapper", global_position + tip, -4.0, 1.4))
+			Sound.play_at("static_shock", global_position + tip, -14.0, 1.4))
 	if not OS.has_feature("web"):
 		_light = OmniLight3D.new()
 		_light.light_color = ROD_ARC_COLOR
@@ -471,7 +470,7 @@ func finish(at: Vector3, blast: bool) -> void:
 			ShotFX.sparks(registry, at + Vector3.UP * 0.3, Vector3.UP, 16)
 		elif blast:
 			Juice.shake(0.7, at)
-			Sound.play_at("explosion_big" if id == "frag" else "explosion", at)
+			Sound.play_at(data.blast_sound, at)
 			ShotFX.puff(registry, at + Vector3.UP * 0.4, data.tracer_color, data.effect_radius * 0.3, 0.45)
 			ShotFX.sparks(registry, at + Vector3.UP * 0.3, Vector3.UP, 12)
 			ShotFX.flash(registry, at + Vector3.UP, data.tracer_color, 8.0, 0.15)

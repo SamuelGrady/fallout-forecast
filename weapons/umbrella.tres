@@ -6,6 +6,7 @@
 script = ExtResource("1")
 display_name = "Umbrella Stand"
 shot_sound = "gun_umbrella"
+deploy_sound = "gun_umbrella_open"
 kind = 1
 mechanic = "umbrella"
 damage = 0.0

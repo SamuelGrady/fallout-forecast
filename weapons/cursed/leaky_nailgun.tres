@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("2_xy4ij")
-shot_sound = "shot_nailgun"
+shot_sound = "gun_leaky_nailgun"
 display_name = "Leaky Nailgun"
 damage = 34.0
 spread_degrees = 0.8
