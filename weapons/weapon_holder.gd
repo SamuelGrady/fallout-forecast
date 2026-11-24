@@ -253,7 +253,7 @@ func _handle_input() -> void:
 		# A trigger pressed in loadout must return to neutral before firing or
 		# releasing a charged shot in gameplay.
 		return
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
+	if not TouchInput.combat_pointer_active() and not _pad_connected():
 		_fire_buffer = 0.0
 		_local_charging = false
 		return
@@ -279,9 +279,6 @@ func _handle_input() -> void:
 		elif _local_charging and not Input.is_action_pressed("fire"):
 			_local_charging = false
 			fire()
-		if Input.is_action_just_released("fire"):
-			_local_charging = false
-			fire()
 		return
 	_local_charging = false
 	if Input.is_action_just_pressed("fire"):
@@ -294,6 +291,11 @@ func _handle_input() -> void:
 			fire()
 		elif data.mag_size != 1 and selected_reserve() > 0 and _reload_left <= 0.0:
 			start_reload()
+
+func cancel_touch_fire() -> void:
+	_fire_buffer = 0.0
+	_local_charging = false
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.dedicated or not player.is_multiplayer_authority() or not can_act() or InventoryMenu.blocks_gameplay_actions():
@@ -361,7 +363,7 @@ func _throw_pouch(id: String) -> void:
 	if id != active_pouch or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
 			or _throw_cooldown > 0.0 or pouch_count(id) <= 0 or InventoryMenu.is_open():
 		return
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
+	if not TouchInput.combat_pointer_active() and not _pad_connected():
 		return
 	_pouch_fire_latched = Input.is_action_pressed("fire")
 	_throw_cooldown = THROW_COOLDOWN
@@ -1148,7 +1150,7 @@ func _animate(delta: float) -> void:
 	# nothing about anyone else's.
 	var aiming: bool = can_act() and not player.get("tarp_raised") \
 			and _reload_left <= 0.0 and not InventoryMenu.is_open() \
-			and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or _pad_connected()) and Input.is_action_pressed("aim")
+			and (TouchInput.combat_pointer_active() or _pad_connected()) and Input.is_action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))

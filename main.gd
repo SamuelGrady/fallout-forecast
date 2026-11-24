@@ -68,8 +68,7 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		Engine.max_physics_steps_per_frame = 2
 	Sound.start_run()
-	var pause_menu := CanvasLayer.new()
-	pause_menu.set_script(preload("res://ui/pause_menu.gd"))
+	var pause_menu := preload("res://ui/pause_menu.gd").new()
 	add_child(pause_menu)
 	if not Net.dedicated:
 		# Screen-level juice: trailing bars, suit breach, downed view, rain
@@ -115,6 +114,14 @@ func _ready() -> void:
 		inventory.set_script(preload("res://ui/inventory_menu.gd"))
 		inventory.set("starter_picker", starter_picker)
 		add_child(inventory)
+		if OS.has_feature("web"):
+			var touch_layer := preload("res://ui/touch_controls.tscn").instantiate()
+			var controls := touch_layer.get_node("Controls")
+			controls.pause_menu = pause_menu
+			controls.inventory = inventory
+			controls.starter_picker = starter_picker
+			controls.hotbar = $HUD.hotbar()
+			add_child(touch_layer)
 	Net.roster_changed.connect(_sync_players)
 	Net.server_closed.connect(_leave_to_title)
 	GameManager.run_finished.connect(_on_run_finished)

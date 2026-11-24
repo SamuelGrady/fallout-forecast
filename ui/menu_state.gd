@@ -12,7 +12,7 @@ func open(menu: Node) -> void:
 	stack.append(menu)
 	menu.visible = true
 	get_tree().paused = true
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	menu.focus_default()
 
 
@@ -25,11 +25,14 @@ func close(menu: Node) -> void:
 	if not stack.is_empty():
 		stack.back().visible = true
 		stack.back().focus_default()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if not stack.is_empty() else Input.MOUSE_MODE_CAPTURED
+	if not stack.is_empty():
+		TouchInput.release_pointer()
+	else:
+		TouchInput.capture_pointer()
 
 
 func reset() -> void:
 	stack.clear()
 	GameManager.global_paused = false
 	get_tree().paused = false
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()

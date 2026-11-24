@@ -32,7 +32,7 @@ var _starting := false
 
 
 func _ready() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	theme = BroadcastUI.theme()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	BroadcastUI.backdrop(self)
@@ -76,6 +76,8 @@ func _ready() -> void:
 		_error.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_error.hide()
 		SceneLoader.load_failed.connect(_on_load_failed)
+		TouchInput.layout_changed.connect(_layout_touch)
+		_layout_touch()
 
 	_selection = Maps.fallback(Settings.solo_map_id) if mode == Mode.SOLO else Net.lobby_map_id
 	if mode == Mode.VOTE:
@@ -174,12 +176,21 @@ func _confirm() -> void:
 		Net.set_lobby_map(_selection)
 		dismissed.emit()
 		return
+	if TouchInput.enabled and not TouchInput.landscape:
+		return
 	_starting = true
 	_error.hide()
 	Settings.solo_map_id = Maps.resolve(_selection)
 	Settings.save()
 	hide()
 	SceneLoader.goto(Maps.RUN_SCENE)
+
+
+func _layout_touch() -> void:
+	var height := maxf(48.0, 44.0 * TouchInput.units_per_css_pixel()) if TouchInput.enabled else 48.0
+	_deploy.custom_minimum_size.y = height
+	_back.custom_minimum_size.y = height
+	_deploy.text = "ROTATE TO PLAY" if TouchInput.enabled and not TouchInput.landscape else "PLAY"
 
 
 func _on_load_failed(message: String) -> void:

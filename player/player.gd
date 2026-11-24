@@ -173,7 +173,7 @@ func _ready() -> void:
 			# Fog hides everything past ~80 m; culling far geometry cuts WebGL draw calls.
 			camera.far = 95.0
 		else:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			TouchInput.capture_pointer()
 	else:
 		camera.current = false
 
@@ -237,12 +237,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	# The loadout screen owns the cursor: no look, no click-to-recapture.
 	if InventoryMenu.is_open():
 		return
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_look(event.relative * Settings.mouse_sensitivity)
 	elif event.is_action_pressed("pause"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		TouchInput.release_pointer()
 	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		TouchInput.capture_pointer()
+
+
+func touch_look(screen_relative: Vector2) -> void:
+	_look(TouchInput.look_delta(screen_relative))
 
 
 func _process(delta: float) -> void:
@@ -302,6 +308,7 @@ func _physics_process(delta: float) -> void:
 		_coyote_timer = 0.0
 
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	input = (input + TouchInput.movement).limit_length()
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
 	sprint_lock = maxf(0.0, sprint_lock - delta)
 	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" \

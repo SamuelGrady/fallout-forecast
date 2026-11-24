@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>$GODOT_PROJECT_NAME</title>
   $GODOT_HEAD_INCLUDE
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,8 +22,15 @@
       --panel: #14232d;
       --primary: #244d57;
       --hover: #2f626e;
-      --stage-w: min(100vw, calc(100vh * 4 / 3));
-      --stage-h: min(100vh, calc(100vw * 3 / 4));
+      --inset-top: env(safe-area-inset-top, 0px);
+      --inset-right: env(safe-area-inset-right, 0px);
+      --inset-bottom: env(safe-area-inset-bottom, 0px);
+      --inset-left: env(safe-area-inset-left, 0px);
+      --height: 100vh;
+      --safe-w: calc(100vw - var(--inset-left) - var(--inset-right));
+      --safe-h: calc(var(--height) - var(--inset-top) - var(--inset-bottom));
+      --stage-w: min(var(--safe-w), calc(var(--safe-h) * 4 / 3));
+      --stage-h: min(var(--safe-h), calc(var(--safe-w) * 3 / 4));
       font-family: "VT323", ui-monospace, monospace;
       background: var(--surround);
       color: var(--paper);
@@ -35,15 +42,25 @@
       overflow: hidden;
       background: var(--surround);
     }
-    canvas {
-      position: fixed;
+    @supports (height: 100dvh) { :root { --height: 100dvh; } }
+    #safe-area {
+      position: absolute;
+      top: var(--inset-top);
+      left: var(--inset-left);
+      width: var(--safe-w);
+      height: var(--safe-h);
+    }
+    #canvas {
+      position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
       display: block;
       outline: 0;
     }
-    /* Subtle 4:3 monitor frame matching Godot's fixed 960x720 keep-aspect picture. */
+    .touch-mode.in-run #canvas { touch-action: none; }
     #bezel {
-      position: fixed;
+      position: absolute;
       top: 50%;
       left: 50%;
       width: var(--stage-w);
@@ -55,9 +72,10 @@
       pointer-events: none;
       z-index: 2;
     }
+    .touch-mode #bezel { width: 100%; height: 100%; }
     #bezel[hidden], :fullscreen #bezel { display: none; }
     #backdrop {
-      position: fixed;
+      position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
@@ -65,7 +83,7 @@
       background: var(--surround);
       z-index: 5;
     }
-    #backdrop[hidden], #fullscreen[hidden] { display: none; }
+    [hidden] { display: none !important; }
     #launch {
       position: relative;
       width: var(--stage-w);
@@ -75,14 +93,21 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: clamp(1rem, 2.6vh, 1.8rem);
-      padding: clamp(1.2rem, 4vw, 2.8rem);
+      gap: clamp(.4rem, 1.8dvh, 1.3rem);
+      padding: clamp(.8rem, 3vw, 2.8rem);
       text-align: center;
       overflow: hidden;
       background:
         radial-gradient(circle at 50% 44%, #142838 0%, var(--ink) 74%);
       border: 2px solid rgba(102, 223, 218, .35);
       box-shadow: 0 0 60px rgba(0, 0, 0, .85);
+    }
+    @media (orientation: portrait) {
+      #launch {
+        width: min(100%, 32rem);
+        height: min(100%, 36rem);
+      }
+      .osd.top-right, .osd.bottom-right { display: none; }
     }
     /* VHS overlay inside the 4:3 broadcast frame, matching the in-game title. */
     #launch::before {
@@ -156,9 +181,9 @@
       transition: transform .10s ease, background .10s ease, border-color .10s ease, color .10s ease;
     }
     #start {
-      flex: 1 1 14rem;
+      flex: 1 1 auto;
       min-height: clamp(3.4rem, 8.5vmin, 4.4rem);
-      padding: .75rem 2.2rem;
+      padding: .45rem clamp(1rem, 3vw, 2.2rem);
       font-size: clamp(1.7rem, 4vmin, 2.3rem);
       color: var(--paper);
       background: var(--primary);
@@ -175,12 +200,12 @@
     #start:active:not(:disabled) { transform: scale(.985); }
     #start:disabled { opacity: .72; cursor: wait; }
     #download {
-      flex: 0 1 12.5rem;
+      flex: 1 1 auto;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       min-height: clamp(3.4rem, 8.5vmin, 4.4rem);
-      padding: .75rem 1.6rem;
+      padding: .45rem clamp(1rem, 2vw, 1.6rem);
       font-size: clamp(1.5rem, 3.6vmin, 2.0rem);
       text-decoration: none;
       color: var(--paper);
@@ -194,7 +219,7 @@
       border-color: var(--cyan);
       transform: scale(1.02);
     }
-    #start:focus-visible, #download:focus-visible, #fullscreen:focus-visible {
+    button:focus-visible, #download:focus-visible {
       outline: 2px solid var(--cyan);
       outline-offset: 3px;
     }
@@ -208,11 +233,8 @@
       text-transform: uppercase;
       color: var(--cyan);
     }
-    #fullscreen {
-      position: fixed;
-      bottom: .75rem;
-      right: .9rem;
-      z-index: 4;
+    #fullscreen, #audio, #controls {
+      min-height: 44px;
       color: var(--paper);
       background: rgba(20, 35, 45, .92);
       border: 1px solid rgba(102, 223, 218, .55);
@@ -220,47 +242,80 @@
       border-radius: 0;
       padding: .35rem .85rem;
       font: inherit;
-      font-size: 1.35rem;
+      font-size: 1.2rem;
       letter-spacing: .08em;
       text-transform: uppercase;
       cursor: pointer;
     }
-    #fullscreen:hover {
+    #controls { position: relative; z-index: 1; }
+    #fullscreen, #audio {
+      position: absolute;
+      bottom: .75rem;
+      right: .9rem;
+      z-index: 4;
+    }
+    #audio { bottom: auto; top: .65rem; }
+    #fullscreen:hover, #audio:hover, #controls:hover {
       background: #24424f;
       color: var(--cyan);
       border-color: var(--cyan);
     }
-    :fullscreen #fullscreen, .mouse-captured #fullscreen { display: none; }
+    :fullscreen #fullscreen, .mouse-captured #fullscreen,
+    .mouse-captured #audio, .touch-mode.in-run #fullscreen { display: none; }
+    #rotate {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: 1rem;
+      background: rgba(5, 9, 15, .95);
+      color: var(--cyan);
+      font-size: clamp(1.6rem, 8vmin, 2.5rem);
+    }
   </style>
 </head>
 <body>
-  <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
-  <div id="bezel" aria-hidden="true" hidden></div>
-  <div id="backdrop">
-    <main id="launch">
-      <div class="osd top-left rec">REC</div>
-      <div class="osd top-right">SP  OCT 31 1987</div>
-      <h1 id="title" aria-label="Fallout Forecast"><span class="a">FALLOUT</span><span class="b">FORECAST</span></h1>
-      <div id="actions">
-        <button id="start" type="button">&gt; PLAY</button>
-        <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
-      </div>
-      <p id="status" role="status"></p>
-      <div class="osd bottom-left">CH 03  /  4:3 BROADCAST</div>
-      <div class="osd bottom-right">HI-FI STEREO</div>
-    </main>
+  <div id="safe-area">
+    <canvas id="canvas" tabindex="0" aria-label="$GODOT_PROJECT_NAME"></canvas>
+    <div id="bezel" aria-hidden="true" hidden></div>
+    <div id="backdrop">
+      <main id="launch">
+        <div class="osd top-left rec">REC</div>
+        <div class="osd top-right">SP  OCT 31 1987</div>
+        <h1 id="title" aria-label="Fallout Forecast"><span class="a">FALLOUT</span><span class="b">FORECAST</span></h1>
+        <div id="actions">
+          <button id="start" type="button">&gt; PLAY</button>
+          <a id="download" href="https://github.com/kickofline/fallout-forecast/releases/tag/nightly" target="_blank" rel="noopener">DOWNLOAD</a>
+        </div>
+        <button id="controls" type="button">CONTROLS: AUTO</button>
+        <p id="status" role="status"></p>
+        <div class="osd bottom-left">CH 03</div>
+        <div class="osd bottom-right">HI-FI STEREO</div>
+      </main>
+    </div>
+    <div id="rotate" role="status" hidden>ROTATE TO LANDSCAPE</div>
+    <button id="fullscreen" type="button" hidden>FULLSCREEN</button>
+    <button id="audio" type="button" hidden>ENABLE AUDIO</button>
   </div>
-  <button id="fullscreen" type="button" hidden>FULLSCREEN</button>
   <script>
     // Track every AudioContext Godot creates and resume on any user gesture so
     // async WASM downloads never leave WebAudio stuck in "suspended".
-    (function () {
+    const audio = document.getElementById("audio");
+    const updateAudio = (function () {
       const contexts = [];
+      const isSuspended = ctx => ["suspended", "interrupted"].includes(ctx.state);
+      const update = () => {
+        audio.hidden = !document.getElementById("backdrop").hidden || !contexts.some(isSuspended);
+      };
       const NativeAC = window.AudioContext || window.webkitAudioContext;
       if (NativeAC) {
         const WrappedAC = function (...args) {
           const ctx = new NativeAC(...args);
           contexts.push(ctx);
+          ctx.addEventListener("statechange", update);
+          update();
           return ctx;
         };
         WrappedAC.prototype = NativeAC.prototype;
@@ -269,13 +324,19 @@
         if (window.webkitAudioContext) window.webkitAudioContext = WrappedAC;
         const unlock = () => {
           for (const ctx of contexts) {
-            if (ctx.state === "suspended") ctx.resume().catch(() => {});
+            if (isSuspended(ctx)) ctx.resume().then(update).catch(() => {});
           }
         };
         window.addEventListener("pointerdown", unlock, { capture: true, passive: true });
         window.addEventListener("keydown", unlock, { capture: true, passive: true });
         window.addEventListener("touchstart", unlock, { capture: true, passive: true });
+        window.addEventListener("touchend", unlock, { capture: true, passive: true });
+        audio.addEventListener("click", () => {
+          unlock();
+          document.getElementById("canvas").focus();
+        });
       }
+      return update;
     })();
   </script>
   <script src="$GODOT_URL"></script>
@@ -286,6 +347,71 @@
     const start = document.getElementById("start");
     const status = document.getElementById("status");
     const fullscreen = document.getElementById("fullscreen");
+    const controls = document.getElementById("controls");
+    const rotate = document.getElementById("rotate");
+    const coarse = matchMedia("(pointer: coarse)");
+    const modes = ["auto", "touch", "mouse"];
+    let preference = "auto";
+    try {
+      const saved = localStorage.getItem("fallout-controls");
+      if (modes.includes(saved)) preference = saved;
+    } catch (_) {}
+    let inRun = false;
+    let browserCallback;
+
+    const touchMode = () => preference === "touch" ||
+      (preference === "auto" && coarse.matches && navigator.maxTouchPoints > 0);
+
+    function updateLayout() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const landscape = width >= height;
+      const touch = touchMode();
+      document.body.classList.toggle("touch-mode", touch);
+      document.body.classList.toggle("in-run", inRun);
+      rotate.hidden = !inRun || !touch || landscape;
+      controls.textContent = "CONTROLS: " + preference.toUpperCase();
+      if (browserCallback) browserCallback(touch, landscape, document.hasFocus() &&
+        document.visibilityState === "visible", height, canvas.height / height);
+    }
+
+    function resizeCanvas() {
+      // Resize policy 0 leaves the backing store to the shell, so the render
+      // surface can avoid cutouts and follow mobile browser bars.
+      const scale = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(canvas.clientWidth * scale));
+      const height = Math.max(1, Math.round(canvas.clientHeight * scale));
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      updateLayout();
+    }
+
+    window.falloutTouch = {
+      subscribe(callback) {
+        browserCallback = callback;
+        updateLayout();
+      },
+      setRunVisible(value) {
+        inRun = value;
+        updateLayout();
+      },
+    };
+    controls.addEventListener("click", () => {
+      preference = modes[(modes.indexOf(preference) + 1) % modes.length];
+      try { localStorage.setItem("fallout-controls", preference); } catch (_) {}
+      updateLayout();
+    });
+    new ResizeObserver(resizeCanvas).observe(document.getElementById("safe-area"));
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("blur", updateLayout);
+    window.addEventListener("focus", updateLayout);
+    document.addEventListener("visibilitychange", () => { updateLayout(); updateAudio(); });
+    // Godot's Web template forwards touchcancel as a release. Cancel the
+    // gesture before the template sees that release.
+    canvas.addEventListener("touchcancel", updateLayout, { capture: true, passive: true });
+    coarse.addEventListener("change", updateLayout);
+    resizeCanvas();
     // DOWNLOAD: point straight at the matching desktop build when we can tell the OS.
     (function () {
       const agent = navigator.userAgent.toLowerCase();
@@ -355,7 +481,7 @@
         if (typeof Engine === "undefined") throw new Error("THE GAME SCRIPT COULD NOT LOAD.");
         const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
         if (missing.length) throw new Error(missing.join(". "));
-        const engine = new Engine($GODOT_CONFIG);
+        const engine = new Engine({ ...$GODOT_CONFIG, experimentalVK: true });
         await engine.startGame({
           canvas,
           onProgress(current, total) {
@@ -366,6 +492,7 @@
         backdrop.hidden = true;
         bezel.hidden = false;
         fullscreen.hidden = !document.fullscreenEnabled;
+        updateAudio();
         canvas.focus();
       } catch (error) {
         start.disabled = false;

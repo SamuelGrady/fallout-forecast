@@ -243,7 +243,10 @@ func _refresh_hints() -> void:
 	for i in _parts.size():
 		_parts[i].key.text = PAD_HINTS[i] if _pad else str(i + 1)
 	if _footer_hint:
-		_footer_hint.text = "[D-PAD / STICK] BROWSE   |   [A] EQUIP" if _pad else "[1-3] QUICK PICK   |   [A/D] BROWSE   |   [CLICK / ENTER] EQUIP"
+		if TouchInput.enabled and not _pad:
+			_footer_hint.text = "TAP A KIT TO EQUIP"
+		else:
+			_footer_hint.text = "[D-PAD / STICK] BROWSE   |   [A] EQUIP" if _pad else "[1-3] QUICK PICK   |   [A/D] BROWSE   |   [CLICK / ENTER] EQUIP"
 
 
 func _apply_card_styles(confirmed_index: int) -> void:
@@ -327,7 +330,7 @@ func _open_overlay() -> void:
 	else:
 		BroadcastUI.reveal(self)
 	if MenuState.stack.is_empty() and not get_tree().paused:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		TouchInput.release_pointer()
 
 
 func _close_overlay_immediate(restore_mouse: bool) -> void:
@@ -345,7 +348,7 @@ func _restore_mouse_capture() -> void:
 	if _is_server_only():
 		return
 	if MenuState.stack.is_empty() and not get_tree().paused and not GameManager.finished:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		TouchInput.capture_pointer()
 
 
 func _process(delta: float) -> void:
@@ -365,7 +368,7 @@ func _process(delta: float) -> void:
 		if not _overlay_active:
 			_open_overlay()
 		elif MenuState.stack.is_empty() and not get_tree().paused and Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			TouchInput.release_pointer()
 		_update_slot_hint()
 	elif _overlay_active:
 		# Yield cleanly when Pause/Dev menu is on top; restore capture when closing back to gameplay.

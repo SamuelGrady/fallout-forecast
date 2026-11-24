@@ -5,6 +5,7 @@ const LOADOUT_HOLD := 0.4
 var _panel := PanelContainer.new()
 var _resume_button: Button
 var _remote := Label.new()
+var _remote_resume := Button.new()
 var _remote_layer := CanvasLayer.new()
 var _loadout_hint: Label
 var _start_held := false
@@ -71,12 +72,33 @@ func _ready() -> void:
 	_remote_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_remote_layer)
 	_remote_layer.add_child(_remote)
+	_remote_resume.text = "RESUME"
+	_remote_resume.theme = BroadcastUI.theme()
+	BroadcastUI.button_role(_remote_resume, true)
+	_remote_resume.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_remote_resume.offset_left = -96
+	_remote_resume.offset_right = 96
+	_remote_resume.offset_top = 44
+	_remote_resume.pressed.connect(func(): GameManager.request_pause(false))
+	_remote_resume.hide()
+	_remote_layer.add_child(_remote_resume)
+	TouchInput.layout_changed.connect(_layout_buttons)
+	_layout_buttons()
 	GameManager.global_pause_changed.connect(_on_global_pause)
+
+
+func _layout_buttons() -> void:
+	var target := maxf(48.0, 44.0 * TouchInput.units_per_css_pixel()) if TouchInput.enabled else 48.0
+	for control in _resume_button.get_parent().get_children():
+		if control is Button:
+			control.custom_minimum_size.y = target
+	_remote_resume.offset_bottom = _remote_resume.offset_top + target
 
 
 func _on_global_pause(paused: bool, by: String) -> void:
 	_remote.text = "PAUSED  -  %s" % by.to_upper()
 	_remote.visible = paused and not visible
+	_remote_resume.visible = _remote.visible and TouchInput.enabled
 	if not paused and visible:
 		MenuState.close(self)
 
@@ -96,7 +118,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_start_held = false
 			if not event.is_canceled() and _start_time < LOADOUT_HOLD and InventoryMenu.can_open():
-				_toggle_pause()
+				toggle_pause()
 			return
 		if event.is_pressed() and InventoryMenu.can_open() and not GameManager.global_paused:
 			get_viewport().set_input_as_handled()
@@ -114,10 +136,11 @@ func _input(event: InputEvent) -> void:
 		if not MenuState.stack.is_empty() and MenuState.stack.back() != self:
 			return
 		get_viewport().set_input_as_handled()
-		_toggle_pause()
+		toggle_pause()
 
 func _process(delta: float) -> void:
 	if visible:
+		_loadout_hint.visible = not TouchInput.enabled
 		_loadout_hint.text = "[%s]  LOADOUT & MUTATIONS" % BroadcastUI.input_hint("inventory")
 	if not _start_held or _start_time >= LOADOUT_HOLD:
 		return
@@ -128,7 +151,7 @@ func _process(delta: float) -> void:
 	if _start_time >= LOADOUT_HOLD:
 		InventoryMenu.open_from_gamepad()
 
-func _toggle_pause() -> void:
+func toggle_pause() -> void:
 	Sound.play("ui_click")
 	if visible:
 		_resume()
@@ -140,6 +163,7 @@ func _toggle_pause() -> void:
 		BroadcastUI.reveal(_panel)
 		GameManager.request_pause(true)
 		_remote.visible = false
+		_remote_resume.hide()
 
 func focus_default() -> void:
 	_resume_button.grab_focus()
@@ -155,7 +179,7 @@ func _main_menu() -> void:
 	GameManager.run_active = false
 	GameManager.mutations.clear()
 	WeatherManager.stop()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	Net.leave()
 	SceneLoader.cut_to("res://ui/title.tscn")
 

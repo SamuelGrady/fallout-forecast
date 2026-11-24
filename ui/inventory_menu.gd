@@ -61,6 +61,7 @@ var _ammo_flow: HFlowContainer
 var _enemy_mutations: VBoxContainer
 var _squad_mutations: VBoxContainer
 var _close_hint: Label
+var _touch_close: Button
 
 
 ## True while the loadout screen is up on this machine.
@@ -88,6 +89,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("inventory_menu")
 	_build()
+	TouchInput.layout_changed.connect(_layout_touch_buttons)
+	_layout_touch_buttons()
 	visible = false
 	_set_preview_active(false)
 	if GameManager.mutations:
@@ -154,7 +157,7 @@ func open() -> void:
 	_refresh_state()
 	_refresh_input_hints()
 	_set_preview_active(true)
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	TouchInput.release_pointer()
 	if Settings.using_gamepad:
 		_focus_slot()
 	BroadcastUI.reveal(_card)
@@ -173,7 +176,7 @@ func close() -> void:
 	Sound.play("ui_tick", -10.0)
 	if MenuState.stack.is_empty() and not get_tree().paused and GameManager.run_active \
 			and not GameManager.awaiting_tape_choice:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		TouchInput.capture_pointer()
 
 
 func toggle() -> void:
@@ -452,6 +455,7 @@ func _refresh_belt() -> void:
 
 
 func _refresh_input_hints() -> void:
+	_close_hint.visible = not TouchInput.enabled or Settings.using_gamepad
 	_close_hint.text = "[%s] CLOSE" % BroadcastUI.input_hint("cancel")
 	if Settings.using_gamepad:
 		if _swap_from >= 0:
@@ -460,6 +464,14 @@ func _refresh_input_hints() -> void:
 			_close_hint.text = "[D-PAD] INSPECT   [A] EQUIP   [X] MOVE   [R3] DROP   [B] CLOSE"
 	_frag_key.text = BroadcastUI.input_hint("throw_grenade")
 	_dome_key.text = BroadcastUI.input_hint("throw_dome")
+
+
+func _layout_touch_buttons() -> void:
+	var height := 44.0 * TouchInput.units_per_css_pixel() if TouchInput.enabled else 0.0
+	_touch_close.visible = TouchInput.enabled
+	_touch_close.custom_minimum_size.y = height
+	_equip_button.custom_minimum_size.y = height
+	_drop_button.custom_minimum_size.y = height
 
 
 func _refresh_vitals() -> void:
@@ -593,6 +605,9 @@ func _header() -> Control:
 	title.text = "LOADOUT"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_close_hint = _label(row, 18, BroadcastUI.MUTED)
+	_touch_close = _small_button(row, "CLOSE", BroadcastUI.CYAN, close)
+	_touch_close.custom_minimum_size.x = 130
+	_touch_close.focus_mode = Control.FOCUS_NONE
 	return bar
 
 

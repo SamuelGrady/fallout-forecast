@@ -272,7 +272,7 @@ func _finish_tally() -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_echo() or not event.is_pressed():
 		return
-	if _counting and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventMouseButton):
+	if _counting and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventMouseButton or event is InputEventScreenTouch):
 		_finish_tally()
 		Sound.play("ui_tick", -18.0, 1.18)
 		get_viewport().set_input_as_handled()
@@ -308,6 +308,8 @@ func _button(parent: Control, caption: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = caption
 	button.custom_minimum_size = Vector2(216, 48)
+	if TouchInput.enabled:
+		button.custom_minimum_size.y = maxf(48.0, 44.0 * TouchInput.units_per_css_pixel())
 	BroadcastUI.animate_button(button)
 	button.pressed.connect(action)
 	parent.add_child(button)

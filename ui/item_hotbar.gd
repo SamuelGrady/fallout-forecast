@@ -10,6 +10,7 @@ const CELL := Vector2(68, 64)
 const GAP := 5
 ## Whole hotbar: 5 cells and 4 gaps (360 x 64 px in the 960x720 viewport).
 const SIZE := Vector2(CELL.x * 5 + GAP * 4, CELL.y)
+const TOUCH_SIZE := Vector2(CELL.x * 7 + GAP * 6, CELL.y)
 const INK := Color(0.047, 0.078, 0.133, 0.9)
 ## Pouch rows right of the slots: [key] icon count/cap.
 const POUCHES := ["frag", "shield_dome"]
@@ -21,6 +22,7 @@ var _state: Array = []
 var _flash := 0.0
 var _pouch: Array = []
 var _active_pouch := ""
+var _touch_layout := false
 var _pouch_flash: Dictionary = {"frag": 0.0, "shield_dome": 0.0}
 var _scrap_icon := GameIcon.new()
 
@@ -31,6 +33,32 @@ func _ready() -> void:
 	_scrap_icon.size = Vector2(14, 14)
 	_scrap_icon.position = Vector2(SIZE.x + 6, CELL.y - 18)
 	add_child(_scrap_icon)
+
+
+func set_touch_layout(enabled: bool) -> void:
+	_touch_layout = enabled
+	var width := TOUCH_SIZE.x if enabled else SIZE.x
+	_scrap_icon.position.x = width + 6
+	queue_redraw()
+
+
+func touch_cell_at(viewport_position: Vector2) -> int:
+	if not _touch_layout or not visible or _state.is_empty():
+		return -1
+	var at := get_global_transform().affine_inverse() * viewport_position
+	for i in WeaponHolder.SLOT_COUNT + POUCHES.size():
+		if Rect2(Vector2(i * (CELL.x + GAP), 0), CELL).has_point(at):
+			return i
+	return -1
+
+
+func select_touch_cell(index: int, holder: WeaponHolder) -> void:
+	if holder == null:
+		return
+	if index < WeaponHolder.SLOT_COUNT:
+		holder.select_slot(index)
+	else:
+		holder.select_pouch(POUCHES[index - WeaponHolder.SLOT_COUNT])
 
 
 func refresh(holder: WeaponHolder) -> void:
@@ -83,9 +111,13 @@ func _draw() -> void:
 	if _state.is_empty():
 		return
 	var scrap_text := str(_state[1])
-	draw_string_outline(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, INK)
-	draw_string(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
-	_draw_pouches()
+	var scrap_at := _scrap_icon.position + Vector2(18, 13)
+	draw_string_outline(FONT, scrap_at, scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, INK)
+	draw_string(FONT, scrap_at, scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
+	if _touch_layout:
+		_draw_touch_pouches()
+	else:
+		_draw_pouches()
 	for i in WeaponHolder.SLOT_COUNT:
 		var selected: bool = _active_pouch.is_empty() and _state[0] == i
 		var at := Vector2(i * (CELL.x + GAP), -4.0 if selected else 0.0)
@@ -105,7 +137,7 @@ func _draw() -> void:
 		draw_rect(Rect2(at + Vector2(6, CELL.y - 5), Vector2(CELL.x - 12, 2)), color)
 		var definition := ItemCatalog.definition(item[0])
 		var alpha := 1.0 if selected else 0.7
-		if selected:
+		if selected and not _touch_layout:
 			var hint := "%s DROP" % BroadcastUI.input_hint("drop_item")
 			var hint_at := at + Vector2(0, -5)
 			draw_string_outline(FONT, hint_at, hint, HORIZONTAL_ALIGNMENT_CENTER, CELL.x, 15, 3, INK)
@@ -120,6 +152,21 @@ func _draw() -> void:
 		if definition.ammo_type.is_empty():
 			draw_string_outline(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, 3, INK)
 			draw_string(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, color)
+
+
+func _draw_touch_pouches() -> void:
+	if _pouch.size() != POUCHES.size():
+		return
+	for i in POUCHES.size():
+		var id: String = POUCHES[i]
+		var at := Vector2((WeaponHolder.SLOT_COUNT + i) * (CELL.x + GAP), 0)
+		var held := id == _active_pouch
+		var color: Color = POUCH_COLORS[id] if _pouch[i] > 0 else MUTED
+		draw_rect(Rect2(at, CELL), Color(INK, 0.75))
+		draw_rect(Rect2(at, CELL), Color(color, 0.95 if held else 0.52), false, 2.0 if held else 1.0)
+		var icon := ItemCatalog.definition(id).icon
+		draw_texture_rect(icon, Rect2(at + Vector2(13, 7), Vector2(42, 42)), false, Color(1, 1, 1, 1.0 if _pouch[i] > 0 else 0.45))
+		draw_string(FONT, at + Vector2(0, 58), str(_pouch[i]), HORIZONTAL_ALIGNMENT_CENTER, CELL.x, 19, color)
 
 
 func _draw_pouches() -> void:
