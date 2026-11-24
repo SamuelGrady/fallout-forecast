@@ -1171,10 +1171,10 @@
     },
     {
       id: 'flare_launcher', name: 'Road Flare Launcher', cat: 'firearm', badge: 'Special · Incendiary', bClass: 'b-special',
-      sub: 'Break-action launcher firing burning, drying illumination flares.',
-      kind: 'gun', dmg: 36, pellets: 1, rate: 1/0.75, mag: 1, reload: 1.35, range: 64, radius: 4.0, dur: 8.0, ammo: 'Flares (12)',
+      sub: 'Disposable launcher with three incendiary flares.',
+      kind: 'gun', dmg: 36, pellets: 1, rate: 1/0.75, mag: 3, disposable: true, range: 64, radius: 4.0, dur: 8.0,
       slot: 'Hotbar Slot', source: 'Vending Bay 3 / Bay 2 from W3 / W3+ Drop', dot: '#7cd4ff',
-      mech: 'Auto-reloading launcher firing a 36-dmg road flare that burns for 8s in a 4m radius: reveals & ignites infected (18 DPS burn, tier-scaled) AND creates a warm dry zone cutting acid rain suit drain by 75%.'
+      mech: 'Each shot launches a 36-damage flare that burns for 8s in a 4m radius. It reveals and ignites infected for 18 DPS at Standard tier and cuts acid rain suit drain by 75%. The launcher disappears after the third shot.'
     },
 
     // SPECIALS & LEGENDARY
@@ -1414,7 +1414,7 @@
     if (w.kind === 'gun') {
       const b2 = document.createElement('span');
       b2.className = 'badge b-ammo';
-      b2.textContent = `Ammo: ${w.ammo}`;
+      b2.textContent = w.disposable ? 'Disposable' : `Ammo: ${w.ammo}`;
       br.appendChild(b2);
       if (activeTier > 0) {
         const b3 = document.createElement('span');
@@ -1442,13 +1442,13 @@
       const dps = Math.round(totalDmg * w.rate);
       addBar(sb, 'DMG', Math.sqrt(totalDmg / 128), dmgTxt, '#ffc365');
       addBar(sb, 'RATE', Math.sqrt(w.rate / 12), `${w.rate.toFixed(1)}/s`, '#64e4de');
-      addBar(sb, 'MAG', Math.sqrt(w.mag / 56), `${w.mag}`, '#b5ef82');
+      addBar(sb, w.disposable ? 'SHOTS' : 'MAG', w.disposable ? 1 : Math.sqrt(w.mag / 56), `${w.mag}`, '#b5ef82');
       if (w.range) addBar(sb, 'RANGE', w.range / 104, `${w.range}m`, '#9db5ff');
       else if (w.radius) addBar(sb, 'BLAST', w.radius / 10, `${w.radius}m`, '#9db5ff');
 
       const extras = [
         ['Burst DPS', `${dps}/s`],
-        ['Reload', w.shellReload ? `${w.reload}s/shell` : `${w.reload}s`],
+        ['Reload', w.disposable ? 'None' : (w.shellReload ? `${w.reload}s/shell` : `${w.reload}s`)],
         ['Mode', w.charge ? `Charge ${w.charge}s` : (w.auto ? 'Full-Auto' : 'Semi')],
       ];
       if (w.pierce) extras[2] = ['Pierce', `+${w.pierce} targets`];
@@ -1502,7 +1502,7 @@
       btn.innerHTML = `
         <div class="thumb-wrap"><canvas></canvas></div>
         <div class="wcard-name">${w.name}</div>
-        <div class="wcard-meta"><span><span class="dot-tag" style="background:${w.dot}"></span> ${headline}</span><span>${w.kind==='gun' ? w.mag+' MAG' : '×'+w.stack}</span></div>`;
+        <div class="wcard-meta"><span><span class="dot-tag" style="background:${w.dot}"></span> ${headline}</span><span>${w.kind==='gun' ? w.mag + (w.disposable ? ' SHOTS' : ' MAG') : '×'+w.stack}</span></div>`;
       btn.onclick = () => selectWeapon(w.id);
       grid.appendChild(btn);
 

@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Workflow & Rules
 
 - Commit `.uid` files alongside scripts and resources. `.godot/` is ignored.
-- Bump `Net.PROTOCOL` in `game/net.gd` (currently `17`) whenever an RPC signature, replicated payload, or networked node path changes so mismatched clients are rejected cleanly instead of desyncing.
+- Bump `Net.PROTOCOL` in `game/net.gd` (currently `18`) whenever an RPC signature, replicated payload, or networked node path changes so mismatched clients are rejected cleanly instead of desyncing.
 - Commit and push changes cleanly; keep throwaway test/capture scripts outside the repository.
 - Keep READMEs, compose files, docs, and code comments infrastructure-agnostic (no private hostnames, deployment dashboards, internal UUIDs, or credentials).
 

@@ -9,6 +9,7 @@ enum Kind { GUN, THROWABLE, CONSUMABLE, DEPLOYABLE }
 @export var kind: Kind
 @export var icon: Texture2D
 @export var pickup_visual: PackedScene
+## Empty for items that are consumed after their last use, including disposable launchers.
 @export var ammo_type: String
 @export var stack_cap := 1
 @export var spawn_count := 1

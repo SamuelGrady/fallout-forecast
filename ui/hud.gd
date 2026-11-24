@@ -755,7 +755,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 	var mag := maxi(1, definition.weapon.mag_size) if is_gun else 1
 	var low := is_gun and count <= ceili(mag * 0.25)
 	_ammo.text = str(count) if is_gun else "x%d" % count
-	_reserve.text = "/ %d" % holder.selected_reserve() if is_gun else ""
+	_reserve.text = "/ %d" % holder.selected_reserve() if not definition.ammo_type.is_empty() else ""
 	var ammo_color := BroadcastUI.PINK if jammed else (BroadcastUI.AMBER if low else BroadcastUI.PAPER)
 	if _ammo.get_theme_color("font_color") != ammo_color:
 		_ammo.add_theme_color_override("font_color", ammo_color)

@@ -19,7 +19,7 @@ const COLUMN_BG := Color(0.03, 0.06, 0.09, 0.72)
 const PREVIEW_SIZE := Vector2i(210, 178)
 const SLOT_SIZE := Vector2(58, 72)
 const AMMO_NAMES := {"shell": "SHELLS", "rifle": "RIFLE", "nail": "NAILS", "water": "WATER",
-	"cell": "CELLS", "flare": "FLARES", "shaft": "SHAFTS", "fuel": "FUEL", "radio": "RADIO",
+	"cell": "CELLS", "shaft": "SHAFTS", "fuel": "FUEL", "radio": "RADIO",
 	"rocket": "ROCKETS", "revolver": ".38"}
 
 static var _instance: InventoryMenu
@@ -328,7 +328,7 @@ func _refresh_inspector() -> void:
 		_insp_card.clear("EMPTY SLOT")
 		return
 	var opts := {"source": "inventory", "count": item.count}
-	if definition.kind == ItemDefinition.Kind.GUN:
+	if not definition.ammo_type.is_empty():
 		opts["reserve"] = int(holder.reserves.get(definition.ammo_type, 0))
 		opts["reserve_cap"] = int(ItemCatalog.CAPS.get(definition.ammo_type, 0))
 	_insp_card.set_item(item.id, item.tier, opts)

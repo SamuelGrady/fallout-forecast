@@ -261,10 +261,13 @@ static func stat_rows(id: String, tier := 0, opts := {}) -> Array:
 		var max_mag := float(opts.get("max_mag", maxima.max_mag))
 		var n := gun_numbers(data, tier)
 		var dmg_text := "%dx%d" % [roundi(n.damage), n.pellets] if n.pellets > 1 else "%d" % roundi(n.damage)
+		var disposable := definition.ammo_type.is_empty()
+		var rounds := int(opts.get("count", n.mag)) if disposable else int(n.mag)
+		var capacity := float(n.mag) if disposable else max_mag
 		return [
 			["DMG", clampf(sqrt(n.power / maxf(max_power, 0.01)), 0.14, 1.0), dmg_text, BroadcastUI.AMBER],
 			["RATE", clampf(sqrt(n.rate / maxf(max_rate, 0.01)), 0.14, 1.0), "%.1f/S" % n.rate, BroadcastUI.CYAN],
-			["MAG", clampf(float(n.mag) / maxf(max_mag, 1.0), 0.14, 1.0), "%d" % n.mag, BroadcastUI.ACID],
+			["SHOTS" if disposable else "MAG", clampf(float(rounds) / maxf(capacity, 1.0), 0.14, 1.0), str(rounds), BroadcastUI.ACID],
 		]
 	var rows: Array = []
 	match id:
@@ -535,18 +538,20 @@ func _apply_footer(id: String, definition: ItemDefinition, opts: Dictionary) -> 
 			else:
 				var verb := "SWAP" if bool(opts.get("swap", false)) else "TAKE"
 				meta_color = BroadcastUI.AMBER if verb == "SWAP" else BroadcastUI.ACID
-				if is_gun:
+				if is_gun and definition.ammo_type.is_empty():
+					meta = verb
+				elif is_gun:
 					meta = "%s  /  %d RDS LOADED" % [verb, int(opts.get("count", 0))]
 				else:
 					meta = "%s x%d" % [verb, int(opts.get("count", 1))]
 		"inventory":
-			if is_gun:
+			if is_gun and not definition.ammo_type.is_empty():
 				var reserve := int(opts.get("reserve", 0))
 				var cap := int(opts.get("reserve_cap", ItemCatalog.CAPS.get(definition.ammo_type, 0)))
 				var loaded := int(opts.get("count", 0))
 				meta = "RESERVE: %d / %d   MAG %d/%d" % [reserve, cap, loaded, maxi(1, definition.weapon.mag_size)]
 				meta_color = BroadcastUI.PINK if reserve <= 0 and loaded <= 0 else BroadcastUI.PAPER
-			elif definition:
+			elif definition and not is_gun:
 				meta = "x%d" % int(opts.get("count", 1))
 				meta_color = BroadcastUI.PAPER
 	_meta_label.text = meta

@@ -108,7 +108,7 @@ func selected_reserve() -> int:
 	if not active_pouch.is_empty():
 		return 0
 	var definition := selected_definition()
-	return int(reserves.get(definition.ammo_type, 0)) if definition else 0
+	return int(reserves.get(definition.ammo_type, 0)) if definition and not definition.ammo_type.is_empty() else 0
 
 func reload_remaining() -> float:
 	return _reload_left
@@ -697,7 +697,7 @@ func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming:
 	player.end_hit_batch()
 	_play_shot(item.id, origin, dir, traces, is_aiming)
 	Net.rpc_to_run(_shot_fx, [loot.run_id, item.id, origin, dir, traces, is_aiming, predicted])
-	var emptied := item.count == 0 and definition.kind != ItemDefinition.Kind.GUN
+	var emptied := item.count == 0 and definition.ammo_type.is_empty()
 	if emptied:
 		slots[current] = null
 	send_state(emptied)

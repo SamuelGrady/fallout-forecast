@@ -8,7 +8,7 @@ const TIER_NAMES := ["STANDARD", "TUNED", "OVERCLOCKED"]
 const TIER_COLORS := [Color("#fff0d9"), Color("#66dfda"), Color("#ffc365")]
 const DAMAGE_SCALE := [1.0, 1.08, 1.16]
 const CAPS := {"shell": 36, "rifle": 200, "nail": 120, "water": 120, "cell": 80,
-	"flare": 12, "shaft": 10, "fuel": 100, "radio": 12, "rocket": 10, "revolver": 36}
+	"shaft": 10, "fuel": 100, "radio": 12, "rocket": 10, "revolver": 36}
 const MODELS := "res://weapons/item_models.gd"
 
 const GUNS := {
@@ -16,7 +16,7 @@ const GUNS := {
 	"pump_shotgun": ["shell", "pump_shotgun"], "spray_rifle": ["rifle", "spray_rifle"],
 	"nail_driver": ["nail", "nail_driver"], "hunting_rifle": ["rifle", "hunting_rifle"],
 	"pressure_washer": ["water", "pressure_washer"], "rock_salt": ["shell", "rock_salt"],
-	"battery_zapper": ["cell", "battery_zapper"], "flare_launcher": ["flare", "flare_launcher"],
+	"battery_zapper": ["cell", "battery_zapper"], "flare_launcher": ["", "flare_launcher"],
 	"harpoon": ["shaft", "harpoon"], "leaf_blower": ["fuel", "leaf_blower"],
 	"disruptor": ["radio", "disruptor"], "leaky_nailgun": ["nail", "cursed/leaky_nailgun"],
 	"boombox_launcher": ["rocket", "cursed/boombox_launcher"],

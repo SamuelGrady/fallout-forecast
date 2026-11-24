@@ -117,7 +117,7 @@ func _draw() -> void:
 			for word in definition.display_name.split(" "):
 				initials += word.left(1)
 			draw_string(FONT, at + Vector2(15, 36), initials.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 38, 22, Color(color, alpha))
-		if definition.kind != ItemDefinition.Kind.GUN:
+		if definition.ammo_type.is_empty():
 			draw_string_outline(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, 3, INK)
 			draw_string(FONT, at + Vector2(CELL.x - 28, CELL.y - 10), str(item[2]), HORIZONTAL_ALIGNMENT_RIGHT, 22, 18, color)
 
