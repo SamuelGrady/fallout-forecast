@@ -20,6 +20,7 @@ const MUTED := Color("#728b92")
 var _state: Array = []
 var _flash := 0.0
 var _pouch: Array = []
+var _active_pouch := ""
 var _pouch_flash: Dictionary = {"frag": 0.0, "shield_dome": 0.0}
 var _scrap_icon := GameIcon.new()
 
@@ -33,11 +34,12 @@ func _ready() -> void:
 
 
 func refresh(holder: WeaponHolder) -> void:
-	var data: Array = [holder.current, holder.scrap]
+	var data: Array = [holder.current, holder.scrap, holder.active_pouch]
 	for item: ItemInstance in holder.slots:
 		data.append([item.id, item.tier, item.count] if item else [])
 	if _state != data:
 		_state = data
+		_active_pouch = holder.active_pouch
 		queue_redraw()
 	var pouch: Array = []
 	for id: String in POUCHES:
@@ -59,7 +61,7 @@ func pouch_key() -> Array:
 ## Slot contents without the selection or scrap, so the HUD can tell a pickup
 ## or swap apart from ammo ticking down.
 func state_key() -> Array:
-	return _state.slice(2).map(func(item): return item.slice(0, 2) if item is Array and not item.is_empty() else [])
+	return _state.slice(3).map(func(item): return item.slice(0, 2) if item is Array and not item.is_empty() else [])
 
 
 ## Pulse the selected cell (unlocks, pickups).
@@ -85,9 +87,9 @@ func _draw() -> void:
 	draw_string(FONT, Vector2(SIZE.x + 24, CELL.y - 5), scrap_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#ffc365"))
 	_draw_pouches()
 	for i in WeaponHolder.SLOT_COUNT:
-		var selected: bool = _state[0] == i
+		var selected: bool = _active_pouch.is_empty() and _state[0] == i
 		var at := Vector2(i * (CELL.x + GAP), -4.0 if selected else 0.0)
-		var item: Array = _state[i + 2]
+		var item: Array = _state[i + 3]
 		var color := Color("#728b92") if item.is_empty() else ItemCatalog.tier_color(item[0], item[1])
 		if selected:
 			draw_rect(Rect2(at, CELL), Color(color, 0.14))
@@ -128,16 +130,21 @@ func _draw_pouches() -> void:
 		var count: int = _pouch[i]
 		var cap := ItemCatalog.pouch_cap(id)
 		var stocked := count > 0
+		var held := _active_pouch == id
 		var pulse: float = _pouch_flash[id]
 		var accent: Color = POUCH_COLORS[id]
 		var color := accent.lerp(Color.WHITE, clampf(pulse, 0.0, 1.0) * 0.6) if stocked else MUTED
 		var alpha := 1.0 if stocked else 0.45
 		var x := SIZE.x + 6.0
 		var y := i * POUCH_ROW
+		if held:
+			var row_rect := Rect2(Vector2(x - 3.0, y), Vector2(78.0, POUCH_ROW - 1.0))
+			draw_rect(row_rect, Color(accent, 0.18))
+			draw_rect(row_rect, Color("#c7faff"), false, 1.5)
 		var key := BroadcastUI.input_hint(ItemCatalog.POUCH_ACTIONS[id])
 		var key_w := FONT.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 		draw_string_outline(FONT, Vector2(x, y + 15), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, INK)
-		draw_string(FONT, Vector2(x, y + 15), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.91, 0.91, 0.84, 0.85 if stocked else 0.4))
+		draw_string(FONT, Vector2(x, y + 15), key, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#c7faff") if held else Color(0.91, 0.91, 0.84, 0.85 if stocked else 0.4))
 		x += key_w + 3.0
 		var icon_rect := Rect2(Vector2(x, y + (POUCH_ROW - POUCH_ICON) * 0.5 - 1.0), Vector2.ONE * POUCH_ICON)
 		if pulse > 0.0:

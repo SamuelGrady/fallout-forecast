@@ -324,6 +324,16 @@ Remote players and infected interpolate host-relayed movement (15 Hz for infecte
 | Enemy tuning | Shield Dome pushes enemies out and blocks acid and spores; same-kind clouds merge instead of stacking. Hailstones turn slowly. Cumulus tracks one player at a time, hovering near them until the core is exposed and then keeping its distance. | weapons/projectile.gd, enemies/mister/spore\_cloud.gd, enemies/boss/boss\_cumulus.gd |
 | Maps and web | Maple Hollow is now a forest around the church and cemetery, with wind sway. Web folds materials to fewer shader variants and warms every one before the level shows; vertex shading on web. Web launch page has PLAY and DOWNLOAD (nightly builds). | retro/web\_materials.gd, game/warmup.gd, web/shell.html |
 
+**November 23 gameplay update.**
+
+| Area | What was built | Where |
+| --- | --- | --- |
+| Loadout and mutations | A Field Kit overlay offers Pump Shotgun, Nail Driver, or Service Revolver. Drafts open during Calm. Tab or I opens a loadout with the suit model, movable slots, mutation icons, and the shared weapon stat card. | `ui/starter_picker.gd`, `ui/slot_reel.gd`, `ui/inventory_menu.gd`, `ui/item_stat_card.gd` |
+| Scrap and vending | Infected drop collectible scrap, shown as 3D gears matching the HUD. Covered vending stations have three rotating offers and a five-scrap ammo refill. All stations work in solo runs. | `weapons/ammo_drop.gd`, `weapons/scrap_gear.gd`, `game/crate_manager.gd`, `crates/supply_station.gd` |
+| Supply drops | Starting before wave 2, supplies descend during Calm and target reachable outdoor ground near the squad. A beacon and distance marker guide players to the pallet, and the chute stays visible after landing. Loot scales from surplus to Apex by wave 5. | `game/crate_manager.gd`, `crates/supply_station.gd`, `ui/teammate_markers.gd` |
+| Belt pouches | Q equips a Frag Grenade (cap 10) and F equips a Shield Dome (cap 5). Aim with the throw preview and fire to throw. The host synchronizes the equipped pouch and remaining count on protocol 17. | `weapons/weapon_holder.gd`, `ui/item_hotbar.gd`, `game/net.gd` |
+| Combat feedback | The reticle reflects current weapon spread. Damage numbers keep their screen size above the VHS pass. Gun reports play on local fire, and the combat score settles quickly after the wave clears. | `ui/hud.gd`, `weapons/damage_number.gd`, `weapons/weapon_combat.gd`, `game/sound.gd` |
+
 ## Team, milestones and risks
 
 Sam and Drew build the game in three weeks.

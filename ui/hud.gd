@@ -670,7 +670,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 	_slots.visible = holder != null and player.state == "ok"
 	if holder:
 		_slots.refresh(holder)
-		var slot_state := "%d|%s" % [holder.current, str(_slots.state_key())]
+		var slot_state := "%d|%s|%s" % [holder.current, holder.active_pouch, str(_slots.state_key())]
 		if slot_state != _last_slot_state:
 			if not _last_slot_state.is_empty():
 				_hotbar_hot = 3.0
@@ -685,7 +685,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 				_hotbar_hot = 3.0
 			_last_pouch_state = pouch_state
 	_hotbar_hot = maxf(0.0, _hotbar_hot - delta)
-	_fade(_slots, _hotbar_hot > 0.0, 0.45, delta)
+	_fade(_slots, _hotbar_hot > 0.0 or (holder != null and not holder.active_pouch.is_empty()), 0.45, delta)
 	var definition: ItemDefinition = holder.selected_definition() if holder else null
 	_armory.visible = player.state == "ok" and definition != null
 	_reticle.reload = 0.0
@@ -697,7 +697,9 @@ func _update_weapon(player: Player, delta: float) -> void:
 		_reticle.style = _reticle.Style.CROSS
 		_reticle.target_spread = 6.0
 		return
-	var item: ItemInstance = holder.selected()
+	var item: ItemInstance = holder.selected() if holder.active_pouch.is_empty() else null
+	var count := holder.active_count()
+	var tier := item.tier if item else 0
 	var data: WeaponData = definition.weapon
 	var is_gun := definition.kind == ItemDefinition.Kind.GUN
 	# Fortnite-style dynamic angular spread crosshair projection.
@@ -727,6 +729,9 @@ func _update_weapon(player: Player, delta: float) -> void:
 	_name_left = maxf(0.0, _name_left - delta)
 	_hint_left = maxf(0.0, _hint_left - delta)
 	var hint_text := ItemStatCard.hud_hint(definition.id)
+	if not holder.active_pouch.is_empty():
+		var key := BroadcastUI.input_hint(ItemCatalog.POUCH_ACTIONS[holder.active_pouch])
+		hint_text = "%s THROW · %s STOW" % [BroadcastUI.input_hint("fire"), key]
 	var persist_hint := definition.is_cursed() or data.charge_time > 0.0 or not is_gun
 	_weapon_hint.visible = not hint_text.is_empty() and (_hint_left > 0.0 or persist_hint)
 	if _weapon_hint.visible:
@@ -740,7 +745,7 @@ func _update_weapon(player: Player, delta: float) -> void:
 	_weapon.modulate.a = clampf(_name_left * 2.0, 0.0, 1.0)
 	if _name_left > 0.0:
 		_weapon.text = _unlock_name if not _unlock_name.is_empty() else definition.display_name.to_upper()
-		var weapon_color := BroadcastUI.AMBER if not _unlock_name.is_empty() else ItemCatalog.tier_color(definition.id, item.tier)
+		var weapon_color := BroadcastUI.AMBER if not _unlock_name.is_empty() else ItemCatalog.tier_color(definition.id, tier)
 		if _weapon.get_theme_color("font_color") != weapon_color:
 			_weapon.add_theme_color_override("font_color", weapon_color)
 	else:
@@ -748,19 +753,19 @@ func _update_weapon(player: Player, delta: float) -> void:
 	var reloading := holder.reload_remaining() > 0.0
 	var jammed := holder.jammed()
 	var mag := maxi(1, definition.weapon.mag_size) if is_gun else 1
-	var low := is_gun and item.count <= ceili(mag * 0.25)
-	_ammo.text = str(item.count) if is_gun else "x%d" % item.count
+	var low := is_gun and count <= ceili(mag * 0.25)
+	_ammo.text = str(count) if is_gun else "x%d" % count
 	_reserve.text = "/ %d" % holder.selected_reserve() if is_gun else ""
 	var ammo_color := BroadcastUI.PINK if jammed else (BroadcastUI.AMBER if low else BroadcastUI.PAPER)
 	if _ammo.get_theme_color("font_color") != ammo_color:
 		_ammo.add_theme_color_override("font_color", ammo_color)
 	_pips.visible = is_gun
-	_pips.rounds = item.count
+	_pips.rounds = count
 	_pips.capacity = definition.weapon.mag_size if is_gun else 0
 	_pips.reload_progress = 1.0 - holder.reload_remaining() / maxf(holder._reload_total, 0.01) if reloading else 0.0
 	_reticle.reload = _pips.reload_progress
 	_reticle.jammed = jammed
-	if is_gun and item.count == 0 and not reloading and not jammed and holder.selected_reserve() > 0 and not _prompt.visible:
+	if is_gun and count == 0 and not reloading and not jammed and holder.selected_reserve() > 0 and not _prompt.visible:
 		_prompt.show_prompt(BroadcastUI.input_hint("reload"), "RELOAD", BroadcastUI.AMBER)
 		_prompt.visible = true
 	_armory_hot = maxf(0.0, _armory_hot - delta)

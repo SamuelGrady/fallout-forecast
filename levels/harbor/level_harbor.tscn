@@ -4996,7 +4996,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0.08, -32)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0.08, -1)
 
 [node name="CrateSpawn6" type="Marker3D" parent="CrateSpawns" unique_id=2107401139 groups=["crate_spawn"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.08, 5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.08, 9)
 
 [node name="CrateSpawn7" type="Marker3D" parent="CrateSpawns" unique_id=334266186 groups=["crate_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.08, 24)

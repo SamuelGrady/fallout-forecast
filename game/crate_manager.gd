@@ -1,9 +1,6 @@
 extends Node
-## Weather Service vending, double-or-nothing and airdrop inventory.
+## Weather Service vending and airdrop inventory.
 
-const BASE_PRICE := 20
-const PRICE_STEP := 5
-const DOUBLE_WINDOW := 2.0
 const STATION_TABLE := preload("res://crates/loot_table.tres")
 const VENDING_POOLS := [
 	["med_tin", "suit_patch", "frag", "shield_dome", "umbrella", "bleach_bomb", "bait_radio"],
@@ -24,9 +21,7 @@ var loot: LootTable = STATION_TABLE
 var stations: Dictionary = {}
 var airdrop: SupplyStation
 var last_drop_position := Vector3.INF
-var _pending: Array[Dictionary] = []
 var _holds: Dictionary = {}
-var _waiting: Dictionary = {}
 var _offer_serial := 0
 var _vending_rng := RandomNumberGenerator.new()
 var _run := 0
@@ -40,9 +35,7 @@ func begin_run() -> void:
 	var registry := RunLoot.find(get_tree())
 	_run = registry.run_id
 	_stations_from_markers(registry)
-	_pending.clear()
 	_holds.clear()
-	_waiting.clear()
 	_offer_serial = 0
 	_drop_wave = 0
 	_launched_wave = 0
@@ -60,13 +53,10 @@ func _stations_from_markers(registry: RunLoot) -> void:
 		if is_instance_valid(old):
 			(old as Node).queue_free()
 	stations.clear()
-	var markers := get_tree().get_nodes_in_group("crate_station")
-	for i in markers.size():
-		var marker := markers[i] as Marker3D
+	for marker: Marker3D in get_tree().get_nodes_in_group("crate_station"):
 		var station := SupplyStation.new()
 		station.key = str(marker.name)
 		station.name = marker.name
-		station.has_double = i == 0
 		registry.add_child(station)
 		station.global_transform = marker.global_transform
 		stations[station.key] = station
@@ -83,24 +73,16 @@ func _physics_process(delta: float) -> void:
 		var hold: Dictionary = _holds[key]
 		if _clock - hold.start > 2.5 or not _valid(GameManager.player_for_peer(key), hold.station, hold.mode):
 			_holds.erase(key)
-	for i in range(_pending.size() - 1, -1, -1):
-		var roll := _pending[i]
-		if roll.due <= _clock:
-			_drop_reward(roll)
-			_pending.remove_at(i)
 
 func start_calm() -> void:
 	if not Net.is_host() or _drop_wave == WeatherManager.wave:
 		return
 	_drop_wave = WeatherManager.wave
 	last_drop_position = Vector3.INF
-	_waiting.clear()
 	for key: String in stations.keys():
 		var station: Variant = stations[key]
 		if is_instance_valid(station):
-			var cabinet := station as SupplyStation
-			_set_price(cabinet, BASE_PRICE)
-			_restock(cabinet)
+			_restock(station as SupplyStation)
 	# Wave 1 Calm is starter-pick time; every later Calm gets a between-wave drop.
 	if WeatherManager.wave < 2 or _launched_wave == WeatherManager.wave:
 		return
@@ -154,19 +136,62 @@ func _drop_point() -> Vector3:
 	var map := registry.get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) == 0:
 		return Vector3.INF
-	var fallback := Vector3.INF
-	var best_score := INF
 	var all_players := GameManager.players().filter(func(p): return p.state == "ok")
 	if all_players.is_empty():
 		return Vector3.INF
+	var centroid := Vector3.ZERO
+	var origins := PackedVector3Array()
+	var nav_origins := PackedVector3Array()
+	for player: Node3D in all_players:
+		var at := player.global_position
+		centroid += at
+		origins.append(at)
+		nav_origins.append(NavigationServer3D.map_get_closest_point(map, at))
+	centroid /= float(all_players.size())
 	var space := registry.get_world_3d().direct_space_state
 	var shelter := PhysicsPointQueryParameters3D.new()
 	shelter.collision_mask = 1 << 3
 	shelter.collide_with_bodies = false
 	shelter.collide_with_areas = true
+
+	var best := Vector3.INF
+	var best_score := INF
+
+	# Build candidates: curated crate_spawn markers plus open-sky rings right near active players.
+	var candidates := PackedVector3Array()
 	for marker: Node3D in get_tree().get_nodes_in_group("crate_spawn"):
-		var at := NavigationServer3D.map_get_closest_point(map, marker.global_position)
-		if at.distance_to(marker.global_position) > 2.5:
+		candidates.append(marker.global_position)
+	var curated_count := candidates.size()
+	var anchors: Array[Vector3] = [centroid]
+	for at: Vector3 in origins:
+		if at.distance_to(centroid) > 6.0:
+			anchors.append(at)
+	for anchor: Vector3 in anchors:
+		for radius: float in [9.0, 11.0, 16.0, 20.0]:
+			for step in 12:
+				var angle := float(step) * TAU / 12.0 + 0.25 * radius
+				var probe := anchor + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+				candidates.append(probe)
+
+	for index in candidates.size():
+		var raw := candidates[index]
+		var curated := index < curated_count
+		var at := NavigationServer3D.map_get_closest_point(map, raw)
+		if at.distance_to(raw) > (2.5 if curated else 3.5):
+			continue
+		var too_close := false
+		for origin: Vector3 in origins:
+			if Vector2(at.x - origin.x, at.z - origin.z).length_squared() < 5.5 * 5.5:
+				too_close = true
+				break
+		if too_close:
+			continue
+		var blocked_station := false
+		for station: SupplyStation in stations.values():
+			if is_instance_valid(station) and at.distance_to(station.global_position) < 3.5:
+				blocked_station = true
+				break
+		if blocked_station:
 			continue
 		var sky := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.UP * 45.0, 1)
 		if not space.intersect_ray(sky).is_empty():
@@ -174,24 +199,28 @@ func _drop_point() -> Vector3:
 		shelter.position = at + Vector3.UP * 1.5
 		if not space.intersect_point(shelter, 1).is_empty():
 			continue
+		var floor_hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.5, at - Vector3.UP * 2.0, 1))
+		if floor_hit.is_empty() or (floor_hit.normal as Vector3).y < 0.85:
+			continue
 		var nearest_route := INF
-		for player: Node3D in all_players:
-			var player_nav := NavigationServer3D.map_get_closest_point(map, player.global_position)
-			var route := NavigationServer3D.map_get_path(map, player_nav, at, true)
+		for player_index in origins.size():
+			var route := NavigationServer3D.map_get_path(map, nav_origins[player_index], at, true)
 			if route.is_empty() or route[-1].distance_to(at) > 0.9:
 				continue
-			var length := player.global_position.distance_to(route[0])
+			var length := origins[player_index].distance_to(route[0])
 			for i in range(1, route.size()):
 				length += route[i - 1].distance_to(route[i])
 			nearest_route = minf(nearest_route, length)
-		var score := absf(nearest_route - 22.0)
+		if not is_finite(nearest_route):
+			continue
+		# Prefer landing ~11m from the nearest player and close to the squad centroid.
+		var score := absf(nearest_route - 11.0) + maxf(0.0, at.distance_to(centroid) - 16.0) * 0.35
+		if curated and nearest_route <= 20.0:
+			score -= 2.0
 		if score < best_score:
-			var floor_hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.3, at - Vector3.UP * 2.0, 1))
-			if floor_hit.is_empty():
-				continue
 			best_score = score
-			fallback = floor_hit.position
-	return fallback
+			best = floor_hit.position
+	return best
 
 func _make_airdrop(at: Vector3, descent: float) -> void:
 	if is_instance_valid(airdrop):
@@ -270,8 +299,6 @@ func _handle_hold(run: int, key: String, mode: String, step: String, player: Nod
 			return true
 		"ammo":
 			return _buy_ammo(station, player)
-		"double":
-			return _open_double(station, player)
 		_:
 			return _purchase(station, mode, offer, player)
 
@@ -284,15 +311,6 @@ func _valid(player: Node, target: SupplyStation, mode: String) -> bool:
 		return false
 	var eye := RunLoot.holder(player).camera.global_position
 	return WeaponCombat.clear_path(target.get_world_3d(), eye, pad.global_position)
-
-func _set_price(station: SupplyStation, cost: int) -> void:
-	station.price = cost
-	Net.rpc_to_run(_price, [_run, station.key, cost])
-
-@rpc("authority", "call_remote", "reliable")
-func _price(run: int, key: String, cost: int) -> void:
-	if run == _run and stations.has(key):
-		stations[key].price = cost
 
 func _restock(station: SupplyStation, sold := -1) -> void:
 	var offers := station.offers.duplicate()
@@ -381,52 +399,6 @@ func _buy_ammo(station: SupplyStation, player: Node) -> bool:
 	_display_roll(station, "ammo_box", 0, "AMMO REFILLED")
 	return true
 
-func _open_double(station: SupplyStation, player: Node) -> bool:
-	var peer := player.get_multiplayer_authority()
-	var waiting: Array = _waiting.get(station.key, [])
-	var partner: Node
-	if not waiting.is_empty() and _clock - float(waiting[1]) <= DOUBLE_WINDOW:
-		partner = GameManager.player_for_peer(waiting[0])
-	if partner == player:
-		return false
-	if not _valid(partner, station, "double") or RunLoot.holder(partner).scrap < station.price:
-		if RunLoot.holder(player).scrap >= station.price:
-			_waiting[station.key] = [peer, _clock]
-			_display_roll(station, "ammo_box", 0, "WAITING FOR PARTNER")
-		return false
-	if not RunLoot.holder(player).spend_scrap(station.price):
-		return false
-	RunLoot.holder(partner).spend_scrap(station.price)
-	_waiting.erase(station.key)
-	_set_price(station, station.price + PRICE_STEP)
-	if RNG.chance(0.5):
-		_queue_reward(station, _pick(loot.pool(1, WeatherManager.wave)), ItemCatalog.TUNED)
-		_queue_reward(station, _pick(loot.pool(1, WeatherManager.wave)), ItemCatalog.TUNED)
-	else:
-		var players := GameManager.players()
-		var victim: Node = players[RNG.rng.randi_range(0, players.size() - 1)]
-		_queue_reward(station, _pick(loot.cursed_items), 0, victim.get_multiplayer_authority(), "CURSED · %s" % victim.display_name)
-	return true
-
-func _pick(pool: Array) -> String:
-	return pool[RNG.rng.randi_range(0, pool.size() - 1)]
-
-func _queue_reward(station: SupplyStation, id: String, tier: int, peer := 0, title := "") -> void:
-	var due := _clock + 1.35
-	for roll: Dictionary in _pending:
-		if roll.key == station.key:
-			due = maxf(due, roll.due + 1.45)
-	var at := station.global_position - station.global_basis.z * 1.16
-	_pending.append({"key": station.key, "at": at, "id": id, "tier": tier, "peer": peer, "due": due})
-	_display_roll(station, id, tier, loot.display_name(id) if title.is_empty() else title)
-
-func _drop_reward(roll: Dictionary) -> void:
-	var registry := RunLoot.find(get_tree())
-	if ItemCatalog.definition(roll.id):
-		registry.spawn_item(roll.id, roll.at, roll.tier, roll.peer)
-	else:
-		registry.spawn_pickup(null, roll.at, roll.id)
-
 func _display_roll(station: SupplyStation, id: String, tier: int, title: String) -> void:
 	station.reveal(id, tier, title)
 	Net.rpc_to_run(_reveal, [_run, station.key, id, tier, title])
@@ -481,7 +453,7 @@ func sync_to_peer(peer: int) -> void:
 		var station: Variant = stations[key]
 		if is_instance_valid(station):
 			var s := station as SupplyStation
-			cabinets[s.key] = [s.price, s.offers]
+			cabinets[s.key] = s.offers
 	var drop: Array = [airdrop.global_position, airdrop.descent_left] if is_instance_valid(airdrop) else []
 	_snapshot.rpc_id(peer, _run, cabinets, drop)
 
@@ -495,7 +467,6 @@ func _snapshot(run: int, cabinets: Dictionary, drop: Array) -> void:
 		return
 	_stations_from_markers(registry)
 	for key: String in cabinets:
-		_price(run, key, cabinets[key][0])
-		_stock(run, key, cabinets[key][1])
+		_stock(run, key, cabinets[key])
 	if not drop.is_empty():
 		_make_airdrop(drop[0], drop[1])

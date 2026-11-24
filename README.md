@@ -2,7 +2,7 @@
 
 **A 1–4 player co-op retro FPS where a plague falls with the rain.**
 
-Set on Halloween night, 1987, *Fallout Forecast* drops a squad of hazmat exterminators into quarantined coastal and suburban districts under an infected storm front. Survive five escalating storms, share cover before the acid eats through your suit, draft bio-mutations against each wave's forecast, gamble on crates and airdrops, and break **Cumulus**'s storm — or keep the tape rolling in Endless Mode.
+Set on Halloween night, 1987, *Fallout Forecast* drops a squad of hazmat exterminators into quarantined coastal and suburban districts under an infected storm front. Survive five escalating storms, share cover before the acid eats through your suit, draft bio-mutations against each wave's forecast, scavenge marked supply drops, and break **Cumulus**'s storm — or keep the tape rolling in Endless Mode.
 
 Built with **Godot 4.7.2** by **Sam and Drew** for CSCI 3103.
 
@@ -18,7 +18,7 @@ Built with **Godot 4.7.2** by **Sam and Drew** for CSCI 3103.
 - **Shelter, Puddles & Lightning** — Duck under awnings, canopies, garages, tree canopies, and thrown **Shield Domes** to stop suit drain — or refill at shared **Decon Showers**. Watch your footing: standing in a growing puddle overrides roof shelter. Lightning strikes flash the sky, trigger VHS tracking glitches, and silhouette every nearby infected through walls and fog.
 - **1–4 Player Cross-Play Co-op** — Web and desktop clients connect over WebSockets (`WebSocketMultiplayerPeer`) to the same dedicated cloud server (`wss://fallout.drew.place/`), with host-authoritative combat, analytical lag compensation, contextual team pings, teammate nameplates, and player-count scaling.
 - **Downed, Revive & Turned** — Hit 0 HP and teammates have 20 seconds to revive you (cut in half in rain). Miss the window and you **Turn** into an infected Drip, hunting your old squad until Clearing. Solo runs include one self-revive per wave.
-- **Mutation Draft & Loadouts** — Each wave forecasts an enemy storm modifier while the squad drafts persistent **Player Bio-Mutations** (`1`/`2`/`3` or D-pad). Build a 5-slot loadout from wave-1 starter kits, mid-wave airdrops, rotating scrap vending stations, and risky **Double-or-Nothing** crates:
+- **Mutation Draft & Loadouts** — Each wave forecasts an enemy storm modifier while the squad drafts persistent **Player Bio-Mutations** (`1`/`2`/`3` or D-pad). Build a 5-slot loadout from wave-1 starter kits, marked airdrops that land near the squad, and sheltered vending machines that rotate their stock:
   - **15 Firearms** including starter Service Revolver, Pump Shotgun, Spray Rifle, Nail Driver, Hunting Rifle, Pressure Washer, Rock Salt, Battery Zapper, Flare Launcher, Harpoon, Leaf Blower, the legendary **Disruptor**, and 3 **Cursed Weapons** (*Leaky Nailgun*, *Boombox Launcher*, *Lucky Penny Revolver*).
   - **9 Throwables, Deployables & Consumables** — *Shield Dome*, *Frag Grenade*, *Umbrella Stand*, *Bleach Bomb*, *Bait Radio*, *Sandbag*, *Lightning Rod Spike*, *Med Tin*, and *Suit Patch*.
 - **10 Infected Types + Miniboss & Boss** — Core hordes (**Drip**, **Gutter**, **Mister**), armored **Hailstones**, forecast specialists (**Sleet**, **Smog**, **Static**, **Thunderhead**, **Undertow**), the wave-3 named miniboss **Cloudburst**, and the wave-5 Acid Storm boss **Cumulus**.
@@ -68,6 +68,8 @@ Full keyboard/mouse and gamepad support is built in:
 | Crouch | `Ctrl` / `C` | `B` / Circle |
 | Reload | `R` | `X` / Square |
 | Switch Slots (1–5) | `1`–`5` / Mouse Wheel | `LB` / `RB` |
+| Open Loadout | `Tab` / `I` | — |
+| Equip Frag Grenade / Shield Dome | `Q` / `F` | D-pad Left / Right |
 | Interact / Pick Up / Revive / Decon | `E` | `Y` / Triangle |
 | Drop Selected Item | `G` | `R3` |
 | Toggle Tarp | `T` | D-pad Up |
@@ -131,7 +133,7 @@ fallout-forecast/
 ├── enemies/       # Infected AI, wave director, specialists, Cloudburst miniboss, Cumulus boss
 ├── weather/       # WeatherManager state machine, rain/fog FX, lightning silhouettes, puddles
 ├── levels/        # Pinecrest, Harbor Point, and Maple Hollow scenes
-├── crates/        # Supply stations, airdrops, mystery & Double-or-Nothing crates
+├── crates/        # Supply stations and airdrops
 ├── props/         # Procedural buildings, neon lettering, decon showers, shelters, trees, batching
 ├── retro/         # PS1 vertex-snap shader, VHS screen composite, web material folding
 ├── ui/            # VCR title screen, lobby, HUD, compass, ping wheel, mutation draft, feats, results

@@ -4509,10 +4509,10 @@ max_radius = 1.8
 [node name="CrateStations" type="Node3D" parent="."]
 
 [node name="HardwareStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.055, 7.28)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0.055, 9)
 
 [node name="GasStationSurplus" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 53.6, 0.08, 33.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49, 0.08, 26.5)
 
 [node name="TownSquareStation" type="Marker3D" parent="CrateStations" groups=["crate_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 0.1, 31.65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53, 0.08, 30.85)

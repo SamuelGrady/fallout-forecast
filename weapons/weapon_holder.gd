@@ -5,7 +5,7 @@ extends Node3D
 
 signal weapon_changed(data: WeaponData)
 signal fired(data: WeaponData)
-## Local owner only: a pouch item left the belt via quick-throw.
+## Local owner only: a held pouch item was thrown.
 signal thrown(id: String)
 
 const HIT_MASK := 1 | 4
@@ -15,11 +15,13 @@ const SPRINT_RAISE := 0.15
 const THROW_COOLDOWN := 0.35
 const STARTING_FRAGS := 2
 const STARTING_DOMES := 1
+const POUCH_ORDER := ["frag", "shield_dome"]
 
 var slots: Array[ItemInstance] = [null, null, null, null, null]
 var reserves: Dictionary = {}
 var _seeded_ammo: Dictionary = {"revolver": true}
 var current := 0
+var active_pouch := ""
 var scrap := 0
 ## Belt pouches: host-authoritative, mirrored to the owner in _private_state.
 var grenades := 0
@@ -45,6 +47,9 @@ var _jam_left := 0.0
 var _charge_serial := 0
 var _charge_at := 0.0
 var _pending_action := 0.0
+var _pending_pouch := ""
+var _pouch_ack_left := 0.0
+var _pouch_fire_latched := false
 var _kick := 0.0
 var _harpoon_motion_left := 0.0
 var _bob := 0.0
@@ -85,7 +90,14 @@ func selected() -> ItemInstance:
 func selected_serial() -> int:
 	return selected().serial if selected() else 0
 
+func active_count() -> int:
+	if not active_pouch.is_empty():
+		return pouch_count(active_pouch)
+	return selected().count if selected() else 0
+
 func selected_definition() -> ItemDefinition:
+	if not active_pouch.is_empty():
+		return ItemCatalog.definition(active_pouch)
 	return ItemCatalog.definition(selected().id) if selected() else null
 
 func selected_weapon() -> WeaponData:
@@ -93,6 +105,8 @@ func selected_weapon() -> WeaponData:
 	return definition.weapon if definition else null
 
 func selected_reserve() -> int:
+	if not active_pouch.is_empty():
+		return 0
 	var definition := selected_definition()
 	return int(reserves.get(definition.ammo_type, 0)) if definition else 0
 
@@ -100,11 +114,11 @@ func reload_remaining() -> float:
 	return _reload_left
 
 func jammed() -> bool:
-	return _jam_left > 0.0
+	return _jam_left > 0.0 and active_pouch.is_empty()
 
 func is_charging() -> bool:
 	var data := selected_weapon()
-	return _local_charging and data != null and data.charge_time > 0.0 and selected() != null and selected().count > 0
+	return active_pouch.is_empty() and _local_charging and data != null and data.charge_time > 0.0 and selected() != null and selected().count > 0
 
 func charge_progress() -> float:
 	if not is_charging():
@@ -155,6 +169,7 @@ func _process(delta: float) -> void:
 	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
 	_jam_left = maxf(0.0, _jam_left - delta)
 	_pending_action = maxf(0.0, _pending_action - delta)
+	_pouch_ack_left = maxf(0.0, _pouch_ack_left - delta)
 	_harpoon_motion_left = maxf(0.0, _harpoon_motion_left - delta)
 	if _reload_left > 0.0:
 		_reload_left = maxf(0.0, _reload_left - delta)
@@ -165,7 +180,7 @@ func _process(delta: float) -> void:
 			if _reload_serial != 0 or _charge_serial != 0:
 				_cancel_actions()
 				send_state(false)
-		elif _cooldown <= 0.0 and _reload_serial == 0:
+		elif _cooldown <= 0.0 and _reload_serial == 0 and active_pouch.is_empty():
 			var item := selected()
 			if item and item.count == 0 and selected_weapon().mag_size == 1 and selected_reserve() > 0:
 				_start_reload_host()
@@ -194,17 +209,37 @@ func _handle_input() -> void:
 		return
 	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
 	if wheel != 0:
-		select_slot(posmod(current + wheel, SLOT_COUNT))
+		if not active_pouch.is_empty():
+			select_slot(current)
+		else:
+			select_slot(posmod(current + wheel, SLOT_COUNT))
+		return
+	if not Input.is_action_pressed("fire"):
+		_pouch_fire_latched = false
+	if _pouch_ack_left > 0.0:
+		if not _pending_pouch.is_empty() and Input.is_action_just_pressed("fire") and not player.tarp_raised:
+			_fire_buffer = _pouch_ack_left
 		return
 	var data := selected_weapon()
 	if data == null or player.tarp_raised:
 		_local_charging = false
 		return
-	if Input.is_action_just_pressed("reload"):
+	if Input.is_action_just_pressed("reload") and active_pouch.is_empty():
 		start_reload()
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		_fire_buffer = 0.0
 		_local_charging = false
+		return
+	if not active_pouch.is_empty():
+		_local_charging = false
+		if Input.is_action_just_pressed("fire"):
+			_fire_buffer = 0.25 + _raise_left
+		if _fire_buffer > 0.0 and _cooldown <= 0.0 and _throw_cooldown <= 0.0 and _raise_left <= 0.0:
+			_fire_buffer = 0.0
+			if pouch_count(active_pouch) > 0:
+				_throw_pouch(active_pouch)
+			else:
+				select_slot(current)
 		return
 	if data.charge_time > 0.0:
 		if Input.is_action_just_pressed("fire"):
@@ -224,7 +259,7 @@ func _handle_input() -> void:
 	_local_charging = false
 	if Input.is_action_just_pressed("fire"):
 		_fire_buffer = 0.15 + _raise_left
-	var wants := Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0
+	var wants := not _pouch_fire_latched and (Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0)
 	if wants:
 		player.sprint_lock = 0.35
 	if wants and _cooldown <= 0.0 and _pending_action <= 0.0 and _jam_left <= 0.0 and _raise_left <= 0.0:
@@ -238,10 +273,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	for id: String in ItemCatalog.POUCH_ACTIONS:
 		if event.is_action_pressed(ItemCatalog.POUCH_ACTIONS[id]):
-			quick_throw(id)
+			select_pouch(id)
 			get_viewport().set_input_as_handled()
 			return
-	if event.is_action_pressed("drop_item") and selected():
+	if event.is_action_pressed("drop_item") and active_pouch.is_empty() and selected():
 		_command("drop")
 		get_viewport().set_input_as_handled()
 		return
@@ -251,8 +286,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+## Equip a belt pouch item (Frag Grenade / Shield Dome) into hand to aim and throw with LMB.
+func select_pouch(id: String) -> void:
+	if not ItemCatalog.is_pouch(id) or not can_act() or not Net.can_send_run_rpc():
+		return
+	if pouch_count(id) <= 0:
+		var definition := ItemCatalog.definition(id)
+		var title := definition.display_name.to_upper() if definition else id.to_upper()
+		notify_effect("NO %s" % title, Color("#ff9f6b"), "empty_pouch_" + id, 0.5)
+		return
+	var held := _pending_pouch if _pouch_ack_left > 0.0 else active_pouch
+	var target := "" if held == id else id
+	_fire_buffer = 0.0
+	_local_charging = false
+	if not Net.is_host():
+		_pending_pouch = target
+		_pouch_ack_left = 0.75
+	_send_action("select_pouch", 0, POUCH_ORDER.find(target))
+
 func fire() -> void:
-	if not Net.can_send_run_rpc() or not can_act() or selected() == null:
+	if not Net.can_send_run_rpc() or not can_act() or _pouch_ack_left > 0.0:
+		return
+	if not active_pouch.is_empty():
+		_throw_pouch(active_pouch)
+		return
+	if selected() == null:
 		return
 	_fire_buffer = 0.0
 	var dir := -camera.global_basis.z
@@ -271,13 +329,13 @@ func fire() -> void:
 			_local_shot_motion(selected().id, data, ads)
 		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, ads, predict)
 
-## Throw one pouch item straight from the belt; the equipped slot is untouched.
-func quick_throw(id: String) -> void:
-	if not ItemCatalog.is_pouch(id) or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
+func _throw_pouch(id: String) -> void:
+	if id != active_pouch or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
 			or _throw_cooldown > 0.0 or pouch_count(id) <= 0 or InventoryMenu.is_open():
 		return
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _pad_connected():
 		return
+	_pouch_fire_latched = Input.is_action_pressed("fire")
 	_throw_cooldown = THROW_COOLDOWN
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
@@ -294,7 +352,7 @@ func _request_throw(run: int, id: String, origin: Vector3, dir: Vector3) -> void
 
 func _host_throw(run: int, id: String, origin: Vector3, dir: Vector3, predicted: bool) -> bool:
 	if not Net.is_host() or not can_act() or run != loot.run_id or not ItemCatalog.is_pouch(id) \
-			or player.tarp_raised or pouch_count(id) <= 0:
+			or id != active_pouch or player.tarp_raised or pouch_count(id) <= 0:
 		return false
 	# A little looser than the owner's cooldown so jittered packets still land.
 	if loot.clock - _last_throw_at < THROW_COOLDOWN * 0.6:
@@ -309,7 +367,10 @@ func _host_throw(run: int, id: String, origin: Vector3, dir: Vector3, predicted:
 	loot.launch(id, WeaponCombat.throw_origin(get_world_3d(), origin, dir), dir, ItemCatalog.STANDARD, player)
 	_play_throw(id, origin, dir)
 	Net.rpc_to_run(_throw_fx, [loot.run_id, id, origin, dir, predicted])
-	send_state(false)
+	var emptied := active_pouch == id and pouch_count(id) <= 0
+	if emptied:
+		active_pouch = ""
+	send_state(emptied)
 	return true
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -382,6 +443,9 @@ func start_reload() -> void:
 	_command("reload")
 
 func select_slot(slot: int) -> void:
+	if _pouch_ack_left > 0.0:
+		_pending_pouch = ""
+		_fire_buffer = 0.0
 	_command("select", slot)
 
 func _command(action: String, slot := -1) -> void:
@@ -423,10 +487,23 @@ func _action(run: int, action: String, expected: int, slot: int) -> void:
 func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 	if not can_act() or run != loot.run_id:
 		return
-	if action == "select" and slot >= 0 and slot < SLOT_COUNT and slot != current:
+	if action == "select" and slot >= 0 and slot < SLOT_COUNT and (slot != current or not active_pouch.is_empty()):
 		_cancel_actions()
+		active_pouch = ""
 		current = slot
-		_cooldown = maxf(_cooldown, 0.25)
+		_cooldown = maxf(_cooldown, 0.22)
+		_heat = 0.0
+		send_state()
+		return
+	if action == "select_pouch":
+		if slot < -1 or slot >= POUCH_ORDER.size():
+			return
+		var id: String = POUCH_ORDER[slot] if slot >= 0 else ""
+		if active_pouch == id or (not id.is_empty() and pouch_count(id) <= 0):
+			return
+		_cancel_actions()
+		active_pouch = id
+		_cooldown = maxf(_cooldown, 0.18)
 		_heat = 0.0
 		send_state()
 		return
@@ -435,6 +512,8 @@ func _host_action(run: int, action: String, expected: int, slot: int) -> void:
 		return
 	if action == "drop_slot":
 		_host_drop_slot(expected, slot)
+		return
+	if not active_pouch.is_empty():
 		return
 	if expected == 0 or expected != selected_serial():
 		return
@@ -576,7 +655,7 @@ func _request_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aimi
 
 func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming: bool, rewind_ms: int, predicted := false) -> bool:
 	if not Net.is_host() or not can_act() or run != loot.run_id or serial == 0 or selected_serial() != serial \
-			or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
+			or not active_pouch.is_empty() or player.tarp_raised or player.is_sprinting or _cooldown > 0.0:
 		return false
 	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.5 \
 			or origin.distance_to(camera.global_position) > 3.0 \
@@ -848,13 +927,13 @@ func sync_private_to(peer: int) -> void:
 	var rows: Array = []
 	for item in slots:
 		rows.append(item.encode() if item else [])
-	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, scrap, grenades, domes, _reload_left, _reload_total, _jam_left, _cooldown)
+	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, active_pouch, scrap, grenades, domes, _reload_left, _reload_total, _jam_left, _cooldown)
 
 func sync_equip_to(peer: int) -> void:
 	_equip_state.rpc_id(peer, loot.run_id, revision, equipped_id, equipped_tier)
 
 @rpc("any_peer", "call_remote", "reliable")
-func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, new_scrap: int, frags: int, shield_domes: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
+func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, pouch: String, new_scrap: int, frags: int, shield_domes: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
 	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id or rev <= _private_revision or not player.is_multiplayer_authority():
 		return
 	_private_revision = rev
@@ -864,6 +943,11 @@ func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: in
 		slots[i] = ItemInstance.decode(rows[i])
 	reserves = stash
 	current = slot
+	active_pouch = pouch
+	if _pouch_ack_left > 0.0 and active_pouch == _pending_pouch:
+		_pouch_ack_left = 0.0
+		if _fire_buffer > 0.0:
+			_fire_buffer = 0.25 + _raise_left
 	scrap = new_scrap
 	grenades = frags
 	domes = shield_domes
@@ -884,6 +968,17 @@ func _equip_state(run: int, rev: int, id: String, tier: int) -> void:
 		_apply_equip(id, tier)
 
 func _refresh_equip() -> void:
+	if not active_pouch.is_empty() and pouch_count(active_pouch) <= 0:
+		active_pouch = ""
+	if not active_pouch.is_empty():
+		_apply_equip(active_pouch, 0)
+		var pouch_serial := -(POUCH_ORDER.find(active_pouch) + 10)
+		if player.is_multiplayer_authority() and _model_serial != pouch_serial:
+			_model_serial = pouch_serial
+			_harpoon_motion_left = 0.0
+			_equip_left = 1.0
+			_aim = 0.0
+		return
 	var item := selected()
 	_apply_equip(item.id if item else "", item.tier if item else 0)
 	if player.is_multiplayer_authority() and _model_serial != selected_serial():
@@ -933,7 +1028,7 @@ func _apply_equip(id: String, tier: int) -> void:
 func _publish() -> void:
 	var data := selected_weapon()
 	player.weapon_name = data.display_name + (" (JAMMED)" if jammed() else (" (reloading)" if _reload_left > 0.0 else "")) if data else null
-	player.ammo = selected().count if data else null
+	player.ammo = active_count() if data else null
 	player.max_ammo = selected_reserve() if data else null
 
 func _pad_connected() -> bool:
@@ -1133,7 +1228,7 @@ var _previous_id := ""
 
 func _update_throw_preview(delta: float) -> void:
 	var data := selected_weapon()
-	var wanted: bool = data != null and can_act() and not player.tarp_raised and selected().count > 0 \
+	var wanted: bool = data != null and can_act() and not player.tarp_raised and active_count() > 0 \
 		and data.kind in [WeaponData.Kind.GRENADE, WeaponData.Kind.FLARE]
 	if not wanted:
 		if _arc:

@@ -3298,13 +3298,13 @@ max_radius = 2.2
 [node name="CrateStations" type="Node3D" parent="." unique_id=808369556]
 
 [node name="ChapelSteps" type="Marker3D" parent="CrateStations" unique_id=1096597712 groups=["crate_station"]]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 20, 0, -37.6)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 24, 0.24, -36.5)
 
 [node name="RangerStation" type="Marker3D" parent="CrateStations" unique_id=460481708 groups=["crate_station"]]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -7.1, 0, 43.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.24, 42)
 
 [node name="Campground" type="Marker3D" parent="CrateStations" unique_id=1038336525 groups=["crate_station"]]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -14.1, 0, -34.15)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -12, 0.06, -39.9)
 
 [node name="StreetSupplySpawns2" type="Node3D" parent="." unique_id=843320688]
 

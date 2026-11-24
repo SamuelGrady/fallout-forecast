@@ -2,6 +2,10 @@ class_name GameIcon
 extends Control
 ## Small geometric pictograms shared by cards, HUD and world signage.
 
+const SCRAP_GEAR := preload("res://weapons/scrap_gear.gd")
+
+static var _scrap_outline := SCRAP_GEAR.outline()
+
 @export var kind := "health":
 	set(v):
 		if kind != v:
@@ -129,8 +133,11 @@ func _draw() -> void:
 			for x in [-6, 0, 6]:
 				draw_line(Vector2(x,15), Vector2(x,25), Color(0.05,0.08,0.12), 2)
 		"scrap":
-			_line([Vector2(-20,-12),Vector2(4,-24),Vector2(24,-6),Vector2(16,20),Vector2(-14,22),Vector2(-24,4),Vector2(-20,-12)], 5)
-			draw_circle(Vector2(0,0), 7, color)
+			draw_set_transform(size * 0.5, 0.0, Vector2.ONE * scale_factor * 24.5)
+			for i in _scrap_outline.size():
+				var a := _scrap_outline[i]
+				var b := _scrap_outline[(i + 1) % _scrap_outline.size()]
+				draw_colored_polygon(PackedVector2Array([a, b, SCRAP_GEAR.bore_point(b), SCRAP_GEAR.bore_point(a)]), color)
 		"check":
 			_line([Vector2(-22,0),Vector2(-6,16),Vector2(22,-16)], 7)
 		# Extra enemy mutations.

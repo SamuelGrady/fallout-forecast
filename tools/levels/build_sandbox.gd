@@ -73,7 +73,7 @@ func markers() -> void:
 	points("StreetSupplySpawns", "street_supply_spawn", [Vector2(-28, 8),
 		Vector2(-8, 28), Vector2(22, 22), Vector2(12, -32)], 0.06)
 	directories["CrateStations"] = add(scene, Node3D.new(), "CrateStations")
-	marker("CrateStations", "crate_station", "RangeVending", Vector3(8, 0, -8)).rotation_degrees.y = 135
+	marker("CrateStations", "crate_station", "RangeVending", Vector3(-12, 0, -12.2)).rotation_degrees.y = 180
 	shower("RangeDecon", Vector3(-12, 0, -4))
 	puddles([Vector3(-6, 2.2, -14)])
 	drain(Vector3(-6, 0.02, -17))

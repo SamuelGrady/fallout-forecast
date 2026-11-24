@@ -1267,11 +1267,11 @@ func markers() -> void:
 	shower("CampgroundDecon", Vector3(-19.5, 0.0, -35.0))
 	shower("ChapelDecon", Vector3(28.5, 0.0, -35.8))
 
-	# 3 Crate Stations (Chapel Steps, Ranger Station, Campground)
+	# 3 Crate Stations (under Chapel Porch, Ranger Porch, and Campground Pavilion cover)
 	directories["CrateStations"] = add(scene, Node3D.new(), "CrateStations")
-	marker("CrateStations", "crate_station", "ChapelSteps", Vector3(20, 0, -37.6)).rotation_degrees.y = 180
-	marker("CrateStations", "crate_station", "RangerStation", Vector3(-7.1, 0, 43.35)).rotation_degrees.y = -90
-	marker("CrateStations", "crate_station", "Campground", Vector3(-14.1, 0, -34.15)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "ChapelSteps", Vector3(24.0, 0.24, -36.5)).rotation_degrees.y = 180
+	marker("CrateStations", "crate_station", "RangerStation", Vector3(-14.0, 0.24, 42.0)).rotation_degrees.y = 0
+	marker("CrateStations", "crate_station", "Campground", Vector3(-12.0, 0.06, -39.9)).rotation_degrees.y = 180
 
 	# 4 Street Supply Spawns at main woodland junctions
 	directories["StreetSupplySpawns"] = add(scene, Node3D.new(), "StreetSupplySpawns")

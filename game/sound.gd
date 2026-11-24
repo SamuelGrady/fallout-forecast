@@ -13,8 +13,11 @@ const CUE_SOURCE := {"ui_focus": "reel_tick", "ui_tick": "reel_tick"}
 ## Source-level trims measured from the decoded files, before local/3D gains.
 const CUE_TRIM_DB := {
 	"ui_click": -4.0, "ui_focus": -2.0,
-	"gun_shotgun": -4.0, "gun_revolver": -3.0, "gun_rifle": -1.0,
-	"shot_shotgun": -7.0, "shot_nailgun": -7.0, "shot_rifle": 2.0,
+	"gun_shotgun": -2.0, "gun_revolver": 1.0, "gun_rifle": -2.0,
+	"gun_nail_driver": 4.0, "gun_hunting_rifle": 3.5, "gun_harpoon": 4.5,
+	"gun_battery_zapper": 4.5, "gun_flare_launcher": 3.5, "gun_rock_salt": 3.0,
+	"gun_leaf_blower": 2.5, "gun_pressure_washer": 2.0, "gun_disruptor": 2.5,
+	"shot_shotgun": -1.5, "shot_nailgun": 1.5, "shot_rifle": 2.5, "shot_boombox": 0.0,
 	"explosion": -3.0, "explosion_big": -3.0, "hit_flesh": -4.0, "reload": -4.0,
 	"turned": -4.0, "decon_spray": -3.0, "dome_deploy": -3.0, "dome_collapse": -3.0,
 	"downpour": -3.0, "storm_clear": -4.0, "storm_arrival": -2.0, "storm_countdown": -2.0,
@@ -23,9 +26,10 @@ const CUE_TRIM_DB := {
 	"static_blink": 1.0, "thunderhead_fuse": -2.0, "thunder": 0.0,
 	"vcr_insert": -5.0, "vcr_eject": -2.0, "vcr_whirr": 1.0,
 }
-## Per-cue ceiling overrides for cue_gain (default -10 dB). Thunder has to
-## cut through rain, wind and the score, so it may play much hotter.
+## Per-cue ceiling overrides for cue_gain (default -10 dB; weapon fire and
+## thunder must cut cleanly through rain, wind and the darksynth score).
 const CUE_CAP_DB := {"thunder": -1.0}
+const WEAPON_CAP_DB := -1.0
 var _last_cue_ms := {}
 
 ## Combat heat (0-1): spikes fast on hits, kills, gunfire, explosions and
@@ -38,9 +42,10 @@ const HEAT_CUES := {"explosion": 0.35, "explosion_big": 0.35, "hit_flesh": 0.30,
 const HEAT_HOLD := 1.0
 const HEAT_DECAY := 0.22
 const NEAR_ENEMY_M := 22.0
-## Music energy attack/release rates (1/s): ~0.5 s up, ~3.5 s down.
+## Music energy attack/release rates (1/s): ~0.5 s up, ~3.5 s down, fast calm-down after wave clear.
 const ATTACK_RATE := 6.0
 const RELEASE_RATE := 0.85
+const CALM_RELEASE_RATE := 2.6
 var _combat_heat := 0.0
 var _heat_hold := 0.0
 var _heat := 0.0
@@ -77,14 +82,14 @@ func _ready() -> void:
 		var limiter := AudioEffectHardLimiter.new()
 		limiter.ceiling_db = -1.5
 		AudioServer.add_bus_effect(0, limiter)
-		# Music ducks a few dB while guns are firing.
+		# Music ducks while guns are firing so shots always read clearly.
 		var duck := AudioEffectCompressor.new()
 		duck.sidechain = &"Weapons"
-		duck.threshold = -19.0
-		duck.ratio = 2.5
-		duck.mix = 0.28
-		duck.attack_us = 5000.0
-		duck.release_ms = 260.0
+		duck.threshold = -22.0
+		duck.ratio = 3.0
+		duck.mix = 0.42
+		duck.attack_us = 3000.0
+		duck.release_ms = 220.0
 		AudioServer.add_bus_effect(AudioServer.get_bus_index(&"Music"), duck)
 	WeatherManager.phase_changed.connect(_phase_changed)
 	# GameManager is a later autoload: connect once the whole tree is up.
@@ -118,7 +123,8 @@ func _is_fire(cue: String) -> bool:
 
 
 func cue_gain(cue: String, volume_db: float) -> float:
-	return minf(volume_db + float(CUE_TRIM_DB.get(cue, 0.0)), float(CUE_CAP_DB.get(cue, -10.0)))
+	var default_cap := WEAPON_CAP_DB if _is_fire(cue) else -10.0
+	return minf(volume_db + float(CUE_TRIM_DB.get(cue, 0.0)), float(CUE_CAP_DB.get(cue, default_cap)))
 
 
 func ui_focus() -> void:
@@ -221,10 +227,11 @@ func _process(delta: float) -> void:
 		var e := maxf(_heat, _storm)
 		var storm_layer := maxf(clampf((_heat - 0.08) / 0.35, 0.0, 1.0), clampf((_storm - 0.05) / 0.45, 0.0, 1.0))
 		var overdrive := 0.55 * smoothstep(0.72, 0.95, _heat) * smoothstep(0.55, 0.7, _storm)
-		_boss_mix = lerpf(_boss_mix, 0.95 if boss else overdrive, 1.0 - exp(-(4.0 if boss else 1.5) * real))
+		var boss_rate := 4.0 if boss else (3.0 if _is_calm_phase() else 1.5)
+		_boss_mix = lerpf(_boss_mix, 0.95 if boss else overdrive, 1.0 - exp(-boss_rate * real))
 		gains = [
-			lerpf(0.62, 0.34, e),
-			lerpf(0.20, 0.95, smoothstep(0.02, 0.3, e)),
+			lerpf(0.58, 0.34, e),
+			lerpf(0.06, 0.95, smoothstep(0.03, 0.3, e)),
 			storm_layer,
 			_boss_mix,
 		]
@@ -252,6 +259,10 @@ func _process(delta: float) -> void:
 		_wind.volume_linear = smoothstep(0.23, 1.0, _rain_gain) * lerpf(0.27, 0.09, _shelter_mix)
 
 
+func _is_calm_phase() -> bool:
+	return WeatherManager.phase in [WeatherManager.Phase.CALM, WeatherManager.Phase.CLEARING, WeatherManager.Phase.MUTATION_ROLL]
+
+
 ## Raw combat heat plus its floors (swarm, low health, boss), then the
 ## smoothed heat/storm drives with a fast attack and a slow release.
 func _update_heat(real: float, player: Node, boss: bool) -> void:
@@ -269,17 +280,22 @@ func _update_heat(real: float, player: Node, boss: bool) -> void:
 				if enemy is Node3D and origin.distance_squared_to(enemy.global_position) < NEAR_ENEMY_M * NEAR_ENEMY_M:
 					near += 1
 		_swarm_floor = maxf(clampf(enemies.size() / 7.0, 0.0, 1.0) * 0.8, clampf(near / 3.0, 0.0, 1.0))
+	var wave_clear := _is_calm_phase() and _swarm_floor <= 0.0 and not boss
+	if wave_clear:
+		_combat_heat = 0.0
+		_heat_hold = 0.0
 	var target := maxf(_combat_heat, _swarm_floor)
-	if player and (player.state == "downed" or player.health <= 30.0):
+	if not wave_clear and player and (player.state == "downed" or player.health <= 30.0):
 		target = maxf(target, 0.85)
 	if boss:
 		target = maxf(target, 0.7)
-	_heat = _ramp(_heat, target, real)
-	_storm = _ramp(_storm, _storm_drive(), real)
+	var release := CALM_RELEASE_RATE if wave_clear else RELEASE_RATE
+	_heat = _ramp(_heat, target, real, release)
+	_storm = _ramp(_storm, _storm_drive(), real, release)
 
 
-func _ramp(current: float, target: float, real: float) -> float:
-	var rate := ATTACK_RATE if target > current else RELEASE_RATE
+func _ramp(current: float, target: float, real: float, release := RELEASE_RATE) -> float:
+	var rate := ATTACK_RATE if target > current else release
 	return lerpf(current, target, 1.0 - exp(-rate * real))
 
 
@@ -299,6 +315,9 @@ func _storm_drive() -> float:
 
 func add_combat_heat(amount: float) -> void:
 	if not _in_run:
+		return
+	if _is_calm_phase() and get_tree().get_node_count_in_group("enemies") == 0 \
+			and get_tree().get_first_node_in_group("boss") == null:
 		return
 	_combat_heat = minf(1.0, _combat_heat + amount)
 	_heat_hold = HEAT_HOLD
@@ -321,11 +340,18 @@ func _phase_changed(phase: int, wave: int) -> void:
 		return
 	_last_phase = transition
 	match phase:
+		WeatherManager.Phase.CALM:
+			_combat_heat = 0.0
+			_heat_hold = 0.0
+			_swarm_floor = 0.0
 		WeatherManager.Phase.DRIZZLE:
 			play("storm_arrival", -13.0)
 		WeatherManager.Phase.DOWNPOUR:
 			play("downpour", -7.0)
 		WeatherManager.Phase.CLEARING:
+			_combat_heat = 0.0
+			_heat_hold = 0.0
+			_swarm_floor = 0.0
 			play("storm_clear", -12.0)
 
 
@@ -344,17 +370,18 @@ func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
 		return
 	_first_play(cue)
 	_heat_for_cue(cue)
+	var is_fire := _is_fire(cue)
 	if cue == "pickup":
 		# Pickups come in bursts after a fight: one soft, varied cue at a time.
 		if _recent(cue, 0.3):
 			return
 		volume_db -= 6.0
 		pitch *= randf_range(0.92, 1.12)
-	elif _web and cue != "ui_focus" and _recent(cue, 0.045):
+	elif _web and cue != "ui_focus" and not is_fire and _recent(cue, 0.045):
 		return
-	if _web and _is_fire(cue):
-		Juice.duck_music(-1.5, 0.09)
-	_play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus_for(cue))
+	if _web and is_fire:
+		Juice.duck_music(-2.5, 0.11)
+	_play_stream(_get_sfx(cue), cue_gain(cue, volume_db), pitch, bus_for(cue), is_fire)
 
 
 ## Thunder for a lightning strike. Its own player per strike (overlaps are

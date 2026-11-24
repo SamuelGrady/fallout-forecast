@@ -172,15 +172,6 @@
     pointer-events: none;
     letter-spacing: 0.04em;
   }
-  .tri-count {
-    position: absolute;
-    right: 10px;
-    bottom: 8px;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 10px;
-    color: rgba(230, 240, 250, 0.45);
-    pointer-events: none;
-  }
 
   .stage-footer {
     display: flex;
@@ -439,7 +430,6 @@
       <div class="canvas-box" id="stageBox">
         <canvas id="stageCanvas"></canvas>
         <div class="drag-hint">DRAG TO ORBIT · SCROLL TO ZOOM</div>
-        <div class="tri-count" id="triCount"></div>
       </div>
       <div class="stage-footer">
         <span id="stageOrigin"></span>
@@ -1176,14 +1166,14 @@
       id: 'battery_zapper', name: 'Car-Battery Zapper', cat: 'firearm', badge: 'Special · Chain Arc', bClass: 'b-special',
       sub: 'Jumper-clamp arc caster that chains lightning across puddles.',
       kind: 'gun', dmg: 23, pellets: 1, rate: 1/0.39, mag: 12, reload: 2.1, range: 22, spread: 0.35, auto: true, ammo: 'Cells (80)',
-      slot: 'Hotbar Slot', source: 'Vending Bay 2-3 / W3+ Drop', dot: '#7cd4ff',
+      slot: 'Hotbar Slot', source: 'Vending Bay 3 / Bay 2 from W3 / W3+ Drop', dot: '#7cd4ff',
       mech: 'Shocks targets and chains lightning to 2 nearby enemies within 7m (72% dmg, staggering & revealing). If an infected is standing in a puddle, arc reach jumps to 12m and adds up to +3 bonus chain hops!'
     },
     {
       id: 'flare_launcher', name: 'Road Flare Launcher', cat: 'firearm', badge: 'Special · Incendiary', bClass: 'b-special',
       sub: 'Break-action launcher firing burning, drying illumination flares.',
       kind: 'gun', dmg: 36, pellets: 1, rate: 1/0.75, mag: 1, reload: 1.35, range: 64, radius: 4.0, dur: 8.0, ammo: 'Flares (12)',
-      slot: 'Hotbar Slot', source: 'Vending Bay 2-3 / W3+ Drop', dot: '#7cd4ff',
+      slot: 'Hotbar Slot', source: 'Vending Bay 3 / Bay 2 from W3 / W3+ Drop', dot: '#7cd4ff',
       mech: 'Auto-reloading launcher firing a 36-dmg road flare that burns for 8s in a 4m radius: reveals & ignites infected (18 DPS burn, tier-scaled) AND creates a warm dry zone cutting acid rain suit drain by 75%.'
     },
 
@@ -1215,38 +1205,38 @@
       id: 'leaky_nailgun', name: 'Leaky Nailgun', cat: 'cursed', badge: 'Cursed · Acid Auto', bClass: 'b-cursed',
       sub: 'Overpowered 3-pierce automatic nailer that corrodes your own suit.',
       kind: 'gun', dmg: 34, pellets: 1, rate: 1/0.22, mag: 24, reload: 2.0, range: 70, spread: 0.8, auto: true, pierce: 3, kb: 2.0, ammo: 'Nails (120)',
-      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / W3+ Drop', dot: '#ff69be',
       mech: 'Shreds hordes with 34 dmg full-auto nails that pierce 3 infected up to 70m. CURSE: Leaking green tank drains your suit integrity at 2.0%/sec whenever held — even inside dry shelter!'
     },
     {
       id: 'boombox_launcher', name: 'Boombox Launcher', cat: 'cursed', badge: 'Cursed · Rocket', bClass: 'b-cursed',
       sub: '80s bass rocket launcher with huge blasts — pulls enemies toward you.',
-      kind: 'gun', dmg: 110, pellets: 1, rate: 1/1.1, mag: 4, reload: 2.4, range: 60, radius: 6.5, kb: 14.0, ammo: 'Rockets (10)',
-      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      kind: 'gun', dmg: 110, pellets: 1, rate: 1/1.1, mag: 4, reload: 2.4, radius: 6.5, kb: 14.0, ammo: 'Rockets (10)',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / W3+ Drop', dot: '#ff69be',
       mech: 'Launches heavy rockets (110 dmg, 6.5m blast radius, 14.0 knockback). CURSE: The bass drop drags every infected within 16m straight toward YOU every time you pull the trigger.'
     },
     {
       id: 'lucky_penny_revolver', name: 'Lucky Penny Revolver', cat: 'cursed', badge: 'Cursed · Gamble', bClass: 'b-cursed',
       sub: 'Gold snub-nose with a 25% instant-kill roll and 10% jam risk.',
       kind: 'gun', dmg: 32, pellets: 1, rate: 1/0.38, mag: 6, reload: 1.6, range: 60, spread: 0.5, ammo: '.38 (36)',
-      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / Drops / 2× Gamble', dot: '#ff69be',
+      slot: 'Hotbar Slot', source: 'W3+ Vending Bay 3 / W3+ Drop', dot: '#ff69be',
       mech: 'Snappy 32-dmg base shots with a 25% chance to deal 9,999 lethal damage (one-shotting Elites & heavies). CURSE: 10% chance per shot to JAM for 2.0 seconds, wasting the round and locking fire.'
     },
 
     // GEAR & BELT POUCHES
     {
       id: 'frag', name: 'Frag Grenade', cat: 'gear', badge: 'Belt Pouch [Q] · Explosive', bClass: 'b-pouch',
-      sub: 'Quick-throw fragmentation grenade stored off the hotbar.',
+      sub: 'Fragmentation grenade carried in its own belt pouch.',
       kind: 'gear', dmg: 90, radius: 6.0, dur: 2.4, stack: 10, kb: 10.0,
       slot: 'Belt Pouch [Q] (Cap 10)', source: 'Start w/ 2 · Vending / Drops', dot: '#b5ef82',
-      mech: 'Lives in your dedicated belt pouch so it never eats a weapon slot. Quick-throw with [Q] for a 90-damage, 6m explosive blast with 10.0 knockback. Scales with Volatile Rounds mutation.'
+      mech: 'Equip with Q, aim with the throw arc, then left-click. The grenade deals up to 90 damage in a 6m blast and scales with Volatile Rounds.'
     },
     {
       id: 'shield_dome', name: 'Shield Dome', cat: 'gear', badge: 'Belt Pouch [F] · Shelter', bClass: 'b-pouch',
       sub: 'Instant portable rain shield that weakens & repels infected.',
       kind: 'gear', dmg: 0, radius: 6.5, dur: 9.0, stack: 5,
       slot: 'Belt Pouch [F] (Cap 5)', source: 'Start w/ 1 · Vending / Drops', dot: '#b5ef82',
-      mech: 'Dedicated belt pouch quick-throw [F]. Deploys a 6.5m rain-proof shelter bubble for 9s that keeps the squad dry while revealing, weakening (-35% speed & dmg), and physically keeping non-boss infected out.'
+      mech: 'Equip with F, aim with the throw arc, then left-click. The 6.5m dome keeps the squad dry for 9s, reveals and weakens infected, and keeps non-boss infected out.'
     },
     {
       id: 'umbrella', name: 'Umbrella Stand', cat: 'gear', badge: 'Throwable · Dry Bunker', bClass: 'b-gear',
@@ -1273,7 +1263,7 @@
       id: 'sandbag', name: 'Sandbag', cat: 'gear', badge: 'Deployable · Cover', bClass: 'b-gear',
       sub: 'Places a 90s waist-high fortification wall right in front of you.',
       kind: 'gear', dmg: 0, radius: 1.8, dur: 90.0, stack: 6,
-      slot: 'Hotbar Slot (Stack 6)', source: 'Vending / Drops (Spawns x3)', dot: '#bcb2ff',
+      slot: 'Hotbar Slot (Stack 6)', source: 'Developer menu (bundle of 3)', dot: '#bcb2ff',
       mech: 'Drops a solid 1.8m-wide sandbag barricade lasting 90 seconds (spawns in bundles of 3, stacks to 6). Blocks enemy movement & projectiles so you can funnel waves or fortify doorway holds.'
     },
     {
@@ -1386,8 +1376,7 @@
 
   function scaledDmg(w) {
     if (w.kind !== 'gun') return w.dmg || 0;
-    const mult = w.cat === 'cursed' ? 1.0 : TIER_MULT[activeTier];
-    return Math.round(w.dmg * mult * 10) / 10;
+    return Math.round(w.dmg * TIER_MULT[activeTier] * 10) / 10;
   }
 
   function selectWeapon(id) {
@@ -1414,7 +1403,6 @@
     document.getElementById('wSub').textContent = w.sub;
     document.getElementById('stageOrigin').textContent = `Source: ${w.source}`;
     document.getElementById('stageSlot').textContent = w.slot;
-    document.getElementById('triCount').textContent = `${MESHES[w.id].tris.length} TRIS`;
 
     // Badges
     const br = document.getElementById('badgeRow');
@@ -1428,7 +1416,7 @@
       b2.className = 'badge b-ammo';
       b2.textContent = `Ammo: ${w.ammo}`;
       br.appendChild(b2);
-      if (activeTier > 0 && w.cat !== 'cursed') {
+      if (activeTier > 0) {
         const b3 = document.createElement('span');
         b3.className = 'badge ' + (activeTier === 2 ? 'b-legend' : 'b-starter');
         b3.textContent = `${TIER_NAME[activeTier]} (${activeTier===2?'+16%':'+8%'})`;
@@ -1455,7 +1443,8 @@
       addBar(sb, 'DMG', Math.sqrt(totalDmg / 128), dmgTxt, '#ffc365');
       addBar(sb, 'RATE', Math.sqrt(w.rate / 12), `${w.rate.toFixed(1)}/s`, '#64e4de');
       addBar(sb, 'MAG', Math.sqrt(w.mag / 56), `${w.mag}`, '#b5ef82');
-      addBar(sb, 'RANGE', w.range / 104, `${w.range}m`, '#9db5ff');
+      if (w.range) addBar(sb, 'RANGE', w.range / 104, `${w.range}m`, '#9db5ff');
+      else if (w.radius) addBar(sb, 'BLAST', w.radius / 10, `${w.radius}m`, '#9db5ff');
 
       const extras = [
         ['Burst DPS', `${dps}/s`],

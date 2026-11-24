@@ -453,7 +453,7 @@ outline_size = 0
 [node name="CrateStations" type="Node3D" parent="." unique_id=1954345465]
 
 [node name="RangeVending" type="Marker3D" parent="CrateStations" unique_id=263700634 groups=["crate_station"]]
-transform = Transform3D(-0.70710677, 0, 0.70710677, 0, 1, 0, -0.70710677, 0, -0.70710677, 8, 0, -8)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -12, 0, -12.2)
 
 [node name="BossAnchor" type="Marker3D" parent="." unique_id=487583818 groups=["boss_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, -32)

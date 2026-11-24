@@ -22,22 +22,20 @@ func get_prompt(player: Node) -> String:
 			return "Need %d scrap" % SupplyStation.AMMO_PRICE
 		return "Buy Ammo Refill  %d scrap" % SupplyStation.AMMO_PRICE
 	var offer := station.offer_for(mode)
-	var cost: int = station.price if offer.is_empty() else offer[2]
-	if mode == "double" and GameManager.player_count() < 2:
-		return "Needs 2 players"
+	if offer.is_empty():
+		return ""
+	var cost: int = offer[2]
 	var holder := RunLoot.holder(player)
-	if not offer.is_empty() and ItemCatalog.is_pouch(offer[0]) and holder.pouch_full(offer[0]):
+	if ItemCatalog.is_pouch(offer[0]) and holder.pouch_full(offer[0]):
 		var full_item := ItemCatalog.definition(offer[0])
 		var cap := ItemCatalog.pouch_cap(offer[0])
 		return "%s pouch FULL (%d/%d)" % [full_item.display_name, cap, cap]
 	if holder.scrap < cost:
 		return "Need %d scrap" % cost
-	var action_label := "Double or nothing"
-	if not offer.is_empty():
-		var item := ItemCatalog.definition(offer[0])
-		action_label = "Buy %s" % item.display_name
-		if item.spawn_count > 1:
-			action_label += " ×%d" % item.spawn_count
+	var item := ItemCatalog.definition(offer[0])
+	var action_label := "Buy %s" % item.display_name
+	if item.spawn_count > 1:
+		action_label += " ×%d" % item.spawn_count
 	return "%s  %d scrap" % [action_label, cost]
 
 func action(player: Node, step: String) -> void:

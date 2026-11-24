@@ -5,7 +5,7 @@ extends CanvasLayer
 ##
 ## Like a co-op survival inventory it never pauses the tree. It frees the
 ## cursor while open, and Player / WeaponHolder ask is_open() to mute look,
-## fire, the wheel, slot keys and quick-throws. Slot moves and drops go to the
+## fire, the wheel, slot keys and pouch shortcuts. Slot moves and drops go to the
 ## host through WeaponHolder.swap_slots / drop_slot; the screen just redraws
 ## from the holder's mirrored state.
 ##
@@ -14,10 +14,10 @@ extends CanvasLayer
 
 const SurvivorModel := preload("res://player/player_model.gd")
 const SCRIM := Color(0.015, 0.03, 0.055, 0.78)
-const CARD_SIZE := Vector2(860, 556)
+const CARD_SIZE := Vector2(860, 430)
 const COLUMN_BG := Color(0.03, 0.06, 0.09, 0.72)
 const PREVIEW_SIZE := Vector2i(210, 178)
-const SLOT_HEIGHT := 38.0
+const SLOT_SIZE := Vector2(58, 72)
 const AMMO_NAMES := {"shell": "SHELLS", "rifle": "RIFLE", "nail": "NAILS", "water": "WATER",
 	"cell": "CELLS", "flare": "FLARES", "shaft": "SHAFTS", "fuel": "FUEL", "radio": "RADIO",
 	"rocket": "ROCKETS", "revolver": ".38"}
@@ -31,7 +31,6 @@ var starter_picker: Control
 var _card: PanelContainer
 var _cards: Array = []
 var _inspect := -1
-var _hovered := -1
 var _signature := ""
 
 var _model: SurvivorModel
@@ -54,11 +53,12 @@ var _frag_key: Label
 var _dome_key: Label
 
 var _insp_card: ItemStatCard
-var _insp_slot: Label
 var _equip_button: Button
 var _drop_button: Button
 var _ammo_flow: HFlowContainer
-var _mutation_text: RichTextLabel
+var _enemy_mutations: VBoxContainer
+var _squad_mutations: VBoxContainer
+var _close_hint: Label
 
 
 ## True while the loadout screen is up on this machine.
@@ -100,6 +100,9 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			if not event.is_echo():
 				close()
+
+		elif event is InputEventJoypadButton and event.is_pressed() and get_viewport().gui_get_focus_owner() == null:
+			_cards[_inspect].grab_focus()
 		return
 	if event.is_action_pressed("inventory") and not event.is_echo() and _can_open():
 		get_viewport().set_input_as_handled()
@@ -128,15 +131,18 @@ func open() -> void:
 	if visible:
 		return
 	visible = true
-	_hovered = -1
 	var holder := _holder()
 	_inspect = holder.current if holder else 0
 	_signature = ""
 	_refresh_look()
+	_refresh_vitals()
 	_refresh_mutations()
 	_refresh_state()
+	_refresh_input_hints()
 	_set_preview_active(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if Settings.using_gamepad:
+		_cards[_inspect].grab_focus()
 	BroadcastUI.reveal(_card)
 	Sound.play("ui_click")
 
@@ -148,7 +154,6 @@ func close() -> void:
 		get_viewport().gui_cancel_drag()
 	visible = false
 	_closed_frame = Engine.get_process_frames()
-	_hovered = -1
 	_set_preview_active(false)
 	Sound.play("ui_tick", -10.0)
 	if MenuState.stack.is_empty() and not get_tree().paused and GameManager.run_active \
@@ -171,6 +176,7 @@ func _process(delta: float) -> void:
 		return
 	_refresh_vitals()
 	_refresh_state()
+	_refresh_input_hints()
 	if _pivot:
 		_spin_hold = maxf(0.0, _spin_hold - delta)
 		if _spin_hold <= 0.0 and not Settings.reduced_flash:
@@ -184,6 +190,8 @@ func request_swap(from_slot: int, to_slot: int) -> void:
 		return
 	holder.swap_slots(from_slot, to_slot)
 	_inspect = to_slot
+	_refresh_cards()
+	_refresh_inspector()
 	Sound.play("ui_tick", -6.0, 1.15)
 
 
@@ -203,21 +211,16 @@ func request_equip(slot: int) -> void:
 	if holder.current != slot:
 		holder.select_slot(slot)
 		Sound.play("ui_click")
-	_refresh_inspector()
-
-
-func inspect(slot: int) -> void:
-	_inspect = slot
-	Sound.ui_focus()
 	_refresh_cards()
 	_refresh_inspector()
 
 
-func on_slot_hover(slot: int, inside: bool) -> void:
-	if inside:
-		_hovered = slot
-	elif _hovered == slot:
-		_hovered = -1
+func inspect(slot: int) -> void:
+	if _inspect == slot:
+		return
+	_inspect = slot
+	Sound.ui_focus()
+	_refresh_cards()
 	_refresh_inspector()
 
 
@@ -272,7 +275,8 @@ func _refresh_state() -> void:
 	var holder := _holder()
 	if holder == null:
 		return
-	var parts := PackedStringArray([str(holder.current), str(holder.scrap), str(holder.grenades), str(holder.domes)])
+	var parts := PackedStringArray([str(holder.current), str(holder.scrap), str(holder.grenades),
+		str(holder.domes), str(holder.can_act())])
 	for item in holder.slots:
 		parts.append("%d:%s:%d:%d" % [item.serial, item.id, item.tier, item.count] if item else "-")
 	var types := holder.reserves.keys()
@@ -300,9 +304,8 @@ func _refresh_cards() -> void:
 		var item := holder.slots[i]
 		card.item = item
 		card.definition = ItemCatalog.definition(item.id) if item else null
-		card.reserve = -1
-		if card.definition and card.definition.kind == ItemDefinition.Kind.GUN:
-			card.reserve = int(holder.reserves.get(card.definition.ammo_type, 0))
+		card.tooltip_text = card.definition.display_name if card.definition else "Empty slot"
+		card.mouse_default_cursor_shape = Control.CURSOR_DRAG if item else Control.CURSOR_POINTING_HAND
 		card.equipped = i == holder.current
 		card.inspected = i == _inspect
 		card.queue_redraw()
@@ -312,17 +315,17 @@ func _refresh_inspector() -> void:
 	var holder := _holder()
 	if holder == null or _insp_card == null:
 		return
-	var index := _hovered if _hovered >= 0 else _inspect
-	index = clampi(index, 0, WeaponHolder.SLOT_COUNT - 1)
+	var index := clampi(_inspect, 0, WeaponHolder.SLOT_COUNT - 1)
 	var item := holder.slots[index]
 	_equip_button.disabled = item == null or index == holder.current or not holder.can_act()
 	_drop_button.disabled = item == null or not holder.can_act()
 	_equip_button.text = "IN HAND" if item and index == holder.current else "EQUIP"
-	_insp_slot.text = "SLOT %d" % (index + 1)
-	_insp_slot.add_theme_color_override("font_color", BroadcastUI.CYAN if item and index == holder.current else BroadcastUI.MUTED)
+	var target := _drop_button if _equip_button.disabled else _equip_button
+	for card: Control in _cards:
+		card.focus_neighbor_bottom = card.get_path_to(target)
 	var definition := ItemCatalog.definition(item.id) if item else null
 	if definition == null:
-		_insp_card.clear()
+		_insp_card.clear("EMPTY SLOT")
 		return
 	var opts := {"source": "inventory", "count": item.count}
 	if definition.kind == ItemDefinition.Kind.GUN:
@@ -336,13 +339,8 @@ func _refresh_ammo() -> void:
 	if holder == null:
 		return
 	for child in _ammo_flow.get_children():
+		_ammo_flow.remove_child(child)
 		child.queue_free()
-	var head := Label.new()
-	head.text = "AMMO"
-	BroadcastUI.text(head, 16, BroadcastUI.MUTED)
-	head.custom_minimum_size.y = 22
-	head.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_ammo_flow.add_child(head)
 	var carried := {}
 	for item in holder.slots:
 		if item:
@@ -381,12 +379,16 @@ func _refresh_belt() -> void:
 	if holder == null:
 		return
 	_scrap_value.text = str(holder.scrap)
-	_frag_key.text = "FRAG [%s]" % BroadcastUI.input_hint("throw_grenade")
-	_dome_key.text = "DOME [%s]" % BroadcastUI.input_hint("throw_dome")
 	_frag_value.text = "%d/%d" % [holder.grenades, ItemCatalog.pouch_cap("frag")]
 	_dome_value.text = "%d/%d" % [holder.domes, ItemCatalog.pouch_cap("shield_dome")]
 	_frag_value.add_theme_color_override("font_color", BroadcastUI.PAPER if holder.grenades > 0 else Color(BroadcastUI.MUTED, 0.6))
 	_dome_value.add_theme_color_override("font_color", BroadcastUI.PAPER if holder.domes > 0 else Color(BroadcastUI.MUTED, 0.6))
+
+
+func _refresh_input_hints() -> void:
+	_close_hint.text = "[%s] CLOSE" % BroadcastUI.input_hint("cancel")
+	_frag_key.text = BroadcastUI.input_hint("throw_grenade")
+	_dome_key.text = BroadcastUI.input_hint("throw_dome")
 
 
 func _refresh_vitals() -> void:
@@ -426,30 +428,45 @@ func _on_mutations_changed(_active: Array = []) -> void:
 
 ## This wave's enemy mutation and the squad's run-long bio-mutations.
 func _refresh_mutations() -> void:
-	if _mutation_text == null:
-		return
+	for list in [_enemy_mutations, _squad_mutations]:
+		for child in list.get_children():
+			list.remove_child(child)
+			child.queue_free()
 	var roll := GameManager.mutations
-	var muted := BroadcastUI.MUTED.to_html(false)
-	var lines := PackedStringArray()
-	lines.append("[b][color=#%s]INFECTED[/color][/b]" % BroadcastUI.PINK.to_html(false))
-	if roll == null or roll.active.is_empty():
-		lines.append("[color=#%s]No enemy mutation yet.[/color]" % muted)
-	else:
+	if roll:
 		for id in roll.active:
 			var entry: MutationData = roll.table.get_entry(id)
 			if entry:
-				lines.append("[b]%s[/b]\n[color=#%s]%s[/color]" % [entry.display_name.to_upper(), muted, entry.description])
-	lines.append("")
-	lines.append("[b][color=#%s]SQUAD[/color][/b]" % BroadcastUI.ACID.to_html(false))
-	if roll == null or roll.player_mutations.is_empty():
-		lines.append("[color=#%s]Draft bio-mutations between waves.[/color]" % muted)
-	else:
+				_add_mutation(_enemy_mutations, id, entry.display_name, entry.description, entry.color)
 		for id in roll.player_mutations:
 			if GameManager.PLAYER_MUTATIONS.has(id):
 				var info: Dictionary = GameManager.PLAYER_MUTATIONS[id]
-				lines.append("[b]%s[/b]\n[color=#%s]%s[/color]" % [str(info.name).to_upper(), muted, str(info.desc)])
-	_mutation_text.text = "\n".join(lines)
-	_mutation_text.scroll_to_line(0)
+				_add_mutation(_squad_mutations, id, info.name, info.desc, info.color)
+	for list in [_enemy_mutations, _squad_mutations]:
+		if list.get_child_count() == 0:
+			_label(list, 17, BroadcastUI.MUTED).text = "—"
+
+
+func _add_mutation(parent: Control, id: String, title: String, description: String, tint: Color) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	parent.add_child(row)
+	var glyph := GameIcon.new()
+	glyph.kind = id
+	glyph.color = tint
+	glyph.custom_minimum_size = Vector2(25, 25)
+	glyph.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(glyph)
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 0)
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(copy)
+	var title_label := _label(copy, 19, tint)
+	title_label.text = title.to_upper()
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var effect := _label(copy, 16, BroadcastUI.MUTED)
+	effect.text = description
+	effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 # ------------------------------------------------------------------ layout
@@ -501,27 +518,10 @@ func _header() -> Control:
 	bar.add_theme_stylebox_override("panel", style)
 	var row := HBoxContainer.new()
 	bar.add_child(row)
-	var dot := Label.new()
-	dot.text = "REC"
-	BroadcastUI.text(dot, 18, BroadcastUI.PINK)
-	dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(dot)
-	var gap := Control.new()
-	gap.custom_minimum_size.x = 10
-	row.add_child(gap)
-	var title := Label.new()
-	title.text = "LOADOUT & MUTATIONS"
-	BroadcastUI.text(title, 30, BroadcastUI.CYAN)
-	row.add_child(title)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
-	var hint := Label.new()
-	hint.text = "[TAB / ESC] CLOSE"
-	BroadcastUI.text(hint, 18, BroadcastUI.MUTED)
-	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hint.size_flags_vertical = Control.SIZE_FILL
-	row.add_child(hint)
+	var title := _label(row, 30, BroadcastUI.CYAN)
+	title.text = "LOADOUT"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_close_hint = _label(row, 18, BroadcastUI.MUTED)
 	return bar
 
 
@@ -542,7 +542,6 @@ func _column(width: float) -> VBoxContainer:
 
 func _left_column() -> Control:
 	var box := _column(232)
-	box.add_child(_section("SURVIVOR"))
 	if OS.has_feature("web") or SuitPicker.force_2d_preview:
 		_build_preview_2d(box)
 	else:
@@ -550,24 +549,22 @@ func _left_column() -> Control:
 	_callsign = _label(box, 26, BroadcastUI.PAPER)
 	_callsign.clip_text = true
 	_suit_name = _label(box, 16, BroadcastUI.MUTED)
-	var vitals := _vital(box, "HP", BroadcastUI.PINK)
+	var vitals := _vital(box, "health", BroadcastUI.PINK)
 	_hp_bar = vitals[0]
 	_hp_value = vitals[1]
-	vitals = _vital(box, "SUIT", BroadcastUI.CYAN)
+	vitals = _vital(box, "suit", BroadcastUI.CYAN)
 	_suit_bar = vitals[0]
 	_suit_value = vitals[1]
 	_suit_bar.max_value = 100.0
 	var scrap := HBoxContainer.new()
 	scrap.add_theme_constant_override("separation", 6)
 	box.add_child(scrap)
-	var nut := _ScrapIcon.new()
-	nut.custom_minimum_size = Vector2(20, 22)
-	scrap.add_child(nut)
-	var scrap_label := _label(scrap, 20, BroadcastUI.AMBER)
-	scrap_label.text = "SCRAP"
-	scrap_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var gear := GameIcon.new()
+	gear.kind = "scrap"
+	gear.color = BroadcastUI.AMBER
+	gear.custom_minimum_size = Vector2(22, 22)
+	scrap.add_child(gear)
 	_scrap_value = _label(scrap, 22, BroadcastUI.AMBER)
-	box.add_child(_section("BELT POUCHES"))
 	var frag := _pouch_row(box, "frag")
 	_frag_key = frag[0]
 	_frag_value = frag[1]
@@ -580,26 +577,28 @@ func _left_column() -> Control:
 func _center_column() -> Control:
 	var box := _column(344)
 	box.add_theme_constant_override("separation", 4)
-	var head := HBoxContainer.new()
-	box.add_child(head)
-	var title := _section("HOTBAR")
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	var help := _label(head, 15, Color(BroadcastUI.MUTED, 0.75))
-	help.text = "DRAG TO MOVE  /  RMB DROP"
-	var slots := VBoxContainer.new()
-	slots.add_theme_constant_override("separation", 3)
+	box.add_child(_section("HOTBAR"))
+	var slots := HBoxContainer.new()
+	slots.add_theme_constant_override("separation", 5)
 	box.add_child(slots)
 	for i in WeaponHolder.SLOT_COUNT:
 		var card := _SlotCard.new()
 		card.menu = self
 		card.index = i
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slots.add_child(card)
 		_cards.append(card)
 	var zone := _DropZone.new()
 	zone.menu = self
+	zone.hide()
 	box.add_child(zone)
 	box.add_child(_inspector())
+	for i in _cards.size():
+		var card: Control = _cards[i]
+		card.focus_neighbor_left = card.get_path_to(_cards[posmod(i - 1, _cards.size())])
+		card.focus_neighbor_right = card.get_path_to(_cards[(i + 1) % _cards.size()])
+	_drop_button.focus_neighbor_top = _drop_button.get_path_to(_cards[0])
+	_equip_button.focus_neighbor_top = _equip_button.get_path_to(_cards[0])
 	return box.get_parent()
 
 
@@ -613,34 +612,35 @@ func _inspector() -> Control:
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 6)
 	box.add_child(actions)
-	_insp_slot = _label(actions, 16, BroadcastUI.MUTED)
-	_insp_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_equip_button = _small_button(actions, "EQUIP", BroadcastUI.CYAN, func():
-		request_equip(_hovered if _hovered >= 0 else _inspect))
-	_drop_button = _small_button(actions, "DROP", BroadcastUI.PINK, func():
-		request_drop(_hovered if _hovered >= 0 else _inspect))
+	_equip_button = _small_button(actions, "EQUIP", BroadcastUI.CYAN, func(): request_equip(_inspect))
+	_equip_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_drop_button = _small_button(actions, "DROP", BroadcastUI.PINK, func(): request_drop(_inspect))
+	_drop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return box
 
 
 func _right_column() -> Control:
 	var box := _column(232)
-	# Carried ammo chips sit above the mutations so the center column can give
-	# the inspector stat card its full height.
+	box.add_child(_section("RESERVE AMMO"))
 	_ammo_flow = HFlowContainer.new()
 	_ammo_flow.add_theme_constant_override("h_separation", 6)
 	_ammo_flow.add_theme_constant_override("v_separation", 4)
 	box.add_child(_ammo_flow)
-	var title := _label(box, 26, BroadcastUI.CYAN)
-	title.text = "MUTATIONS"
-	_mutation_text = RichTextLabel.new()
-	_mutation_text.bbcode_enabled = true
-	_mutation_text.scroll_active = true
-	_mutation_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_mutation_text.add_theme_font_override("normal_font", BroadcastUI.FONT)
-	_mutation_text.add_theme_font_override("bold_font", BroadcastUI.FONT)
-	_mutation_text.add_theme_font_size_override("normal_font_size", 19)
-	_mutation_text.add_theme_font_size_override("bold_font_size", 21)
-	box.add_child(_mutation_text)
+	box.add_child(_section("MUTATIONS"))
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(scroll)
+	var mutations := VBoxContainer.new()
+	mutations.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mutations.add_theme_constant_override("separation", 4)
+	scroll.add_child(mutations)
+	_label(mutations, 17, BroadcastUI.PINK).text = "INFECTED"
+	_enemy_mutations = VBoxContainer.new()
+	mutations.add_child(_enemy_mutations)
+	_label(mutations, 17, BroadcastUI.ACID).text = "SQUAD"
+	_squad_mutations = VBoxContainer.new()
+	mutations.add_child(_squad_mutations)
 	return box.get_parent()
 
 
@@ -659,23 +659,27 @@ func _label(parent: Control, font_size: int, color: Color) -> Label:
 	return label
 
 
-func _vital(parent: Control, title: String, color: Color) -> Array:
-	var block := VBoxContainer.new()
-	block.add_theme_constant_override("separation", 1)
-	parent.add_child(block)
+func _vital(parent: Control, kind: String, color: Color) -> Array:
 	var row := HBoxContainer.new()
-	block.add_child(row)
-	var name_label := _label(row, 18, color)
-	name_label.text = title
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var value := _label(row, 18, BroadcastUI.PAPER)
+	row.add_theme_constant_override("separation", 6)
+	parent.add_child(row)
+	var icon := GameIcon.new()
+	icon.kind = kind
+	icon.color = color
+	icon.custom_minimum_size = Vector2(22, 22)
+	row.add_child(icon)
 	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(0, 8)
+	bar.custom_minimum_size.y = 8
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.show_percentage = false
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	BroadcastUI.bar(bar, color)
-	block.add_child(bar)
-	return [bar, value]
+	row.add_child(bar)
+	var count := _label(row, 18, BroadcastUI.PAPER)
+	count.custom_minimum_size.x = 57
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	return [bar, count]
 
 
 func _pouch_row(parent: Control, id: String) -> Array:
@@ -690,7 +694,8 @@ func _pouch_row(parent: Control, id: String) -> Array:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
-	var key := _label(row, 20, BroadcastUI.PAPER)
+	var key := _label(row, 17, BroadcastUI.MUTED)
+	key.tooltip_text = definition.display_name if definition else id
 	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var value := _label(row, 22, BroadcastUI.PAPER)
 	return [key, value]
@@ -699,7 +704,7 @@ func _pouch_row(parent: Control, id: String) -> Array:
 func _small_button(parent: Control, text: String, accent: Color, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
+	button.focus_mode = Control.FOCUS_ALL
 	BroadcastUI.button_accent(button, accent, true)
 	button.add_theme_font_size_override("font_size", 17)
 	for state: String in ["normal", "hover", "pressed", "disabled"]:
@@ -817,7 +822,6 @@ class _SlotCard extends Control:
 	var index := 0
 	var item: ItemInstance
 	var definition: ItemDefinition
-	var reserve := -1
 	var equipped := false
 	var inspected := false
 	var _hover := false
@@ -825,7 +829,9 @@ class _SlotCard extends Control:
 	var _dragging := false
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(0, InventoryMenu.SLOT_HEIGHT)
+		custom_minimum_size = InventoryMenu.SLOT_SIZE
+		focus_mode = Control.FOCUS_ALL
+		focus_entered.connect(func(): menu.inspect(index))
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
@@ -849,6 +855,10 @@ class _SlotCard extends Control:
 		menu.request_swap(int(data.inventory_slot), index)
 
 	func _gui_input(event: InputEvent) -> void:
+		if event.is_action_pressed("ui_accept"):
+			menu.request_equip(index)
+			accept_event()
+			return
 		var button := event as InputEventMouseButton
 		if button == null or not button.pressed:
 			return
@@ -867,12 +877,10 @@ class _SlotCard extends Control:
 			NOTIFICATION_MOUSE_ENTER:
 				_hover = true
 				queue_redraw()
-				menu.on_slot_hover(index, true)
 			NOTIFICATION_MOUSE_EXIT:
 				_hover = false
 				_drop_hover = false
 				queue_redraw()
-				menu.on_slot_hover(index, false)
 			NOTIFICATION_DRAG_BEGIN:
 				_dragging = true
 				queue_redraw()
@@ -883,72 +891,47 @@ class _SlotCard extends Control:
 
 	func _draw() -> void:
 		var font := BroadcastUI.FONT
-		var w := size.x
-		var h := size.y
 		var bg := Color("#10202b") if item else Color(BroadcastUI.INK, 0.55)
 		if equipped:
 			bg = Color("#173943")
 		if _hover or _drop_hover:
 			bg = bg.lightened(0.07)
 		draw_rect(Rect2(Vector2.ZERO, size), bg)
-		# Number tab.
-		var tab_w := 30.0
-		draw_rect(Rect2(0, 0, tab_w, h), Color(BroadcastUI.CYAN, 0.24) if equipped else Color(BroadcastUI.INK, 0.85))
-		draw_string(font, Vector2(0, h * 0.5 + 9.0), str(index + 1), HORIZONTAL_ALIGNMENT_CENTER, tab_w, 28,
+		draw_string(font, Vector2(6, 16), str(index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
 				BroadcastUI.CYAN if equipped else BroadcastUI.MUTED)
+		if equipped:
+			var x := size.x - 13.0
+			draw_polyline(PackedVector2Array([Vector2(x - 2, 11), Vector2(x + 2, 15), Vector2(x + 8, 7)]), BroadcastUI.CYAN, 2.0, true)
 		if item and definition:
 			var tier_color := ItemCatalog.tier_color(item.id, item.tier)
 			if definition.legendary:
 				tier_color = BroadcastUI.AMBER
-			var icon_rect := Rect2(tab_w + 6.0, 4.0, h - 8.0, h - 8.0)
-			draw_rect(icon_rect, Color(0, 0, 0, 0.35))
 			if definition.icon:
-				draw_texture_rect(definition.icon, icon_rect, false)
-			var text_x := icon_rect.end.x + 8.0
-			var count_w := 74.0
-			draw_string(font, Vector2(text_x, 18.0), definition.display_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT,
-					w - text_x - count_w, 21, BroadcastUI.PAPER)
-			var tier_text := ItemCatalog.tier_name(item.id, item.tier)
-			draw_string(font, Vector2(text_x, 33.0), tier_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, tier_color)
-			var tier_w := font.get_string_size(tier_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-			draw_rect(Rect2(text_x, 34.5, tier_w, 1.5), Color(tier_color, 0.8))
-			# Tier strip along the bottom edge.
-			draw_rect(Rect2(tab_w, h - 2.0, w - tab_w, 2.0), Color(tier_color, 0.55 if item.tier > 0 or definition.is_cursed() or definition.legendary else 0.18))
-			var count_text := ""
-			var count_sub := ""
+				var icon_size := Vector2(38, 38)
+				draw_texture_rect(definition.icon, Rect2(Vector2((size.x - icon_size.x) * 0.5, 13), icon_size), false)
+			var count := "x%d" % item.count
+			var tint := BroadcastUI.PAPER
 			if definition.kind == ItemDefinition.Kind.GUN and definition.weapon:
-				count_text = "%d/%d" % [item.count, definition.weapon.mag_size]
-				count_sub = "+%d %s" % [maxi(reserve, 0), "RES"]
-			else:
-				count_text = "x%d" % item.count
-				count_sub = "OF %d" % definition.stack_cap
-			var count_color := BroadcastUI.PAPER
-			if definition.kind == ItemDefinition.Kind.GUN and item.count <= 0:
-				count_color = BroadcastUI.PINK
-			draw_string(font, Vector2(w - count_w - 6.0, 19.0), count_text, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 22, count_color)
-			draw_string(font, Vector2(w - count_w - 6.0, 33.0), count_sub, HORIZONTAL_ALIGNMENT_RIGHT, count_w, 14, BroadcastUI.MUTED)
-			if equipped:
-				draw_string(font, Vector2(text_x + tier_w + 10.0, 33.0), "IN HAND", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BroadcastUI.CYAN)
+				count = "%d/%d" % [item.count, definition.weapon.mag_size]
+				if item.count <= 0:
+					tint = BroadcastUI.PINK
+			draw_string(font, Vector2(0, size.y - 7), count, HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, tint)
+			draw_rect(Rect2(0, size.y - 2, size.x, 2), tier_color)
 		else:
-			draw_string(font, Vector2(tab_w + 12.0, h * 0.5 + 7.0), "EMPTY", HORIZONTAL_ALIGNMENT_LEFT, -1, 20,
-					Color(BroadcastUI.MUTED, 0.45))
+			draw_line(size * 0.5 - Vector2(4, 0), size * 0.5 + Vector2(4, 0), Color(BroadcastUI.MUTED, 0.5), 2)
 		var border := Color(BroadcastUI.MUTED, 0.3)
 		var width := 1.0
 		if _drop_hover:
 			border = BroadcastUI.CYAN
 			width = 2.0
-		elif equipped:
-			border = Color(BroadcastUI.CYAN, 0.85)
-			width = 2.0
 		elif inspected:
-			border = Color(BroadcastUI.PAPER, 0.7)
+			border = BroadcastUI.PAPER
+			width = 2.0
+		elif equipped or _dragging:
+			border = Color(BroadcastUI.CYAN, 0.65)
 		elif _hover:
 			border = Color(BroadcastUI.PAPER, 0.45)
-		elif _dragging:
-			border = Color(BroadcastUI.CYAN, 0.35)
 		draw_rect(Rect2(Vector2.ONE * width * 0.5, size - Vector2.ONE * width), border, false, width)
-		if inspected:
-			draw_rect(Rect2(tab_w - 3.0, 0, 3.0, h), BroadcastUI.PAPER)
 
 
 ## Drag a slot here to drop it on the ground in front of you.
@@ -959,7 +942,7 @@ class _DropZone extends Control:
 
 	func _init() -> void:
 		custom_minimum_size = Vector2(0, 26)
-		mouse_filter = Control.MOUSE_FILTER_STOP
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
 		var ok: bool = data is Dictionary and data.has("inventory_slot")
@@ -980,36 +963,24 @@ class _DropZone extends Control:
 				queue_redraw()
 			NOTIFICATION_DRAG_BEGIN:
 				_dragging = true
+				mouse_filter = Control.MOUSE_FILTER_STOP
+				show()
 				queue_redraw()
 			NOTIFICATION_DRAG_END:
 				_dragging = false
+				mouse_filter = Control.MOUSE_FILTER_IGNORE
 				_armed = false
-				queue_redraw()
+				hide()
 
 	func _draw() -> void:
+		if not _dragging:
+			return
 		var rect := Rect2(Vector2.ONE, size - Vector2.ONE * 2.0)
-		var tint := BroadcastUI.PINK if _armed or _dragging else Color(BroadcastUI.MUTED, 0.45)
-		draw_rect(rect, Color(BroadcastUI.PINK, 0.22 if _armed else (0.07 if _dragging else 0.0)))
+		var tint := BroadcastUI.PINK
+		draw_rect(rect, Color(BroadcastUI.PINK, 0.22 if _armed else 0.07))
 		var corners := [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]
 		for i in 4:
 			draw_dashed_line(corners[i], corners[(i + 1) % 4], tint, 1.5 if _armed else 1.0, 6.0)
 		var label := "RELEASE TO DROP" if _armed else "DROP ON GROUND"
 		draw_string(BroadcastUI.FONT, Vector2(0, size.y * 0.5 + 7.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x, 20,
-				BroadcastUI.PINK if _armed or _dragging else Color(BroadcastUI.MUTED, 0.7))
-
-
-## Small amber hex nut for the scrap counter.
-class _ScrapIcon extends Control:
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		var c := size * 0.5
-		var r := minf(size.x, size.y) * 0.45
-		var points := PackedVector2Array()
-		for i in 6:
-			points.append(c + Vector2.from_angle(TAU * i / 6.0 + PI / 6.0) * r)
-		draw_colored_polygon(points, BroadcastUI.AMBER)
-		points.append(points[0])
-		draw_polyline(points, BroadcastUI.INK, 1.5)
-		draw_circle(c, r * 0.38, BroadcastUI.INK)
+				tint)

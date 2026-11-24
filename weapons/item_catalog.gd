@@ -35,7 +35,7 @@ const STACKS := {
 }
 ## Frags and domes ride in dedicated belt pouches, never in the 5 hotbar slots.
 const POUCH_CAPS := {"frag": 10, "shield_dome": 5}
-## Quick-throw input action per pouch item.
+## Equip or stow the pouch item with its dedicated input action.
 const POUCH_ACTIONS := {"frag": "throw_grenade", "shield_dome": "throw_dome"}
 static var _entries: Dictionary[String, ItemDefinition] = {}
 static var _icons: Dictionary[String, Texture2D] = {}

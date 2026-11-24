@@ -12,8 +12,6 @@ const AMMO_PRICE := 5
 const AMMO_PAD := Vector3(-0.68, 0.56, -0.58)
 var key: String
 var is_drop := false
-var has_double := false
-var price := 20
 var offers: Array = []
 var descent_left := 0.0
 var opened := false
@@ -22,6 +20,12 @@ var _chute: Node3D
 var _lid: Node3D
 var _display: Label3D
 var _spin_root: Node3D
+var _beacon_beam: MeshInstance3D
+var _beacon_ring: MeshInstance3D
+var _beacon_inner: MeshInstance3D
+var _beacon_mat: StandardMaterial3D
+var _beacon_ring_mat: StandardMaterial3D
+var _beacon_clock := 0.0
 var _smoke_left := 0.0
 var _show_clock := 0.0
 var _show_queue: Array[Array] = []
@@ -52,6 +56,7 @@ func _ready() -> void:
 				_display.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			else:
 				_build_pallet()
+			_build_drop_beacon()
 		else:
 			_build_station()
 		_spin_root = Node3D.new()
@@ -63,8 +68,6 @@ func _ready() -> void:
 		for i in OFFER_PADS.size():
 			_add_pad(OFFER_PADS[i], Vector3(BAY_CENTERS[i], 1.25, -0.58))
 		_add_pad("ammo", AMMO_PAD)
-		if has_double:
-			_add_pad("double", Vector3(0.72, 0.59, -0.61))
 
 func _add_pad(mode: String, at: Vector3) -> void:
 	var pad := SupplyInteract.new()
@@ -83,7 +86,7 @@ func available(mode: String) -> bool:
 		return descent_left <= 0.0 and not opened
 	if mode == "ammo":
 		return not is_drop
-	return not is_drop and (not offer_for(mode).is_empty() or (mode == "double" and has_double and WeatherManager.wave >= 4))
+	return not is_drop and not offer_for(mode).is_empty()
 
 func offer_for(mode: String) -> Array:
 	if mode == "ammo":
@@ -130,6 +133,7 @@ func _process(delta: float) -> void:
 		descent_left = maxf(0.0, descent_left - delta)
 		_frame.position.y = 5.8 * descent_left
 		if not Net.dedicated:
+			_tick_drop_beacon(delta)
 			if airborne and descent_left == 0.0:
 				Sound.play_at("airdrop_land", global_position, -4.0)
 				ShotFX.puff(self, global_position + Vector3.UP * 0.25,
@@ -147,6 +151,80 @@ func _process(delta: float) -> void:
 					Color(1.0, 0.47, 0.23, 0.68), 0.25, 1.3)
 	if not Net.dedicated:
 		_tick_reveal(delta)
+
+func _build_drop_beacon() -> void:
+	_beacon_mat = StandardMaterial3D.new()
+	_beacon_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_beacon_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_beacon_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_beacon_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_beacon_mat.no_depth_test = false
+	_beacon_mat.albedo_color = Color(AMBER.r, AMBER.g, AMBER.b, 0.22)
+
+	var beam_mesh := CylinderMesh.new()
+	beam_mesh.top_radius = 0.14
+	beam_mesh.bottom_radius = 0.42
+	beam_mesh.height = 28.0
+	beam_mesh.radial_segments = 14
+	beam_mesh.cap_top = false
+	beam_mesh.cap_bottom = false
+	_beacon_beam = MeshInstance3D.new()
+	_beacon_beam.mesh = beam_mesh
+	_beacon_beam.material_override = _beacon_mat
+	_beacon_beam.position.y = 14.0
+	_beacon_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_beacon_beam)
+
+	_beacon_ring_mat = StandardMaterial3D.new()
+	_beacon_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_beacon_ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_beacon_ring_mat.albedo_color = Color(AMBER.r, AMBER.g, AMBER.b, 0.82)
+
+	var outer := TorusMesh.new()
+	outer.inner_radius = 1.48
+	outer.outer_radius = 1.72
+	outer.rings = 28
+	outer.ring_segments = 6
+	_beacon_ring = MeshInstance3D.new()
+	_beacon_ring.mesh = outer
+	_beacon_ring.material_override = _beacon_ring_mat
+	_beacon_ring.position.y = 0.07
+	_beacon_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_beacon_ring)
+
+	var inner := TorusMesh.new()
+	inner.inner_radius = 0.88
+	inner.outer_radius = 1.04
+	inner.rings = 24
+	inner.ring_segments = 6
+	_beacon_inner = MeshInstance3D.new()
+	_beacon_inner.mesh = inner
+	_beacon_inner.material_override = _beacon_ring_mat
+	_beacon_inner.position.y = 0.08
+	_beacon_inner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_beacon_inner)
+
+func _tick_drop_beacon(delta: float) -> void:
+	if _beacon_beam == null:
+		return
+	var active := not opened
+	_beacon_beam.visible = active
+	_beacon_ring.visible = active
+	_beacon_inner.visible = active
+	if not active:
+		return
+	_beacon_clock += delta
+	var pulse := 0.5 if Settings.reduced_flash else 0.5 + 0.5 * sin(_beacon_clock * 4.5)
+	var airborne := descent_left > 0.0
+	_beacon_mat.albedo_color.a = lerpf(0.16, 0.30, pulse) if airborne else lerpf(0.09, 0.17, pulse)
+	_beacon_ring_mat.albedo_color.a = lerpf(0.65, 0.95, pulse) if airborne else lerpf(0.45, 0.72, pulse)
+	if airborne:
+		var t := clampf(descent_left / DESCENT, 0.0, 1.0)
+		var s := lerpf(0.55, 1.55, t)
+		_beacon_inner.scale = Vector3(s, 1.0, s)
+	else:
+		var s := 1.0 + 0.08 * pulse
+		_beacon_inner.scale = Vector3(s, 1.0, s)
 
 func _compass_tint(amount: float) -> void:
 	set_meta("compass_color", AMBER.lerp(BroadcastUI.PAPER, amount))
@@ -183,12 +261,9 @@ func _build_station() -> void:
 		_frame.add_child(mount)
 		_offer_items.append(mount)
 	_build_ammo_panel()
-	if has_double:
-		_box(_frame, Vector3(0.72, 0.56, -0.45), Vector3(0.30, 0.25, 0.12), Color("#224353"))
-		_label("2X W4+", Vector3(0.72, 0.56, -0.52), AMBER, 35)
 
 func _build_ammo_panel() -> void:
-	# Lower-left dispenser, mirroring the 2X pad: steel housing, olive ammo tin, rim strip.
+	# Lower-left ammo dispenser with a steel housing and a rim strip.
 	var x := AMMO_PAD.x - 0.02
 	_box(_frame, Vector3(x, 0.56, -0.45), Vector3(0.30, 0.34, 0.12), Color("#20282c"))
 	_box(_frame, Vector3(x, 0.56, -0.512), Vector3(0.27, 0.30, 0.012), Color("#2c3a3a"))

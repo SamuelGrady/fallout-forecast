@@ -76,6 +76,48 @@ func _draw_markers() -> void:
 			_plate(screen, label, dist, accent, p, glyph)
 		else:
 			_edge_arrow(screen, behind, view, dist, accent, glyph)
+	_draw_supply_drops(camera, me, view)
+
+
+func _draw_supply_drops(camera: Camera3D, me: Node3D, view: Vector2) -> void:
+	for node in get_tree().get_nodes_in_group("crates"):
+		var drop := node as SupplyStation
+		if drop == null or not drop.is_drop or drop.opened or not drop.is_inside_tree() or drop.is_queued_for_deletion():
+			continue
+		var airborne := drop.descent_left > 0.0
+		var target := drop.global_position + Vector3.UP * (2.2 + minf(drop.descent_left * 2.5, 5.0))
+		var dist := me.global_position.distance_to(drop.global_position)
+		var behind := camera.is_position_behind(target)
+		var screen := Vector2.ZERO
+		if behind:
+			var local := camera.to_local(target)
+			screen = view * 0.5 + Vector2(local.x, -local.y) * 20.0
+		else:
+			screen = camera.unproject_position(target)
+			if not screen.is_finite():
+				continue
+		var accent := SupplyStation.AMBER
+		if not Settings.reduced_flash:
+			var pulse := 0.25 + 0.25 * sin(_clock * (7.5 if airborne else 4.0))
+			accent = accent.lerp(Color("#fff2cf"), pulse)
+		var on_screen := not behind and Rect2(Vector2.ZERO, view).grow(-EDGE).has_point(screen)
+		if on_screen:
+			_drop_plate(screen, dist, accent, airborne)
+		else:
+			_edge_arrow(screen, behind, view, dist, accent, "drop")
+
+
+func _drop_plate(at: Vector2, dist: float, color: Color, airborne: bool) -> void:
+	_glyph(at + Vector2(0, -30), "drop", color, 24.0)
+	var tag := ("INBOUND %dm" if airborne else "SUPPLY %dm") % roundi(dist)
+	var size := 17
+	var width := FONT.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var origin := at + Vector2(-width * 0.5, -2)
+	_canvas.draw_string_outline(FONT, origin, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(0, 0, 0, 0.85))
+	_canvas.draw_string(FONT, origin, tag, HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+	var tip := at + Vector2(0, 14)
+	_canvas.draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-7, -8), tip + Vector2(7, -8)]), Color(0, 0, 0, 0.7))
+	_canvas.draw_colored_polygon(PackedVector2Array([tip + Vector2(0, -1), tip + Vector2(-5.5, -7), tip + Vector2(5.5, -7)]), color)
 
 
 func _plate(at: Vector2, label: String, dist: float, color: Color, p: Node, glyph: String) -> void:
@@ -127,7 +169,7 @@ func _edge_arrow(screen: Vector2, behind: bool, view: Vector2, dist: float, colo
 
 
 
-## Small state glyph drawn straight onto the canvas: a cross (downed) or a skull (turned).
+## Small state glyph drawn straight onto the canvas: a cross (downed), skull (turned), or parachute crate (supply drop).
 func _glyph(center: Vector2, kind: String, color: Color, side: float) -> void:
 	var u := side / 22.0
 	var ink := Color(0, 0, 0, 0.8)
@@ -137,6 +179,17 @@ func _glyph(center: Vector2, kind: String, color: Color, side: float) -> void:
 			_canvas.draw_rect(r.grow(1.5), ink)
 		for rect in [Rect2(-3, -9, 6, 18), Rect2(-9, -3, 18, 6)]:
 			_canvas.draw_rect(Rect2(center + rect.position * u, rect.size * u), color)
+	elif kind == "drop":
+		# Parachute dome + rigging lines + supply crate box.
+		_canvas.draw_arc(center + Vector2(0, -3) * u, 10.0 * u, PI, TAU, 16, ink, 4.5 * u, true)
+		_canvas.draw_arc(center + Vector2(0, -3) * u, 10.0 * u, PI, TAU, 16, color, 2.8 * u, true)
+		_canvas.draw_line(center + Vector2(-9, -3) * u, center + Vector2(-4, 3) * u, ink, 2.8 * u, true)
+		_canvas.draw_line(center + Vector2(9, -3) * u, center + Vector2(4, 3) * u, ink, 2.8 * u, true)
+		_canvas.draw_line(center + Vector2(-9, -3) * u, center + Vector2(-4, 3) * u, color, 1.5 * u, true)
+		_canvas.draw_line(center + Vector2(9, -3) * u, center + Vector2(4, 3) * u, color, 1.5 * u, true)
+		var crate := Rect2(center + Vector2(-5.5, 3) * u, Vector2(11, 8) * u)
+		_canvas.draw_rect(crate.grow(1.5 * u), ink)
+		_canvas.draw_rect(crate, color)
 	else:
 		_canvas.draw_circle(center + Vector2(0, -2) * u, 9.5 * u, ink)
 		_canvas.draw_circle(center + Vector2(0, -2) * u, 8.0 * u, color)

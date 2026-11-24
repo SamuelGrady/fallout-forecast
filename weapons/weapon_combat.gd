@@ -387,9 +387,9 @@ static func play_fx(parent: Node, id: String, muzzle: Vector3, traces: Array, lo
 	var data := ItemCatalog.definition(id).weapon
 	if muzzle_fx and not data.shot_sound.is_empty():
 		if local:
-			Sound.play(data.shot_sound, -7.0)
+			Sound.play(data.shot_sound, -2.5)
 		else:
-			Sound.play_at(data.shot_sound, muzzle, -8.0)
+			Sound.play_at(data.shot_sound, muzzle, -4.5)
 	if data.kind != WeaponData.Kind.HITSCAN:
 		return
 	var stream := data.mechanic in ["wash", "gust", "zap", "suppress"]

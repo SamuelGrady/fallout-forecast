@@ -1,5 +1,8 @@
 extends Node3D
 ## Presentation for supply pickups, owned by RunLoot.
+
+const SCRAP_GEAR := preload("res://weapons/scrap_gear.gd")
+
 @export_enum("ammo", "health", "suit", "supply", "scrap", "scrap_large") var kind := "ammo"
 var _age := 0.0
 var _root := Node3D.new()
@@ -12,8 +15,6 @@ static var _ring_meshes := {}
 
 const SCRAP_AMBER := Color("#ffb33d")
 const SCRAP_GOLD := Color("#ffd75e")
-const SCRAP_BRASS := Color("#c98d3a")
-const SCRAP_STEEL := Color("#4b4f52")
 
 
 func _ready() -> void:
@@ -85,38 +86,22 @@ func _add_ring(accent: Color, inner: float, outer: float, alpha: float) -> void:
 
 
 func _build_scrap(accent: Color) -> void:
-	# Small salvage bundle: steel plate, glowing brass cog and two bolts.
-	_add_box(_root, Vector3(0, -0.02, 0), Vector3(0.3, 0.05, 0.22), SCRAP_STEEL)
-	_add_box(_root, Vector3(0, 0.005, 0), Vector3(0.32, 0.015, 0.24), accent, 0.9)
-	_add_cog(_root, Vector3(0.02, 0.07, 0.0), 0.1, accent, 1.1)
-	_add_cyl(_root, Vector3(-0.11, 0.06, 0.06), 0.022, 0.12, SCRAP_BRASS, 0.5)
-	_add_cyl(_root, Vector3(-0.11, 0.125, 0.06), 0.036, 0.025, SCRAP_BRASS, 0.5)
-	_add_cyl(_root, Vector3(0.12, 0.05, -0.07), 0.02, 0.1, SCRAP_BRASS, 0.5)
+	_add_gear(Vector3(0.0, 0.04, 0.0), Vector3(14.0, 0.0, 0.0), 0.225, accent, 0.95)
 
 
 func _build_scrap_cache(accent: Color) -> void:
-	# Stacked salvage cache: two plates, a big gold cog, a small cog, bolt bundle.
-	_add_box(_root, Vector3(0, -0.04, 0), Vector3(0.46, 0.06, 0.34), SCRAP_STEEL)
-	_add_box(_root, Vector3(0, -0.005, 0), Vector3(0.48, 0.02, 0.36), SCRAP_AMBER, 1.0)
-	_add_box(_root, Vector3(0.03, 0.04, 0.02), Vector3(0.36, 0.05, 0.26), SCRAP_BRASS, 0.35)
-	_add_cog(_root, Vector3(-0.04, 0.11, 0.0), 0.14, accent, 1.6)
-	_add_cog(_root, Vector3(0.16, 0.09, -0.07), 0.075, SCRAP_AMBER, 1.2)
-	for x in [-0.17, -0.12]:
-		_add_cyl(_root, Vector3(x, 0.12, 0.1), 0.024, 0.16, SCRAP_BRASS, 0.6)
-		_add_cyl(_root, Vector3(x, 0.205, 0.1), 0.04, 0.025, SCRAP_BRASS, 0.6)
+	_add_gear(Vector3(-0.08, 0.09, 0.04), Vector3(12.0, 10.0, 0.0), 0.285, accent, 1.3)
+	_add_gear(Vector3(0.22, -0.03, -0.12), Vector3(18.0, -24.0, 15.0), 0.16, SCRAP_AMBER, 1.0)
 
 
-func _add_cog(parent: Node3D, at: Vector3, radius: float, color: Color, glow: float) -> void:
-	var cog := Node3D.new()
-	cog.position = at
-	parent.add_child(cog)
-	_add_cyl(cog, Vector3.ZERO, radius, radius * 0.4, color, glow)
-	_add_cyl(cog, Vector3.ZERO, radius * 0.35, radius * 0.5, SCRAP_STEEL)
-	for i in 6:
-		var tooth := Node3D.new()
-		tooth.rotation.y = i * TAU / 6.0
-		cog.add_child(tooth)
-		_add_box(tooth, Vector3(radius * 1.08, 0, 0), Vector3(radius * 0.32, radius * 0.4, radius * 0.3), color, glow)
+func _add_gear(at: Vector3, tilt: Vector3, radius: float, accent: Color, glow: float) -> void:
+	var gear := MeshInstance3D.new()
+	gear.mesh = SCRAP_GEAR.mesh()
+	gear.position = at
+	gear.rotation_degrees = tilt
+	gear.scale = Vector3.ONE * radius
+	gear.material_override = _mat(accent, glow)
+	_root.add_child(gear)
 
 
 func _build_ammo(accent: Color) -> void:

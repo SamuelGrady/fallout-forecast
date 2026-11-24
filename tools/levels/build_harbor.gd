@@ -533,7 +533,7 @@ func markers() -> void:
 		Vector2(4, 61), Vector2(-21, 58), Vector2(-52, 38), Vector2(-60, -24), Vector2(10, 41),
 		Vector2(35, 36), Vector2(-20, 25)])
 	points("CrateSpawns", "crate_spawn", [Vector2(-57, -28), Vector2(-23, -28), Vector2(11, -28),
-		Vector2(48, -32), Vector2(-26, -1), Vector2(-14, 5), Vector2(-21, 24), Vector2(8.9, 23),
+		Vector2(48, -32), Vector2(-26, -1), Vector2(-14, 9), Vector2(-21, 24), Vector2(8.9, 23),
 		Vector2(32, 24.5), Vector2(9, 38), Vector2(50, 39), Vector2(14, 51), Vector2(-49, 53)])
 	for p: Vector2 in [Vector2(-54, -29), Vector2(-26, -28), Vector2(0, -28), Vector2(32, -28),
 			Vector2(-30, 5), Vector2(35, 8), Vector2(17, 34), Vector2(49, 40),
