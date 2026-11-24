@@ -32,6 +32,9 @@ func _ready() -> void:
 
 
 func hit(is_kill: bool, is_critical: bool) -> void:
+	# An ordinary hit in the next burst should leave a confirmed kill readable.
+	if hit_left > 0.0 and killed and not is_kill:
+		return
 	hit_left = 0.28 if is_kill else 0.13
 	critical = is_critical
 	killed = is_kill
@@ -82,8 +85,13 @@ func _draw() -> void:
 		var outer := inner + (9.0 if critical or killed else 6.0)
 		for i in 4:
 			var direction := Vector2.from_angle(PI / 4 + i * PI / 2)
-			draw_line(center + direction * inner, center + direction * outer, Color.BLACK, 5, true)
-			draw_line(center + direction * inner, center + direction * outer, hit_color, 3, true)
+			var tip := center + direction * outer
+			draw_line(center + direction * inner, tip, Color.BLACK, 5, true)
+			if killed:
+				var cap := direction.orthogonal() * 4.0
+				draw_line(tip - cap, tip + cap, Color.BLACK, 5, true)
+				draw_line(tip - cap, tip + cap, hit_color, 3, true)
+			draw_line(center + direction * inner, tip, hit_color, 3, true)
 
 
 func _draw_reticle(center: Vector2, color: Color) -> void:

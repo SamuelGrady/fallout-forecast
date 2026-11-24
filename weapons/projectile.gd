@@ -25,10 +25,18 @@ var _tick_left := 0.0
 var _body: Node3D
 var _visual: Node3D
 var _light: OmniLight3D
+var _dome_rim: MeshInstance3D
+var _dome_shell: MeshInstance3D
+var _dome_replica_left := 0.0
+var _dome_warning := DomeWarning.NONE
 static var _ring: TorusMesh
 static var _hemisphere: SphereMesh
 static var _zone_mats: Dictionary = {}
 
+enum DomeWarning { NONE, STEADY, PULSE }
+const DOME_PULSE_PERIOD := 0.60
+const DOME_WARNING_TIME := 3.0 * DOME_PULSE_PERIOD
+const DOME_WARNING_COLOR := Color("#ffc365")
 const ROD_ARC_COLOR := Color(0.62, 0.95, 1.0)
 const ROD_STUN := 1.1
 const ROD_REVEAL := 3.0
@@ -48,6 +56,7 @@ func configure(system: RunLoot, key: int, definition_id: String, at: Vector3, mo
 
 func _ready() -> void:
 	global_position = _started_at
+	set_process(false)
 	if not Net.dedicated:
 		_visual = ItemCatalog.projectile_model(id)
 		add_child(_visual)
@@ -173,6 +182,34 @@ func deploy(at: Vector3, duration: float, angle: float, announce := true) -> voi
 				left = maxf(data.effect_time, 0.1)
 	if not Net.dedicated:
 		_build_zone(announce)
+	if _dome_shell:
+		_dome_replica_left = duration
+		_update_dome_warning(duration)
+		set_process(true)
+
+func _process(delta: float) -> void:
+	# Deploy events and late-join snapshots already carry the lifetime.
+	# Replicas count it down for visuals while the host owns removal.
+	if Net.is_host():
+		_update_dome_warning(left)
+	else:
+		_dome_replica_left = maxf(0.0, _dome_replica_left - delta)
+		_update_dome_warning(_dome_replica_left)
+
+func _update_dome_warning(remaining: float) -> void:
+	if remaining > DOME_WARNING_TIME:
+		return
+	var warning := DomeWarning.STEADY
+	if not Settings.reduced_flash and remaining > 0.0:
+		var pulse_time := fposmod(DOME_WARNING_TIME - remaining, DOME_PULSE_PERIOD)
+		if pulse_time < 0.20:
+			warning = DomeWarning.PULSE
+	if warning == _dome_warning:
+		return
+	_dome_warning = warning
+	var bright := warning == DomeWarning.PULSE
+	_dome_rim.material_override = _zone_material(DOME_WARNING_COLOR, 0.96 if bright else 0.64)
+	_dome_shell.material_override = _zone_material(DOME_WARNING_COLOR, 0.29 if bright else 0.13)
 
 func _make_shelter() -> void:
 	var area := Area3D.new()
@@ -283,6 +320,9 @@ func _build_zone(announce: bool) -> void:
 		dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		dome.scale = Vector3(data.effect_radius, 2.4 if id == "umbrella" else data.effect_radius, data.effect_radius)
 		add_child(dome)
+		if id == "shield_dome":
+			_dome_rim = rim
+			_dome_shell = dome
 	if not OS.has_feature("web") and not Net.dedicated and id in ["shield_dome", "flare_launcher"]:
 		_light = OmniLight3D.new()
 		_light.light_color = color
@@ -459,6 +499,7 @@ func explode() -> void:
 
 func finish(at: Vector3, blast: bool) -> void:
 	hide()
+	set_process(false)
 	for group: String in ["active_flares", "dry_weapon_zones", "repair_weapon_zones", "enemy_lures", "sandbag_walls", "lightning_rods"]:
 		if is_in_group(group):
 			remove_from_group(group)

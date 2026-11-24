@@ -43,7 +43,7 @@ func _ready() -> void:
 	_ticker.offset_top = -40
 	_ticker.offset_bottom = -6
 	_ticker.alignment = BoxContainer.ALIGNMENT_END
-	_ticker.add_theme_constant_override("separation", -4)
+	_ticker.add_theme_constant_override("separation", 2)
 	_ticker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(_ticker)
 	Juice.popup_requested.connect(_on_popup)
@@ -160,10 +160,9 @@ func _build_card() -> void:
 func _on_phase(phase: int, wave: int) -> void:
 	if phase != WeatherManager.Phase.DRIZZLE:
 		return
-	var subtitle := "ACID STORM" if wave == WeatherManager.FINAL_WAVE and not GameManager.endless else ""
-	var modifier := WeatherManager.wave_modifier()
-	if not modifier.is_empty():
-		subtitle = modifier.replace("_", " ").to_upper()
+	var subtitle := WeatherManager.wave_modifier().replace("_", " ").to_upper()
+	if wave == WeatherManager.FINAL_WAVE and not GameManager.endless:
+		subtitle = "ACID STORM" if subtitle.is_empty() else "ACID STORM / " + subtitle
 	_card.text = "ENDLESS %d" % (wave - WeatherManager.FINAL_WAVE) if GameManager.endless else "WAVE %d" % wave
 	_card_sub.text = subtitle
 	if _card_tween and _card_tween.is_valid():
@@ -198,9 +197,8 @@ func _on_combat_hit(killed: bool, critical: bool) -> void:
 func _on_popup(text: String, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	BroadcastUI.hud_text(label, BroadcastUI.T_BODY - 2, color)
+	BroadcastUI.hud_text(label, roundi((BroadcastUI.T_BODY - 2) * Settings.hud_scale), color)
 	_ticker.add_child(label)
 	while _ticker.get_child_count() > 2:
 		_ticker.get_child(0).queue_free()
