@@ -18,7 +18,7 @@ var _arms: Array[Node3D] = []
 var _forearms: Array[Node3D] = []
 var _legs: Array[Node3D] = []
 var _shins: Array[Node3D] = []
-var _gun: Node3D
+var weapon_mount := Node3D.new()
 var _clock := 0.0
 var _down_blend := 0.0
 var _speed_smooth := 0.0
@@ -30,6 +30,8 @@ func _ready() -> void:
 	if player and player.get("suit_color") != null:
 		suit_color = player.suit_color
 		skin = int(player.get("skin"))
+	weapon_mount.name = "WeaponMount"
+	add_child(weapon_mount)
 	_build()
 	_clock = randf() * TAU
 
@@ -101,11 +103,6 @@ func _build() -> void:
 		3: _dress_biotech(suit, trim, rubber)
 		4: _dress_ion_rig(suit, trim, rubber)
 		_: _dress_standard(suit, trim, rubber)
-	# Carried rifle, held across the body in the right hand.
-	_gun = GunModels.build("rifle")
-	_gun.scale = Vector3.ONE * 1.25
-	_gun.position = Vector3(0.12, 0.2, -0.32)
-	_torso.add_child(_gun)
 	# Only the local owner's own body sits on Layer 2 (culled by the local
 	# first-person camera). Remote players and lobby previews sit on Layer 1
 	# so every teammate is visible.
@@ -279,15 +276,12 @@ func _process(delta: float) -> void:
 		_arms[1].rotation = Vector3(0.9 - sin(_clock) * 0.25, 0, -0.25)
 		_forearms[0].rotation.x = 1.2
 		_forearms[1].rotation.x = 1.1
-		_gun.rotation = Vector3(0.5, 0.9, 0.2)
 	else:
 		# Shouldered: both arms forward toward the gun.
 		_arms[0].rotation = Vector3(1.25 + aim_lift, 0.15, 0.25)
 		_arms[1].rotation = Vector3(1.35 + aim_lift, -0.3, -0.35)
 		_forearms[0].rotation.x = 0.55
 		_forearms[1].rotation.x = 0.25
-		_gun.rotation = Vector3(aim_lift * 0.9, 0.0, 0.0)
-	_gun.visible = state == "ok"
 	_set_turned(state == "turned")
 	if state == "turned":
 		# Zombie lurch: arms out, head lolled, torso hunched.
@@ -303,6 +297,11 @@ func _process(delta: float) -> void:
 		var crawl := sin(Time.get_ticks_msec() * 0.003)
 		_arms[1].rotation = _arms[1].rotation.lerp(Vector3(2.6 + crawl * 0.3, 0, -0.2), _down_blend)
 		_legs[0].rotation.x = lerpf(_legs[0].rotation.x, 0.3 + crawl * 0.2, _down_blend)
+	# Sample the glove after animating the body. The mount survives suit rebuilds.
+	weapon_mount.global_position = _forearms[1].to_global(Vector3(0, -0.29, 0))
+	var aim := Vector3(0.3, 0.6, 0.2) if sprinting else Vector3(aim_lift * 0.9, 0, 0)
+	weapon_mount.global_basis = _torso.global_basis * Basis.from_euler(aim)
+	weapon_mount.visible = state == "ok"
 
 
 var _turned_shown := false

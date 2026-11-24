@@ -27,6 +27,7 @@ const PROFILES := {
 	"suit_patch": ["press", "Patch", -0.035],
 }
 const G := preload("res://weapons/gun_models.gd")
+const RIGHT_GRIP := Vector3(0.026, -0.045, 0.033)
 var support: Node3D
 var part: Node3D
 var rest := Transform3D.IDENTITY
@@ -47,7 +48,7 @@ func bind(model: Node3D, id: String) -> void:
 	for side in [-1, 1]:
 		var hand := Node3D.new()
 		model.add_child(hand)
-		hand.position = Vector3(side * 0.026, -0.045, row[2] if side < 0 else 0.033)
+		hand.position = Vector3(-RIGHT_GRIP.x, RIGHT_GRIP.y, row[2]) if side < 0 else RIGHT_GRIP
 		if side < 0:
 			support = hand
 			grip = hand.position

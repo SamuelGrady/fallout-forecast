@@ -191,16 +191,17 @@ func _process(delta: float) -> void:
 				_start_reload_host()
 	if not player.is_multiplayer_authority() or Net.dedicated:
 		if _remote_view:
-			_remote_view.visible = player.state == "ok"
 			var pulse := _gesture_weight()
 			_remote_equip = move_toward(_remote_equip, 0.0, delta * 4)
-			_remote_view.position.y = 1.12 - 0.18 * _remote_equip
 			var style: String = _pose.PROFILES[equipped_id][0]
 			_remote_view.rotation_degrees = _pose.gesture_angles(style) * pulse
 			_remote_reload_left = maxf(0.0, _remote_reload_left - delta)
 			var left := _reload_left if Net.is_host() else _remote_reload_left
 			var total := _reload_total if Net.is_host() else _remote_reload_total
-			_remote_view.rotation_degrees.z -= 38 * sin(PI * left / total)
+			if left > 0.0 and total > 0.0:
+				_remote_view.rotation_degrees.z -= 38 * sin(PI * clampf(left / total, 0.0, 1.0))
+			_remote_view.rotation_degrees.x -= 24 * _remote_equip
+			_remote_view.position = -(_remote_view.basis * _pose.RIGHT_GRIP)
 		return
 	_fire_buffer = maxf(0.0, _fire_buffer - delta)
 	_raise_left = SPRINT_RAISE if player.is_sprinting else maxf(0.0, _raise_left - delta)
@@ -1107,11 +1108,23 @@ func _apply_equip(id: String, tier: int) -> void:
 				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_sight_point = _model.get_meta("sight", Vector3.INF)
 		else:
-			_remote_equip = 1.0
-			_remote_view = ItemCatalog.model(id, true)
-			player.add_child.call_deferred(_remote_view)
-			_remote_view.position = Vector3(0.34, 1.12, -0.47)
+			if player.is_node_ready():
+				_mount_remote_weapon(id)
+			else:
+				player.ready.connect(_mount_remote_weapon.bind(id), CONNECT_ONE_SHOT)
 	weapon_changed.emit(definition.weapon if definition else null)
+
+func _mount_remote_weapon(id: String) -> void:
+	if id != equipped_id or _remote_view != null:
+		return
+	var mount := player.get_node_or_null("BodyModel/WeaponMount") as Node3D
+	if mount == null:
+		return
+	_remote_equip = 1.0
+	_remote_view = ItemCatalog.model(id)
+	_remote_view.scale *= 1.6
+	_remote_view.position = -(_remote_view.basis * _pose.RIGHT_GRIP)
+	mount.add_child(_remote_view)
 
 func _publish() -> void:
 	var data := selected_weapon()

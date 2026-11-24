@@ -445,6 +445,8 @@
     const installedMode = matchMedia("(display-mode: standalone)");
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isMobile = () => isIOS || /Android|Mobile/.test(navigator.userAgent) || coarse.matches;
+    const download = document.getElementById("download");
     const hasManifest = Boolean(document.querySelector('link[rel="manifest"]'));
     let installPrompt;
     let installDismissed = false;
@@ -471,6 +473,7 @@
       if (!width || !height) return;
       const landscape = width >= height;
       const touch = touchMode();
+      download.hidden = isMobile();
       document.body.classList.toggle("touch-mode", touch);
       document.body.classList.toggle("in-run", inRun);
       rotate.hidden = !touch || landscape;
@@ -558,9 +561,8 @@
     (function () {
       const agent = navigator.userAgent.toLowerCase();
       const base = "https://github.com/kickofline/fallout-forecast/releases/download/nightly/";
-      const link = document.getElementById("download");
-      if (agent.includes("windows")) link.href = base + "FalloutForecast-windows-x86_64.zip";
-      else if (agent.includes("linux") && !agent.includes("android")) link.href = base + "FalloutForecast-linux-x86_64.tar.gz";
+      if (agent.includes("windows")) download.href = base + "FalloutForecast-windows-x86_64.zip";
+      else if (agent.includes("linux") && !agent.includes("android")) download.href = base + "FalloutForecast-linux-x86_64.tar.gz";
     })();
     let gameRunning = false;
 
