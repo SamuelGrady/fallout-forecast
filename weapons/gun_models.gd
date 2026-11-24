@@ -77,7 +77,7 @@ static func _rifle(root: Node3D) -> void:
 	_box(root, Vector3(0.022, 0.03, 0.02), Vector3(0, 0.006, -0.305), GUNMETAL, 0.6)
 	_cylinder(root, 0.012, 0.04, Vector3(0, 0.0, -0.43), POLYMER, 0.5)
 	# Magazine, grip, trigger guard.
-	_box(root, Vector3(0.03, 0.095, 0.045), Vector3(0, -0.1, -0.035), POLYMER, 0.0, Vector3(12, 0, 0))
+	_box(root, Vector3(0.03, 0.095, 0.045), Vector3(0, -0.1, -0.035), POLYMER, 0.0, Vector3(12, 0, 0)).name = "Magazine"
 	_box(root, Vector3(0.03, 0.07, 0.034), Vector3(0, -0.085, 0.058), POLYMER, 0.0, Vector3(-22, 0, 0))
 	_box(root, Vector3(0.008, 0.006, 0.05), Vector3(0, -0.068, 0.025), GUNMETAL, 0.6)
 	# Stock tube and adjustable stock.
@@ -224,7 +224,7 @@ static func _revolver(root: Node3D, service := false) -> void:
 	var cylinder := Color("#596875") if service else Color("#b4643c")
 	_cylinder(root, 0.011, 0.11, Vector3(0, 0.02, -0.08), frame, 0.8)
 	_box(root, Vector3(0.012, 0.01, 0.1), Vector3(0, 0.033, -0.075), frame, 0.8)  # top strap
-	_cylinder(root, 0.024, 0.045, Vector3(0, 0.012, -0.01), cylinder, 0.8)
+	_cylinder(root, 0.024, 0.045, Vector3(0, 0.012, -0.01), cylinder, 0.8).name = "Cylinder"
 	_box(root, Vector3(0.028, 0.045, 0.06), Vector3(0, 0.0, 0.03), frame, 0.8)
 	_box(root, Vector3(0.03, 0.08, 0.036), Vector3(0, -0.05, 0.06), Color("#3a2a1c"), 0.0, Vector3(-18, 0, 0))
 	_dot(root, Vector3(0, 0.044, -0.12), Color(1.0, 0.86, 0.45), 0.0025)
@@ -238,7 +238,7 @@ static func _nailgun(root: Node3D) -> void:
 	_box(root, Vector3(0.03, 0.05, 0.05), Vector3(0, -0.005, -0.17), Color("#22262b"))
 	_box(root, Vector3(0.012, 0.012, 0.06), Vector3(0, -0.01, -0.22), STEEL, 0.7)
 	_box(root, Vector3(0.034, 0.09, 0.04), Vector3(0, -0.065, 0.05), Color("#22262b"), 0.0, Vector3(-14, 0, 0))
-	_box(root, Vector3(0.02, 0.1, 0.03), Vector3(0, -0.06, -0.12), STEEL, 0.6)  # nail strip
+	_box(root, Vector3(0.02, 0.1, 0.03), Vector3(0, -0.06, -0.12), STEEL, 0.6).name = "Magazine"
 	var tank := _cylinder(root, 0.022, 0.08, Vector3(0.04, 0.03, 0.02), TOXIC_GREEN, 0.0)
 	tank.material_override = _glow(TOXIC_GREEN, 0.8)
 	root.set_meta("muzzle", Vector3(0, -0.01, -0.25))

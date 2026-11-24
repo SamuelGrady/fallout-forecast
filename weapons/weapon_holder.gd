@@ -69,6 +69,13 @@ var _raise_left := 0.0
 var _sight_point := Vector3.INF
 var _shot_counter := 0
 var _spread_at := 0.0
+var _pose := preload("res://weapons/item_pose.gd").new()
+var _gesture_left := 0.0
+var _gesture_duration := 0.3
+var _remote_equip := 0.0
+var _public_reloading := false
+var _remote_reload_left := 0.0
+var _remote_reload_total := 1.0
 var _remote_view: Node3D
 
 func _ready() -> void:
@@ -167,6 +174,7 @@ func can_act() -> bool:
 
 func _process(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
+	_gesture_left = maxf(0.0, _gesture_left - delta)
 	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
 	_jam_left = maxf(0.0, _jam_left - delta)
 	_pending_action = maxf(0.0, _pending_action - delta)
@@ -188,6 +196,15 @@ func _process(delta: float) -> void:
 	if not player.is_multiplayer_authority() or Net.dedicated:
 		if _remote_view:
 			_remote_view.visible = player.state == "ok"
+			var pulse := _gesture_weight()
+			_remote_equip = move_toward(_remote_equip, 0.0, delta * 4)
+			_remote_view.position.y = 1.12 - 0.18 * _remote_equip
+			var style: String = _pose.PROFILES[equipped_id][0]
+			_remote_view.rotation_degrees = _pose.gesture_angles(style) * pulse
+			_remote_reload_left = maxf(0.0, _remote_reload_left - delta)
+			var left := _reload_left if Net.is_host() else _remote_reload_left
+			var total := _reload_total if Net.is_host() else _remote_reload_total
+			_remote_view.rotation_degrees.z -= 38 * sin(PI * left / total)
 		return
 	_fire_buffer = maxf(0.0, _fire_buffer - delta)
 	_raise_left = SPRINT_RAISE if player.is_sprinting else maxf(0.0, _raise_left - delta)
@@ -335,6 +352,7 @@ func fire() -> void:
 			and (_reload_left <= 0.0 or data.shell_reload)
 		var ads := _aim > 0.5
 		if predict:
+			_start_gesture(selected().id)
 			WeaponCombat.play_fx(loot, selected().id, _muzzle_position(), [], true)
 			_local_shot_motion(selected().id, data, ads)
 		_request_shot.rpc_id(1, loot.run_id, selected_serial(), camera.global_position, dir, ads, predict)
@@ -395,6 +413,7 @@ func _play_throw(id: String, origin: Vector3, dir: Vector3) -> void:
 	if Net.dedicated or not ItemCatalog.is_pouch(id):
 		return
 	var local := player.is_multiplayer_authority()
+	_start_gesture(id)
 	WeaponCombat.play_fx(loot, id, origin + dir * 0.45, [], local)
 	if local:
 		_kick = maxf(_kick, 0.45)
@@ -739,6 +758,8 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 		muzzle_model = _model if local else _remote_view
 		if is_instance_valid(muzzle_model) and muzzle_model.is_inside_tree():
 			muzzle = muzzle_model.to_global(ItemModels.muzzle(id))
+	if not (local and predicted):
+		_start_gesture(id)
 	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
 	if not local:
 		return
@@ -926,7 +947,9 @@ func send_state(update_public := true) -> void:
 	revision += 1
 	if update_public:
 		_refresh_equip()
-		Net.rpc_to_run(_equip_state, [loot.run_id, revision, equipped_id, equipped_tier])
+	if update_public or _reload_left > 0 or _public_reloading:
+		_public_reloading = _reload_left > 0
+		Net.rpc_to_run(_equip_state, [loot.run_id, revision, equipped_id, equipped_tier, _reload_left, _reload_total])
 	var item := selected()
 	_jam_left = maxf(0.0, item.jam_until - loot.clock) if item else 0.0
 	var peer := player.get_multiplayer_authority()
@@ -940,7 +963,7 @@ func sync_private_to(peer: int) -> void:
 	_private_state.rpc_id(peer, loot.run_id, revision, rows, reserves, current, active_pouch, scrap, grenades, domes, _reload_left, _reload_total, _jam_left, _cooldown)
 
 func sync_equip_to(peer: int) -> void:
-	_equip_state.rpc_id(peer, loot.run_id, revision, equipped_id, equipped_tier)
+	_equip_state.rpc_id(peer, loot.run_id, revision, equipped_id, equipped_tier, _reload_left, _reload_total)
 
 @rpc("any_peer", "call_remote", "reliable")
 func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: int, pouch: String, new_scrap: int, frags: int, shield_domes: int, reload_left: float, reload_total: float, jam_left: float, cooldown: float) -> void:
@@ -970,10 +993,12 @@ func _private_state(run: int, rev: int, rows: Array, stash: Dictionary, slot: in
 		_reload_sound(selected_weapon())
 
 @rpc("any_peer", "call_remote", "reliable")
-func _equip_state(run: int, rev: int, id: String, tier: int) -> void:
+func _equip_state(run: int, rev: int, id: String, tier: int, left: float, total: float) -> void:
 	if multiplayer.get_remote_sender_id() != 1 or run != loot.run_id or rev <= _public_revision:
 		return
 	_public_revision = rev
+	_remote_reload_left = left
+	_remote_reload_total = total
 	if not player.is_multiplayer_authority():
 		_apply_equip(id, tier)
 
@@ -999,6 +1024,7 @@ func _refresh_equip() -> void:
 
 func _apply_equip(id: String, tier: int) -> void:
 	var changed := equipped_id != id or equipped_tier != tier
+	var previous := equipped_id
 	equipped_id = id
 	equipped_tier = tier
 	var definition := ItemCatalog.definition(id)
@@ -1008,8 +1034,18 @@ func _apply_equip(id: String, tier: int) -> void:
 	if not changed or Net.dedicated:
 		return
 	if _model:
-		_model.hide()
-		_model.queue_free()
+		if _gesture_left > 0 and (ItemCatalog.STACKS.has(previous) or previous == "flare_launcher"):
+			var outgoing := _model
+			if previous == "flare_launcher":
+				_pose.show_rounds(0)
+			var retire := outgoing.create_tween()
+			retire.tween_property(outgoing, "rotation:x", outgoing.rotation.x + 0.30, 0.07)
+			retire.tween_property(outgoing, "position:y", outgoing.position.y - 0.22, 0.14)
+			retire.tween_callback(outgoing.queue_free)
+		else:
+			_model.hide()
+			_model.queue_free()
+		_gesture_left = 0.0
 		_model = null
 	if _remote_view:
 		_remote_view.hide()
@@ -1020,6 +1056,7 @@ func _apply_equip(id: String, tier: int) -> void:
 		if player.is_multiplayer_authority():
 			_model = ItemCatalog.model(id)
 			add_child(_model)
+			_pose.bind(_model, id)
 			var spear := _model.get_node_or_null("Harpoon") as Node3D
 			if spear:
 				spear.set_meta("loaded_z", spear.position.z)
@@ -1030,6 +1067,7 @@ func _apply_equip(id: String, tier: int) -> void:
 				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_sight_point = _model.get_meta("sight", Vector3.INF)
 		else:
+			_remote_equip = 1.0
 			_remote_view = ItemCatalog.model(id, true)
 			player.add_child.call_deferred(_remote_view)
 			_remote_view.position = Vector3(0.34, 1.12, -0.47)
@@ -1158,7 +1196,7 @@ func _animate(delta: float) -> void:
 		var since := 1.0 - clampf(_cooldown / maxf(data.fire_interval, 0.01), 0.0, 1.0)
 		pump.position.z = 0.055 * sin(clampf((since - 0.15) / 0.6, 0.0, 1.0) * PI)
 	var barrel := _model.get_node_or_null("Barrel") as Node3D
-	if barrel:
+	if barrel and data.kind == WeaponData.Kind.FLARE:
 		# Break action: the barrel tips open for the reload.
 		barrel.rotation.x = -deg_to_rad(42.0) * clampf(reload_dip / 1.25, 0.0, 1.0)
 	if data.mechanic == "reel":
@@ -1174,7 +1212,19 @@ func _animate(delta: float) -> void:
 			spool.rotate_x(31.0 * delta)
 		elif _reload_left > 0.0:
 			spool.rotate_x(8.0 * delta)
+	if equipped_id == "flare_launcher":
+		_pose.show_rounds(active_count())
+	_model.rotation_degrees += _pose.equip_angles() * _equip_left
+	_pose.pose(_model, reload_progress, _gesture_weight(), charge_progress(), delta)
 
+
+func _gesture_weight() -> float:
+	return sin(PI * _gesture_left / _gesture_duration)
+
+func _start_gesture(id: String) -> void:
+	if equipped_id == id:
+		_gesture_duration = clampf(ItemCatalog.definition(id).weapon.fire_interval, 0.12, 0.5)
+		_gesture_left = _gesture_duration
 
 func _build_preview() -> void:
 	_arc_material = StandardMaterial3D.new()
