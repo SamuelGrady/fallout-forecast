@@ -138,7 +138,10 @@ func host(port := PORT, as_player := true, default_map := Maps.DEFAULT_ID) -> Er
 	var err := peer.create_server(port)
 	if err != OK:
 		return err
-	multiplayer.multiplayer_peer = peer
+	var active_peer: MultiplayerPeer = peer
+	if dedicated and ResourceLoader.exists("res://game/open_protocol/full_peer.gd"):
+		active_peer = load("res://game/open_protocol/full_peer.gd").new(peer)
+	multiplayer.multiplayer_peer = active_peer
 	_host_port = port
 	mode = Mode.HOST
 	lobby_map_id = Maps.fallback(default_map)
@@ -218,6 +221,8 @@ func leave() -> void:
 	# Back to Godot's default offline peer, not null: with no peer at all,
 	# every is_multiplayer_authority() and rpc() in solo play errors.
 	if not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		if multiplayer.multiplayer_peer.has_method("is_peer_open"):
+			multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	roster_changed.emit()
 
@@ -487,6 +492,8 @@ func _is_peer_open(peer_id: int) -> bool:
 		return false
 	if peer_id not in multiplayer.get_peers():
 		return false
+	if multiplayer.multiplayer_peer.has_method("is_peer_open"):
+		return multiplayer.multiplayer_peer.is_peer_open(peer_id)
 	if multiplayer.multiplayer_peer is WebSocketMultiplayerPeer:
 		var ws: WebSocketPeer = multiplayer.multiplayer_peer.get_peer(peer_id)
 		return ws != null and ws.get_ready_state() == WebSocketPeer.STATE_OPEN
