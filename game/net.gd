@@ -75,6 +75,7 @@ func _ready() -> void:
 	# Clients only communicate with the server. In particular, it shouldn't
 	# relay peer-disconnect packets to another socket that's already closing.
 	(multiplayer as SceneMultiplayer).server_relay = false
+	multiplayer.peer_connected.connect(_guard_thin_identity)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected)
 	multiplayer.connection_failed.connect(_on_connection_failed)
@@ -591,6 +592,12 @@ func rpc_to_run(method: Callable, args: Array) -> void:
 	for peer in run_peers.keys():
 		if _is_peer_open(peer):
 			Callable.create(method, "rpc_id").callv([peer] + args)
+
+
+func _guard_thin_identity(peer_id: int) -> void:
+	# A native transport must never act with a server-owned roster identity.
+	if is_thin_peer(peer_id):
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
 
 
 func _on_peer_disconnected(peer_id: int) -> void:

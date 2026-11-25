@@ -14,7 +14,7 @@ const NO_ACK := 4294967295
 
 
 static func input(data: PackedByteArray) -> Dictionary:
-	if data.size() != 17 or data[0] != INPUT:
+	if data.size() != 17 or data[0] != INPUT or data.decode_u32(1) == NO_ACK:
 		return {}
 	return {"t": "in", "seq": data.decode_u32(1),
 		"mv": [data.decode_s16(5) / 32767.0, data.decode_s16(7) / 32767.0],

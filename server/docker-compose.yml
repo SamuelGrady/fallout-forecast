@@ -1,5 +1,5 @@
-# Fallout Forecast dedicated server (WebSocket on TCP 7777). See server/README.md.
-# Place a TLS-terminating reverse proxy in front of port 7777 when serving wss://.
+# Fallout Forecast dedicated server. See server/README.md.
+# WebSockets use ports 7777 and 7780. Open Protocol raw TCP uses 7781.
 services:
   fallout-server:
     build:
@@ -10,8 +10,12 @@ services:
     restart: unless-stopped
     mem_limit: 1g
     cpus: 1.5
+    environment:
+      FALLOUT_THIN_JOIN_CODE: ${FALLOUT_THIN_JOIN_CODE:-}
     ports:
       - "7777:7777"
+      - "7780:7780"
+      - "7781:7781"
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}

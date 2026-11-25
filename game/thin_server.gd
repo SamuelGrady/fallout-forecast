@@ -131,7 +131,8 @@ func _receive(session: Session, packet: Dictionary) -> void:
 				_lobby_action(session.input.id, message)
 		"in":
 			if session.state == "run":
-				session.input.enqueue(message)
+				if session.wire.encoding != "bin" or ThinClientInput.integer(message.get("seq"), 0, Binary.NO_ACK - 1, -1) >= 0:
+					session.input.enqueue(message)
 		"choice":
 			if session.state == "run":
 				_choose(session.input.id, message)
@@ -295,7 +296,8 @@ func _snapshot(session: Session, now: int) -> void:
 	if not player or not loot:
 		return
 	var interval := 1000.0 / session.rate
-	session.next_snap = maxi(now + 1, session.next_snap + roundi(interval))
+	session.next_snap = now + roundi(interval) if session.next_snap == 0 else (
+		maxi(now + 1, session.next_snap + roundi(interval)))
 	session.tick += 1
 	var frame := session.feed.snapshot(player, loot, session.tick, session.input.ack, now)
 	if session.wire.encoding == "bin":

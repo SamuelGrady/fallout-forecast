@@ -34,7 +34,7 @@ RUN godot --headless --path /game --import >/tmp/import.log 2>&1 || true; \
     test -f /game/.godot/global_script_class_cache.cfg \
  || (tail -40 /tmp/import.log; exit 1)
 
-EXPOSE 7777/tcp
+EXPOSE 7777/tcp 7780/tcp 7781/tcp
 # The server rewrites this file every 15 s; a stale file means the main loop hung.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD ["/usr/local/bin/fallout-healthcheck"]
