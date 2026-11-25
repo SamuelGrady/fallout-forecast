@@ -1,14 +1,14 @@
 extends SceneTree
-## Generates docs/open-protocol-schema.json by scanning every GDScript file in
+## Generates docs/open-protocol/open-protocol-schema.json by scanning every GDScript file in
 ## the repository for @rpc methods and inspecting each script's runtime RPC
 ## config, argument names/types/defaults, node path pattern, and direction.
 ##
 ## Run from the repository root:
 ##   godot --headless --path . --audio-driver Dummy -s tools/open_protocol/gen_schema.gd
 ##
-## Re-run and commit docs/open-protocol-schema.json on every Net.PROTOCOL bump.
+## Re-run and commit docs/open-protocol/open-protocol-schema.json on every Net.PROTOCOL bump.
 
-const OUTPUT_PATH := "res://docs/open-protocol-schema.json"
+const OUTPUT_PATH := "res://docs/open-protocol/open-protocol-schema.json"
 
 const NODE_METADATA := {
 	"res://game/net.gd": {
@@ -84,10 +84,10 @@ const NODE_METADATA := {
 		"notes": "Child of each player's camera. Authoritative 5-slot inventory, belt pouches, shot/throw/reload/swap/drop requests and FX relays.",
 	},
 	"res://props/decon_shower.gd": {
-		"node": "Main/Level/<decon_marker>/Interact",
+		"node": "Main/Level/DeconShowers/<decon_marker>/Interact",
 		"authority": "host",
 		"phase": "run",
-		"notes": "Attached under each node in group 'decon_shower' by main.gd. Spray VFX broadcast when a player repairs their suit.",
+		"notes": "Attached under each node in group 'decon_shower' by main.gd (exact paths per map in docs/open-protocol/level-markers.json). Spray VFX broadcast when a player repairs their suit.",
 	},
 }
 
