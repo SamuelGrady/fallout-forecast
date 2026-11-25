@@ -162,7 +162,10 @@ func _handle_client_packet(client: FullClient, pkt: Dictionary, tree: SceneTree)
 		var msg: Dictionary = parsed
 		match msg["t"]:
 			"ping":
-				client.conn.send_message({"t": "pong", "ms": msg.get("ms")})
+				var ms: Variant = msg.get("ms")
+				if ms is float and is_finite(ms) and floor(ms) == ms:
+					ms = int(ms)
+				client.conn.send_message({"t": "pong", "ms": ms})
 			"leave":
 				_disconnect_full_peer(client.peer_id, "left")
 			"rpc":
