@@ -124,6 +124,24 @@ var interact_prompt := ""
 var interact_progress := 0.0
 ## The radial ping wheel uses mouse motion and the right stick while open.
 var look_locked := false
+## Present only on the server's authoritative instance for a thin client.
+var thin_input: ThinClientInput
+
+
+func peer_id() -> int:
+	return thin_input.id if thin_input else get_multiplayer_authority()
+
+
+func action_pressed(action: StringName) -> bool:
+	return thin_input.pressed(action) if thin_input else Input.is_action_pressed(action)
+
+
+func action_just_pressed(action: StringName) -> bool:
+	return thin_input.just_pressed(action) if thin_input else Input.is_action_just_pressed(action)
+
+
+func action_just_released(action: StringName) -> bool:
+	return thin_input.just_released(action) if thin_input else Input.is_action_just_released(action)
 
 var _height := 1.8
 var _coyote_timer := 0.0
@@ -168,13 +186,13 @@ func _ready() -> void:
 
 	_build_children()
 
-	if is_multiplayer_authority():
+	if is_multiplayer_authority() and not thin_input:
 		add_to_group("local_player")
 		camera.current = true
 		if OS.has_feature("web"):
 			# Fog hides everything past ~80 m; culling far geometry cuts WebGL draw calls.
 			camera.far = 95.0
-		elif not Net.car_bridge:
+		else:
 			TouchInput.capture_pointer()
 	else:
 		camera.current = false
@@ -234,7 +252,7 @@ func _build_children() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Net.car_bridge or not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
+	if thin_input or not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
 		return
 	# The loadout screen owns the cursor: no look, no click-to-recapture.
 	if InventoryMenu.is_open():
@@ -280,6 +298,8 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
+	if thin_input:
+		thin_input.advance()
 	if GameManager.awaiting_tape_choice or not Net.can_send_run_rpc():
 		return
 	if state == "out":
@@ -287,10 +307,17 @@ func _physics_process(delta: float) -> void:
 		interact_prompt = ""
 		return
 
-	var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
-	if pad_look != Vector2.ZERO and not InventoryMenu.is_open():
-		_look(pad_look * pad_look_speed * delta)
-	_apply_touch_aim_magnetism(delta)
+	if thin_input:
+		if thin_input.has_look and not look_locked:
+			rotation.y = thin_input.look.x
+			var limit := deg_to_rad(max_pitch_degrees)
+			_pitch = clampf(thin_input.look.y, -limit, limit)
+			head.rotation.x = _pitch
+	else:
+		var pad_look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+		if pad_look != Vector2.ZERO and not InventoryMenu.is_open():
+			_look(pad_look * pad_look_speed * delta)
+		_apply_touch_aim_magnetism(delta)
 
 	if is_on_floor():
 		_coyote_timer = coyote_time
@@ -299,13 +326,13 @@ func _physics_process(delta: float) -> void:
 		_coyote_timer -= delta
 
 	var loadout_input := InventoryMenu.blocks_gameplay_actions()
-	if not loadout_input and Input.is_action_just_pressed("jump"):
+	if not loadout_input and action_just_pressed("jump"):
 		_jump_buffer_timer = jump_buffer
 	else:
 		_jump_buffer_timer -= delta
 
 	# Crouch: hold to crouch, stay down while something is overhead. Downed = flat.
-	if not loadout_input and Input.is_action_pressed("crouch"):
+	if not loadout_input and action_pressed("crouch"):
 		is_crouching = true
 	elif is_crouching and _can_stand():
 		is_crouching = false
@@ -321,12 +348,11 @@ func _physics_process(delta: float) -> void:
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 
-	var deadzone := 0.0 if Net.car_bridge else -1.0
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back", deadzone)
-	input = (input + TouchInput.movement).limit_length()
+	var input := thin_input.move if thin_input else (
+		Input.get_vector("move_left", "move_right", "move_forward", "move_back") + TouchInput.movement).limit_length()
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
 	sprint_lock = maxf(0.0, sprint_lock - delta)
-	is_sprinting = Input.is_action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" \
+	is_sprinting = action_pressed("sprint") and not is_crouching and input.y < -0.1 and state == "ok" \
 			and not aiming and sprint_lock <= 0.0
 	var speed := walk_speed
 	match state:
@@ -381,17 +407,19 @@ func _physics_process(delta: float) -> void:
 	_update_shelter()
 
 	_handle_interact(delta, loadout_input)
-	if not loadout_input and Input.is_action_just_pressed("ready_up") and state == "ok" and not GameManager.is_voting():
-		GameManager.ready_up()
+	if thin_input and action_just_pressed("ping") and not GameManager.is_voting():
+		Net.thin_server.ping(self)
+	if not loadout_input and action_just_pressed("ready_up") and state == "ok" and not GameManager.is_voting():
+		GameManager.ready_up(thin_input.id if thin_input else 0)
 	if state == "turned":
 		_melee_left -= delta
-		if Input.is_action_just_pressed("fire") and _melee_left <= 0.0:
+		if action_just_pressed("fire") and _melee_left <= 0.0:
 			_melee_left = melee_cooldown
 			if Net.is_host():
 				_melee()
 			else:
 				_request_melee.rpc_id(1)
-	if not loadout_input and has_tarp and state == "ok" and not GameManager.is_voting() and Input.is_action_just_pressed("use_item"):
+	if not loadout_input and has_tarp and state == "ok" and not GameManager.is_voting() and action_just_pressed("use_item"):
 		_set_tarp(not tarp_raised)
 
 
@@ -675,6 +703,8 @@ func _bleed_out() -> void:
 func _set_state(new_state: String) -> void:
 	if new_state != state and new_state in ["downed", "turned", "out"]:
 		Perf.mark("player state " + new_state)
+		if Net.thin_server and new_state == "downed":
+			Net.thin_server.record_down(peer_id())
 	state = new_state
 	state_changed.emit(state)
 	match state:
@@ -775,7 +805,7 @@ func _grant_tarp() -> void:
 
 # ------------------------------------------------------------------ interact
 func _handle_interact(delta: float, loadout_input: bool) -> void:
-	var pressed := not loadout_input and Input.is_action_pressed("interact")
+	var pressed := not loadout_input and action_pressed("interact")
 	var best: Interactable = null
 	var best_score := INF
 	if state != "turned" and not GameManager.is_voting():
@@ -884,15 +914,6 @@ func get_move_state() -> String:
 	if Vector2(velocity.x, velocity.z).length() < 0.1:
 		return "idle"
 	return "sprint" if is_sprinting else "walk"
-
-
-func apply_bridge_look(yaw: float, pitch: float) -> void:
-	if look_locked or state == "out":
-		return
-	rotation.y = yaw
-	var limit := deg_to_rad(max_pitch_degrees)
-	_pitch = clampf(pitch, -limit, limit)
-	head.rotation.x = _pitch
 
 
 func _look(amount: Vector2) -> void:
@@ -1098,8 +1119,6 @@ func _smooth_remote(delta: float) -> void:
 func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool, max_hp := 100.0, charge := 0.0, invuln := false) -> void:
 	if Net.is_host() or multiplayer.get_remote_sender_id() != 1:
 		return
-	if Net.car_bridge and is_multiplayer_authority() and hp < health:
-		Net.car_bridge.record_hurt(health - hp)
 	max_health = max_hp
 	health = hp
 	suit_integrity = suit
@@ -1210,8 +1229,8 @@ func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_
 ## stack into one number, which is why the enemy's net id comes along: the
 ## stacking has to happen on the shooter's machine, whichever peer that is.
 func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
-	if Net.car_bridge:
-		Net.car_bridge.record_hit(point, amount, critical)
+	if thin_input:
+		Net.thin_server.record_hit(peer_id(), point, amount, critical)
 		return
 	if Net.dedicated or not is_inside_tree():
 		return

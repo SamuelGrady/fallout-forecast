@@ -274,7 +274,7 @@ func _hold_request(run: int, key: String, mode: String, step: String, offer_seri
 func _handle_hold(run: int, key: String, mode: String, step: String, player: Node, offer_serial := 0) -> bool:
 	if not Net.is_host() or run != _run or not is_instance_valid(player):
 		return false
-	var peer := player.get_multiplayer_authority()
+	var peer: int = player.peer_id()
 	if step == "cancel":
 		_holds.erase(peer)
 		return false

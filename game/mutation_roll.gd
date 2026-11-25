@@ -113,8 +113,22 @@ func _request_vote(index: int) -> void:
 	_count_vote(multiplayer.get_remote_sender_id(), clampi(index, 0, cards.size() - 1))
 
 
+func vote_for_peer(peer: int, index: int) -> void:
+	if Net.is_host() and stage == "voting" and index >= 0 and index < cards.size():
+		_count_vote(peer, index)
+
+
+func remove_vote(peer: int) -> void:
+	if _votes.erase(peer) and stage == "voting":
+		_update_votes()
+
+
 func _count_vote(peer_id: int, index: int) -> void:
 	_votes[peer_id] = index
+	_update_votes()
+
+
+func _update_votes() -> void:
 	vote_counts = [0, 0, 0]
 	for p in _votes:
 		vote_counts[int(_votes[p])] += 1

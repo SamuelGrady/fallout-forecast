@@ -47,7 +47,7 @@ func reset_run() -> void:
 
 
 func _flags(player: Node) -> Dictionary:
-	var peer := player.get_multiplayer_authority()
+	var peer: int = player.peer_id()
 	if not _run.has(peer):
 		_run[peer] = {
 			# Joined before the first storm: eligible for the "whole run" feats.
@@ -170,7 +170,7 @@ func on_boss_defeated() -> void:
 	if Net.is_online() and players.size() >= 2:
 		var skins := {}
 		for p in players:
-			var info: Dictionary = Net.roster.get(p.get_multiplayer_authority(), {})
+			var info: Dictionary = Net.roster.get(p.peer_id(), {})
 			skins[int(info.get("skin", 0))] = true
 		if skins.size() == 1:
 			_award_all("uniform_policy")
@@ -266,7 +266,7 @@ func _award_all(id: String) -> void:
 func award(player: Node, id: String, amount := 1) -> void:
 	if not Net.is_host() or not is_instance_valid(player) or not Feats.exists(id):
 		return
-	var peer := player.get_multiplayer_authority()
+	var peer: int = player.peer_id()
 	if Feats.goal(id) == 1:
 		var sent: Dictionary = _sent.get_or_add(peer, {})
 		if sent.has(id):

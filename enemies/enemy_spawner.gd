@@ -729,6 +729,8 @@ func _play_enemy_molt(net_id: int) -> void:
 
 ## Host: one enemy died. Tell clients which one, its drops, and death fragment launch.
 func notify_despawn(enemy: EnemyBase, drops: Array, throw_vec := Vector3.ZERO, critical := false) -> void:
+	if Net.thin_server:
+		Net.thin_server.record_kill(enemy)
 	if Net.is_host() and Net.is_online():
 		Net.rpc_to_run(_despawn_enemy, [enemy.net_id, drops, enemy.global_position, throw_vec, critical])
 
@@ -737,12 +739,6 @@ func notify_despawn(enemy: EnemyBase, drops: Array, throw_vec := Vector3.ZERO, c
 func _despawn_enemy(net_id: int, drops: Array, at: Vector3, throw_vec: Vector3, critical: bool) -> void:
 	var enemy := _find_net(net_id)
 	var pos := enemy.global_position if enemy else at
-	if Net.car_bridge:
-		Net.car_bridge.record_kill(net_id, enemy, pos)
-		if enemy:
-			enemy.remove_from_group("enemies")
-			enemy.queue_free()
-		return
 	EnemyBase.spawn_death_fragments(self, pos, throw_vec, critical)
 	Sound.play_at("enemy_death", pos)
 	if enemy:

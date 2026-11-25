@@ -410,8 +410,8 @@ func _first_play(cue: String) -> void:
 
 
 func play(cue: String, volume_db := -10.0, pitch := 1.0) -> void:
-	if Net.car_bridge:
-		Net.car_bridge.record_sound(cue, null)
+	if Net.thin_server:
+		Net.thin_server.record_sound(cue, null)
 	if Net.dedicated or _headless:
 		return
 	_first_play(cue)
@@ -495,8 +495,8 @@ func _play_stream(stream: AudioStream, volume_db: float, pitch: float, bus: Stri
 
 
 func play_at(cue: String, position: Vector3, volume_db := -6.0, pitch := 1.0) -> void:
-	if Net.car_bridge and volume_db > -65.0:
-		Net.car_bridge.record_sound(cue, position)
+	if Net.thin_server and volume_db > -65.0:
+		Net.thin_server.record_sound(cue, position)
 	if Net.dedicated or _headless or volume_db <= -65.0:
 		return
 	_first_play(cue)

@@ -68,12 +68,6 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		Engine.max_physics_steps_per_frame = 2
 	Sound.start_run()
-	if Net.car_bridge:
-		$HUD.queue_free()
-		_add_ping_system()
-		Net.roster_changed.connect(_sync_players)
-		_finish_loading.call_deferred()
-		return
 	var pause_menu := preload("res://ui/pause_menu.gd").new()
 	add_child(pause_menu)
 	if not Net.dedicated:
@@ -103,7 +97,9 @@ func _ready() -> void:
 		var dev_menu := CanvasLayer.new()
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
 		add_child(dev_menu)
-	var pings := _add_ping_system()
+	var pings := PingSystem.new()
+	pings.name = "Pings"
+	add_child(pings)
 	if not Net.dedicated:
 		var ping_hud := preload("res://ui/ping_hud.gd").new()
 		ping_hud.system = pings
@@ -130,13 +126,6 @@ func _ready() -> void:
 	Net.server_closed.connect(_leave_to_title)
 	GameManager.run_finished.connect(_on_run_finished)
 	_prepare_navigation.call_deferred()
-
-
-func _add_ping_system() -> PingSystem:
-	var pings := PingSystem.new()
-	pings.name = "Pings"
-	add_child(pings)
-	return pings
 
 
 func _prepare_navigation() -> void:
@@ -207,11 +196,7 @@ func _prepare_navigation() -> void:
 		warm.set_script(preload("res://game/warmup.gd"))
 		add_child(warm)
 		await warm.finished
-	await _finish_loading()
-
-
-func _finish_loading() -> void:
-	# Synchronize navigation or, for the bridge, the map's deferred CSG collision.
+	# NavigationServer syncs region changes on a physics tick.
 	if _finishing or not is_inside_tree():
 		return
 	await get_tree().physics_frame
@@ -283,7 +268,10 @@ func _sync_players() -> void:
 		_apply_look(player, color, skin)
 		# Authority before add_child: player.gd._ready() checks it to decide
 		# whether to take the camera and capture the mouse.
-		player.set_multiplayer_authority(peer_id)
+		if Net.thin_server:
+			player.thin_input = Net.thin_server.input_for(peer_id)
+		# The thin slot is a roster identity. Its real authority is the server.
+		player.set_multiplayer_authority(1 if player.thin_input else peer_id)
 		if not spawns.is_empty():
 			var spawn := spawns[i % spawns.size()] as Node3D
 			player.transform = container.global_transform.affine_inverse() * spawn.global_transform

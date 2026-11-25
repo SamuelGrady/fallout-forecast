@@ -44,6 +44,11 @@ func _request_starter(run: int, index: int) -> void:
 	if Net.is_host() and Net.run_peers.has(peer):
 		_grant_starter(run, peer, index)
 
+func choose_thin_starter(peer: int) -> void:
+	if Net.is_host() and run_id > 0 and WeatherManager.running:
+		_grant_starter(run_id, peer, 0)
+
+
 func _grant_starter(run: int, peer: int, index: int) -> void:
 	if run != run_id or not GameManager.run_active or GameManager.finished \
 			or _starter_claims.has(peer) or index < 0 or index >= STARTER_KITS.size():
@@ -89,7 +94,7 @@ func _grant_starter(run: int, peer: int, index: int) -> void:
 			inventory.send_state()
 	if peer == Net.local_id():
 		_starter_accepted(run)
-	else:
+	elif Net._is_peer_open(peer):
 		_starter_accepted.rpc_id(peer, run)
 
 @rpc("authority", "call_remote", "reliable")
@@ -166,9 +171,9 @@ func _remove(run: int, id: int, collector: int) -> void:
 	pickups.erase(id)
 	node.hide()
 	node.queue_free()
+	if Net.thin_server and Net.is_thin_peer(collector):
+		Net.thin_server.record_pickup(collector, node.item.id if node.item else node.flavor)
 	if collector != 0 and collector == Net.local_id():
-		if Net.car_bridge:
-			Net.car_bridge.record_pickup(node.item.id if node.item else node.flavor)
 		Sound.play("pickup", -10.0)
 
 @rpc("authority", "call_remote", "reliable")
@@ -196,7 +201,7 @@ func _scan_pickups() -> void:
 			continue
 		for player: Node3D in players:
 			if _reachable(node, player, GameManager.pickup_reach()) and _collect_supply(node.flavor, player):
-				remove_pickup(id, player.get_multiplayer_authority())
+				remove_pickup(id, player.peer_id())
 				break
 
 const SCRAP_VALUES := {"scrap": 5, "scrap_large": 15}
@@ -252,7 +257,7 @@ func claim(run: int, id: int, expected: int, slot: int, player: Node3D) -> bool:
 	if replaced == item:
 		return false
 	var at := node.global_position
-	remove_pickup(id, player.get_multiplayer_authority())
+	remove_pickup(id, player.peer_id())
 	if replaced:
 		spawn_pickup(replaced, at)
 	if ItemCatalog.definition(item.id).is_cursed():
@@ -269,7 +274,7 @@ func _claim_pouch(id: int, node: WorldPickup, inventory: WeaponHolder, player: N
 		return false
 	var left := inventory.add_pouch(item.id, item.count)
 	var at := node.global_position
-	remove_pickup(id, player.get_multiplayer_authority())
+	remove_pickup(id, player.peer_id())
 	if left > 0:
 		spawn_pickup(ItemInstance.new(item.serial, item.id, item.tier, left), at)
 	inventory.send_state(false)
@@ -325,7 +330,7 @@ func sync_to_peer(peer: int) -> void:
 	for player: Node in GameManager.players():
 		var inventory := holder(player)
 		inventory.sync_equip_to(peer)
-		if player.get_multiplayer_authority() == peer:
+		if player.peer_id() == peer:
 			inventory.sync_private_to(peer)
 
 @rpc("authority", "call_remote", "reliable")

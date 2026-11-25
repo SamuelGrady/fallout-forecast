@@ -17,6 +17,9 @@ const HEARTBEAT_EVERY := 15.0
 const STATUS_EVERY := 300.0
 
 var _port := 7777
+var _thin_port := 7780
+var _thin_tcp_port := 7781
+var _thin_join_code := ""
 var _default_map := Maps.DEFAULT_ID
 var _heartbeat_path := ""
 var _heartbeat_left := 0.0
@@ -27,11 +30,18 @@ var _run_serial := 0
 
 func _ready() -> void:
 	_port = Net.PORT
+	_thin_join_code = OS.get_environment("FALLOUT_THIN_JOIN_CODE")
 	var args := OS.get_cmdline_user_args()
 	for i in args.size():
 		var arg: String = args[i]
 		if arg.begins_with("--port="):
 			_port = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--thin-port="):
+			_thin_port = _port_value(arg)
+		elif arg.begins_with("--thin-tcp-port="):
+			_thin_tcp_port = _port_value(arg)
+		elif arg.begins_with("--thin-join-code="):
+			_thin_join_code = arg.trim_prefix("--thin-join-code=")
 		elif arg.begins_with("--heartbeat="):
 			_heartbeat_path = arg.get_slice("=", 1)
 		elif arg == "--map" and i + 1 < args.size():
@@ -44,6 +54,11 @@ func _ready() -> void:
 	# Keep simulating with no window focus and no frame-rate cap from vsync.
 	Engine.max_fps = 60
 	_start.call_deferred()
+
+
+func _port_value(arg: String) -> int:
+	var value := arg.get_slice("=", 1)
+	return value.to_int() if value.is_valid_int() else -1
 
 
 func _start() -> void:
@@ -63,7 +78,32 @@ func _start() -> void:
 	GameManager.run_finished.connect(_on_run_finished)
 	_log("listening for WebSocket (ws://) on TCP %d (protocol v%d, max %d players)" % [_port, Net.PROTOCOL, Net.MAX_PLAYERS])
 	_log("default map: %s" % _default_map)
+	if not _start_thin_server():
+		get_tree().quit(1)
+		return
 	_beat()
+
+
+func _start_thin_server() -> bool:
+	if _thin_port < 0 or _thin_port > 65535 or _thin_tcp_port < 0 or _thin_tcp_port > 65535:
+		_log("ERROR invalid Open Protocol port")
+		return false
+	if _thin_port == 0 and _thin_tcp_port == 0:
+		return true
+	var service := Node.new()
+	service.name = "ThinServer"
+	service.set_script(load("res://game/thin_server.gd"))
+	if service.get_script() == null:
+		service.free()
+		return false
+	add_child(service)
+	var err: Error = service.listen(_thin_port, _thin_tcp_port, _thin_join_code)
+	if err != OK:
+		_log("ERROR could not open Open Protocol listeners (%s)" % error_string(err))
+		return false
+	Net.thin_server = service
+	_log("Open Protocol listeners: WebSocket %d, raw TCP %d (0 disabled)" % [_thin_port, _thin_tcp_port])
+	return true
 
 
 func _process(delta: float) -> void:
@@ -148,6 +188,8 @@ func _reset() -> void:
 	WeatherManager.stop()
 	if get_tree().current_scene:
 		get_tree().unload_current_scene()
+	if Net.thin_server:
+		Net.thin_server.lobby_reset()
 	_log("idle: waiting for players to ready up (%d connected)" % Net.roster.size())
 	# Anyone who readied up during the results screen.
 	_on_roster_changed.call_deferred()

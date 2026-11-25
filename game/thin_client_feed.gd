@@ -1,5 +1,5 @@
 extends RefCounted
-## Translates the running Cloud Play client's state to the car wire format.
+## Translates authoritative game state to the Open Protocol Thin tier.
 
 const Cumulus := preload("res://enemies/boss/boss_cumulus.gd")
 const SporeProjectile := preload("res://enemies/mister/spore_projectile.gd")
@@ -11,6 +11,9 @@ const SUPPLY_KINDS := {"supply": "ammo", "ammo_box": "ammo", "ammo": "ammo",
 	"health": "health", "suit": "suit", "scrap": "scrap", "scrap_large": "scrap"}
 
 var lightning := false
+var radius := 0.0
+var max_enemies := -1
+var _puddle_sample_ms := 0
 var _tree: SceneTree
 var _events: Array[Dictionary] = []
 var _puddles := {}
@@ -31,7 +34,7 @@ func snapshot(me: Player, loot: RunLoot, tick: int, ack: int, now: int) -> Dicti
 		if p != me:
 			players.append(_other_player(p))
 		if p.state == "turned":
-			enemies.append({"id": -p.get_multiplayer_authority(), "type": "turned",
+			enemies.append({"id": -p.peer_id(), "type": "turned",
 				"pos": vec(p.global_position), "yaw": angle(p.rotation.y),
 				"hp": fraction(p.health, p.turned_health), "anim": _walk_anim(p.velocity)})
 			alive += 1
@@ -44,14 +47,17 @@ func snapshot(me: Player, loot: RunLoot, tick: int, ack: int, now: int) -> Dicti
 	if boss:
 		enemies.append(_boss(boss))
 		alive += int(not boss.dead)
-	if tick % 4 == 1:
+	if now >= _puddle_sample_ms:
+		_puddle_sample_ms = now + 200
 		_update_puddles()
 	var phase: String = PHASE_NAMES[WeatherManager.phase]
 	if WeatherManager.storm_state == WeatherManager.StormState.ACID_STORM:
 		phase = "acid_storm"
 	var snap := {"t": "snap", "tick": tick, "t_ms": now, "ack": ack,
-		"you": _local_player(me), "players": players, "enemies": enemies,
-		"pickups": _pickups(loot), "projectiles": _projectiles(loot),
+		"you": _local_player(me), "players": players,
+		"enemies": _nearby(enemies, me.global_position, max_enemies),
+		"pickups": _nearby(_pickups(loot), me.global_position),
+		"projectiles": _nearby(_projectiles(loot), me.global_position),
 		"weather": {"phase": phase, "intensity": angle(WeatherManager.storm_intensity),
 			"wave": WeatherManager.wave, "phase_time_left": decimal(WeatherManager.phase_time_left),
 			"lightning": lightning},
@@ -74,7 +80,7 @@ func _local_player(p: Player) -> Dictionary:
 			"mag": def.weapon.mag_size if gun else null,
 			"reserve": int(holder.reserves.get(def.ammo_type, 0)) if gun else null,
 			"count": 1 if gun else item.count})
-	return {"id": p.get_multiplayer_authority(), "pos": vec(p.global_position), "vel": vec(p.velocity),
+	return {"id": p.peer_id(), "pos": vec(p.global_position), "vel": vec(p.velocity),
 		"yaw": angle(p.rotation.y), "pitch": angle(p.head.rotation.x), "state": p.state,
 		"hp": decimal(p.health), "hp_max": decimal(p.max_health), "suit": decimal(p.suit_integrity), "suit_max": 100,
 		"exposed": p.exposed, "sheltered": p.sheltered, "in_puddle": p.in_puddle,
@@ -87,19 +93,21 @@ func _local_player(p: Player) -> Dictionary:
 
 func _other_player(p: Player) -> Dictionary:
 	var holder := RunLoot.holder(p)
-	return {"id": p.get_multiplayer_authority(), "name": p.display_name, "pos": vec(p.global_position),
+	return {"id": p.peer_id(), "name": p.display_name, "pos": vec(p.global_position),
 		"yaw": angle(p.rotation.y), "pitch": angle(p.head.rotation.x), "state": p.state,
-		"item": holder.equipped_id, "crouch": null, "suit_color": "#" + p.suit_color.to_html(false),
+		"item": holder.equipped_id, "crouch": p.is_crouching if p.thin_input else null, "suit_color": "#" + p.suit_color.to_html(false),
 		"skin": Cosmetics.skin_name(p.skin)}
 
 
 func _enemy(enemy: EnemyBase) -> Dictionary:
-	var anim := _walk_anim(enemy._net_vel if enemy._net_age < 0.15 else Vector3.ZERO)
-	if enemy._attack_flash_left > 0.0:
+	var anim := _walk_anim(enemy.velocity)
+	if enemy._recover_left > 0.0:
+		anim = "attack"
+	if enemy._windup_left > 0.0 or enemy._attack_flash_left > 0.0:
 		anim = "windup"
-	if not enemy._net_has_target:
-		anim = "spawn"
-	var hp: Variant = fraction(enemy.health, enemy.max_health) if enemy.miniboss_wave > 0 else null
+	if enemy._stagger_left > 0.0:
+		anim = "stagger"
+	var hp := fraction(enemy.health, enemy.max_health)
 	return {"id": enemy.net_id, "type": enemy_type(enemy), "pos": vec(enemy.global_position),
 		"yaw": angle(enemy.rotation.y), "hp": hp, "anim": anim}
 
@@ -115,7 +123,7 @@ func _boss(boss: Cumulus) -> Dictionary:
 
 
 static func enemy_type(enemy: EnemyBase) -> String:
-	return enemy.scene_file_path.get_file().get_basename()
+	return "cloudburst" if enemy.miniboss_wave == 3 else enemy.scene_file_path.get_file().get_basename()
 
 
 static func _walk_anim(velocity: Vector3) -> String:
@@ -149,6 +157,24 @@ func _projectiles(loot: RunLoot) -> Array:
 			rows.append({"id": -hazard.hazard_id, "kind": "acid_glob" if hazard.acid else "spore",
 				"pos": vec(hazard.global_position), "vel": vec(hazard._velocity)})
 	return rows
+
+
+func _nearby(rows: Array, origin: Vector3, cap := -1) -> Array:
+	if radius <= 0.0 and cap < 0:
+		return rows
+	var candidates := []
+	var limit := radius * radius if radius > 0.0 else INF
+	for row: Dictionary in rows:
+		var position := Vector3(row.pos[0], row.pos[1], row.pos[2])
+		var distance := origin.distance_squared_to(position)
+		if distance <= limit:
+			candidates.append([distance, row])
+	candidates.sort_custom(func(a, b): return a[0] < b[0])
+	var nearest := []
+	var count := candidates.size() if cap < 0 else mini(cap, candidates.size())
+	for i in count:
+		nearest.append(candidates[i][1])
+	return nearest
 
 
 func _update_puddles() -> void:

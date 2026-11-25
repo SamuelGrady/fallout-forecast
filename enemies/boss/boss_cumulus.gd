@@ -442,6 +442,8 @@ func _shatter_shell() -> void:
 
 
 func _die() -> void:
+	if Net.thin_server:
+		Net.thin_server.record_boss_kill()
 	Perf.mark("boss defeated")
 	Juice.shake(1.0)
 	Juice.duck_music(-12.0, 2.5)
@@ -532,8 +534,6 @@ func _died() -> void:
 	if Net.is_host():
 		return
 	dead = true
-	if Net.car_bridge:
-		Net.car_bridge.record_boss_kill()
 	Sound.play_at("explosion_big", global_position)
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)

@@ -55,8 +55,8 @@ var run_active := false
 ## Headless dedicated server (`-- --server`): hosts with no local player, so
 ## peer 1 is never in the roster. See game/dedicated_server.gd.
 var dedicated := false
-## Local WebSocket adapter. Only set by --car-bridge.
-var car_bridge: Node
+## Optional transport belonging to the dedicated server.
+var thin_server: Node
 ## Why the last join failed, for the join screen ("" = no answer).
 var last_error := ""
 ## Host-measured smoothed RTT in milliseconds per connected client peer id.
@@ -85,11 +85,6 @@ func _ready() -> void:
 		server.name = "DedicatedServer"
 		server.set_script(load("res://game/dedicated_server.gd"))
 		add_child(server)
-	elif "--car-bridge" in OS.get_cmdline_user_args():
-		car_bridge = Node.new()
-		car_bridge.name = "CarBridge"
-		car_bridge.set_script(load("res://game/car_bridge.gd"))
-		add_child(car_bridge)
 
 
 func _process(delta: float) -> void:
@@ -167,8 +162,6 @@ func join_cloud() -> Error:
 
 ## The server CLOUD PLAY uses: Settings' custom address, or the public one.
 func cloud_url() -> String:
-	if car_bridge:
-		return car_bridge.upstream
 	var custom := Settings.server_url.strip_edges()
 	return to_url(custom) if custom != "" else CLOUD_URL
 
@@ -252,6 +245,12 @@ func _request_force_start() -> void:
 	var peer := multiplayer.get_remote_sender_id()
 	if not roster.has(peer):
 		return
+	force_start_for_peer(peer)
+
+
+func force_start_for_peer(peer: int) -> void:
+	if not is_host() or run_active or not roster.has(peer):
+		return
 	var who := str(roster[peer].get("name", "PLAYER"))
 	if dedicated:
 		force_start_requested.emit(who)
@@ -288,7 +287,13 @@ func _request_map_vote(id: String) -> void:
 	if not is_host() or run_active or not lobby_votes_enabled:
 		return
 	var peer := multiplayer.get_remote_sender_id()
-	if not roster.has(peer) or (id != Maps.RANDOM_ID and not Maps.is_available(id)):
+	set_vote_for_peer(peer, id)
+
+
+func set_vote_for_peer(peer: int, id: String) -> void:
+	if not is_host() or run_active or not lobby_votes_enabled or not roster.has(peer):
+		return
+	if id != Maps.RANDOM_ID and not Maps.is_available(id):
 		return
 	_map_votes[peer] = id
 	_broadcast_roster()
@@ -336,9 +341,12 @@ func _request_chat(text: String) -> void:
 	if not is_host():
 		return
 	var peer := multiplayer.get_remote_sender_id()
-	if not roster.has(peer):
-		return
-	_accept_chat(peer, str(roster[peer].get("name", "PLAYER")), _clean_chat(text))
+	send_chat_for_peer(peer, text)
+
+
+func send_chat_for_peer(peer: int, text: String) -> void:
+	if is_host() and roster.has(peer):
+		_accept_chat(peer, str(roster[peer].get("name", "PLAYER")), _clean_chat(text))
 
 
 func _accept_chat(peer: int, sender: String, text: String) -> void:
@@ -450,7 +458,7 @@ func end_run() -> void:
 func _on_connected() -> void:
 	if mode != Mode.CLIENT:
 		return
-	var saved := local_name if car_bridge else Settings.player_name.strip_edges().left(18)
+	var saved := Settings.player_name.strip_edges().left(18)
 	if saved != "":
 		local_name = saved
 	elif local_name == "":
@@ -475,7 +483,7 @@ var _server_confirmed_run := false
 
 ## True when `peer_id` is connected and its underlying WebSocket is still OPEN.
 func _is_peer_open(peer_id: int) -> bool:
-	if not is_online():
+	if not is_online() or is_thin_peer(peer_id):
 		return false
 	if peer_id not in multiplayer.get_peers():
 		return false
@@ -579,6 +587,11 @@ func rpc_to_run(method: Callable, args: Array) -> void:
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
+	if not is_thin_peer(peer_id):
+		remove_roster_peer(peer_id)
+
+
+func remove_roster_peer(peer_id: int) -> void:
 	run_peers.erase(peer_id)
 	_pending_run_peers.erase(peer_id)
 	peer_rtt_ms.erase(peer_id)
@@ -588,6 +601,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	roster.erase(peer_id)
 	_allowed_colors.erase(peer_id)
 	_map_votes.erase(peer_id)
+	_chat_last_ms.erase(peer_id)
 	_broadcast_roster(peer_id)
 	roster_changed.emit()
 
@@ -657,6 +671,9 @@ func _hello(hello: String, protocol := 0) -> void:
 	if not is_host():
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
+	if is_thin_peer(peer_id):
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+		return
 	var refusal := ""
 	if protocol != PROTOCOL:
 		refusal = "UPDATE REQUIRED (v%d, YOU HAVE v%d)" % [PROTOCOL, protocol]
@@ -687,6 +704,19 @@ func _hello(hello: String, protocol := 0) -> void:
 	peer_joined.emit(peer_id)
 
 
+## Thin identities live in the roster only, never in the native transport.
+func is_thin_peer(peer: int) -> bool:
+	return thin_server != null and thin_server.input_for(peer) != null
+
+
+func add_thin_player(peer: int, callsign: String) -> void:
+	roster[peer] = {"name": callsign, "ready": false}
+	_assign_cosmetic(peer, 0, 0)
+	_broadcast_roster()
+	roster_changed.emit()
+	peer_joined.emit(peer)
+
+
 ## Host -> one client: you can't join, and why. The join screen shows it.
 @rpc("authority", "call_remote", "reliable")
 func _reject(reason: String) -> void:
@@ -711,9 +741,12 @@ func _push_roster(new_roster: Dictionary, map_id: String, voting: bool, counts: 
 func _request_ready(value: bool) -> void:
 	if not is_host():
 		return
-	var peer_id := multiplayer.get_remote_sender_id()
-	if roster.has(peer_id):
-		roster[peer_id]["ready"] = value
+	set_ready_for_peer(multiplayer.get_remote_sender_id(), value)
+
+
+func set_ready_for_peer(peer: int, value: bool) -> void:
+	if is_host() and roster.has(peer):
+		roster[peer]["ready"] = value
 		_broadcast_roster()
 		roster_changed.emit()
 

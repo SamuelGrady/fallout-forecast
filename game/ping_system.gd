@@ -93,6 +93,11 @@ func send(kind: String, pos: Vector3, enemy_id := 0) -> void:
 		_request_ping.rpc_id(1, kind, pos, enemy_id)
 
 
+func send_for_peer(peer: int, kind: String, pos: Vector3, enemy_id := 0) -> void:
+	if Net.is_host():
+		_accept(peer, kind, pos, enemy_id)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _request_ping(kind: String, pos: Vector3, enemy_id: int) -> void:
 	if not Net.is_host():

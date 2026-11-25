@@ -44,7 +44,7 @@ func _process(delta: float) -> void:
 
 func can_interact(player: Node) -> bool:
 	return not is_queued_for_deletion() and item != null and player.state == "ok" \
-			and (claim_peer == 0 or claim_peer == player.get_multiplayer_authority())
+			and (claim_peer == 0 or claim_peer == player.peer_id())
 
 func interact_point() -> Vector3:
 	return global_position + Vector3.UP * 0.28

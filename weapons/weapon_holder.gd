@@ -79,10 +79,11 @@ var _remote_reload_total := 1.0
 var _remote_view: Node3D
 
 func _ready() -> void:
-	set_physics_process(Net.car_bridge != null)
 	camera = get_parent() as Camera3D
 	_hip_fov = camera.fov
 	player = camera.get_parent().get_parent() as Node3D
+	set_physics_process(player.thin_input != null)
+	process_physics_priority = 1 if player.thin_input else 0
 	loot = RunLoot.find(get_tree())
 	if Net.is_host() and loot:
 		_refresh_equip()
@@ -213,69 +214,59 @@ func _process(delta: float) -> void:
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
 	_visual_heat = move_toward(_visual_heat, 0.0, delta * 1.6)
-	if not Net.car_bridge:
-		_handle_input()
-	_publish()
-	if not Net.car_bridge:
-		_animate(delta)
-		_update_throw_preview(delta)
-
-func _physics_process(_delta: float) -> void:
-	if not player.is_multiplayer_authority() or not can_act() or not Net.can_send_run_rpc():
-		return
-	for id: String in ItemCatalog.POUCH_ACTIONS:
-		if Input.is_action_just_pressed(ItemCatalog.POUCH_ACTIONS[id]):
-			select_pouch(id)
-			return
-	if Input.is_action_just_pressed("drop_item") and active_pouch.is_empty() and selected():
-		_command("drop")
-		return
-	for slot in SLOT_COUNT:
-		if Input.is_action_just_pressed("weapon_%d" % (slot + 1)):
-			select_slot(slot)
-			return
 	_handle_input()
+	_publish()
+	_animate(delta)
+	_update_throw_preview(delta)
+
+func _physics_process(delta: float) -> void:
+	_animate(delta)
+	_fire_buffer = maxf(0.0, _fire_buffer - delta)
+	_raise_left = SPRINT_RAISE if player.is_sprinting else maxf(0.0, _raise_left - delta)
+	if can_act() and not _discrete_action(Callable(player, "action_just_pressed")):
+		_handle_input()
+
 
 func _handle_input() -> void:
 	var loadout_input := InventoryMenu.blocks_gameplay_actions()
 	if loadout_input:
-		_loadout_fire_blocked = Input.is_action_pressed("fire") or Input.is_action_just_released("fire")
+		_loadout_fire_blocked = player.action_pressed("fire") or player.action_just_released("fire")
 	if not can_act() or loadout_input:
 		_fire_buffer = 0.0
 		_local_charging = false
 		return
-	var wheel := int(Input.is_action_just_pressed("weapon_next")) - int(Input.is_action_just_pressed("weapon_prev"))
+	var wheel := int(player.action_just_pressed("weapon_next")) - int(player.action_just_pressed("weapon_prev"))
 	if wheel != 0:
 		if not active_pouch.is_empty():
 			select_slot(current)
 		else:
 			select_slot(posmod(current + wheel, SLOT_COUNT))
 		return
-	if not Input.is_action_pressed("fire"):
+	if not player.action_pressed("fire"):
 		_pouch_fire_latched = false
 	var block_fire := _loadout_fire_blocked
-	_loadout_fire_blocked = block_fire and Input.is_action_pressed("fire")
+	_loadout_fire_blocked = block_fire and player.action_pressed("fire")
 	if _pouch_ack_left > 0.0:
-		if not block_fire and not _pending_pouch.is_empty() and Input.is_action_just_pressed("fire") and not player.tarp_raised:
+		if not block_fire and not _pending_pouch.is_empty() and player.action_just_pressed("fire") and not player.tarp_raised:
 			_fire_buffer = _pouch_ack_left
 		return
 	var data := selected_weapon()
 	if data == null or player.tarp_raised:
 		_local_charging = false
 		return
-	if Input.is_action_just_pressed("reload") and active_pouch.is_empty():
+	if player.action_just_pressed("reload") and active_pouch.is_empty():
 		start_reload()
 	if block_fire:
 		# A trigger pressed in loadout must return to neutral before firing or
 		# releasing a charged shot in gameplay.
 		return
-	if not TouchInput.combat_pointer_active() and not _pad_connected():
+	if not player.thin_input and not TouchInput.combat_pointer_active() and not _pad_connected():
 		_fire_buffer = 0.0
 		_local_charging = false
 		return
 	if not active_pouch.is_empty():
 		_local_charging = false
-		if Input.is_action_just_pressed("fire"):
+		if player.action_just_pressed("fire"):
 			_fire_buffer = 0.25 + _raise_left
 		if _fire_buffer > 0.0 and _cooldown <= 0.0 and _throw_cooldown <= 0.0 and _raise_left <= 0.0:
 			_fire_buffer = 0.0
@@ -285,21 +276,21 @@ func _handle_input() -> void:
 				select_slot(current)
 		return
 	if data.charge_time > 0.0:
-		if Input.is_action_just_pressed("fire"):
+		if player.action_just_pressed("fire"):
 			if selected().count > 0 and _cooldown <= 0.0 and _reload_left <= 0.0:
 				_local_charging = true
 				_local_charge_at = Time.get_ticks_msec() / 1000.0
 				_command("charge")
 			elif selected_reserve() > 0 and _reload_left <= 0.0:
 				start_reload()
-		elif _local_charging and not Input.is_action_pressed("fire"):
+		elif _local_charging and not player.action_pressed("fire"):
 			_local_charging = false
 			fire()
 		return
 	_local_charging = false
-	if Input.is_action_just_pressed("fire"):
+	if player.action_just_pressed("fire"):
 		_fire_buffer = 0.15 + _raise_left
-	var wants := not _pouch_fire_latched and (Input.is_action_pressed("fire") if data.automatic else _fire_buffer > 0.0)
+	var wants: bool = not _pouch_fire_latched and (player.action_pressed("fire") if data.automatic else _fire_buffer > 0.0)
 	if wants:
 		player.sprint_lock = 0.35
 	if wants and _cooldown <= 0.0 and _pending_action <= 0.0 and _jam_left <= 0.0 and _raise_left <= 0.0:
@@ -316,20 +307,23 @@ func cancel_touch_fire() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.dedicated or not player.is_multiplayer_authority() or not can_act() or InventoryMenu.blocks_gameplay_actions():
 		return
-	for id: String in ItemCatalog.POUCH_ACTIONS:
-		if event.is_action_pressed(ItemCatalog.POUCH_ACTIONS[id]):
-			select_pouch(id)
-			get_viewport().set_input_as_handled()
-			return
-	if event.is_action_pressed("drop_item") and active_pouch.is_empty() and selected():
-		_command("drop")
+	if _discrete_action(event.is_action_pressed):
 		get_viewport().set_input_as_handled()
-		return
+
+
+func _discrete_action(pressed: Callable) -> bool:
+	for id: String in ItemCatalog.POUCH_ACTIONS:
+		if pressed.call(ItemCatalog.POUCH_ACTIONS[id]):
+			select_pouch(id)
+			return true
+	if pressed.call("drop_item") and active_pouch.is_empty() and selected():
+		_command("drop")
+		return true
 	for slot in SLOT_COUNT:
-		if event.is_action_pressed("weapon_%d" % (slot + 1)):
+		if pressed.call("weapon_%d" % (slot + 1)):
 			select_slot(slot)
-			get_viewport().set_input_as_handled()
-			return
+			return true
+	return false
 
 ## Equip a belt pouch item (Frag Grenade / Shield Dome) into hand to aim and throw with LMB.
 func select_pouch(id: String) -> void:
@@ -421,9 +415,9 @@ func _throw_pouch(id: String) -> void:
 	if id != active_pouch or not Net.can_send_run_rpc() or not can_act() or player.tarp_raised \
 			or _throw_cooldown > 0.0 or pouch_count(id) <= 0 or InventoryMenu.is_open():
 		return
-	if not TouchInput.combat_pointer_active() and not _pad_connected():
+	if not player.thin_input and not TouchInput.combat_pointer_active() and not _pad_connected():
 		return
-	_pouch_fire_latched = Input.is_action_pressed("fire")
+	_pouch_fire_latched = player.action_pressed("fire")
 	_throw_cooldown = THROW_COOLDOWN
 	var origin := camera.global_position
 	var dir := -camera.global_basis.z
@@ -784,6 +778,8 @@ func _host_shot(run: int, serial: int, origin: Vector3, dir: Vector3, is_aiming:
 	player.begin_hit_batch()
 	var traces := WeaponCombat.resolve(self, item, origin, dir, seed, spread, is_aiming, lucky, rewind_ms)
 	player.end_hit_batch()
+	if Net.thin_server:
+		Net.thin_server.record_shot(player.peer_id(), item.id, origin, dir, traces)
 	_play_shot(item.id, origin, dir, traces, is_aiming)
 	Net.rpc_to_run(_shot_fx, [loot.run_id, item.id, origin, dir, traces, is_aiming, predicted])
 	var emptied := item.count == 0 and definition.ammo_type.is_empty()
@@ -813,8 +809,6 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 	var local := player.is_multiplayer_authority()
 	var data := ItemCatalog.definition(id).weapon
 	var muzzle := _muzzle_position() if local and equipped_id == id else origin + dir * 0.55
-	if Net.car_bridge:
-		Net.car_bridge.record_shot(player.get_multiplayer_authority(), id, muzzle, traces)
 	var muzzle_model: Node3D
 	if data.mechanic == "reel" and equipped_id == id:
 		muzzle_model = _model if local else _remote_view
@@ -822,8 +816,7 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 			muzzle = muzzle_model.to_global(ItemModels.muzzle(id))
 	if not (local and predicted):
 		_start_gesture(id)
-	if not Net.car_bridge:
-		WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
+	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
 	if not local:
 		return
 	_pending_action = 0.0
@@ -1115,7 +1108,7 @@ func _apply_equip(id: String, tier: int) -> void:
 		_remote_view.queue_free()
 		_remote_view = null
 	_sight_point = Vector3.INF
-	if definition != null:
+	if definition != null and not player.thin_input:
 		if player.is_multiplayer_authority():
 			_model = ItemCatalog.model(id)
 			add_child(_model)
@@ -1217,16 +1210,20 @@ func _eject_casing(heavy: bool) -> void:
 
 func _animate(delta: float) -> void:
 	var data := selected_weapon()
-	if _model == null or data == null:
+	if data == null or (_model == null and not player.thin_input):
+		if player.thin_input:
+			player.aiming = false
 		return
 	# Only the owning player aims down sights; Input on this machine says
 	# nothing about anyone else's.
 	var aiming: bool = can_act() and not player.get("tarp_raised") \
 			and _reload_left <= 0.0 and not InventoryMenu.is_open() \
-			and (TouchInput.combat_pointer_active() or _pad_connected()) and Input.is_action_pressed("aim")
+			and (player.thin_input or TouchInput.combat_pointer_active() or _pad_connected()) and player.action_pressed("aim")
 	if player.is_multiplayer_authority():
 		player.set("aiming", aiming)
 	_aim = lerpf(_aim, 1.0 if aiming else 0.0, 1.0 - exp(-14.0 * delta))
+	if player.thin_input:
+		return
 	# Sprinting widens the view a little for a sense of speed.
 	_sprint_fov = lerpf(_sprint_fov, 6.0 if player.get("is_sprinting") else 0.0, 1.0 - exp(-6.0 * delta))
 	camera.fov = lerpf(_hip_fov + _sprint_fov, data.ads_fov, _aim)

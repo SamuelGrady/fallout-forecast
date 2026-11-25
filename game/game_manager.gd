@@ -316,7 +316,7 @@ func is_voting() -> bool:
 
 func player_for_peer(peer: int) -> Node:
 	for p in players():
-		if p.get_multiplayer_authority() == peer:
+		if p.peer_id() == peer:
 			return p
 	return null
 
@@ -373,11 +373,11 @@ func can_ready_up() -> bool:
 
 
 ## Owner: this player is done looting and wants the next phase now.
-func ready_up() -> void:
+func ready_up(thin_peer := 0) -> void:
 	if not can_ready_up():
 		return
 	if is_host():
-		_mark_ready(multiplayer.get_unique_id() if _online() else 1)
+		_mark_ready(thin_peer if thin_peer > 0 else Net.local_id())
 	else:
 		_request_ready.rpc_id(1)
 
@@ -386,6 +386,11 @@ func ready_up() -> void:
 func _request_ready() -> void:
 	if is_host():
 		_mark_ready(multiplayer.get_remote_sender_id())
+
+
+func remove_ready_peer(peer: int) -> void:
+	if _ready_peers.erase(peer) and run_active:
+		_broadcast_ready(_ready_peers.size(), player_count())
 
 
 func _mark_ready(peer: int) -> void:
@@ -506,7 +511,7 @@ func _sync_decon(value: int) -> void:
 
 # ------------------------------------------------------------------ stats
 func _stat(player: Node) -> Dictionary:
-	var peer := player.get_multiplayer_authority()
+	var peer: int = player.peer_id()
 	if not stats.has(peer):
 		var display = player.get("display_name")
 		stats[peer] = {"name": str(display) if display != null else "Player %d" % peer,
