@@ -190,20 +190,28 @@ def build(raw: Path, name: str) -> None:
     high = THIN_HIGH if tier == "thin" else FULL_HIGH
     md = [f"# {tier.title()} tier session — {meta['transport']}/{meta['enc']}", ""]
     md += [
-        f"Captured from a local dedicated server (Godot 4.7.2, game protocol from `welcome`), transport "
-        f"**{meta['transport']}**, encoding **{meta['enc']}**, by `tools/open_protocol/capture_transcripts.py` "
-        f"under `tools/open_protocol/capture_harness.gd` (real server code; only the storm timers were shortened, "
-        f"wave-1 stragglers were finished off after 9 s and the run was ended through `GameManager.finish(false)` "
-        f"6 s into wave 2 so the session fits in about two minutes). A second bot of the other tier played in the "
-        f"same lobby, so its traffic appears too.",
+        f"Captured from a local Godot 4.7.2 dedicated server using "
+        f"**{meta['transport']}** and **{meta['enc']}**.",
+        "The capture harness shortens Drizzle and Clearing, removes wave-one\n"
+        "stragglers, keeps players above a health and suit floor, and ends the\n"
+        "run six seconds into wave-two Drizzle. A bot of the other tier shares\n"
+        "the lobby, so its traffic appears here too.",
         "",
-        "`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. "
-        + ("Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded "
-           "value underneath. " if meta["enc"] == "bin" else "")
-        + "Long previews can be truncated; TCP prefixes always describe the full payload. Repeats are counted at the end of the section. "
-        f"The order-preserving sampled log is [`{name}.jsonl`]({name}.jsonl).",
+        "`C→S` is client to server, `S→C` is server to client, and `+t` is\n"
+        "seconds since capture start. Long previews can be truncated. Repeats\n"
+        "are counted at the end of the section. The sampled, ordered capture\n"
+        f"is [`{name}.jsonl`]({name}.jsonl).",
         "",
     ]
+    if meta["enc"] == "bin":
+        md += [
+            "TCP prefixes show the full payload length. The JSONL `hex` field\n"
+            "contains the full payload without that prefix. Use `hex` for\n"
+            "byte-exact tests. For outgoing client frames, `msg` can hold\n"
+            "values from before encoding, such as a double that was rounded\n"
+            "to a 32-bit float on the wire.",
+            "",
+        ]
     sampled = [rows[0]]
     seen_notes: set[str] = set()
     state: dict = {}
