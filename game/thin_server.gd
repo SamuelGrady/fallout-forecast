@@ -94,12 +94,18 @@ func _accept(listener: TCPServer, websocket: bool) -> void:
 		if not listener.is_connection_available():
 			return
 		var stream := listener.take_connection()
-		if _sessions.size() >= MAX_CONNECTIONS:
+		if _sessions.size() + _full_peer_count() >= MAX_CONNECTIONS:
 			stream.disconnect_from_host()
 			continue
 		var session := Session.new()
 		session.wire = Wire.new(stream, websocket)
 		_sessions.append(session)
+
+
+func _full_peer_count() -> int:
+	if multiplayer.has_multiplayer_peer() and multiplayer.multiplayer_peer.has_method("active_peer_count"):
+		return int(multiplayer.multiplayer_peer.active_peer_count())
+	return 0
 
 
 func input_for(id: int) -> ThinClientInput:

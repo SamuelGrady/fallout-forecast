@@ -12,12 +12,16 @@ const VariantJson := preload("res://game/open_protocol/variant_json.gd")
 
 const OPEN_PROTOCOL_VERSION := 1
 const MAX_PACKET_SIZE := 65536
+const MAX_FULL_PEERS := 12
+const MAX_DRAINING_CONNS := 32
+const JOIN_DEADLINE_MS := 10000
 
 
 class FullClient:
 	var peer_id: int
 	var conn: RefCounted  # game/open_protocol_wire.gd
 	var encoding: String
+	var join_deadline: int = 0
 	## Server SceneCacheInterface cache_id -> relative node path (for this peer).
 	var server_cache: Dictionary = {}
 
@@ -68,13 +72,19 @@ func add_full_peer(conn: RefCounted, _hello: Dictionary) -> int:
 	if _closed or _refuse:
 		conn.send_message({"t": "error", "msg": "Server is not accepting connections"})
 		conn.close("refused")
-		_draining_conns.append(conn)
+		_enqueue_drain(conn)
+		return 0
+	if _full_peers.size() >= MAX_FULL_PEERS:
+		conn.send_message({"t": "error", "msg": "Too many Open Protocol connections"})
+		conn.close("full")
+		_enqueue_drain(conn)
 		return 0
 	var peer_id := _allocate_peer_id()
 	var client := FullClient.new()
 	client.peer_id = peer_id
 	client.conn = conn
 	client.encoding = str(conn.encoding)
+	client.join_deadline = Time.get_ticks_msec() + JOIN_DEADLINE_MS
 	_full_peers[peer_id] = client
 	conn.send_message({
 		"t": "welcome",
@@ -87,6 +97,17 @@ func add_full_peer(conn: RefCounted, _hello: Dictionary) -> int:
 	})
 	peer_connected.emit(peer_id)
 	return peer_id
+
+
+func _enqueue_drain(conn: RefCounted) -> void:
+	if conn.closed or _draining_conns.size() >= MAX_DRAINING_CONNS:
+		conn.dispose()
+	else:
+		_draining_conns.append(conn)
+
+
+func active_peer_count() -> int:
+	return _full_peers.size()
 
 
 func _allocate_peer_id() -> int:
@@ -138,10 +159,17 @@ func _poll() -> void:
 			conn.dispose()
 			_draining_conns.erase(conn)
 	var tree := _tree()
+	var now := Time.get_ticks_msec()
 	for peer_id: int in _full_peers.keys():
 		var client: FullClient = _full_peers.get(peer_id)
 		if client == null:
 			continue
+		if client.join_deadline > 0:
+			if Net.roster.has(peer_id):
+				client.join_deadline = 0
+			elif now >= client.join_deadline:
+				_disconnect_full_peer(peer_id, "join timeout")
+				continue
 		var packets: Array = client.conn.poll()
 		if client.conn.closed:
 			_remove_full_peer(peer_id, false)
@@ -428,10 +456,7 @@ func _disconnect_full_peer(peer_id: int, reason: String) -> void:
 	_full_peers.erase(peer_id)
 	_purge_inbox(peer_id)
 	client.conn.close(reason)
-	if client.conn.closed:
-		client.conn.dispose()
-	else:
-		_draining_conns.append(client.conn)
+	_enqueue_drain(client.conn)
 	peer_disconnected.emit(peer_id)
 
 
@@ -445,7 +470,7 @@ func _remove_full_peer(peer_id: int, dispose_now: bool) -> void:
 		client.conn.dispose()
 	else:
 		client.conn.close()
-		_draining_conns.append(client.conn)
+		_enqueue_drain(client.conn)
 	peer_disconnected.emit(peer_id)
 
 
