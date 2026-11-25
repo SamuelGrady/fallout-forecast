@@ -79,6 +79,7 @@ var _remote_reload_total := 1.0
 var _remote_view: Node3D
 
 func _ready() -> void:
+	set_physics_process(Net.car_bridge != null)
 	camera = get_parent() as Camera3D
 	_hip_fov = camera.fov
 	player = camera.get_parent().get_parent() as Node3D
@@ -212,10 +213,28 @@ func _process(delta: float) -> void:
 	_recoil = move_toward(_recoil, 0.0, delta * 2.8)
 	_kick = move_toward(_kick, 0.0, delta * 6.0)
 	_visual_heat = move_toward(_visual_heat, 0.0, delta * 1.6)
-	_handle_input()
+	if not Net.car_bridge:
+		_handle_input()
 	_publish()
-	_animate(delta)
-	_update_throw_preview(delta)
+	if not Net.car_bridge:
+		_animate(delta)
+		_update_throw_preview(delta)
+
+func _physics_process(_delta: float) -> void:
+	if not player.is_multiplayer_authority() or not can_act() or not Net.can_send_run_rpc():
+		return
+	for id: String in ItemCatalog.POUCH_ACTIONS:
+		if Input.is_action_just_pressed(ItemCatalog.POUCH_ACTIONS[id]):
+			select_pouch(id)
+			return
+	if Input.is_action_just_pressed("drop_item") and active_pouch.is_empty() and selected():
+		_command("drop")
+		return
+	for slot in SLOT_COUNT:
+		if Input.is_action_just_pressed("weapon_%d" % (slot + 1)):
+			select_slot(slot)
+			return
+	_handle_input()
 
 func _handle_input() -> void:
 	var loadout_input := InventoryMenu.blocks_gameplay_actions()
@@ -794,6 +813,8 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 	var local := player.is_multiplayer_authority()
 	var data := ItemCatalog.definition(id).weapon
 	var muzzle := _muzzle_position() if local and equipped_id == id else origin + dir * 0.55
+	if Net.car_bridge:
+		Net.car_bridge.record_shot(player.get_multiplayer_authority(), id, muzzle, traces)
 	var muzzle_model: Node3D
 	if data.mechanic == "reel" and equipped_id == id:
 		muzzle_model = _model if local else _remote_view
@@ -801,7 +822,8 @@ func _play_shot(id: String, origin: Vector3, dir: Vector3, traces: Array, ads: b
 			muzzle = muzzle_model.to_global(ItemModels.muzzle(id))
 	if not (local and predicted):
 		_start_gesture(id)
-	WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
+	if not Net.car_bridge:
+		WeaponCombat.play_fx(loot, id, muzzle, traces, local, not (local and predicted), muzzle_model)
 	if not local:
 		return
 	_pending_action = 0.0

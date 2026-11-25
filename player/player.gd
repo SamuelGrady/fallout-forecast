@@ -174,7 +174,7 @@ func _ready() -> void:
 		if OS.has_feature("web"):
 			# Fog hides everything past ~80 m; culling far geometry cuts WebGL draw calls.
 			camera.far = 95.0
-		else:
+		elif not Net.car_bridge:
 			TouchInput.capture_pointer()
 	else:
 		camera.current = false
@@ -234,7 +234,7 @@ func _build_children() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
+	if Net.car_bridge or not is_multiplayer_authority() or GameManager.awaiting_tape_choice:
 		return
 	# The loadout screen owns the cursor: no look, no click-to-recapture.
 	if InventoryMenu.is_open():
@@ -321,7 +321,8 @@ func _physics_process(delta: float) -> void:
 		_jump_buffer_timer = 0.0
 		_coyote_timer = 0.0
 
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var deadzone := 0.0 if Net.car_bridge else -1.0
+	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back", deadzone)
 	input = (input + TouchInput.movement).limit_length()
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y)
 	sprint_lock = maxf(0.0, sprint_lock - delta)
@@ -885,6 +886,15 @@ func get_move_state() -> String:
 	return "sprint" if is_sprinting else "walk"
 
 
+func apply_bridge_look(yaw: float, pitch: float) -> void:
+	if look_locked or state == "out":
+		return
+	rotation.y = yaw
+	var limit := deg_to_rad(max_pitch_degrees)
+	_pitch = clampf(pitch, -limit, limit)
+	head.rotation.x = _pitch
+
+
 func _look(amount: Vector2) -> void:
 	if look_locked:
 		return
@@ -1088,6 +1098,8 @@ func _smooth_remote(delta: float) -> void:
 func _apply_vitals(hp: float, suit: float, new_state: String, bleed: float, tarp: bool, max_hp := 100.0, charge := 0.0, invuln := false) -> void:
 	if Net.is_host() or multiplayer.get_remote_sender_id() != 1:
 		return
+	if Net.car_bridge and is_multiplayer_authority() and hp < health:
+		Net.car_bridge.record_hurt(health - hp)
 	max_health = max_hp
 	health = hp
 	suit_integrity = suit
@@ -1198,6 +1210,9 @@ func local_hit(killed: bool, critical: bool, point: Vector3, amount: int, enemy_
 ## stack into one number, which is why the enemy's net id comes along: the
 ## stacking has to happen on the shooter's machine, whichever peer that is.
 func show_damage(point: Vector3, amount: int, critical: bool, enemy_id := 0) -> void:
+	if Net.car_bridge:
+		Net.car_bridge.record_hit(point, amount, critical)
+		return
 	if Net.dedicated or not is_inside_tree():
 		return
 	if not is_instance_valid(_numbers):

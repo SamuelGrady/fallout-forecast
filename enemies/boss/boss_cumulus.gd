@@ -532,6 +532,8 @@ func _died() -> void:
 	if Net.is_host():
 		return
 	dead = true
+	if Net.car_bridge:
+		Net.car_bridge.record_boss_kill()
 	Sound.play_at("explosion_big", global_position)
 	var t := create_tween()
 	t.tween_property(self, "scale", Vector3.ONE * 0.01, 1.5)

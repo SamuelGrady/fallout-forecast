@@ -737,6 +737,12 @@ func notify_despawn(enemy: EnemyBase, drops: Array, throw_vec := Vector3.ZERO, c
 func _despawn_enemy(net_id: int, drops: Array, at: Vector3, throw_vec: Vector3, critical: bool) -> void:
 	var enemy := _find_net(net_id)
 	var pos := enemy.global_position if enemy else at
+	if Net.car_bridge:
+		Net.car_bridge.record_kill(net_id, enemy, pos)
+		if enemy:
+			enemy.remove_from_group("enemies")
+			enemy.queue_free()
+		return
 	EnemyBase.spawn_death_fragments(self, pos, throw_vec, critical)
 	Sound.play_at("enemy_death", pos)
 	if enemy:

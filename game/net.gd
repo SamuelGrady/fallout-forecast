@@ -55,6 +55,8 @@ var run_active := false
 ## Headless dedicated server (`-- --server`): hosts with no local player, so
 ## peer 1 is never in the roster. See game/dedicated_server.gd.
 var dedicated := false
+## Local WebSocket adapter. Only set by --car-bridge.
+var car_bridge: Node
 ## Why the last join failed, for the join screen ("" = no answer).
 var last_error := ""
 ## Host-measured smoothed RTT in milliseconds per connected client peer id.
@@ -83,6 +85,11 @@ func _ready() -> void:
 		server.name = "DedicatedServer"
 		server.set_script(load("res://game/dedicated_server.gd"))
 		add_child(server)
+	elif "--car-bridge" in OS.get_cmdline_user_args():
+		car_bridge = Node.new()
+		car_bridge.name = "CarBridge"
+		car_bridge.set_script(load("res://game/car_bridge.gd"))
+		add_child(car_bridge)
 
 
 func _process(delta: float) -> void:
@@ -160,6 +167,8 @@ func join_cloud() -> Error:
 
 ## The server CLOUD PLAY uses: Settings' custom address, or the public one.
 func cloud_url() -> String:
+	if car_bridge:
+		return car_bridge.upstream
 	var custom := Settings.server_url.strip_edges()
 	return to_url(custom) if custom != "" else CLOUD_URL
 
@@ -441,7 +450,7 @@ func end_run() -> void:
 func _on_connected() -> void:
 	if mode != Mode.CLIENT:
 		return
-	var saved := Settings.player_name.strip_edges().left(18)
+	var saved := local_name if car_bridge else Settings.player_name.strip_edges().left(18)
 	if saved != "":
 		local_name = saved
 	elif local_name == "":

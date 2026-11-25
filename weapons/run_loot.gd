@@ -167,6 +167,8 @@ func _remove(run: int, id: int, collector: int) -> void:
 	node.hide()
 	node.queue_free()
 	if collector != 0 and collector == Net.local_id():
+		if Net.car_bridge:
+			Net.car_bridge.record_pickup(node.item.id if node.item else node.flavor)
 		Sound.play("pickup", -10.0)
 
 @rpc("authority", "call_remote", "reliable")

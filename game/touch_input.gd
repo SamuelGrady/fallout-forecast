@@ -93,4 +93,4 @@ func release_pointer() -> void:
 
 
 func combat_pointer_active() -> bool:
-	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or gameplay_active
+	return Net.car_bridge != null or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or gameplay_active

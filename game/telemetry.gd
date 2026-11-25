@@ -32,6 +32,9 @@ var _seq := 0
 
 
 func _ready() -> void:
+	if Net.car_bridge:
+		set_process(false)
+		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_session = Crypto.new().generate_random_bytes(8).hex_encode()
 	_http = HTTPRequest.new()
@@ -43,6 +46,8 @@ func _ready() -> void:
 
 
 func _active() -> bool:
+	if Net.car_bridge:
+		return false
 	if OS.get_environment("FALLOUT_TELEMETRY_FORCE") == "1":
 		return Settings.telemetry_enabled
 	return Settings.telemetry_enabled and not Net.dedicated and DisplayServer.get_name() != "headless"

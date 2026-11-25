@@ -68,6 +68,12 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		Engine.max_physics_steps_per_frame = 2
 	Sound.start_run()
+	if Net.car_bridge:
+		$HUD.queue_free()
+		_add_ping_system()
+		Net.roster_changed.connect(_sync_players)
+		_finish_loading.call_deferred()
+		return
 	var pause_menu := preload("res://ui/pause_menu.gd").new()
 	add_child(pause_menu)
 	if not Net.dedicated:
@@ -97,9 +103,7 @@ func _ready() -> void:
 		var dev_menu := CanvasLayer.new()
 		dev_menu.set_script(preload("res://ui/dev_menu.gd"))
 		add_child(dev_menu)
-	var pings := PingSystem.new()
-	pings.name = "Pings"
-	add_child(pings)
+	var pings := _add_ping_system()
 	if not Net.dedicated:
 		var ping_hud := preload("res://ui/ping_hud.gd").new()
 		ping_hud.system = pings
@@ -126,6 +130,13 @@ func _ready() -> void:
 	Net.server_closed.connect(_leave_to_title)
 	GameManager.run_finished.connect(_on_run_finished)
 	_prepare_navigation.call_deferred()
+
+
+func _add_ping_system() -> PingSystem:
+	var pings := PingSystem.new()
+	pings.name = "Pings"
+	add_child(pings)
+	return pings
 
 
 func _prepare_navigation() -> void:
@@ -196,7 +207,11 @@ func _prepare_navigation() -> void:
 		warm.set_script(preload("res://game/warmup.gd"))
 		add_child(warm)
 		await warm.finished
-	# NavigationServer syncs region changes on a physics tick.
+	await _finish_loading()
+
+
+func _finish_loading() -> void:
+	# Synchronize navigation or, for the bridge, the map's deferred CSG collision.
 	if _finishing or not is_inside_tree():
 		return
 	await get_tree().physics_frame
