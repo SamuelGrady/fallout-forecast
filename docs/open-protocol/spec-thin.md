@@ -88,8 +88,9 @@ wait for `status run`. The server switches you to `run` as soon as your player
 node exists and the run's loot registry is ready (≈2–4 s after `load`; it
 includes the server's 1.35 s map-reveal delay plus scene setup). On entering `run` the server
 grants the **pump shotgun starter kit** (pump shotgun in the first hotbar slot, `you.slots[0]`, shells, two
-frag grenades, one shield dome) and, if a draft or tape choice is open, sends
-`draft` / `tape` right away.
+frag grenades, one shield dome) in normal play. If a draft or tape choice is
+open, the server sends its state right away. See the
+[late-join starter issue](KNOWN_ISSUES.md#6-thin-starter-on-late-join) for that case.
 
 Input sequence state resets on every `load` and on `results`: you MAY restart
 `seq` at 0 after each `load`.
@@ -118,8 +119,9 @@ All are `{"t":"lobby","a":<action>,...}`:
 | `start` | — | Force start now, regardless of readiness (ignored during `results`). |
 | `chat` | `text`: string | Lobby chat. Cleaned like names (control characters removed, brackets → parentheses), cut to 100 characters; empty after cleaning → ignored; more than one line per 700 ms per player → dropped silently. |
 
-When a run starts the server sets everyone's `ready` back to `false` (you will
-see that `lobby` just before `status loading`).
+A lone player starts the run by sending `ready:true`. The server resets
+lobby readiness internally when starting; the final `lobby` frame may still
+show everyone ready. Use `status loading` as the transition.
 
 ## 5. Input
 
@@ -168,6 +170,15 @@ queue holds 32 frames (oldest dropped on overflow); held state persists between
 frames. If no valid frame arrives for **500 ms**, movement and all held buttons
 are released (the last view is kept). `snap.ack` tells you the last `seq` the
 server actually applied.
+
+**First movement and shot.** After `status run`, wait for a snapshot, then
+start at `seq:0` and increment each frame. Compare `you.pos` across
+acknowledged snapshots to confirm motion. On an empty Pinecrest test server,
+`mv:[0,-1]` and `yaw:0` move the player forward along −Z. To test the starter
+shotgun, wait for `you.slots[0].item == "pump_shotgun"`, stop moving and send a
+Fire press (`b:1`, then `b:0` on a later input). The shotgun can fire during
+Calm without an enemy target. Expect an own-player `shot` event and a lower
+`you.slots[0].ammo` on the same or a later snapshot.
 
 ### 5.2 Binary input (17 bytes)
 
@@ -258,7 +269,7 @@ display name (`"STANDARD"`, `"GAS MASK"`, `"FIREFIGHTER"`, `"BIO-TECH"`,
 | Field | Meaning |
 | --- | --- |
 | `id` | Positive for infected (the server's `net_id`), `0` for the Cumulus boss, `-peer_id` for a Turned player. |
-| `type` | `drip`, `gutter`, `mister`, `hailstone`, `sleet`, `smog`, `static`, `thunderhead`, `undertow`, `cloudburst` (wave-3 miniboss), `cumulus` (wave-5 boss), `turned`. The oversized minibosses of waves 1, 2 and 4 report their base type. |
+| `type` | `drip`, `gutter`, `mister`, `hailstone`, `sleet`, `smog`, `static`, `thunderhead`, `undertow`, `cloudburst` (wave-3 miniboss), `cumulus` (wave-5 boss), `turned`. |
 | `hp` | Health fraction [0,1]. Boss = sum of its parts. |
 | `anim` | Hint: `idle`, `walk`, `windup` (attack tell), `attack` (recovering after an attack), `stagger`, `die` (Cumulus only, briefly after death). `spawn` is reserved. |
 
@@ -407,7 +418,7 @@ boxes. Before a level is loaded (e.g. in the lobby) the reply is
 `{"t":"map","id":null,"boxes":[],"bounds":null}`. Outlines are cached per map
 and can be tens of KiB; request once per `load`. They are a rendering aid only —
 snapshots are authoritative, and accurate geometry comes from the exported
-asset pack ([game-reference.md §7](game-reference.md#7-assets)).
+asset pack ([game-reference.md §7](game-reference.md#7-exported-asset-pack)).
 
 ## 9. Events
 

@@ -2,7 +2,7 @@
 
 Captured from a local dedicated server (Godot 4.7.2, game protocol from `welcome`), transport **tcp**, encoding **bin**, by `tools/open_protocol/capture_transcripts.py` under `tools/open_protocol/capture_harness.gd` (real server code; only the storm timers were shortened, wave-1 stragglers were finished off after 9 s and the run was ended through `GameManager.finish(false)` 6 s into wave 2 so the session fits in about two minutes). A second bot of the other tier played in the same lobby, so its traffic appears too.
 
-`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded value underneath. The first frames of each kind in a section are verbatim; repeats are counted at the end of the section. The order-preserving sampled log is [`thin-bin.jsonl`](thin-bin.jsonl).
+`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded value underneath. Long previews can be truncated; TCP prefixes always describe the full payload. Repeats are counted at the end of the section. The order-preserving sampled log is [`thin-bin.jsonl`](thin-bin.jsonl).
 
 > First frame on the socket, always JSON text even for `enc:"bin"` (spec-common §4, spec-thin §2).
 

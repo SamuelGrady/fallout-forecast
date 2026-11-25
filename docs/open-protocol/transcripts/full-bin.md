@@ -2,7 +2,7 @@
 
 Captured from a local dedicated server (Godot 4.7.2, game protocol from `welcome`), transport **tcp**, encoding **bin**, by `tools/open_protocol/capture_transcripts.py` under `tools/open_protocol/capture_harness.gd` (real server code; only the storm timers were shortened, wave-1 stragglers were finished off after 9 s and the run was ended through `GameManager.finish(false)` 6 s into wave 2 so the session fits in about two minutes). A second bot of the other tier played in the same lobby, so its traffic appears too.
 
-`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded value underneath. The first frames of each kind in a section are verbatim; repeats are counted at the end of the section. The order-preserving sampled log is [`full-bin.jsonl`](full-bin.jsonl).
+`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded value underneath. Long previews can be truncated; TCP prefixes always describe the full payload. Repeats are counted at the end of the section. The order-preserving sampled log is [`full-bin.jsonl`](full-bin.jsonl).
 
 > Open Protocol hello selecting the Full tier; JSON text even for `enc:"bin"` (spec-common §4).
 
@@ -102,7 +102,7 @@ len 3b 00 00 00   (raw TCP prefix: 59 bytes)
 0030 62 6f 74 20 6f 6e 6c 69 6e 65 00
      = {"t":"rpc","node":"Net","method":"_chat_rpc","args":["Thin Bot","thin bot online"],"ch":0,"rel":true,"mode":2}
 +  3.775s S→C binary 326 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 46 01 00 00   (raw TCP prefix: 326 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 02 00 00 00 02 00
 0020 00 00 02 00 00 00 1b 00 00 00 04 00 00 00 04 00
@@ -133,7 +133,7 @@ len 3b 00 00 00   (raw TCP prefix: 59 bytes)
 0030 62 6f 74 20 6f 6e 6c 69 6e 65 00
      = {"t":"rpc","node":"Net","method":"_chat_rpc","args":["Full Bot","full bot online"],"ch":0,"rel":true,"mode":2}
 +  4.179s S→C binary 338 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 52 01 00 00   (raw TCP prefix: 338 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 02 00 00 00 02 00
 0020 00 00 02 00 00 00 1b 00 00 00 04 00 00 00 04 00
@@ -156,7 +156,7 @@ len 1b 00 00 00   (raw TCP prefix: 27 bytes)
 0010 6e 67 01 02 00 00 00 04 00 00 00
      = {"t":"rpc","node":"Net","method":"_rtt_pong","args":[4],"ch":0,"rel":false}
 +  4.581s S→C binary 338 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 52 01 00 00   (raw TCP prefix: 338 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 02 00 00 00 02 00
 0020 00 00 02 00 00 00 1b 00 00 00 04 00 00 00 04 00
@@ -173,7 +173,7 @@ len 20 00 00 00   (raw TCP prefix: 32 bytes)
 0010 74 5f 72 65 61 64 79 01 01 00 00 00 01 00 00 00
      = {"t":"rpc","node":"Net","method":"_request_ready","args":[true],"ch":0,"rel":true}
 +  5.692s S→C binary 338 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 52 01 00 00   (raw TCP prefix: 338 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 02 00 00 00 02 00
 0020 00 00 02 00 00 00 1b 00 00 00 04 00 00 00 04 00
@@ -185,7 +185,7 @@ len 80 00 00 00   (raw TCP prefix: 128 bytes)
      … (hex truncated)
      = {"t":"rpc","node":"Net","method":"_push_roster","args":[{"_t":"dict","v":[[2,{"name":"Thin Bot","ready":true,"color":0,"skin":0}],[234289745,{"name":"Full Bot","ready":true,"color":3,"skin":1}]]},"pinecrest",true,{"pinecrest":2},"pinecrest"],"ch":0,"rel":true,"mode":2}
 +  5.692s S→C binary 338 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 52 01 00 00   (raw TCP prefix: 338 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 02 00 00 00 02 00
 0020 00 00 02 00 00 00 1b 00 00 00 04 00 00 00 04 00
@@ -467,7 +467,7 @@ len 8a 04 00 00   (raw TCP prefix: 1162 bytes)
 0480 00 00 03 00 00 00 00 00 00 00
      = {"t":"rpc","node":"WeatherManager","method":"_sync_puddles","args":[{"_t":"dict","v":[[{"_t":"np","v":"/root/Main/Level/Puddles/MainW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainC"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainFarE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Lane"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/CircleW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/CircleE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotC"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Square"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Gas"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Park"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Backyards"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Alley"},0.0]]}],"ch":0,"rel":true,"mode":2}
 ```
-> World pickups/effects snapshot; arg0 is the `run_id` every run-scoped RPC must carry.
+> World pickups/effects snapshot; arg0 is the `run_id` for RPCs with a `run` argument.
 
 ```text
 +  9.068s S→C binary 72 bytes
@@ -601,7 +601,7 @@ len 4d 00 00 00   (raw TCP prefix: 77 bytes)
 0040 cc cc cc 00 40 02 00 00 00 00 00 00 00
      = {"t":"rpc","node":"Main/Enemies","method":"_sync_progress","args":[1,42,42,2.1,0],"ch":0,"rel":false,"mode":1}
 +  9.074s S→C binary 280 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 18 01 00 00   (raw TCP prefix: 280 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -1164,7 +1164,7 @@ len 1c 01 00 00   (raw TCP prefix: 284 bytes)
 0110 03 00 01 00 c3 f5 28 5c 8f c2 b5 3f
      = {"t":"rpc","node":"Main/Players/P_234289745/Head/Camera3D/WeaponHolder","method":"_private_state","args":[1,3,[[2,"nail_driver",0,23],[],[],[],[]],{"nail":60},0,"",0,2,1,0.0,1.0,0.0,0.085],"ch":0,"rel":true,"mode":2}
 + 25.878s C→S binary 135 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 87 00 00 00   (raw TCP prefix: 135 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -1176,7 +1176,7 @@ len 80 00 00 00   (raw TCP prefix: 128 bytes)
      … (hex truncated)
      = {"t":"rpc","node":"Main/Players/P_234289745/Head/Camera3D/WeaponHolder","method":"_request_shot","args":[1,2,{"_t":"v3","v":[2.2542942637334877,1.65,1.9782876673476795]},{"_t":"v3","v":[-0.4079220103657788,-0.025545116061597962,-0.9126593452677406]},false,true],"ch":0,"rel":true}
 + 25.880s S→C binary 182 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len b6 00 00 00   (raw TCP prefix: 182 bytes)
 0000 03 01 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -1188,7 +1188,7 @@ len 80 00 00 00   (raw TCP prefix: 128 bytes)
      … (hex truncated)
      = {"t":"rpc","node":"Main/Players/P_234289745/Head/Camera3D/WeaponHolder","method":"_shot_fx","args":[1,"nail_driver",{"_t":"v3","v":[2.2542941570281982,1.649999976158142,1.978287696838379]},{"_t":"v3","v":[-0.40792199969291687,-0.025545116513967514,-0.9126593470573425]},[[{"_t":"v3","v":[-9.83846664428711,0.8473240733146667,-24.36788558959961]},0]],false,true],"ch":0,"rel":false,"mode":1}
 + 25.880s S→C binary 284 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 1c 01 00 00   (raw TCP prefix: 284 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -1291,7 +1291,7 @@ len 61 00 00 00   (raw TCP prefix: 97 bytes)
 0060 00
      = {"t":"rpc","node":"Main/RunLoot","method":"_spawn","args":[1,2,[{"_t":"v3","v":[-10.484540939331055,0.0008771783905103803,-21.71038055419922]},[],"scrap",0]],"ch":0,"rel":true,"mode":2}
 + 29.185s S→C binary 129 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 81 00 00 00   (raw TCP prefix: 129 bytes)
 0000 03 02 00 0c 00 4d 61 69 6e 2f 45 6e 65 6d 69 65
 0010 73 0e 5f 64 65 73 70 61 77 6e 5f 65 6e 65 6d 79
 0020 05 02 00 00 00 01 00 00 00 1c 00 00 00 01 00 00
@@ -1343,7 +1343,7 @@ len 8a 00 00 00   (raw TCP prefix: 138 bytes)
 0080 01 00 66 66 66 66 66 66 fa 3f
      = {"t":"rpc","node":"Main/Players/P_234289745/Head/Camera3D/WeaponHolder","method":"_equip_state","args":[1,27,"nail_driver",0,1.65,1.65],"ch":0,"rel":true,"mode":2}
 + 65.411s S→C binary 134 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 86 00 00 00   (raw TCP prefix: 134 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -1575,7 +1575,7 @@ len e9 00 00 00   (raw TCP prefix: 233 bytes)
 00e0 00 02 00 00 00 0c 00 00 00
      = {"t":"rpc","node":"GameManager/CrateManager","method":"_stock","args":[1,"HardwareStation",[["suit_patch",0,6,10],["pressure_washer",1,10,11],["harpoon",2,18,12]]],"ch":0,"rel":true,"mode":2}
 + 76.909s S→C binary 225 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len e1 00 00 00   (raw TCP prefix: 225 bytes)
 0000 03 02 00 18 00 47 61 6d 65 4d 61 6e 61 67 65 72
 0010 2f 43 72 61 74 65 4d 61 6e 61 67 65 72 06 5f 73
 0020 74 6f 63 6b 03 02 00 00 00 01 00 00 00 04 00 00
@@ -2056,7 +2056,7 @@ len 82 00 00 00   (raw TCP prefix: 130 bytes)
 0080 d3 3f
      = {"t":"rpc","node":"Main/Players/P_2/Head/Camera3D/WeaponHolder","method":"_equip_state","args":[1,30,"pump_shotgun",0,0.312,0.312],"ch":0,"rel":true,"mode":2}
 +111.516s C→S binary 135 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 87 00 00 00   (raw TCP prefix: 135 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -2088,7 +2088,7 @@ len 74 00 00 00   (raw TCP prefix: 116 bytes)
 0070 2e 00 00 00
      = {"t":"rpc","node":"Main/Players/P_234289745","method":"_receive_hits","args":[1,[[false,false,{"_t":"v3","v":[12.226219177246094,1.4365967512130737,4.758486270904541]},9,46]]],"ch":0,"rel":true,"mode":2}
 +111.519s S→C binary 182 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len b6 00 00 00   (raw TCP prefix: 182 bytes)
 0000 03 01 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -2100,7 +2100,7 @@ len 80 00 00 00   (raw TCP prefix: 128 bytes)
      … (hex truncated)
      = {"t":"rpc","node":"Main/Players/P_234289745/Head/Camera3D/WeaponHolder","method":"_shot_fx","args":[1,"nail_driver",{"_t":"v3","v":[2.855172872543335,1.649999976158142,-0.7323471307754517]},{"_t":"v3","v":[0.8627459406852722,-0.01984233781695366,0.5052483081817627]},[[{"_t":"v3","v":[12.226219177246094,1.4365967512130737,4.758486270904541]},2]],false,true],"ch":0,"rel":false,"mode":1}
 +111.519s S→C binary 288 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 20 01 00 00   (raw TCP prefix: 288 bytes)
 0000 03 02 00 33 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 33 34 32 38 39 37 34 35 2f 48 65
 0020 61 64 2f 43 61 6d 65 72 61 33 44 2f 57 65 61 70
@@ -2119,7 +2119,7 @@ len 32 00 00 00   (raw TCP prefix: 50 bytes)
 0030 00 00
      = {"t":"rpc","node":"Main/RunLoot","method":"_remove","args":[1,37,0],"ch":0,"rel":true,"mode":2}
 +111.659s S→C binary 130 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 82 00 00 00   (raw TCP prefix: 130 bytes)
 0000 03 02 00 2b 00 4d 61 69 6e 2f 50 6c 61 79 65 72
 0010 73 2f 50 5f 32 2f 48 65 61 64 2f 43 61 6d 65 72
 0020 61 33 44 2f 57 65 61 70 6f 6e 48 6f 6c 64 65 72
@@ -2163,7 +2163,7 @@ len 61 00 00 00   (raw TCP prefix: 97 bytes)
 0060 00
      = {"t":"rpc","node":"Main/RunLoot","method":"_spawn","args":[1,45,[{"_t":"v3","v":[14.216514587402344,0.06087320297956467,3.73880672454834]},[],"scrap",0]],"ch":0,"rel":true,"mode":2}
 +113.078s S→C binary 129 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len 81 00 00 00   (raw TCP prefix: 129 bytes)
 0000 03 02 00 0c 00 4d 61 69 6e 2f 45 6e 65 6d 69 65
 0010 73 0e 5f 64 65 73 70 61 77 6e 5f 65 6e 65 6d 79
 0020 05 02 00 00 00 31 00 00 00 1c 00 00 00 01 00 00
@@ -2299,7 +2299,7 @@ len 2d 00 00 00   (raw TCP prefix: 45 bytes)
 0020 65 73 65 74 5f 72 75 6e 5f 72 70 63 00
      = {"t":"rpc","node":"GameManager/MutationRoll","method":"_reset_run_rpc","args":[],"ch":0,"rel":true,"mode":2}
 +121.843s S→C binary 186 bytes
-len 80 00 00 00   (raw TCP prefix: 128 bytes)
+len ba 00 00 00   (raw TCP prefix: 186 bytes)
 0000 03 02 00 03 00 4e 65 74 0c 5f 70 75 73 68 5f 72
 0010 6f 73 74 65 72 05 1b 00 00 00 01 00 00 00 02 00
 0020 00 00 51 fa f6 0d 1b 00 00 00 04 00 00 00 04 00

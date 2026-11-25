@@ -2,7 +2,7 @@
 
 Captured from a local dedicated server (Godot 4.7.2, game protocol from `welcome`), transport **ws**, encoding **json**, by `tools/open_protocol/capture_transcripts.py` under `tools/open_protocol/capture_harness.gd` (real server code; only the storm timers were shortened, wave-1 stragglers were finished off after 9 s and the run was ended through `GameManager.finish(false)` 6 s into wave 2 so the session fits in about two minutes). A second bot of the other tier played in the same lobby, so its traffic appears too.
 
-`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. The first frames of each kind in a section are verbatim; repeats are counted at the end of the section. The order-preserving sampled log is [`full-json.jsonl`](full-json.jsonl).
+`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. Long previews can be truncated; TCP prefixes always describe the full payload. Repeats are counted at the end of the section. The order-preserving sampled log is [`full-json.jsonl`](full-json.jsonl).
 
 > Open Protocol hello selecting the Full tier; JSON text even for `enc:"bin"` (spec-common §4).
 
@@ -125,7 +125,7 @@ Repeats not shown in this section: 1× `S→C _rtt_ping`, 1× `C→S _rtt_pong`.
 ```text
 +  8.925s S→C {"t":"rpc","node":"WeatherManager","method":"_sync_puddles","args":[{"_t":"dict","v":[[{"_t":"np","v":"/root/Main/Level/Puddles/MainW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainC"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/MainFarE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Lane"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/CircleW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/CircleE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotW"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotC"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/LotE"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Square"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Gas"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Park"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Backyards"},0.0],[{"_t":"np","v":"/root/Main/Level/Puddles/Alley"},0.0]]}],"ch":0,"rel":true}
 ```
-> World pickups/effects snapshot; arg0 is the `run_id` every run-scoped RPC must carry.
+> World pickups/effects snapshot; arg0 is the `run_id` for RPCs with a `run` argument.
 
 ```text
 +  8.926s S→C {"t":"rpc","node":"Main/RunLoot","method":"_snapshot","args":[1,[],[],[],false],"ch":0,"rel":true}

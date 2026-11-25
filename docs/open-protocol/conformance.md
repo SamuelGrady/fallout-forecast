@@ -89,7 +89,11 @@ encoding while keeping the port for that transport. Use the corresponding
 [transcripts](AGENTS.md#reading-order) for offline format comparisons.
 
 The reference checks verify exchange and decode, with a synthetic Full walk.
-For a Full gameplay port also check these outcomes:
+A docs-only Full smoke test can use the first Pinecrest spawn from
+`level-markers.json` on an empty lobby and move one metre along −Z at walk speed
+during the first Calm. Report `(false, false)` for the open-air test spawn and
+compare against the server's echoed pushes. This checks the transform wire
+path. For a Full gameplay port also check these outcomes:
 
 - See an own-player `_relay_transform` matching a position you sent. Start
   from the map's spawn marker and verify movement stays on the authored collision

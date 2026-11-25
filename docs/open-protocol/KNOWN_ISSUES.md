@@ -39,3 +39,13 @@ Mutation lists use typed arrays even when empty; the lobby roster uses integer
 keys, and the puddle sync uses NodePath keys. The worked examples in
 [spec-full.md](spec-full.md#10-worked-binary-examples) and the matching
 [JSON mapping](spec-full.md#7-variant--json-mapping) show both cases.
+
+## 6. Thin starter on late join
+
+The Thin server attempts to grant the kit once on entry to `run`. The inventory
+can refuse it during a mutation draft, a tape choice or a pause. This follows
+from the source path and can leave a late-joining Thin player without the
+automatic kit. There is no Thin starter retry action in v1. Treat an empty
+hotbar as authoritative and render it. The player can scavenge after play
+resumes. A new connection can receive the normal kit if it joins at a time
+when inventory actions are available.

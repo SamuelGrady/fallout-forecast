@@ -6,7 +6,7 @@
 Inputs are the complete logs written by capture_transcripts.py
 ({thin,full}-{json,bin}.jsonl). Outputs per log:
   <name>.md     annotated session; sections follow the session lifecycle, the
-                first frames of each kind are shown verbatim (hex for binary),
+                first frame of each kind is shown (hex for binary),
                 repeats are counted per section.
   <name>.jsonl  every low-rate frame plus every 20th high-rate frame, in order
                 (a sampled but order-preserving copy of the complete log).
@@ -68,7 +68,7 @@ FULL_NOTES = {
     "GameManager/CrateManager._snapshot": "Vending cabinets `{key: [[item,tier,price,offer_serial],...]}` and airdrop.",
     "Main/Enemies._sync_progress": "Wave progress for the HUD at ~3.6 Hz: wave, remaining, total, recovery, endless score.",
     "WeatherManager._sync_puddles": "Puddle growth keyed by *absolute* NodePath (`{\"_t\":\"dict\"}` form).",
-    "Main/RunLoot._snapshot": "World pickups/effects snapshot; arg0 is the `run_id` every run-scoped RPC must carry.",
+    "Main/RunLoot._snapshot": "World pickups/effects snapshot; arg0 is the `run_id` for RPCs with a `run` argument.",
     "_equip_state": "Public held item per player (relayed to everyone including the owner).",
     "_private_state": "Owner-only authoritative inventory; drop updates with `rev <= last` (client-responsibilities §Inventory).",
     "Main/RunLoot._request_starter": "Pick a starter kit (0 pump_shotgun, 1 nail_driver, 2 service_revolver).",
@@ -113,11 +113,11 @@ def note_key(tier: str, msg: dict) -> str | None:
     return msg["method"] if msg["method"] in FULL_NOTES else None
 
 
-def hex_block(hx: str, tcp: bool) -> str:
+def hex_block(hx: str, tcp: bool, payload_size: int) -> str:
     data = bytes.fromhex(hx)
     lines = []
     if tcp:
-        lines.append("len " + len(data).to_bytes(4, "little").hex(" ") + f"   (raw TCP prefix: {len(data)} bytes)")
+        lines.append("len " + payload_size.to_bytes(4, "little").hex(" ") + f"   (raw TCP prefix: {payload_size} bytes)")
     for i in range(0, len(data), 16):
         lines.append(f"{i:04x} " + data[i:i + 16].hex(" "))
     return "\n".join(lines)
@@ -200,7 +200,7 @@ def build(raw: Path, name: str) -> None:
         "`C→S` is client to server, `S→C` server to client, `+t` is seconds since capture start. "
         + ("Binary frames are shown as hex (the raw TCP length prefix is shown on its own line) with the decoded "
            "value underneath. " if meta["enc"] == "bin" else "")
-        + "The first frames of each kind in a section are verbatim; repeats are counted at the end of the section. "
+        + "Long previews can be truncated; TCP prefixes always describe the full payload. Repeats are counted at the end of the section. "
         f"The order-preserving sampled log is [`{name}.jsonl`]({name}.jsonl).",
         "",
     ]
@@ -274,10 +274,11 @@ def build(raw: Path, name: str) -> None:
         arrow = "C→S" if row["dir"] == "c2s" else "S→C"
         stamp = f"+{row['t'] / 1000:7.3f}s {arrow}"
         if "hex" in row:
-            md.append(f"{stamp} binary {len(row['hex']) // 2} bytes")
+            payload_size = len(row["hex"]) // 2
+            md.append(f"{stamp} binary {payload_size} bytes")
             first = shown[(row["dir"], ev_key)] == 1
             hx = row["hex"] if first or len(row["hex"]) <= 256 else row["hex"][:256]
-            md.append(hex_block(hx, tcp) + ("" if hx == row["hex"] else "\n     … (hex truncated)"))
+            md.append(hex_block(hx, tcp, payload_size) + ("" if hx == row["hex"] else "\n     … (hex truncated)"))
             md.append("     = " + compact(msg, 4000 if first else 600))
         else:
             first = shown[(row["dir"], ev_key)] == 1

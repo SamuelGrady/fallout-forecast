@@ -169,7 +169,8 @@ when normal play resumes.
 | `swap` | moving item's serial | `from × 5 + to` | Move/swap/merge two slots. |
 | `charge` | held item's serial | -1 | Begin charging a weapon with `charge_time` > 0 (Disruptor); fire after the charge time. |
 
-A mismatching serial or a request while downed, voting or paused is
+A mismatching serial or a request while downed, voting, awaiting a tape
+choice or paused is
 ignored; re-read `_private_state`.
 
 **Using the held item** (guns, throwables, deployables, consumables in slots):
@@ -180,7 +181,8 @@ ignored; re-read `_private_state`.
   `dir` = view direction (unit vector, from yaw/pitch:
   `(-sin y·cos p, sin p, -cos y·cos p)`).
 - The host rejects it unless: you are in the run and `ok`; `run` and `serial`
-  match, no pouch is selected, no tarp is raised, sprint is inactive and the weapon's cooldown elapsed
+  match, no pouch is selected, no tarp is raised, sprint is inactive and the
+  weapon's cooldown elapsed
   (`fire_interval`, × 0.8 with Reflex Tendons — see `items[].weapon` in
   game-data.json); ammo > 0; not jammed; not mid-reload (except shell reloads);
   `origin` is within **3 m** of the host's copy of your camera with clear line of
@@ -203,7 +205,9 @@ ignored; re-read `_private_state`.
 
 **Pouch throws:** `_action(run, "select_pouch", 0, 0|1)`, then
 `HOLDER._request_throw(run, id, origin, dir)` with `id` `"frag"` or
-`"shield_dome"` (same origin rules; 0.35 s cooldown). Everyone gets `_throw_fx`.
+`"shield_dome"` (same origin rules; 0.35 s owner cooldown). Everyone gets `_throw_fx`.
+The host sets `predicted:true` for Full throw requests. Track whether you
+already played local throw effects before deciding what to render from the echo.
 
 ## 7. Projectiles, deployables and hazards
 
@@ -254,11 +258,11 @@ pad offsets in cabinet-local space: `offer_1/2/3` at (−0.62 | 0 | 0.62, 1.25,
 - `Main/Enemies._spawn_enemy(net_id, kind, at, small, elite, miniboss_wave)`:
   create enemy `net_id` of `kind` (0 Drip, 1 Gutter, 2 Mister, 3 Sleet,
   4 Hailstone, 5 Undertow, 6 Static, 7 Smog, 8 Thunderhead). `small` = a split
-  child (Splitters), `elite` = marked elite, `miniboss_wave` 1–4 = that wave's
-  oversized named miniboss (wave 3 is Cloudburst).
-- `Main/Enemies._sync_enemies(ids, places, yaws)` at 20 Hz (unreliable): latest
-  position (feet) and yaw per id; interpolate. Unknown ids can appear after
-  packet loss of a spawn — ignore them until spawned.
+  child (Splitters), `elite` = marked elite. The campaign's Cloudburst spawn
+  uses `miniboss_wave:3`; ordinary enemies use 0.
+- `Main/Enemies._sync_enemies(ids, places, yaws)` at 20 Hz (unreliable-ordered):
+  latest position (feet) and yaw per id. Interpolate known enemies and skip
+  rows for unknown ids until their spawn arrives.
 - `_despawn_enemy(net_id, drops, at, throw_vec, critical)`: death (ragdoll along
   `throw_vec`); `_retire_enemies(ids)`: silent removal (Clearing stragglers).
 - Cues: `_play_enemy_tell(net_id, cue, duration, volume)` (attack wind-up),
@@ -283,7 +287,7 @@ Only **phase changes** cross the network:
   `WeatherManager._override(value)` is ≥ 0, ease toward that instead (−1 = no
   override). `_receive_intensity(value)` (catch-up) sets it directly.
 - It is *raining* when intensity > 0.02 and the phase is Drizzle/Downpour (or an
-  override > 0 is active).
+  override > 0.001 is active).
 
 Downpour may run past 0 s until the wave is cleared; wait for the next
 `_receive_phase`. Ready-up (`GameManager._request_ready()`) skips Calm/Clearing

@@ -190,9 +190,9 @@ One RPC per JSON text message:
 | `method` | string | required | Exact method name from the schema. |
 | `args` | array | default `[]` | Positional arguments (§7). Trailing optional arguments (schema `optional:true`) MAY be omitted. |
 | `ch` | integer | optional | Channel; default = the method's channel (0 for every current RPC). |
-| `rel` | bool | optional | `true` reliable, `false` unreliable-ordered; default = the method's mode. Informational on the server side. |
+| `rel` | bool | optional | `true` reliable, `false` unreliable. The adapter treats supplied `false` as ordered for ingress metadata. Omitting `rel` uses the method's mode. |
 
-Server-sent RPCs always include `ch` and `rel` (`rel:true` only for reliable).
+Server-sent RPCs always include `ch` and `rel` (`true` for reliable, `false` for either unreliable mode).
 `{"t":"raw","data":"<base64>","ch":0,"rel":true}` carries raw
 `SceneMultiplayer.send_bytes` data in both directions; the game never uses it.
 
@@ -222,7 +222,7 @@ Godot values without a JSON equivalent use a two-key tagged object
 | COLOR (20) | `{"_t":"color","v":[r,g,b,a]}` | Linear floats 0–1; `a` defaults to 1 on input. |
 | STRING_NAME (21) | `{"_t":"sn","v":"..."}` | |
 | NODE_PATH (22) | `{"_t":"np","v":"/root/Main/Level/Puddles/MainW"}` | |
-| OBJECT, RID, CALLABLE, SIGNAL (23–26) | `null` | Never sent. |
+| RID, OBJECT, CALLABLE, SIGNAL (23–26) | `null` | Never sent. |
 | DICTIONARY (27) | `{...}` or `{"_t":"dict","v":[[k,v],...]}` | Plain object **only** if every key is a String and none is `"_t"`; otherwise the tagged pair list (roster: int keys; puddles: NodePath keys; results `players`: int keys). Pair order = Godot insertion order. |
 | ARRAY (28) | `[...]` | Typed arrays (`Array[String]`) are plain JSON arrays too. |
 | PACKED_BYTE_ARRAY (29) | `{"_t":"bytes","v":"<base64>"}` | |
@@ -241,8 +241,9 @@ declared parameter types (schema `args[].type`) and converts plain JSON values:
 a number becomes `int` or `float` (or `bool` = number ≠ 0) as declared; a string
 becomes `NodePath`/`StringName` when declared; a plain array becomes the declared
 `Packed*Array`. So `[19]` is fine for an `int` argument and
-`"Main/Level/DeconShowers/Laundromat/Interact"` is fine for a `NodePath`
-argument. **Inside untyped `Array`/`Dictionary` arguments numbers stay floats**
+`"/root/Main/Level/DeconShowers/GarageWest/Interact"` is fine for a
+`NodePath` argument. An RPC envelope uses a path relative to `/root`; an
+interaction argument uses its own NodePath and should be absolute. **Inside untyped `Array`/`Dictionary` arguments numbers stay floats**
 (Godot's JSON parser has no integers); use `{"_t":"i","v":n}` where an exact int
 matters. Keys of `{"_t":"dict"}` pairs that are whole numbers become ints.
 A value of the wrong kind (e.g. a string for a `bool`) makes the server drop the
@@ -491,7 +492,7 @@ Guard against double-applying your own:
 | `Main/Players/P_<id>._relay_transform` | **Ignore for your own id** (you own your transform). |
 | `Main/Players/P_<id>._apply_tarp` | Authoritative tarp state (also for you). |
 | `.../WeaponHolder._shot_fx` | If it is yours and `predicted` is true, skip re-playing muzzle/recoil/sound; still draw `traces`. |
-| `.../WeaponHolder._throw_fx` | Same rule as `_shot_fx`. |
+| `.../WeaponHolder._throw_fx` | The echo for a Full throw carries `predicted:true`. Skip presentation already played locally, or play it on receipt if you deferred it. |
 | `.../WeaponHolder._equip_state` | Ignore for your own player's model (use `_private_state`); apply for others. |
 
 ## 13. Payload structures inside RPC arguments

@@ -116,7 +116,7 @@ anything else; the server reads only one frame before the handshake completes.
 | `v` | integer | yes | Open Protocol major version. MUST be `1`. |
 | `tier` | `"thin"` \| `"full"` | no, default `"thin"` | Which tier to speak ([AGENTS.md](AGENTS.md#choosing-a-tier)). |
 | `enc` | `"json"` \| `"bin"` | no, default `"json"` | Data-frame encoding for the tier (§5). Control messages stay JSON. |
-| `name` | string | Thin only | Callsign. Full ignores it (Full sends its name in `Net._hello`). |
+| `name` | string | no, Thin only | Callsign. Full ignores it (Full sends its name in `Net._hello`). |
 | `client` | string | no | Free-form client/version string, e.g. `"3ds-port/0.3"`. Informational. |
 | `code` | string | only if the server has a join code | Shared secret. Applies to both transports and tiers. |
 | tier fields | | no | Thin: `rate`, `radius`, `max_enemies` ([spec-thin.md §2](spec-thin.md#2-negotiation)). |
