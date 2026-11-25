@@ -81,6 +81,10 @@ Full keyboard/mouse and gamepad support is built in:
 
 ---
 
+## Open Protocol
+
+Build an independent game client with the [Open Protocol implementer guide](docs/open-protocol.md).
+
 ## Running from Source
 
 ### Requirements
